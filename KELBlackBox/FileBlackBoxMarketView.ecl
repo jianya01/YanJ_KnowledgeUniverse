@@ -1,4 +1,4 @@
-IMPORT ut;
+IMPORT KELBlackBox, Utilities;
 
 SHARED LayoutMarketView := RECORD
   unsigned4 date_first_seen;
@@ -404,4 +404,5 @@ SHARED LayoutMarketView := RECORD
   string1 truetouch_onlinebidmrktplc;
 END;
 
-EXPORT FileBlackBoxMarketView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::marketview', LayoutMarketView, THOR);
+//EXPORT FileBlackBoxMarketView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::marketview', LayoutMarketView, THOR);
+EXPORT FileBlackBoxMarketView := DATASET('~bpahl::base::cdw::prod::marketview', LayoutMarketView, THOR);
