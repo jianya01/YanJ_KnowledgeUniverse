@@ -405,4 +405,4 @@ SHARED LayoutMarketView := RECORD
 END;
 
 //EXPORT FileBlackBoxMarketView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::marketview', LayoutMarketView, THOR);
-EXPORT FileBlackBoxMarketView := DATASET('~bpahl::base::cdw::prod::marketview', LayoutMarketView, THOR);
+EXPORT FileBlackBoxMarketView := DATASET('~bpahl::base::cdw::prod::marketviewslim', LayoutMarketView, THOR);
