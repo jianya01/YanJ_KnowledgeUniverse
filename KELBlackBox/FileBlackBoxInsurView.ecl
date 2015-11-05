@@ -1,6 +1,6 @@
 /* BlackBox File for InsurView Attributes */
 
-IMPORT ut;
+IMPORT KELBlackBox, Utilities;
 
 SHARED LayoutInsurView := RECORD
   string8 load_dt;
@@ -42,4 +42,5 @@ SHARED LayoutInsurView := RECORD
   string1 relexid_flag;
 END;
 
-// EXPORT Code goes here 
+// Note: Need to verify the below location is correct
+EXPORT FileBlackBoxInsurView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insurview', LayoutInsurView, THOR);
