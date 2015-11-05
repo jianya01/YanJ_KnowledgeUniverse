@@ -1,0 +1,1 @@
+EXPORT foreign_development_boca := '~foreign::dataland_dali.br.seisint.com::';
