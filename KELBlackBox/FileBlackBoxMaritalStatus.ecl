@@ -1,6 +1,6 @@
 /* BlackBox File for Marital Status Attributes */
 
-IMPORT ut;
+IMPORT KELBlackBox, Utilities;
 
 SHARED LayoutMaritalStatus := RECORD
   unsigned4 date_first_seen;
@@ -21,5 +21,5 @@ SHARED LayoutMaritalStatus := RECORD
   integer4 mar_dt;
  END;
  
- // EXPORT Code goes here 
- 
+// Note: Need to verify the below location is correct
+EXPORT FileBlackBoxMaritalStatus := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::maritalstatus', LayoutMaritalStatus, THOR);
