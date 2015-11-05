@@ -1,5 +1,5 @@
 /* File Location for the Black Box Attributes feeds */
 
-IMPORT ut;
+IMPORT Utilities;
 
-EXPORT FileBlackBoxLocation := ut.foreign_prod;
+EXPORT FileBlackBoxLocation := Utilities.foreign_production_alpha;
