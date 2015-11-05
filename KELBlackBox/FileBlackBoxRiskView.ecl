@@ -1,6 +1,6 @@
 /* BlackBox File for RiskView Attributes */
 
-IMPORT ut;
+IMPORT KELBlackBox, Utilities;
 
 SHARED LayoutRiskView := RECORD
   unsigned4 date_first_seen;
