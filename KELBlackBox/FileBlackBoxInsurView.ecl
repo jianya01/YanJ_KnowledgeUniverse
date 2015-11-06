@@ -43,4 +43,5 @@ SHARED LayoutInsurView := RECORD
 END;
 
 // Note: Need to verify the below location is correct
+// Add a slim file here 
 EXPORT FileBlackBoxInsurView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insurview', LayoutInsurView, THOR);
