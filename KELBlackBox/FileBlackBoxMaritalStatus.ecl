@@ -20,6 +20,6 @@ SHARED LayoutMaritalStatus := RECORD
   integer4 div_dt;
   integer4 mar_dt;
  END;
- 
-// Note: Need to verify the below location is correct
-EXPORT FileBlackBoxMaritalStatus := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::maritalstatus', LayoutMaritalStatus, THOR);
+
+//EXPORT FileBlackBoxMaritalStatus := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::maritalstatus', LayoutMaritalStatus, THOR);
+EXPORT FileBlackBoxMaritalStatus := DATASET('~bpahl::base::ar::prod::maritalstatusslim', LayoutMaritalStatus, THOR);

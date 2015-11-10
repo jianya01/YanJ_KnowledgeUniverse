@@ -42,6 +42,5 @@ SHARED LayoutInsurView := RECORD
   string1 relexid_flag;
 END;
 
-// Note: Need to verify the below location is correct
-// Add a slim file here 
-EXPORT FileBlackBoxInsurView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insurview', LayoutInsurView, THOR);
+//EXPORT FileBlackBoxInsurView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insurview', LayoutInsurView, THOR);
+EXPORT FileBlackBoxInsurView := DATASET('~bpahl::base::cdw::prod::insurviewslim', LayoutInsurView, THOR);
