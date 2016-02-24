@@ -2,7 +2,7 @@
 
 IMPORT KELBlackBox, Utilities;
 
-SHARED LayoutMaritalStatus := RECORD
+LayoutMaritalStatus := RECORD
   unsigned4 date_first_seen;
   unsigned4 date_last_seen;
   string1 active_flag;
@@ -21,5 +21,5 @@ SHARED LayoutMaritalStatus := RECORD
   integer4 mar_dt;
  END;
 
-//EXPORT FileBlackBoxMaritalStatus := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::maritalstatus', LayoutMaritalStatus, THOR);
-EXPORT FileBlackBoxMaritalStatus := DATASET('~bpahl::base::ar::prod::maritalstatusslim', LayoutMaritalStatus, THOR);
+EXPORT FileBlackBoxMaritalStatus := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::maritalstatus', LayoutMaritalStatus, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+//EXPORT FileBlackBoxMaritalStatus := DATASET('~bpahl::base::ar::prod::maritalstatusslim', LayoutMaritalStatus, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);

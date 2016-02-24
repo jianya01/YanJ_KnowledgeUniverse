@@ -2,7 +2,7 @@
 
 IMPORT KELBlackBox, Utilities;
 
-SHARED LayoutInsuranceHeader := RECORD
+LayoutInsuranceHeader := RECORD
   unsigned8 lexid;
   unsigned4 date_first_seen;
   unsigned4 date_last_seen;
@@ -38,5 +38,5 @@ SHARED LayoutInsuranceHeader := RECORD
   unsigned8 rid;
  END;
  
- // EXPORT FileBlackBoxInsuranceHeader := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insuranceheader', LayoutInsuranceHeader, THOR);
-EXPORT FileBlackBoxInsuranceHeader := DATASET('~bpahl::base::cdw::prod::insuranceheaderslim', LayoutInsuranceHeader, THOR);
+EXPORT FileBlackBoxInsuranceHeader := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insuranceheader', LayoutInsuranceHeader, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+//EXPORT FileBlackBoxInsuranceHeader := DATASET('~bpahl::base::cdw::prod::insuranceheaderslim', LayoutInsuranceHeader, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);

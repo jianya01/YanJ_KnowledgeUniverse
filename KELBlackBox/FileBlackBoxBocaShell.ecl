@@ -2,7 +2,7 @@
 
 IMPORT KELBlackBox, Utilities;
 
-SHARED LayoutBocaShell := RECORD
+LayoutBocaShell := RECORD
   unsigned4 date_first_seen;
   unsigned4 date_last_seen;
   string1 active_flag;
@@ -1152,5 +1152,5 @@ SHARED LayoutBocaShell := RECORD
   string200 errorcode;
  END;
 
-// EXPORT FileBlackBoxBocaShell := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::bocashell', LayoutBocaShell, THOR);
-EXPORT FileBlackBoxBocaShell := DATASET('~bpahl::base::cdw::prod::bocashellslim', LayoutBocaShell, THOR);
+EXPORT FileBlackBoxBocaShell := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::bocashell', LayoutBocaShell, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+//EXPORT FileBlackBoxBocaShell := DATASET('~bpahl::base::cdw::prod::bocashellslim', LayoutBocaShell, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
