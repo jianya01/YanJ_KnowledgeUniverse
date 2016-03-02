@@ -2,7 +2,7 @@
 
 IMPORT KELBlackBox, Utilities;
 
-SHARED LayoutInsurView := RECORD
+LayoutInsurView := RECORD
   string8 load_dt;
   string8 correlator_dt;
   string19 order_dt;
@@ -42,5 +42,5 @@ SHARED LayoutInsurView := RECORD
   string1 relexid_flag;
 END;
 
-//EXPORT FileBlackBoxInsurView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insurview', LayoutInsurView, THOR);
-EXPORT FileBlackBoxInsurView := DATASET('~bpahl::base::cdw::prod::insurviewslim', LayoutInsurView, THOR);
+EXPORT FileBlackBoxInsurView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insurview', LayoutInsurView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+//EXPORT FileBlackBoxInsurView := DATASET('~bpahl::base::cdw::prod::insurviewslim', LayoutInsurView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);

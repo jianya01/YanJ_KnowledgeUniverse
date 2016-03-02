@@ -2,4 +2,5 @@
 
 IMPORT Utilities;
 
-EXPORT FileBlackBoxLocation := Utilities.foreign_production_alpha;
+//EXPORT FileBlackBoxLocation := Utilities.foreign_production_alpha;
+EXPORT FileBlackBoxLocation := '~';

@@ -2,7 +2,7 @@
 
 IMPORT KELBlackBox, Utilities;
 
-SHARED LayoutRiskView := RECORD
+LayoutRiskView := RECORD
   unsigned4 date_first_seen;
   unsigned4 date_last_seen;
   string1 active_flag;
@@ -353,5 +353,5 @@ SHARED LayoutRiskView := RECORD
   unsigned8 did;
 END;
 
-// EXPORT FileBlackBoxRiskView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::riskview', LayoutRiskView, THOR);
-EXPORT FileBlackBoxRiskView := DATASET('~bpahl::base::ar::prod::riskviewslim', LayoutRiskView, THOR);
+EXPORT FileBlackBoxRiskView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::riskview', LayoutRiskView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+//EXPORT FileBlackBoxRiskView := DATASET('~bpahl::base::ar::prod::riskviewslim', LayoutRiskView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
