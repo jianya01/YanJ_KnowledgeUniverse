@@ -1,6 +1,6 @@
 /* BlackBox File for InsurView Attributes */
 
-IMPORT KELBlackBox, Utilities;
+IMPORT KELBlackBox;
 
 LayoutInsurView := RECORD
   string8 load_dt;

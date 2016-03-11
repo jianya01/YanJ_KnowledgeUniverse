@@ -1,6 +1,6 @@
 /* BlackBox File for Boca Shell Attributes */
 
-IMPORT KELBlackBox, Utilities;
+IMPORT KELBlackBox;
 
 LayoutBocaShell := RECORD
   unsigned4 date_first_seen;

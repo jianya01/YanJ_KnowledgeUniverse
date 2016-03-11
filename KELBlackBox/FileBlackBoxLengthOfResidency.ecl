@@ -1,6 +1,6 @@
 /* BlackBox File for Length of Residency Attributes */
 
-IMPORT KELBlackBox, Utilities;
+IMPORT KELBlackBox;
 
 LayoutLengthOfResidency := RECORD
   unsigned4 date_first_seen;
