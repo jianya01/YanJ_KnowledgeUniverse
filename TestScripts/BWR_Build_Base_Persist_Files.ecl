@@ -1,9 +1,9 @@
 #workunit('name', 'Building Base Persist Files');
 #option('expandSelectCreateRow', true); // Added to improve overall compile time
 
-IMPORT KELBlackBox, KELGlobal, Utilities;
+IMPORT KELBlackBox, KELGlobal, UT;
 
-TodaysDate := (INTEGER)Utilities.GetDate;
+TodaysDate := (INTEGER)UT.GetDate;
 
 // List of Entities that need to be built
 BuildPersonEntity := KELGlobal.Q_All_Person_Entity_Data(TodaysDate).Res0;

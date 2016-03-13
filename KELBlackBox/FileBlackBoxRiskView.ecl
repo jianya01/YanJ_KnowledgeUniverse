@@ -1,6 +1,6 @@
 /* BlackBox File for RiskView Attributes */
 
-IMPORT KELBlackBox, Utilities;
+IMPORT KELBlackBox;
 
 LayoutRiskView := RECORD
   unsigned4 date_first_seen;

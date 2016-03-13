@@ -1,6 +1,6 @@
 /* BlackBox File for Insurance Header Attributes */
 
-IMPORT KELBlackBox, Utilities;
+IMPORT KELBlackBox;
 
 LayoutInsuranceHeader := RECORD
   unsigned8 lexid;
