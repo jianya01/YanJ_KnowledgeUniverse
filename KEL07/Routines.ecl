@@ -610,6 +610,20 @@ EXPORT Routines := MODULE
       ENDMACRO;
 
 //============================================================================================
+//      Helper Functions for FromFlat macro handling DATEs
+
+  EXPORT KEL.typ.nkdate DateFromField(KEL.typ.kdate pdate) := FUNCTION
+    KEL.typ.nkdate rval := IF(IsValidDate(pdate), __CN(pdate), __N(Kel.typ.kdate));
+    RETURN rval;
+  END;
+  
+  EXPORT DateFromField2(pdate, prule) := FUNCTIONMACRO
+    KEL.typ.kdate tdate := (KEL.typ.kdate)prule(pdate); 
+    LOCAL KEL.typ.nkdate __rval := IF(KEL.Routines.IsValidDate(tdate), __CN(tdate), __N(Kel.typ.kdate));
+    RETURN __rval;
+  ENDMACRO;
+
+//============================================================================================
 //      Helper Functions for ECL syntax
 
   EXPORT SubStr2(STRING pstr, istart, iend) := FUNCTION
@@ -649,3 +663,4 @@ EXPORT Routines := MODULE
         ENDMACRO;
 
 END;
+

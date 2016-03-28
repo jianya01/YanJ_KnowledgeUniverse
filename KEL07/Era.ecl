@@ -36,6 +36,17 @@ EXPORT Era := MODULE
     RETURN IF(pdate=0,0,KEL.Routines.ToDaysSince1900(pdate));
   END;
 
+    // these two replace the above function; in time it can be deleted
+  EXPORT INTEGER FromField(KEL.typ.kdate pdate) := FUNCTION
+    // top bound for EPOCH is actually 2079-06-06 (65535 days after 1900-01-01) but the validation routine runs on years
+    RETURN IF(KEL.Routines.IsValidDate3(pdate,1900,2078),KEL.Routines.ToDaysSince1900(pdate),0);
+  END;
+  
+  EXPORT FromField2(pdate, prule) := FUNCTIONMACRO
+    KEL.typ.kdate tdate := (KEL.typ.kdate)prule(pdate); 
+    RETURN IF(KEL.Routines.IsValidDate3(tdate,1900,2078),KEL.Routines.ToDaysSince1900(tdate),0);
+  ENDMACRO;
+
   EXPORT FromNDate(pdate) := FUNCTIONMACRO
     RETURN IF(__NL(pdate),0,KEL.Routines.ToDaysSince1900(__T(pdate)));
   ENDMACRO;
@@ -53,3 +64,4 @@ EXPORT Era := MODULE
   END;
 
 END;
+

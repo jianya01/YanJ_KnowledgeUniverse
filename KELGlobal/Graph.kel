@@ -1,3 +1,7 @@
+/* KEL Compiler Options and Configurations. */
+#OPTION(persist, 2)
+#OPTION(persistexpire, 7)
+
 /* Global Entity definitions belong here. */
 
 // Defining the ERA to allow for ASOF functionality
@@ -7,7 +11,76 @@ ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 Person := ENTITY(FLAT(UID=LexID),
 	MODEL(UID));
 
+// Global Credit Report Entity Definition
+CreditReport := ENTITY(FLAT(UID(Transaction_ID),
+		STRING TransactionID,
+		BOOLEAN SubjectRecord,
+		INTEGER LexID,
+		DATE DateCreditFileEstbed,
+		DATE OldestOpeningDateOfTrade,
+		DATE LatestReportingDateOfTrade,
+		DATE DateOfLatestFileActivity,
+		BOOLEAN ReportIncludesBankruptcies,
+		DATE DateOfLatestBankruptcyV1,
+		BOOLEAN ReportIncludesPublicRecords,
+		BOOLEAN ReportIncludesCollectionItems,
+		BOOLEAN ReportIncludesConsumerStatements,
+		INTEGER HighCreditRangeLowAmount,
+		INTEGER HighCreditRangeHighAmount,
+		INTEGER TotalNumberOfTradelines,
+		INTEGER NumberOfAccountsWithCurrentStatus0,
+		INTEGER NumberOfAccountsWithCurrentStatus1,
+		INTEGER NumberOfAccountsWithCurrentStatus2,
+		INTEGER NumberOfAccountsWithCurrentStatus3,
+		INTEGER NumberOfAccountsWithCurrentStatus4,
+		INTEGER NumberOfAccountsWithCurrentStatus5,
+		INTEGER NumberOfAccountsWithCurrentStatus6,
+		INTEGER NumberOfAccountsWithCurrentStatus7,
+		INTEGER NumberOfAccountsWithCurrentStatus8,
+		INTEGER NumberOfAccountsWithCurrentStatus9,
+		INTEGER NumberOfAccountsWithCurrentStatusBlank,
+		INTEGER NumberOfAccountsWithHistoricalStatus1,
+		INTEGER NumberOfAccountsWithHistoricalStatus2,
+		INTEGER NumberOfAccountsWithHistoricalStatus3,
+		INTEGER NumberOfAccountsWithHistoricalStatus4,
+		INTEGER NumberOfAccountsWithHistoricalStatus5,
+		INTEGER NumberOfAccountsWithHistoricalStatus6,
+		INTEGER NumberOfAccountsWithHistoricalStatus7,
+		INTEGER NumberOfAccountsWithHistoricalStatus8,
+		INTEGER NumberOfAccountsWithHistoricalStatus9,
+		INTEGER HighCreditTotalRevolving,
+		INTEGER HighCreditOpenEnded,
+		INTEGER HighCreditInstallment,
+		INTEGER AmountOwedTotalRevolving,
+		INTEGER AmountOwedTotalOpenEnded,
+		INTEGER AmountOwedTotalInstallment,
+		INTEGER PastDueTotalRevolving,
+		INTEGER PastDueTotalOpenEnded,
+		INTEGER PastDueTotalInstallment,
+		INTEGER NinetyDayInquiryHistoryCount,
+		DATE NinetyDayInquiryHistoryDate,
+		INTEGER NumberOfRevolvingAccounts,
+		INTEGER NumberOfOpenEndedAccounts,
+		INTEGER NumberOfInstallmentAccounts),
+	MODEL(UID, {*}));
+		
+		
+
 // Black Box Attributes - ENTITY Definitions
+// These are the individual pieces of the Credit Report Entity definition
+CreditReportBankruptcy := ENTITY(FLAT(UID(Transaction_ID, DateFiled, CaseNumber), // Once KEL 0.8 arrives UID(Transaction_ID, DateFiled, CaseNumber) can be removed, this UID does nothing currently accept allow for you to define new attributes based on CreditReportBankruptcy
+		CreditReport Report=UID(Transaction_ID),
+		DATE DateFiled,
+		STRING BankruptcyStatus,
+		INTEGER AssetsReported,
+		INTEGER LiabilitiesReported,
+		DATE SatisfiedDischargeDate,
+		STRING CourtNumber,
+		STRING CaseNumber,
+		STRING BankruptcyType,
+		STRING FilingType), 
+	MODEL(*)); // Once KEL 0.8 arrives this MODEL(*) definition can be removed, this has to be included as we have the UID definition above.
+
 // These have been broken into their individual entity definitions to reduce the size of the Person Entity record structure
 BocaShell := ENTITY(FLAT(Person Subject=LexID,
 		DATE SnapshotDateFirstSeen=NULL(''),
@@ -2022,7 +2095,7 @@ GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree, #Title1, #RelationshipType1
 // Maps the Relatives V3 index to the FirstDegreeAssociations
 USE Relationship.key_relatives_v3(FLAT,
 	FirstDegreeAssociations(
-		DateFirstSeen = rel_dt_first_seen,
+		DateFirstSeen = rel_dt_first_seen, // Contains information for ASOF
 		Subject = did1, 
 		FirstDegreeAssociation = did2, 
 		Title = title,
@@ -2032,6 +2105,125 @@ USE Relationship.key_relatives_v3(FLAT,
 		Generation = generation,
 		RelationshipDateFirstSeen = rel_dt_first_seen,
 		RelationshipDateLastSeen = rel_dt_last_seen));
+
+// Maps the Credit Report file to the CreditReport Entity
+USE Consumer_Credit.FilesCleaned.CreditReportSummary_Data(FLAT,
+	CreditReport(FILTER(ReportTypeCounter = 1), // Grab the records for the Subject on this CreditReport
+		DateFirstSeen = Date_Reported,
+		TransactionID = Transaction_ID,
+		SubjectRecord = TRUE,
+		LexID = LexID,
+		DateCreditFileEstbed = DateCreditFileEstbed,
+		OldestOpeningDateOfTrade = OldestOpeningDateOfTrade,
+		LatestReportingDateOfTrade = LatestReportingDateOfTrade,
+		DateOfLatestFileActivity = DateOfLatestFileActivity,
+		ReportIncludesBankruptcies = ReportIncludesBankruptciesBool,
+		DateOfLatestBankruptcyV1 = DateOfLatestBankruptcyv1,
+		ReportIncludesPublicRecords = ReportIncludesPublicRecordsBool,
+		ReportIncludesCollectionItems = ReportIncludesCollectionItemsBool,
+		ReportIncludesConsumerStatements = ReportIncludesConsumerStatementsBool,
+		HighCreditRangeLowAmount = HighCreditRangeLowAmount,
+		HighCreditRangeHighAmount = HighCreditRangeHighAmount,
+		TotalNumberOfTradelines = TotalNumberOfTradelines,
+		NumberOfAccountsWithCurrentStatus0 = NoOfAcctsWCurrentStatus0,
+		NumberOfAccountsWithCurrentStatus1 = NoOfAcctsWCurrentStatus1,
+		NumberOfAccountsWithCurrentStatus2 = NoOfAcctsWCurrentStatus2,
+		NumberOfAccountsWithCurrentStatus3 = NoOfAcctsWCurrentStatus3,
+		NumberOfAccountsWithCurrentStatus4 = NoOfAcctsWCurrentStatus4,
+		NumberOfAccountsWithCurrentStatus5 = NoOfAcctsWCurrentStatus5,
+		NumberOfAccountsWithCurrentStatus6 = NoOfAcctsWCurrentStatus6,
+		NumberOfAccountsWithCurrentStatus7 = NoOfAcctsWCurrentStatus7,
+		NumberOfAccountsWithCurrentStatus8 = NoOfAcctsWCurrentStatus8,
+		NumberOfAccountsWithCurrentStatus9 = NoOfAcctsWCurrentStatus9,
+		NumberOfAccountsWithCurrentStatusBlank = NoOfAcctsWCurrStatusBlank,
+		NumberOfAccountsWithHistoricalStatus1 = NoOfAcctsWHistStatus1,
+		NumberOfAccountsWithHistoricalStatus2 = NoOfAcctsWHistStatus2,
+		NumberOfAccountsWithHistoricalStatus3 = NoOfAcctsWHistStatus3,
+		NumberOfAccountsWithHistoricalStatus4 = NoOfAcctsWHistStatus4,
+		NumberOfAccountsWithHistoricalStatus5 = NoOfAcctsWHistStatus5,
+		NumberOfAccountsWithHistoricalStatus6 = NoOfAcctsWHistStatus6,
+		NumberOfAccountsWithHistoricalStatus7 = NoOfAcctsWHistStatus7,
+		NumberOfAccountsWithHistoricalStatus8 = NoOfAcctsWHistStatus8,
+		NumberOfAccountsWithHistoricalStatus9 = NoOfAcctsWHistStatus9,
+		HighCreditTotalRevolving = HighCreditTotalRevolving,
+		HighCreditOpenEnded = HighCreditOpenEnded,
+		HighCreditInstallment = HighCreditInstallment,
+		AmountOwedTotalRevolving = AmountOwedTotalRevolving,
+		AmountOwedTotalOpenEnded = AmountOwedTotalOpenEnded,
+		AmountOwedTotalInstallment = AmountOwedTotalInstallment,
+		PastDueTotalRevolving = PastDueTotalRevolving,
+		PastDueTotalOpenEnded = PastDueTotalOpenEnded,
+		PastDueTotalInstallment = PastDueTotalInstallment,
+		NinetyDayInquiryHistoryCount = NinetyDayInquiryHistoryCount,
+		NinetyDayInquiryHistoryDate = NinetyDayInquiryHistoryDate,
+		NumberOfRevolvingAccounts = NumberOfRevolvingAccounts,
+		NumberOfOpenEndedAccounts = NumberOfOpenEndedAccounts,
+		NumberOfInstallmentAccounts = NumberOfInstallmentAccounts),
+	CreditReport(FILTER(ReportTypeCounter = 2), // Grab the records for the Joint Applicant on this CreditReport
+		DateFirstSeen = Date_Reported,
+		TransactionID = Transaction_ID,
+		SubjectRecord = FALSE,
+		LexID = LexID,
+		DateCreditFileEstbed = DateCreditFileEstbed,
+		OldestOpeningDateOfTrade = OldestOpeningDateOfTrade,
+		LatestReportingDateOfTrade = LatestReportingDateOfTrade,
+		DateOfLatestFileActivity = DateOfLatestFileActivity,
+		ReportIncludesBankruptcies = ReportIncludesBankruptciesBool,
+		DateOfLatestBankruptcyV1 = DateOfLatestBankruptcyv1,
+		ReportIncludesPublicRecords = ReportIncludesPublicRecordsBool,
+		ReportIncludesCollectionItems = ReportIncludesCollectionItemsBool,
+		ReportIncludesConsumerStatements = ReportIncludesConsumerStatementsBool,
+		HighCreditRangeLowAmount = HighCreditRangeLowAmount,
+		HighCreditRangeHighAmount = HighCreditRangeHighAmount,
+		TotalNumberOfTradelines = TotalNumberOfTradelines,
+		NumberOfAccountsWithCurrentStatus0 = NoOfAcctsWCurrentStatus0,
+		NumberOfAccountsWithCurrentStatus1 = NoOfAcctsWCurrentStatus1,
+		NumberOfAccountsWithCurrentStatus2 = NoOfAcctsWCurrentStatus2,
+		NumberOfAccountsWithCurrentStatus3 = NoOfAcctsWCurrentStatus3,
+		NumberOfAccountsWithCurrentStatus4 = NoOfAcctsWCurrentStatus4,
+		NumberOfAccountsWithCurrentStatus5 = NoOfAcctsWCurrentStatus5,
+		NumberOfAccountsWithCurrentStatus6 = NoOfAcctsWCurrentStatus6,
+		NumberOfAccountsWithCurrentStatus7 = NoOfAcctsWCurrentStatus7,
+		NumberOfAccountsWithCurrentStatus8 = NoOfAcctsWCurrentStatus8,
+		NumberOfAccountsWithCurrentStatus9 = NoOfAcctsWCurrentStatus9,
+		NumberOfAccountsWithCurrentStatusBlank = NoOfAcctsWCurrStatusBlank,
+		NumberOfAccountsWithHistoricalStatus1 = NoOfAcctsWHistStatus1,
+		NumberOfAccountsWithHistoricalStatus2 = NoOfAcctsWHistStatus2,
+		NumberOfAccountsWithHistoricalStatus3 = NoOfAcctsWHistStatus3,
+		NumberOfAccountsWithHistoricalStatus4 = NoOfAcctsWHistStatus4,
+		NumberOfAccountsWithHistoricalStatus5 = NoOfAcctsWHistStatus5,
+		NumberOfAccountsWithHistoricalStatus6 = NoOfAcctsWHistStatus6,
+		NumberOfAccountsWithHistoricalStatus7 = NoOfAcctsWHistStatus7,
+		NumberOfAccountsWithHistoricalStatus8 = NoOfAcctsWHistStatus8,
+		NumberOfAccountsWithHistoricalStatus9 = NoOfAcctsWHistStatus9,
+		HighCreditTotalRevolving = HighCreditTotalRevolving,
+		HighCreditOpenEnded = HighCreditOpenEnded,
+		HighCreditInstallment = HighCreditInstallment,
+		AmountOwedTotalRevolving = AmountOwedTotalRevolving,
+		AmountOwedTotalOpenEnded = AmountOwedTotalOpenEnded,
+		AmountOwedTotalInstallment = AmountOwedTotalInstallment,
+		PastDueTotalRevolving = PastDueTotalRevolving,
+		PastDueTotalOpenEnded = PastDueTotalOpenEnded,
+		PastDueTotalInstallment = PastDueTotalInstallment,
+		NinetyDayInquiryHistoryCount = NinetyDayInquiryHistoryCount,
+		NinetyDayInquiryHistoryDate = NinetyDayInquiryHistoryDate,
+		NumberOfRevolvingAccounts = NumberOfRevolvingAccounts,
+		NumberOfOpenEndedAccounts = NumberOfOpenEndedAccounts,
+		NumberOfInstallmentAccounts = NumberOfInstallmentAccounts));
+
+// Maps the Credit Report Bankruptcy Records to the CRBankruptcy Entity
+USE Consumer_Credit.FilesCleaned.Bankruptcy_Data(FLAT,
+	CreditReportBankruptcy(
+		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateFiled = DateFiled,
+		BankruptcyStatus = BankruptcyStatus,
+		AssetsReported = AssetsReported,
+		LiabilitiesReported = LiabilitiesReported,
+		SatisfiedDischargeDate = SatisfiedDischargeDate,
+		CourtNumber = CourtNumber,
+		CaseNumber = CaseNumber,
+		BankruptcyType = BankruptcyType,
+		FilingType = FilingType));
 
 // Maps the Boca Shell BlackBox Attributes to the Person Entity
 USE KELBlackBox.FileBlackBoxBocaShell(FLAT,
@@ -6101,6 +6293,30 @@ Person: => BlackBoxDateLastSeen := MAP(NOT BocaShell_SnapshotDateLastSeen:Null A
 										NOT MarketView_SnapshotDateLastSeen:Null AND MarketView_SnapshotDateLastSeen >= BocaShell_SnapshotDateLastSeen AND MarketView_SnapshotDateLastSeen >= InsuranceHeader_SnapshotDateLastSeen AND MarketView_SnapshotDateLastSeen >= MaritalStatus_SnapshotDateLastSeen AND MarketView_SnapshotDateLastSeen >= RiskView_SnapshotDateLastSeen			=> MarketView_SnapshotDateLastSeen,
 										NOT RiskView_SnapshotDateLastSeen:Null AND RiskView_SnapshotDateLastSeen >= BocaShell_SnapshotDateLastSeen AND RiskView_SnapshotDateLastSeen >= InsuranceHeader_SnapshotDateLastSeen AND RiskView_SnapshotDateLastSeen >= MaritalStatus_SnapshotDateLastSeen AND RiskView_SnapshotDateLastSeen >= MarketView_SnapshotDateLastSeen				=> RiskView_SnapshotDateLastSeen);
 
+CreditReportBankruptcy: => Dismissed := BankruptcyStatus IN ['M', 'K', 'E', 'J'];
+CreditReportBankruptcy: => Discharged := BankruptcyStatus IN ['A', 'F', 'L', 'H'];
+CreditReportBankruptcy: => Chapter7 := BankruptcyStatus IN ['V', 'M', 'A', 'I'];
+CreditReportBankruptcy: => Chapter11 := BankruptcyStatus IN ['D', 'E', 'F'];
+CreditReportBankruptcy: => Chapter12 := BankruptcyStatus IN ['G', 'J', 'H'];
+CreditReportBankruptcy: => Chapter13 := BankruptcyStatus IN ['C', 'K', 'L'];
+
+CreditReport: => TotalBankruptcies := COUNT(CreditReportBankruptcy);
+CreditReport: => TotalChapter7Bankruptcies := COUNT(CreditReportBankruptcy(Chapter7));
+CreditReport: => TotalChapter11Bankruptcies := COUNT(CreditReportBankruptcy(Chapter11));
+CreditReport: => TotalChapter12Bankruptcies := COUNT(CreditReportBankruptcy(Chapter12));
+CreditReport: => TotalChapter13Bankruptcies := COUNT(CreditReportBankruptcy(Chapter13));
+CreditReport: => TotalDismissedBankruptcies := COUNT(CreditReportBankruptcy (Dismissed));
+CreditReport: => TotalDismissedChapter7Bankruptcies := COUNT(CreditReportBankruptcy(Chapter7 AND Dismissed));
+CreditReport: => TotalDismissedChapter11Bankruptcies := COUNT(CreditReportBankruptcy(Chapter11 AND Dismissed));
+CreditReport: => TotalDismissedChapter12Bankruptcies := COUNT(CreditReportBankruptcy(Chapter12 AND Dismissed));
+CreditReport: => TotalDismissedChapter13Bankruptcies := COUNT(CreditReportBankruptcy(Chapter13 AND Dismissed));
+CreditReport: => TotalDischargedBankruptcies := COUNT(CreditReportBankruptcy (Discharged));
+CreditReport: => TotalDischargedChapter7Bankruptcies := COUNT(CreditReportBankruptcy(Chapter7 AND Discharged));
+CreditReport: => TotalDischargedChapter11Bankruptcies := COUNT(CreditReportBankruptcy(Chapter11 AND Discharged));
+CreditReport: => TotalDischargedChapter12Bankruptcies := COUNT(CreditReportBankruptcy(Chapter12 AND Discharged));
+CreditReport: => TotalDischargedChapter13Bankruptcies := COUNT(CreditReportBankruptcy(Chapter13 AND Discharged));
+
+
 /* Queries specific to the Person Entity definition belong here. */
 
 // Note: I am temporarily commenting this IMPORT statement out due to a bug in the current HPCC platform which doesn't allow 
@@ -6316,3 +6532,7 @@ QUERY: AllFirstDegreeRelativesAndAssociates(ArchiveDate) <= FirstDegreeAssociati
 	Generation,
 	RelationshipDateFirstSeen,
 	RelationshipDateLastSeen} ASOF reportedby(ArchiveDate);
+
+QUERY: CreditReportAttributes(SearchForTransactionID) <= CreditReport(TransactionID = SearchForTransactionID);
+
+QUERY: CreditReportBankruptcyAttributes(SearchForTransactionID) <= CreditReportBankruptcy(Report.TransactionID = SearchForTransactionID);

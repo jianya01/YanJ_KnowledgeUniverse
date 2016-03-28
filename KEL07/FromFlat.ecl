@@ -1,6 +1,6 @@
 EXPORT FromFlat := MODULE
 
-    EXPORT BuildMapping(from, to, source, dest, nullval) := FUNCTIONMACRO
+    EXPORT BuildMapping(from, to, source, dest, nullval, frule) := FUNCTIONMACRO
         LOADXML('<xml/>');
         #DECLARE(f)
         #DECLARE(ktype)
@@ -9,7 +9,17 @@ EXPORT FromFlat := MODULE
         #DECLARE(caster)
         #SET(f, '')
         #IF(nullval = 'EPOCH')
-          #APPEND(f,'SELF.'+dest+':=KEL.Era.FromDate((KEL.typ.kdate)LEFT.'+source+');')
+          #IF(frule='')
+            #APPEND(f,'SELF.'+dest+':=KEL.Era.FromField((KEL.typ.kdate)LEFT.'+source+');')
+          #ELSE
+            #APPEND(f,'SELF.'+dest+':=KEL.Era.FromField2((STRING)LEFT.'+source+','+frule+');')
+          #END    
+        #ELSEIF(nullval = 'DATE')
+          #IF(frule='')
+            #APPEND(f,'SELF.'+dest+':=KEL.Routines.DateFromField((KEL.typ.kdate)LEFT.'+source+');')
+          #ELSE
+            #APPEND(f,'SELF.'+dest+':=KEL.Routines.DateFromField2((STRING)LEFT.'+source+','+frule+');')
+          #END        
         #ELSE
           #APPEND(f,'SELF.'+dest+'.v:=')
           #IF(nullval != '')
@@ -45,14 +55,16 @@ EXPORT FromFlat := MODULE
         #DECLARE(dests)
         #DECLARE(dest)
         #DECLARE(nullval)
+        #DECLARE(frule)
         #SET(f, '')
         #IF(REGEXFIND('(,|^)'+source+'\\([^)]*\\)(,|$)', spec, NOCASE))
             #SET(dests, REGEXFIND('(,|^)'+source+'\\(([^)]*)\\)(,|$)', spec, 2, NOCASE))
             #LOOP
-                #IF(REGEXFIND('^([^:]+)(:([^|]+))?(\\||$)', %'dests'%))
-                    #SET(dest, REGEXFIND('^([^:]+)(:([^|]+))?(\\||$)', %'dests'%, 1))
-                    #SET(nullval, REGEXFIND('^([^:]+)(:([^|]+))?(\\||$)', %'dests'%, 3))
-                    #APPEND(f, KEL.FromFlat.BuildMapping(to, from, source, %'dest'%, %'nullval'%))
+                #IF(REGEXFIND('^([^:]+)(:([^:|]+))?(:([^:|]+))?(\\||$)', %'dests'%))
+                    #SET(dest,    REGEXFIND('^([^:]+)(:([^:|]+))?(:([^:|]+))?(\\||$)', %'dests'%, 1))
+                    #SET(nullval, REGEXFIND('^([^:]+)(:([^:|]+))?(:([^:|]+))?(\\||$)', %'dests'%, 3))
+                    #SET(frule,   REGEXFIND('^([^:]+)(:([^:|]+))?(:([^:|]+))?(\\||$)', %'dests'%, 5))
+                    #APPEND(f, KEL.FromFlat.BuildMapping(to, from, source, %'dest'%, %'nullval'%, %'frule'%))
                     #SET(dests, REGEXFIND('^[^|]*(\\|(.*))?$', %'dests'%, 2))
                 #ELSE
                     #BREAK
@@ -104,6 +116,84 @@ EXPORT FromFlat := MODULE
 
     EXPORT Convert(from,to,spec):=FUNCTIONMACRO
         RETURN #EXPAND(KEL.FromFlat.BuildFromFlat(from,to,spec));
+    ENDMACRO;
+
+    EXPORT ReducedRecord(from,fieldlist):=FUNCTIONMACRO
+    // build a record with the same 'shape' as *from* but with only the fields from *fieldlist*
+        LOADXML('<xml/>');
+        #DECLARE(f) #SET(f,'')
+        #DECLARE(prefix) #SET(prefix, '')
+        #DECLARE(recName)
+        #DECLARE(indataset) #SET(indataset, 0)
+        #EXPORTXML(fields,RECORDOF(from))
+        // walk the 'from' structure building the shape elements
+        #FOR(fields)
+          #FOR(Field)
+            #IF(%{@isRecord}%=1 AND %indataset%=0)
+              #SET(prefix, %'prefix'%+%'{@label}'%+'.')
+              #APPEND(f, '{')
+            #ELSEIF(%{@isRecord}%=1 AND %indataset%>0)
+              #SET(indataset, %indataset%+1)
+            #ELSEIF(%{@isDataset}%>0)
+              #SET(indataset, %indataset%+1)
+            #ELSEIF(%{@isEnd}%=1 AND %indataset%>=1)
+              #SET(indataset, %indataset%-1)
+            #ELSEIF(%{@isEnd}%=1)
+              #SET(recName, REGEXFIND('^(.*\\.)?([^.]+)\\.', %'prefix'%, 2, NOCASE))
+              #SET(prefix,  REGEXFIND('^(.*\\.)?([^.]+)\\.', %'prefix'%, 1, NOCASE))
+              #APPEND(f, '}'+%'recName'%+';')
+            #ELSEIF(%indataset%>=1)
+              // Skip everything in child datasets
+            #ELSE
+              // do we need this field?  If so generate it.
+              #IF(REGEXFIND(','+%'prefix'%+%'{@label}'%+',', ','+fieldList+',', NOCASE))
+                #APPEND(f, #TEXT(from)+'.'+%'prefix'%+%'{@label}'% + ';')
+              #END  
+            #END
+          #END
+        #END
+        // now get rid of any empty records
+        #LOOP
+          #IF(REGEXFIND('\\{\\}[a-z0-9_]+;', %'f'%, NOCASE))
+            #SET(f, REGEXREPLACE('\\{\\}[a-z0-9_]+;', %'f'%, '', NOCASE))
+          #ELSE
+            #BREAK
+          #END
+        #END
+        // get rid of the trailing semicolon 
+        RETURN REGEXREPLACE(';$', %'f'%, '', NOCASE);
+    ENDMACRO;
+
+    EXPORT TopLevelNames(from):=FUNCTIONMACRO
+    // build a list of top level names from the specified record
+        LOADXML('<xml/>'); 
+        #DECLARE(f) #SET(f,'')
+        #DECLARE(nest) #SET(nest, 0)
+        #DECLARE(indataset) #SET(indataset, 0)
+        #EXPORTXML(fields,RECORDOF(from))
+        #FOR(fields)
+          #FOR(Field)
+            #IF(%{@isRecord}%=1 AND %indataset%=0)
+              #IF(%nest%=0)
+                #APPEND(f, %'{@label}'% + ',')
+              #END
+              #SET(nest, %nest%+1)
+            #ELSEIF(%{@isRecord}%=1 AND %indataset%>0)
+              #SET(indataset, %indataset%+1)
+            #ELSEIF(%{@isDataset}%>0)
+              #SET(indataset, %indataset%+1)
+            #ELSEIF(%{@isEnd}%=1 AND %indataset%>=1)
+              #SET(indataset, %indataset%-1)
+            #ELSEIF(%{@isEnd}%=1)
+              #SET(nest, %nest%-1)
+            #ELSEIF(%indataset%>=1)
+            #ELSEIF(%nest%=0)
+              #APPEND(f, %'{@label}'% + ',')
+            #END
+          #END
+        #END
+        // get rid of the trailing comma so the generated ECL looks 'normal'
+        RETURN REGEXREPLACE(',$', %'f'%, '', NOCASE);
     ENDMACRO;
 
  END;
