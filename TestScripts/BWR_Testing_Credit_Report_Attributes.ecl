@@ -13,3 +13,24 @@ OUTPUT(CreditReport, NAMED('Credit_Report'));
 
 Bankruptcy := KELGlobal.Q_Credit_Report_Bankruptcy_Attributes(TransactionID).Res0;
 OUTPUT(Bankruptcy, NAMED('Bankruptcy'));
+
+Collection := KELGlobal.Q_Credit_Report_Collection_Attributes(TransactionID).Res0;
+OUTPUT(Collection, NAMED('Collection'));
+
+Employment := KELGlobal.Q_Credit_Report_Employment_Attributes(TransactionID).Res0;
+OUTPUT(Employment, NAMED('Employment'));
+
+Inquiry := KELGlobal.Q_Credit_Report_Inquiry_Attributes(TransactionID).Res0;
+OUTPUT(Inquiry, NAMED('Inquiry'));
+
+Judgement := KELGlobal.Q_Credit_Report_Judgement_Attributes(TransactionID).Res0;
+OUTPUT(Judgement, NAMED('Judgement'));
+
+Lien := KELGlobal.Q_Credit_Report_Lien_Attributes(TransactionID).Res0;
+OUTPUT(Lien, NAMED('Lien'));
+
+Tradeline := KELGlobal.Q_Credit_Report_Tradeline_Attributes(TransactionID).Res0;
+OUTPUT(Tradeline, NAMED('Tradeline'));
+
+NarrativeRemarks := KELGlobal.Q_Credit_Report_Narrative_Remarks_Attributes(TransactionID).Res0;
+OUTPUT(NarrativeRemarks, NAMED('Narrative_Remarks'));
