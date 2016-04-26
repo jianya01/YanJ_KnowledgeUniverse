@@ -29,7 +29,7 @@ Alternatively we also maintain a copy of the latest installer within this Git re
 
 KEL Contacts
 ------
-KEL Masters via: RIS-GLO KEL Masters KEL.Masters@risk.lexislexis.com
+KEL Masters via: RIS-GLO Knowledge Engineering & Vault KEL.Entity.Vault@risk.lexisnexis.com
 
 KEL Congress via: RIS-GLO KEL Congress KEL.Congress@risk.lexislexis.com
 
