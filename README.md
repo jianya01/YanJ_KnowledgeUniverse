@@ -18,15 +18,6 @@ The ECL plug-in for Eclipse is available at: http://eclipse.hpccsystems.com/stab
 
 To install the plug-in in Eclipse, go to Help -> Install New Software, and use the URL listed above. 
 
-KEL Installation
-------
-The latest version of KEL is available at the following locations - please contact Eric Blood for access to either of these locations: 
-  * https://github.com/hpcc-systems/KEL/releases
-  * https://docs.rs.lexisnexis.net/share/page/site/KEL/documentlibrary#filter=path|/Current%2520KEL%2520Release&page=1
-
-Alternatively we also maintain a copy of the latest installer within this Git repository:
-[KEL07/KELInstaller](KEL07/KELInstaller)
-
 KEL Contacts
 ------
 KEL Masters via: RIS-GLO Knowledge Engineering & Vault KEL.Entity.Vault@risk.lexisnexis.com
