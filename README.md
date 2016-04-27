@@ -1,6 +1,6 @@
-KELUniverse
+KknowledgeUniverse
 ------
-KELUniverse GIT repository addresses the universe of global KEL definitions, associations, USE'es, black box, and white box attributes. Entity model and definitions are created and maintained by KEL Entity Masters who are in compliance with KEL Congress.
+KnowledgeUniverse GIT repository addresses the universe of global KEL definitions, associations, USE'es, black box, and white box attributes. Entity model and definitions are created and maintained by KEL Entity Masters who are in compliance with KEL Congress.
 
 GIT Repository
 ------
