@@ -1,3 +1,4 @@
-IMPORT STD;
-
-EXPORT STRING8 GetDate := (STRING)STD.DATE.Today(); // Outputs todays date in YYYYMMDD format
+IMPORT lib_stringlib;
+export string8 GetDate := 
+stringlib.getDateYYYYMMDD();
+//'20020501';
