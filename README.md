@@ -13,7 +13,7 @@ This documentation includes but is not limited to:
 * Vault Data Documentation
 
 # Knowledge Universe Contacts
-**KEL Entity Masters** or **Vault Development**: **_RIS-GLO Knowledge Engineering & Vault_** (_KEL.Entity.Vault@risk.lexisnexis.com_)
+**KEL Entity Masters** or **Vault Development**: **_RIS-GLO Knowledge Engineering & Vault_** [KEL.Entity.Vault@risk.lexisnexis.com](mailto:KEL.Entity.Vault@risk.lexisnexis.com)
 
-**KEL Congress**: **_RIS-GLO KEL Congress_** (_KEL.Congress@risk.lexislexis.com_)
+**KEL Congress**: **_RIS-GLO KEL Congress_** [KEL.Congress@risk.lexislexis.com](mailto:KEL.Congress@risk.lexislexis.com)
 
