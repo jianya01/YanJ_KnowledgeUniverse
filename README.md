@@ -1,26 +1,19 @@
-KnowledgeUniverse
-------
-KnowledgeUniverse GIT repository addresses the universe of global KEL definitions, associations, USE'es, black box, and white box attributes. Entity model and definitions are created and maintained by KEL Entity Masters who are in compliance with KEL Congress.
+# Knowledge Universe
+The KnowledgeUniverse GIT repository addresses the universe of global KEL definitions, associations, USE'es, black box, and white box attributes as well as our Vault development.  
+The Entity model and definitions are created and maintained by KEL Entity Masters who are in compliance with KEL Congress.
 
-GIT Repository
-------
-The GIT introduction videos are available in YouTube. I’d recommend watching these videos and familiarize yourself navigating around GIT.  
+# Knowledge Universe Documentation
+Please visit the [Knowledge Universe Wiki](https://gitlab.ins.risk.regn.net/risk-engineering/KnowledgeUniverse/wikis/home) for Knowledge Universe Documentation.  
+This documentation includes but is not limited to:
+* IDE Installation and Configuration
+* KEL Standards and Best Practices
+* KEL Language Documentation
+* KEL Entity Documentation
+* Vault Standards and Best Practices
+* Vault Data Documentation
 
-GIT Overview: GIT & Eclipse: https://www.youtube.com/watch?v=C0bFLGJqnI8
+# Knowledge Universe Contacts
+**KEL Entity Masters** or **Vault Development**: **_RIS-GLO Knowledge Engineering & Vault_** [KEL.Entity.Vault@risk.lexisnexis.com](mailto:KEL.Entity.Vault@risk.lexisnexis.com)
 
-Creating a Repository: GIT & Eclipse: https://www.youtube.com/watch?v=r5C6yXNaSGo
-
-Checking out an existing project: GIT & Eclipse: https://www.youtube.com/watch?v=V42r5REJx-M
-
-ECL Plug-In for Eclipse 
-------
-The ECL plug-in for Eclipse is available at: http://eclipse.hpccsystems.com/stable
-
-To install the plug-in in Eclipse, go to Help -> Install New Software, and use the URL listed above. 
-
-KEL Contacts
-------
-KEL Masters via: RIS-GLO Knowledge Engineering & Vault KEL.Entity.Vault@risk.lexisnexis.com
-
-KEL Congress via: RIS-GLO KEL Congress KEL.Congress@risk.lexislexis.com
+**KEL Congress**: **_RIS-GLO KEL Congress_** [KEL.Congress@risk.lexislexis.com](mailto:KEL.Congress@risk.lexislexis.com)
 
