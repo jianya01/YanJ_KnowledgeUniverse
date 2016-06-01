@@ -15,7 +15,7 @@ HistoricalDate := (INTEGER)UT.GetDate; // Pick this to run with todays date
 //HistoricalDate := 20141001; // Pick this to run with a historical archive date in YYYYMMDD format
 
 #if(RunSingleLexID)
-LexID := 31474864422; // Pick a specific LexID
+LexID := 910; // Pick a specific LexID
 
 // These queries produce the "most recent attribute value" for a given LexID as of the historical date
 BlackBoxAttributes			:= KELGlobal.Q_Black_Box_Attributes(LexID, HistoricalDate).Res0;
