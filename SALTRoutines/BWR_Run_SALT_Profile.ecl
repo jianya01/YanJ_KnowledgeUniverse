@@ -1,6 +1,18 @@
+// This script takes in a file (Either as a dataset with a RECORD definition you define, or as an ECL file/index reference), 
+// and then performs a full SALT profile.  It will then take that profile and infer potential data types, show the least populated fields, etc.
+
+// To use:
+// Step 1 - Change the inputRecordStructure to match your input file.  NOTE: If you are just going to use a predefined ECL file/index reference such as ADVO.Key_Addr1 you DO NOT need to do this step.
+// Step 2 - Change the inputDataset to consume your input file.  This can either be in the form of the DATASET, or as an ECL file/index reference (Including any appropriate IMPORT statements).
+// Step 3 - Pick your Target THOR and Submit!
+
+// For future Workunit Identification it is suggested that you update this WORKUNIT name to something specific to the file you are profiling
+#WORKUNIT('name', 'SALT_Profile');
+
 IMPORT SALT34, SALTRoutines; 
 
-// ---- Step 1.) Change the below record structure to Match your input file: ----
+
+// ---- Step 1.) Change the below record structure to Match your input file. NOTE: If you are just going to use a predefined ECL file/index reference such as ADVO.Key_Addr1 you DO NOT need to do this step: ----
 inputRecordStructure :=  RECORD
   string8 process_date;
   string60 offender_key;
@@ -61,10 +73,18 @@ inputRecordStructure :=  RECORD
   string1 fcra_date_type;
 END;
 
-// ---- Step 2.) Change the below Dataset to point at your input file: ----
+
+// ---- Step 2.) Change the below Dataset to point at your input file. This can either be in the form of the DATASET, or as an ECL file/index reference (Including any appropriate IMPORT statements): ----
 inputDataset := DATASET('~' + 'thor::base::crim::corrections_punishment_public', inputRecordStructure, THOR); 
- 
+
+//IMPORT ADVO;
+//inputDataset := ADVO.Key_Addr1; 
+
+
 // ---- Step 3.) Run the BWR Script! Nothing else to change ----
 SaltProfileResults := SALTRoutines.mac_profile(inputDataset);
 
-SaltProfileResults;
+OUTPUT(SaltProfileResults, NAMED('Full_Profile_Results'));
+OUTPUT(SALTRoutines.SALT_Profile_Poorly_Populated_Fields(SaltProfileResults, 5, 50.0), NAMED('Poorly_Populated_Fields'));
+OUTPUT(SALTRoutines.SALT_Profile_Field_Types(SaltProfileResults, 10), NAMED('Field_Types'));
+OUTPUT(SALTRoutines.SALT_Profile_Characters(SaltProfileResults, 15), NAMED('Characters'));
