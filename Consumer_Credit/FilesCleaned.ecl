@@ -70,7 +70,11 @@ EXPORT FilesCleaned := MODULE
 	
 	EXPORT ReportIdSupplement_Data := Consumer_Credit.Files.ReportIdSupplement_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate);
 	
-	EXPORT ReportRequest_Data := Consumer_Credit.Files.ReportRequest_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate);
+	EXPORT ReportRequest_Data := DISTRIBUTE(PROJECT(Consumer_Credit.Files.ReportRequest_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT)},
+		SELF.DateOfOrder				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateOfOrder);
+		SELF.DateOfReceipt				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateOfReceipt);
+		SELF.DateOfCompletion			:= Consumer_Credit.Utilities.CleanDate(LEFT.DateOfCompletion);
+		SELF							:= LEFT)), HASH64(TRIM((STRING)Transaction_ID) + '|' + TRIM((STRING)LexID)));
 
 	EXPORT TaxLien_Data := DISTRIBUTE(PROJECT(Consumer_Credit.Files.TaxLien_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM(RECORDOF(LEFT),
 		SELF.DateFiled					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateFiled);
