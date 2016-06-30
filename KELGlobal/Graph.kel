@@ -1,4 +1,4 @@
-/* KEL Compiler Options and Configurations. */
+﻿/* KEL Compiler Options and Configurations. */
 #OPTION(persist, 2)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
@@ -9,8 +9,29 @@
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 
 // Global Person Entity Definition
-Person := ENTITY(FLAT(UID=LexID),
-	MODEL(UID));
+
+Person := ENTITY(FLAT(UID=LexID,
+	STRING FirstName=NULL(),
+	STRING MiddleName=NULL(), 
+	STRING LastName=NULL(),
+	DATE DateOfBirth),
+	MODEL(UID, 
+				FullName{FirstName, MiddleName, LastName}, 
+				ReportedDatesOfBirth{DateOfBirth}));
+
+  
+CriminalOffense := ENTITY(FLAT(UID(offender_key),
+		STRING OffenderKey=NULL(),
+		DATE DateOfConviction,
+		STRING Level=NULL(),
+		STRING CaseNumber=NULL(),
+		STRING FinalPlea=NULL(),
+		DATE DispositionDate,
+		STRING Description=NULL()),
+		MODEL(UID, 
+					OffenderKey, 
+					OffenseCharges{DateOfConviction, Level, CaseNumber, FinalPlea, DispositionDate, Description}));
+
 
 // Global Credit Report Entity Definition
 CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
@@ -79,7 +100,7 @@ CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
 		INTEGER NumberOfInstallmentAccounts),
 	MODEL(UID, TransactionID, ReferenceNumber, LexIDs{SubjectRecordCode, LexID}, ROWS{SubjectRecord, DateCreditFileEstbed, OldestOpeningDateOfTrade, LatestReportingDateOfTrade, DateOfLatestFileActivity, ReportIncludesBankruptcies, DateOfLatestBankruptcyV1, ReportIncludesPublicRecords, ReportIncludesCollectionItems, ReportIncludesConsumerStatements, HighCreditRangeLowAmount, HighCreditRangeHighAmount, TotalNumberOfTradelines, NumberOfAccountsWithCurrentStatus0, NumberOfAccountsWithCurrentStatus1, NumberOfAccountsWithCurrentStatus2, NumberOfAccountsWithCurrentStatus3, NumberOfAccountsWithCurrentStatus4, NumberOfAccountsWithCurrentStatus5, NumberOfAccountsWithCurrentStatus6, NumberOfAccountsWithCurrentStatus7, NumberOfAccountsWithCurrentStatus8, NumberOfAccountsWithCurrentStatus9, NumberOfAccountsWithCurrentStatusBlank, NumberOfAccountsWithHistoricalStatus1, NumberOfAccountsWithHistoricalStatus2, NumberOfAccountsWithHistoricalStatus3, NumberOfAccountsWithHistoricalStatus4, NumberOfAccountsWithHistoricalStatus5, NumberOfAccountsWithHistoricalStatus6, NumberOfAccountsWithHistoricalStatus7, NumberOfAccountsWithHistoricalStatus8, NumberOfAccountsWithHistoricalStatus9, HighCreditTotalRevolving, HighCreditOpenEnded, HighCreditInstallment, AmountOwedTotalRevolving, AmountOwedTotalOpenEnded, AmountOwedTotalInstallment, PastDueTotalRevolving, PastDueTotalOpenEnded, PastDueTotalInstallment, NinetyDayInquiryHistoryCount, NinetyDayInquiryHistoryDate, NumberOfRevolvingAccounts, NumberOfOpenEndedAccounts, NumberOfInstallmentAccounts}, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage));
 		
-		
+		 
 
 // Black Box Attributes - ENTITY Definitions
 // These are the individual pieces of the Credit Report Entity definition
@@ -2209,14 +2230,37 @@ RiskView := ENTITY(FLAT(Person rPerson=LexID,
 PersonCreditReport := ASSOCIATION(FLAT(Person Subject=LexID, CreditReport Report=UID(TransactionID, LexID))); // Connects a Person to a Credit Report
 JointCreditReport := ASSOCIATION(FLAT(CreditReport SubjectReport=UID(TransactionID, LexID), CreditReport JointReport=UID(TransactionID, LexID))); // Connects a Credit Report for a Subject to the Credit Report for the joint applicant
 
+
+PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
+
 // Define a first degree and second degree associations
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
 SecondDegreeAssociations := ASSOCIATION(FLAT(Person FirstDegreeAssociation=LexID, Person SecondDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
 // Now make sure that I am not my own second degree relative (For example: I am my dad's relative)
 GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree, #Title1, #RelationshipType1, #RelationshipConfidence1, #RelationshipScore1, #Generation1, #RelationshipDateFirstSeen1, #RelationshipDateLastSeen1), FirstDegreeAssociations(#FirstDegree, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2), #Subj<>#SecondDegree => SecondDegreeAssociations(#Subj, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2);
 
+USE hygenics_crim.File_Moxie_Crim_Offender2_Dev(FLAT, 
+						PersonOffenses(Offender=did));
+						
+USE IDL_Header.header_ins(FLAT, 
+						Person(UID=did,
+									FirstName = fname,
+									MiddleName = mname,
+									LastName = lname,
+									DateOfBirth = dob));						
 
- 
+
+USE hygenics_crim.File_Moxie_Court_Offenses_Dev(FLAT, 
+						CriminalOffense(
+										OffenderKey = offender_key,
+										DateOfConviction = convict_dt,
+										Level = court_off_lev,
+										CaseNumber = court_case_number,
+										FinalPlea = court_final_plea,
+										DispositionDate = court_disp_date,
+										Description = pros_off_desc_1));
+
+  
 /* The following USE statements map the various base files to the appropriate ENTITY definitions. */
 
 // Note: I am temporarily commenting this IMPORT statement out due to a bug in the current HPCC platform which doesn't allow 
@@ -6552,7 +6596,10 @@ Person: => RiskView_Reason23 := ONLY(RiskViewCurrentSnapshot, Reason23);
 Person: => RiskView_Reason24 := ONLY(RiskViewCurrentSnapshot, Reason24);
 Person: => RiskView_Reason25 := ONLY(RiskViewCurrentSnapshot, Reason25);
 
+Person: => SecondOrThirdDegreeFelonyCount := COUNT(PersonOffenses.Offense(IsSecondOrThirdDegreeFelony)); 
+Person: => LastConvictedDate := PersonOffenses.Offense.OffenseCharges.DateOfConviction$Max;
 
+  
 
 // White Box Attributes Section
 // Constants Defined for Credit Report Narrative Remarks categorizations - Note: As Constant values, these must use all UPPERCASE names as enforced by the KEL compiler
@@ -6760,6 +6807,9 @@ CreditReportTradeline: TRAVEL_AND_ENTERTAINMENT_INDUSTRY_CODE_LIST := ['ON'];
 CreditReportTradeline: UTILITY_CELLULAR_INDUSTRY_CODE_LIST := ['UL', 'UP', 'UT'];
 CreditReportTradeline: UTILITY_INDUSTRY_CODE_LIST := ['UA', 'UC', 'UD', 'UE', 'UF', 'UG', 'UH', 'UO', 'US', 'UV', 'UW', 'UZ'];
 CreditReportTradeline: UTILITY_INDUSTRY_INQUIRY_CODE_LIST := ['UA', 'UC', 'UD', 'UE', 'UF', 'UG', 'UH', 'UL', 'UO', 'UP', 'US', 'UT', 'UV', 'UW', 'UZ'];
+
+CriminalOffense: SECOND_OR_THIRD_DEGREE_FELONY_CODE_LIST := ['F2', 'F3'];
+
 
 // Credit Report Based Attributes
 CreditReportNarrativeRemarks: => AllstateAccountTypeGlobalExclusion := RemarksCode1 IN ALLSTATE_ACCOUNT_TYPE_GLOBAL_EXCLUSION_CODE_LIST OR RemarksCode2 IN ALLSTATE_ACCOUNT_TYPE_GLOBAL_EXCLUSION_CODE_LIST;
@@ -6971,7 +7021,7 @@ CreditReportTradeline: => StudentLoanIndustry := IndustryCode IN STUDENT_LOAN_IN
 CreditReportTradeline: => TravelAndEntertainmentIndustry := IndustryCode IN TRAVEL_AND_ENTERTAINMENT_INDUSTRY_CODE_LIST;
 CreditReportTradeline: => UtilityCellularIndustry := IndustryCode IN UTILITY_CELLULAR_INDUSTRY_CODE_LIST;
 
-CreditReport: => MostRecentBankruptcyAgeInMonths := CreditReportBankruptcy.AgeInMonths$Min;
+CreditReport: => MostRecentBankruptcyAgeInMonths := CreditReportBankruptcy.AgeInMonths$Min; 
 CreditReport: => TotalBankruptcies := COUNT(CreditReportBankruptcy);
 CreditReport: => TotalBankruptciesWithValidDate := COUNT(CreditReportBankruptcy(ValidDate));
 CreditReport: => TotalChapter7Bankruptcies := COUNT(CreditReportBankruptcy(Chapter7));
@@ -6988,6 +7038,9 @@ CreditReport: => TotalDismissedChapter7Bankruptcies := COUNT(CreditReportBankrup
 CreditReport: => TotalDismissedChapter11Bankruptcies := COUNT(CreditReportBankruptcy(Chapter11 AND Dismissed));
 CreditReport: => TotalDismissedChapter12Bankruptcies := COUNT(CreditReportBankruptcy(Chapter12 AND Dismissed));
 CreditReport: => TotalDismissedChapter13Bankruptcies := COUNT(CreditReportBankruptcy(Chapter13 AND Dismissed));
+
+
+CriminalOffense: => IsSecondOrThirdDegreeFelony := EXISTS(OffenseCharges.Level IN SECOND_OR_THIRD_DEGREE_FELONY_CODE_LIST); 
 
 /* Queries specific to the Person Entity definition belong here. */
 
@@ -7225,3 +7278,13 @@ QUERY: CreditReportTradelineAttributes(SearchForTransactionID) <= CreditReportTr
 QUERY: CreditReportNarrativeRemarksAttributes(SearchForTransactionID) <= CreditReportNarrativeRemarks(rCreditReport.TransactionID = SearchForTransactionID);
 
 QUERY: PersonsCreditReport(SearchForLexID) <= Person(UID = SearchForLexID).PersonCreditReport.Report;
+
+QUERY: PersonByLexID(SearchForLexID) <= Person(UID=SearchForLexID);
+
+QUERY: PersonSecondThirdDegreeFelonyCountByLexID(SearchForLexID) <= Person(UID=SearchForLexID){SecondOrThirdDegreeFelonyCount}; 
+
+QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense{Person.UID, Person.PersonOffenses.Offense.OffenderKey, OffenseCharges.Level};
+
+QUERY: CriminalOffenses(SearchForOffenderKey) <= CriminalOffense(OffenderKey = SearchForOffenderKey);
+
+QUERY: PersonLastConvictedDate(SearchForLexID) <= Person(UID=SearchForLexID){LastConvictedDate};   
