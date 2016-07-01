@@ -1,4 +1,3 @@
-﻿//EXPORT File_Moxie_Crim_Offender2_Dev := 'todo';
 
 LayoutOffenders := RECORD
   string8 process_date;
