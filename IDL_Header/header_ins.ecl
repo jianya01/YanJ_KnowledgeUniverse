@@ -1,4 +1,3 @@
-﻿//EXPORT header_ins := 'todo';
 
 LayoutPolicyHeader := RECORD
   unsigned8 rid;
