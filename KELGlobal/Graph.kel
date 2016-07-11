@@ -1,4 +1,4 @@
-﻿/* KEL Compiler Options and Configurations. */
+/* KEL Compiler Options and Configurations. */
 #OPTION(persist, 2)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
@@ -7,17 +7,17 @@
 
 // Defining the ERA to allow for ASOF functionality
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
+ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
 // Global Person Entity Definition
-
 Person := ENTITY(FLAT(UID=LexID,
-	STRING FirstName=NULL(),
-	STRING MiddleName=NULL(), 
-	STRING LastName=NULL(),
-	DATE DateOfBirth),
+		STRING FirstName=NULL(),
+		STRING MiddleName=NULL(), 
+		STRING LastName=NULL(),
+		DATE DateOfBirth),
 	MODEL(UID, 
-				FullName{FirstName, MiddleName, LastName}, 
-				ReportedDatesOfBirth{DateOfBirth}));
+		FullName{FirstName, MiddleName, LastName}, 
+		ReportedDatesOfBirth{DateOfBirth}));
 
   
 CriminalOffense := ENTITY(FLAT(UID(offender_key),
@@ -28,10 +28,88 @@ CriminalOffense := ENTITY(FLAT(UID(offender_key),
 		STRING FinalPlea=NULL(),
 		DATE DispositionDate,
 		STRING Description=NULL()),
-		MODEL(UID, 
-					OffenderKey, 
-					OffenseCharges{DateOfConviction, Level, CaseNumber, FinalPlea, DispositionDate, Description}));
+	MODEL(UID, 
+		OffenderKey, 
+		OffenseCharges{DateOfConviction, Level, CaseNumber, FinalPlea, DispositionDate, Description}));
 
+Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), // For now we are using a hashed UID, eventually this will be replaced with the upcoming Location ID
+		STRING PrimaryRange=NULL('garbage12345'),
+		STRING Predirectional=NULL('garbage12345'),
+		STRING PrimaryName=NULL('garbage12345'),
+		STRING Suffix=NULL('garbage12345'),
+		STRING Postdirectional=NULL('garbage12345'),
+		STRING UnitDesignation=NULL(),
+		STRING SecondaryRange=NULL('garbage12345'),
+		STRING PostalCity=NULL(),
+		STRING VanityCity=NULL(),
+		STRING State=NULL(),
+		INTEGER ZIP5=NULL('garbage12345'),
+		INTEGER ZIP4=NULL(),
+		STRING CarrierRouteNumber=NULL(),
+		STRING CarrierRouteSortationAtZIP=NULL(),
+		INTEGER LineOfTravel=NULL(),
+		STRING LineOfTravelOrder=NULL(),
+		INTEGER DeliveryPointBarcode=NULL(),
+		INTEGER DeliveryPointBarcodeCheckDigit=NULL(),
+		STRING TypeCode=NULL(),
+		INTEGER County=NULL(),
+		REAL Latitude=NULL(),
+		REAL Longitude=NULL(),
+		INTEGER MetropolitanStatisticalArea=NULL(),
+		INTEGER GeoBlock=NULL(),
+		STRING GeoMatch=NULL(),
+		STRING ACECleanerErrorCode=NULL(),
+		DATE ADVODateFirstSeen,
+		DATE ADVODateLastSeen,
+		DATE ADVODateVendorFirstReported,
+		DATE ADVODateVendorLastReported,
+		STRING VacancyIndicator=NULL(),
+		STRING ThrowBackIndicator=NULL(),
+		STRING SeasonalDeliveryIndicator=NULL(),
+		STRING SeasonalStartSuppressionDate=NULL(),
+		STRING SeasonalEndSuppressionDate=NULL(),
+		STRING DoNotDeliverIndicator=NULL(),
+		STRING CollegeIndicator=NULL(),
+		STRING CollegeStartSuppressionDate=NULL(),
+		STRING CollegeEndSuppressionDate=NULL(),
+		STRING StyleCode=NULL(),
+		INTEGER SimplifyCount=NULL(),
+		STRING DropIndicator=NULL(),
+		STRING ResidentialOrBusinessIndicator=NULL(),
+		STRING OnlyWayToGetMailIndicator=NULL(),
+		STRING RecordTypeCode=NULL(),
+		STRING MixedUsageCode=NULL(),
+		DATE VacationBeginDate,
+		DATE VacationEndDate,
+		INTEGER NumberOfCurrentVacationMonths=NULL(),
+		INTEGER MaxVacationMonths=NULL(),
+		INTEGER VacationPeriodsCount=NULL(),
+		STRING InstitutionTypeCode=NULL(),
+		STRING InstitutionTypeExpanded=NULL(),
+		STRING InstitutionName=NULL()),
+	MODEL(UID, PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, UnitDesignation, SecondaryRange, PostalCity, VanityCity, State, ZIP5, ZIP4, CarrierRouteNumber, CarrierRouteSortationAtZIP, LineOfTravel, LineOfTravelOrder, DeliveryPointBarcode, DeliveryPointBarcodeCheckDigit, TypeCode, County, Latitude, Longitude, MetropolitanStatisticalArea, GeoBlock, GeoMatch, ACECleanerErrorCode, 
+		College{CollegeIndicator, CollegeStartSuppressionDate, CollegeEndSuppressionDate},
+		ADVODateSummary{ADVODateFirstSeen, ADVODateLastSeen, ADVODateVendorFirstReported, ADVODateVendorLastReported},
+		DoNotDeliver{DoNotDeliverIndicator},
+		MailDrop{DropIndicator},
+		MixedUsage{MixedUsageCode},
+		OnlyWayToGetMail{OnlyWayToGetMailIndicator},
+		RecordType{RecordTypeCode},
+		ResidentialOrBusiness{ResidentialOrBusinessIndicator},
+		SeasonalDelivery{SeasonalDeliveryIndicator, SeasonalStartSuppressionDate, SeasonalEndSuppressionDate},
+		Simplify{SimplifyCount},
+		Style{StyleCode},
+		ThrowBack{ThrowBackIndicator},
+		Vacancy{VacancyIndicator},
+		Vacation{NumberOfCurrentVacationMonths, MaxVacationMonths, VacationPeriodsCount, VacationBeginDate, VacationEndDate},
+		ACA{InstitutionTypeCode, InstitutionTypeExpanded, InstitutionName}));
+
+// Due to a current issue with KEL the ACA information needs to be broken out into its own ENTITY and then joined back to the Address using some Address Logical Properties.  This should be fixed with the 0.8.2 build sometime in the next couple months.
+ACAInfo := ENTITY(FLAT(Address parent=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
+		STRING InstitutionTypeCode=NULL(), 
+		STRING InstitutionTypeExpanded=NULL(), 
+		STRING InstitutionName=NULL(), 
+		INTEGER RecordCountHelper=NULL()));
 
 // Global Credit Report Entity Definition
 CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
@@ -100,7 +178,7 @@ CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
 		INTEGER NumberOfInstallmentAccounts),
 	MODEL(UID, TransactionID, ReferenceNumber, LexIDs{SubjectRecordCode, LexID}, ROWS{SubjectRecord, DateCreditFileEstbed, OldestOpeningDateOfTrade, LatestReportingDateOfTrade, DateOfLatestFileActivity, ReportIncludesBankruptcies, DateOfLatestBankruptcyV1, ReportIncludesPublicRecords, ReportIncludesCollectionItems, ReportIncludesConsumerStatements, HighCreditRangeLowAmount, HighCreditRangeHighAmount, TotalNumberOfTradelines, NumberOfAccountsWithCurrentStatus0, NumberOfAccountsWithCurrentStatus1, NumberOfAccountsWithCurrentStatus2, NumberOfAccountsWithCurrentStatus3, NumberOfAccountsWithCurrentStatus4, NumberOfAccountsWithCurrentStatus5, NumberOfAccountsWithCurrentStatus6, NumberOfAccountsWithCurrentStatus7, NumberOfAccountsWithCurrentStatus8, NumberOfAccountsWithCurrentStatus9, NumberOfAccountsWithCurrentStatusBlank, NumberOfAccountsWithHistoricalStatus1, NumberOfAccountsWithHistoricalStatus2, NumberOfAccountsWithHistoricalStatus3, NumberOfAccountsWithHistoricalStatus4, NumberOfAccountsWithHistoricalStatus5, NumberOfAccountsWithHistoricalStatus6, NumberOfAccountsWithHistoricalStatus7, NumberOfAccountsWithHistoricalStatus8, NumberOfAccountsWithHistoricalStatus9, HighCreditTotalRevolving, HighCreditOpenEnded, HighCreditInstallment, AmountOwedTotalRevolving, AmountOwedTotalOpenEnded, AmountOwedTotalInstallment, PastDueTotalRevolving, PastDueTotalOpenEnded, PastDueTotalInstallment, NinetyDayInquiryHistoryCount, NinetyDayInquiryHistoryDate, NumberOfRevolvingAccounts, NumberOfOpenEndedAccounts, NumberOfInstallmentAccounts}, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage));
 		
-		 
+		
 
 // Black Box Attributes - ENTITY Definitions
 // These are the individual pieces of the Credit Report Entity definition
@@ -2227,6 +2305,7 @@ RiskView := ENTITY(FLAT(Person rPerson=LexID,
 		STRING Reason25));
 		
 /* The following ASSOCIATIONs link together our various ENTITY definitions. */
+PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange))); // Connects a Person to an Address
 PersonCreditReport := ASSOCIATION(FLAT(Person Subject=LexID, CreditReport Report=UID(TransactionID, LexID))); // Connects a Person to a Credit Report
 JointCreditReport := ASSOCIATION(FLAT(CreditReport SubjectReport=UID(TransactionID, LexID), CreditReport JointReport=UID(TransactionID, LexID))); // Connects a Credit Report for a Subject to the Credit Report for the joint applicant
 
@@ -2237,28 +2316,31 @@ PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
 SecondDegreeAssociations := ASSOCIATION(FLAT(Person FirstDegreeAssociation=LexID, Person SecondDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
 // Now make sure that I am not my own second degree relative (For example: I am my dad's relative)
-GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree, #Title1, #RelationshipType1, #RelationshipConfidence1, #RelationshipScore1, #Generation1, #RelationshipDateFirstSeen1, #RelationshipDateLastSeen1), FirstDegreeAssociations(#FirstDegree, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2), #Subj<>#SecondDegree => SecondDegreeAssociations(#Subj, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2);
+GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#FirstDegree, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2), #Subj<>#SecondDegree => SecondDegreeAssociations(#Subj, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2);
+//GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#FirstDegree, #SecondDegree), #Subj<>#SecondDegree, NOT FirstDegreeAssociations(#Subj, #SecondDegree) => SecondDegreeAssociations(#Subj, #SecondDegree, 9999/*Title*/, 'SECOND DEGREE'/*RelationshipType*/, ''/*RelationshipConfidence*/, 0/*RelationshipScore*/, ''/*Generation*/, '0'/*RelationshipDateFirstSeen*/, '0'/*RelationshipDateLastSeen*/);
 
 USE hygenics_crim.File_Moxie_Crim_Offender2_Dev(FLAT, 
 						PersonOffenses(Offender=did));
-						
+
 USE IDL_Header.header_ins(FLAT, 
-						Person(UID=did,
-									FirstName = fname,
-									MiddleName = mname,
-									LastName = lname,
-									DateOfBirth = dob));						
+	Person(UID=did,
+		DateFirstSeen = dt_first_seen, // Contains information for ASOF
+		DateLastSeen = dt_last_seen, // Contains information for ASOF
+		FirstName = fname,
+		MiddleName = mname,
+		LastName = lname,
+		DateOfBirth = dob));						
+ 
 
-
-USE hygenics_crim.File_Moxie_Court_Offenses_Dev(FLAT, 
-						CriminalOffense(
-										OffenderKey = offender_key,
-										DateOfConviction = convict_dt,
-										Level = court_off_lev,
-										CaseNumber = court_case_number,
-										FinalPlea = court_final_plea,
-										DispositionDate = court_disp_date,
-										Description = pros_off_desc_1));
+USE hygenics_crim.File_Moxie_Court_Offenses_Dev(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
+	CriminalOffense(
+		OffenderKey = offender_key,
+		DateOfConviction = convict_dt,
+		Level = court_off_lev,
+		CaseNumber = court_case_number,
+		FinalPlea = court_final_plea,
+		DispositionDate = court_disp_date,
+		Description = pros_off_desc_1));
 
   
 /* The following USE statements map the various base files to the appropriate ENTITY definitions. */
@@ -2267,10 +2349,100 @@ USE hygenics_crim.File_Moxie_Court_Offenses_Dev(FLAT,
 // for nested IMPORT statements (https://track.hpccsystems.com/browse/IDE-373). You will need to syntax check in the PersonQueries.kel file
 //IMPORT KELGlobal.Entities;
 
+// Maps the ACA index to the Address Entity
+USE ACA.Key_ACA_Addr_RID(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
+	Address(
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		UnitDesignation = unit_desig,
+		SecondaryRange = sec_range,
+		PostalCity = p_city_name,
+		VanityCity = v_city_name,
+		State = st,
+		ZIP5 = z5,
+		ZIP4 = zip4,
+		TypeCode = addr_type,
+		InstitutionTypeCode = inst_type,
+		InstitutionTypeExpanded = inst_type_exp,
+		InstitutionName = institution),
+	ACAInfo( // Supporting the ACAInfo Address Entity until KEL 0.8.2 arrives and then this can be removed
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		SecondaryRange = sec_range,
+		ZIP5 = z5,
+		InstitutionTypeCode = inst_type,
+		InstitutionTypeExpanded = inst_type_exp,
+		InstitutionName = institution,
+		RecordCountHelper = UniqueID));
+
+// Maps the ADVO index to the Address Entity
+USE ADVO.Key_Addr1(FLAT,
+	Address(
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
+		ADVODateFirstSeen = date_first_seen,
+		ADVODateLastSeen = date_last_seen,
+		ADVODateVendorFirstReported = date_vendor_first_reported,
+		ADVODateVendorLastReported = date_vendor_last_reported,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		UnitDesignation = unit_desig,
+		SecondaryRange = sec_range,
+		PostalCity = p_city_name,
+		VanityCity = v_city_name,
+		State = st,
+		ZIP5 = zip,
+		ZIP4 = zip4,
+		CarrierRouteNumber = cart,
+		CarrierRouteSortationAtZIP = cr_sort_sz,
+		LineOfTravel = lot,
+		LineOfTravelOrder = lot_order,
+		DeliveryPointBarcode = dbpc,
+		DeliveryPointBarcodeCheckDigit = chk_digit,
+		TypeCode = rec_type,
+		County = county,
+		Latitude = geo_lat,
+		Longitude = geo_long,
+		MetropolitanStatisticalArea = msa,
+		GeoBlock = geo_blk,
+		GeoMatch = geo_match,
+		ACECleanerErrorCode = err_stat,
+		VacancyIndicator = address_vacancy_indicator,
+		ThrowBackIndicator = throw_back_indicator,
+		SeasonalDeliveryIndicator = seasonal_delivery_indicator,
+		SeasonalStartSuppressionDate = seasonal_start_suppression_date,
+		SeasonalEndSuppressionDate = seasonal_end_suppression_date,
+		DoNotDeliverIndicator = dnd_indicator,
+		CollegeIndicator = college_indicator,
+		CollegeStartSuppressionDate = college_start_suppression_date,
+		CollegeEndSuppressionDate = college_end_suppression_date,
+		StyleCode = address_style_flag,
+		SimplifyCount = simplify_address_count,
+		DropIndicator = drop_indicator,
+		ResidentialOrBusinessIndicator = residential_or_business_ind,
+		OnlyWayToGetMailIndicator = owgm_indicator,
+		RecordTypeCode = record_type_code,
+		MixedUsageCode = mixed_address_usage,
+		VacationBeginDate = vac_begdt,
+		VacationEndDate = vac_enddt,
+		NumberOfCurrentVacationMonths = months_vac_curr,
+		MaxVacationMonths = months_vac_max,
+		VacationPeriodsCount = vac_count));
+
 // Maps the Relatives V3 index to the FirstDegreeAssociations
 USE Relationship.key_relatives_v3(FLAT,
 	FirstDegreeAssociations(
 		DateFirstSeen = rel_dt_first_seen, // Contains information for ASOF
+		DateLastSeen = rel_dt_last_seen, // Contains information for ASOF
 		Subject = did1, 
 		FirstDegreeAssociation = did2, 
 		Title = title,
@@ -2285,6 +2457,7 @@ USE Relationship.key_relatives_v3(FLAT,
 USE Consumer_Credit.FilesCleaned.CreditReportSummary_Data(FLAT,
 	CreditReport(FILTER(ReportTypeCounter = 1), // Grab the records for the Subject on this CreditReport
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		TransactionID = Transaction_ID,
 		SubjectRecord = TRUE,
@@ -2338,6 +2511,7 @@ USE Consumer_Credit.FilesCleaned.CreditReportSummary_Data(FLAT,
 		NumberOfInstallmentAccounts = NumberOfInstallmentAccounts),
 	CreditReport(FILTER(ReportTypeCounter = 2), // Grab the records for the Joint Applicant on this CreditReport
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		TransactionID = Transaction_ID,
 		SubjectRecord = FALSE,
@@ -2391,17 +2565,21 @@ USE Consumer_Credit.FilesCleaned.CreditReportSummary_Data(FLAT,
 		NumberOfInstallmentAccounts = NumberOfInstallmentAccounts),
 	PersonCreditReport(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		Subject = LexID,
 		TransactionID = Transaction_ID),
 	JointCreditReport(FILTER(ReportTypeCounter = 1), // Grab the records for the Subject on this JointCreditReport
-		DateFirstSeen = Date_Reported), // Contains information for ASOF
+		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported), // Contains information for ASOF
 	JointCreditReport(FILTER(ReportTypeCounter = 2), // Grab the records for the Joint Applicant on this JointCreditReport
-		DateFirstSeen = Date_Reported)); // Contains information for ASOF
+		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported)); // Contains information for ASOF
 
 // Maps the Credit Report Request file to the CreditReport Entity
 USE Consumer_Credit.FilesCleaned.ReportRequest_Data(FLAT,
 	CreditReport(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		SubjectRecordCode = ReportTypeCounter,
 		LexID = LexID,
 		DateOfOrder = DateOfOrder,
@@ -2421,6 +2599,7 @@ USE Consumer_Credit.FilesCleaned.ReportRequest_Data(FLAT,
 USE Consumer_Credit.FilesCleaned.Bankruptcy_Data(FLAT,
 	CreditReportBankruptcy(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		DateFiled = DateFiled,
 		BankruptcyStatus = BankruptcyStatus,
@@ -2436,6 +2615,7 @@ USE Consumer_Credit.FilesCleaned.Bankruptcy_Data(FLAT,
 USE Consumer_Credit.FilesCleaned.Collection_Data(FLAT,
 	CreditReportCollection(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = DateReported,
 		DateAssigned = DateAssigned,
 		IndustryCode = IndustryCode,
@@ -2456,6 +2636,7 @@ USE Consumer_Credit.FilesCleaned.Collection_Data(FLAT,
 USE Consumer_Credit.FilesCleaned.Employment_Data(FLAT,
 	CreditReportEmployment(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		Classification = Classification,
 		EmployerName = EmployerName,
@@ -2467,6 +2648,7 @@ USE Consumer_Credit.FilesCleaned.Employment_Data(FLAT,
 USE Consumer_Credit.FilesCleaned.InquiryHistory_Data(FLAT,
 	CreditReportInquiry(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		DateOfInquiry = DateOfInquiry,
 		InquirerName = InquirerName,
@@ -2478,6 +2660,7 @@ USE Consumer_Credit.FilesCleaned.InquiryHistory_Data(FLAT,
 USE Consumer_Credit.FilesCleaned.Judgement_Data(FLAT,
 	CreditReportJudgement(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		Classification = Classification,
 		DateFiled = DateFiled,
@@ -2494,6 +2677,7 @@ USE Consumer_Credit.FilesCleaned.Judgement_Data(FLAT,
 USE Consumer_Credit.FilesCleaned.TaxLien_Data(FLAT,
 	CreditReportLien(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		DateFiled = DateFiled,
 		ReportingCourtNumber = ReportingCourtNumber,
@@ -2506,6 +2690,7 @@ USE Consumer_Credit.FilesCleaned.TaxLien_Data(FLAT,
 USE Consumer_Credit.FilesCleaned.TradeLine_Data(FLAT,
 	CreditReportTradeline(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = DateReported,
 		DateAccountOpened = DateAccountOpened,
 		DateOfLastActivity = DateOfLastActivity,
@@ -2535,6 +2720,7 @@ USE Consumer_Credit.FilesCleaned.TradeLine_Data(FLAT,
 USE Consumer_Credit.FilesCleaned.NarrativeA_Data(FLAT,
 	CreditReportNarrativeRemarks(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
 		RemarksCode1 = RemarksCode1,
 		Remarks1 = Remarks1,
 		RemarksCode2 = RemarksCode2,
@@ -2547,9 +2733,11 @@ USE Consumer_Credit.FilesCleaned.NarrativeA_Data(FLAT,
 // Maps the Boca Shell BlackBox Attributes to the Person Entity
 USE KELBlackBox.FileBlackBoxBocaShell(FLAT,
 	Person(
-		DateFirstSeen = date_first_seen), // Contains information for ASOF
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen), // Contains information for ASOF
 	BocaShell(
 		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
 		SnapshotDateFirstSeen = date_first_seen,
 		SnapshotDateLastSeen = date_last_seen,
 		ActiveFlag = active_flag,
@@ -3694,14 +3882,27 @@ USE KELBlackBox.FileBlackBoxBocaShell(FLAT,
 		AddrStability = addr_stability,
 		EstimatedIncome = estimated_income,
 		HistoryDateTimeStamp = historydatetimestamp,
-		ErrorCode = errorcode));
+		ErrorCode = errorcode),
+	PersonAddress(
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
+		Subject = did,
+		PrimaryRange = shell_input__prim_range,
+		Predirectional = shell_input__predir,
+		PrimaryName = shell_input__prim_name,
+		Suffix = shell_input__addr_suffix,
+		Postdirectional = shell_input__postdir,
+		ZIP5 = shell_input__z5,
+		SecondaryRange = shell_input__sec_range));
 
 // Maps the InsuranceHeader BlackBox Attributes to the Person Entity
 USE KELBlackBox.FileBlackBoxInsuranceHeader(FLAT,
 	Person(
-		DateFirstSeen = date_first_seen), // Contains information for ASOF
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen), // Contains information for ASOF
 	InsuranceHeader(
 		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
 		SnapshotDateFirstSeen = date_first_seen,
 		SnapshotDateLastSeen = date_last_seen,
 		InsuranceHeaderDateFirstSeen = ih_date_first_seen,
@@ -3738,9 +3939,11 @@ USE KELBlackBox.FileBlackBoxInsuranceHeader(FLAT,
 // Maps the InsurView BlackBox Attributes to the Person Entity
 USE KELBlackBox.FileBlackBoxInsurView(FLAT,
 	Person(
-		DateFirstSeen = correlator_dt), // Contains information for ASOF
+		DateFirstSeen = correlator_dt, // Contains information for ASOF
+		DateLastSeen = correlator_dt), // Contains information for ASOF
 	InsurView(
 		DateFirstSeen = correlator_dt, // Contains information for ASOF
+		DateLastSeen = correlator_dt, // Contains information for ASOF
 		LoadDate = load_dt,
 		CorrelatorDate = correlator_dt,
 		OrderDate = order_dt,
@@ -3781,9 +3984,11 @@ USE KELBlackBox.FileBlackBoxInsurView(FLAT,
 // Maps the Length of Residency BlackBox Attributes to the Person Entity
 USE KELBlackBox.FileBlackBoxLengthOfResidency(FLAT,
 	Person(
-		DateFirstSeen = date_first_seen), // Contains information for ASOF
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen), // Contains information for ASOF
 	LengthOfResidency(
 		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
 		SnapshotDateFirstSeen = date_first_seen,
 		SnapshotDateLastSeen = date_last_seen,
 		ActiveFlag = active_flag,
@@ -3795,9 +4000,11 @@ USE KELBlackBox.FileBlackBoxLengthOfResidency(FLAT,
 // Maps the MaritalStatus BlackBox Attributes to the Person Entity
 USE KELBlackBox.FileBlackBoxMaritalStatus(FLAT,
 	Person(
-		DateFirstSeen = date_first_seen), // Contains information for ASOF
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen), // Contains information for ASOF
 	MaritalStatus(
 		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
 		SnapshotDateFirstSeen = date_first_seen,
 		SnapshotDateLastSeen = date_last_seen,
 		ActiveFlag = active_flag,
@@ -3817,9 +4024,11 @@ USE KELBlackBox.FileBlackBoxMaritalStatus(FLAT,
 // Maps the MarketView BlackBox Attributes to the Person Entity
 USE KELBlackBox.FileBlackBoxMarketView(FLAT, 
 	Person(
-		DateFirstSeen = Date_First_Seen), // Contains information for ASOF
+		DateFirstSeen = Date_First_Seen, // Contains information for ASOF
+		DateLastSeen = Date_Last_Seen), // Contains information for ASOF
 	MarketView(
 		DateFirstSeen = Date_First_Seen, // Contains information for ASOF
+		DateLastSeen = Date_Last_Seen, // Contains information for ASOF
 		SnapshotDateFirstSeen = Date_First_Seen,
 		SnapshotDateLastSeen = Date_Last_Seen,
 		MarketUAK = uak,
@@ -4224,9 +4433,11 @@ USE KELBlackBox.FileBlackBoxMarketView(FLAT,
 // Maps the RiskView BlackBox Attributes to the Person Entity
 USE KELBlackBox.FileBlackBoxRiskView(FLAT, 
 	Person(
-		DateFirstSeen = Date_First_Seen), // Contains information for ASOF
+		DateFirstSeen = Date_First_Seen, // Contains information for ASOF
+		DateLastSeen = Date_Last_Seen), // Contains information for ASOF
 	RiskView(
 		DateFirstSeen = Date_First_Seen, // Contains information for ASOF
+		DateLastSeen = Date_Last_Seen, // Contains information for ASOF
 		SnapshotDateFirstSeen = Date_First_Seen,
 		SnapshotDateLastSeen = Date_Last_Seen,
 		ActiveFlag = Active_Flag,
@@ -4584,55 +4795,55 @@ USE KELBlackBox.FileBlackBoxRiskView(FLAT,
 // IMPORT KELGlobal.Entities, KELGlobal.EntityUses;
 
 // Translate the Relative/Association Title from numeric to something that an end user could understand
-// WARNING: This code requires KEL 0.8 to run!! Thus it is temporarily being commented out.
-//FirstDegreeAssociations: => TitleDescription := MAP(
-//	Title = 1	=> 'Subject',
-//	Title = 2	=> 'Husband',
-//	Title = 3	=> 'Wife',
-//	Title = 4	=> 'Spouse',
-//	Title = 5	=> 'Ex-Husband',
-//	Title = 6	=> 'Ex-Wife',
-//	Title = 7	=> 'Ex-Spouse',
-//	Title = 8	=> 'Widow',
-//	Title = 9	=> 'Widower',
-//	Title = 10	=> 'Father',
-//	Title = 11	=> 'Mother',
-//	Title = 12	=> 'Parent',
-//	Title = 13	=> 'Grandfather',
-//	Title = 14	=> 'Grandmother',
-//	Title = 15	=> 'Grandparent',
-//	Title = 16	=> 'Brother',
-//	Title = 17	=> 'Sister',
-//	Title = 18	=> 'Sibling',
-//	Title = 19 	=> 'Son',
-//	Title = 20	=> 'Daughter',
-//	Title = 21	=> 'Child',
-//	Title = 22	=> 'Grandson',
-//	Title = 23	=> 'Granddaughter',
-//	Title = 24 	=> 'Grandchild',
-//	Title = 25 	=> 'In-law',
-//	Title = 26 	=> 'Sister-in-law',
-//	Title = 27 	=> 'Brother-in-law',
-//	Title = 28 	=> 'Sibling-in-law',
-//	Title = 29	=> 'Mother-in-law',
-//	Title = 30	=> 'Father-in-law',
-//	Title = 31 	=> 'Parent-in-law',
-//	Title = 32	=> 'Stepfather',
-//	Title = 33	=> 'Stepmother',
-//	Title = 34 	=> 'Stepparent',
-//	Title = 35	=> 'Stepbrother',
-//	Title = 36 	=> 'Stepsister',
-//	Title = 37	=> 'Stepsibling',
-//	Title = 38	=> 'Aunt',
-//	Title = 39	=> 'Uncle',
-//	Title = 40	=> 'Niece',
-//	Title = 41 	=> 'Nephew',
-//	Title = 42 	=> 'Cousin',
-//	Title = 43 	=> 'Relative',
-//	Title = 44 	=> 'Associate',
-//	Title = 45	=> 'Neighbor',
-//	Title = 46 	=> 'Business',
-//					'Transactional-Associate');
+FirstDegreeAssociations: => TitleDescription := MAP(
+	Title = 1	=> 'Subject',
+	Title = 2	=> 'Husband',
+	Title = 3	=> 'Wife',
+	Title = 4	=> 'Spouse',
+	Title = 5	=> 'Ex-Husband',
+	Title = 6	=> 'Ex-Wife',
+	Title = 7	=> 'Ex-Spouse',
+	Title = 8	=> 'Widow',
+	Title = 9	=> 'Widower',
+	Title = 10	=> 'Father',
+	Title = 11	=> 'Mother',
+	Title = 12	=> 'Parent',
+	Title = 13	=> 'Grandfather',
+	Title = 14	=> 'Grandmother',
+	Title = 15	=> 'Grandparent',
+	Title = 16	=> 'Brother',
+	Title = 17	=> 'Sister',
+	Title = 18	=> 'Sibling',
+	Title = 19 	=> 'Son',
+	Title = 20	=> 'Daughter',
+	Title = 21	=> 'Child',
+	Title = 22	=> 'Grandson',
+	Title = 23	=> 'Granddaughter',
+	Title = 24 	=> 'Grandchild',
+	Title = 25 	=> 'In-law',
+	Title = 26 	=> 'Sister-in-law',
+	Title = 27 	=> 'Brother-in-law',
+	Title = 28 	=> 'Sibling-in-law',
+	Title = 29	=> 'Mother-in-law',
+	Title = 30	=> 'Father-in-law',
+	Title = 31 	=> 'Parent-in-law',
+	Title = 32	=> 'Stepfather',
+	Title = 33	=> 'Stepmother',
+	Title = 34 	=> 'Stepparent',
+	Title = 35	=> 'Stepbrother',
+	Title = 36 	=> 'Stepsister',
+	Title = 37	=> 'Stepsibling',
+	Title = 38	=> 'Aunt',
+	Title = 39	=> 'Uncle',
+	Title = 40	=> 'Niece',
+	Title = 41 	=> 'Nephew',
+	Title = 42 	=> 'Cousin',
+	Title = 43 	=> 'Relative',
+	Title = 44 	=> 'Associate',
+	Title = 45	=> 'Neighbor',
+	Title = 46 	=> 'Business',
+	Title = 9999=> '2nd-Degree-Associate',
+					'Transactional-Associate');
 
 // Pick out the most recently seen snapshot for each set of BlackBox Attributes
 Person: => BocaShellCurrentDate := BocaShell.SnapshotDateLastSeen$Max;
@@ -6599,9 +6810,57 @@ Person: => RiskView_Reason25 := ONLY(RiskViewCurrentSnapshot, Reason25);
 Person: => SecondOrThirdDegreeFelonyCount := COUNT(PersonOffenses.Offense(IsSecondOrThirdDegreeFelony)); 
 Person: => LastConvictedDate := PersonOffenses.Offense.OffenseCharges.DateOfConviction$Max;
 
-  
+
 
 // White Box Attributes Section
+Address: => ACAHit := IF(EXISTS(ACA), 'Y', 'N');
+// Due to a current KEL limitation need to manually dedup/count a separate ACAInfo ENTITY until the built in kel RecordCount field can be accessed (https://github.com/hpcc-systems/KEL/issues/1346)
+Address: => ACAWithCounts := ACAInfo{parent, InstitutionName, InstitutionTypeCode, InstitutionTypeExpanded, Frequency := COUNT(GROUP)};
+Address: => TopACA := ONLY(TOPN(ACAWithCounts, 1, -Frequency));
+Address: => ACAInstitutionName := TopACA.InstitutionName;
+Address: => ACAInstitutionTypeCode := TopACA.InstitutionTypeCode;
+Address: => ACAInstitutionTypeExpanded := TopACA.InstitutionTypeExpanded;
+
+Address: => ADVOHit := IF(EXISTS(ADVODateSummary), 'Y', 'N');
+Address: => MostRecentCollege := TOPN(College, 1, -CollegeIndicator:DateLastSeen, -CollegeIndicator:DateFirstSeen);
+Address: => ADVOCollegeIndicator := ONLY(MostRecentCollege, CollegeIndicator);
+Address: => ADVOCollegeStartSuppressionDate := ONLY(MostRecentCollege, CollegeStartSuppressionDate);
+Address: => ADVOCollegeEndSuppressionDate := ONLY(MostRecentCollege, CollegeEndSuppressionDate);
+Address: => MostRecentDoNotDeliver := TOPN(DoNotDeliver, 1, -DoNotDeliverIndicator:DateLastSeen, -DoNotDeliverIndicator:DateFirstSeen);
+Address: => ADVODoNotDeliverIndicator := ONLY(MostRecentDoNotDeliver, DoNotDeliverIndicator);
+Address: => MostRecentMailDrop := TOPN(MailDrop, 1, -DropIndicator:DateLastSeen, -DropIndicator:DateFirstSeen);
+Address: => ADVODropIndicator := ONLY(MostRecentMailDrop, DropIndicator);
+Address: => MostRecentMixedUsage := TOPN(MixedUsage, 1, -MixedUsageCode:DateLastSeen, -MixedUsageCode:DateFirstSeen);
+Address: => ADVOMixedUsageCode := ONLY(MostRecentMixedUsage, MixedUsageCode);
+Address: => MostRecentOnlyWayToGetMail := TOPN(OnlyWayToGetMail, 1, -OnlyWayToGetMailIndicator:DateLastSeen, -OnlyWayToGetMailIndicator:DateFirstSeen);
+Address: => ADVOOnlyWayToGetMailIndicator := ONLY(MostRecentOnlyWayToGetMail, OnlyWayToGetMailIndicator);
+Address: => MostRecentRecordType := TOPN(RecordType, 1, -RecordTypeCode:DateLastSeen, -RecordTypeCode:DateFirstSeen);
+Address: => ADVORecordTypeCode := ONLY(MostRecentRecordType, RecordTypeCode);
+Address: => MostRecentResidentialOrBusiness := TOPN(ResidentialOrBusiness, 1, -ResidentialOrBusinessIndicator:DateLastSeen, -ResidentialOrBusinessIndicator:DateFirstSeen);
+Address: => ADVOResidentialOrBusinessIndicator := ONLY(MostRecentResidentialOrBusiness, ResidentialOrBusinessIndicator);
+Address: => MostRecentSeasonalDelivery := TOPN(SeasonalDelivery, 1, -SeasonalDeliveryIndicator:DateLastSeen, -SeasonalDeliveryIndicator:DateFirstSeen);
+Address: => ADVOSeasonalDeliveryIndicator := ONLY(MostRecentSeasonalDelivery, SeasonalDeliveryIndicator);
+Address: => ADVOSeasonalStartSuppressionDate := ONLY(MostRecentSeasonalDelivery, SeasonalStartSuppressionDate);
+Address: => ADVOSeasonalEndSuppressionDate := ONLY(MostRecentSeasonalDelivery, SeasonalEndSuppressionDate);
+Address: => MostRecentSimplify := TOPN(Simplify, 1, -SimplifyCount:DateLastSeen, -SimplifyCount:DateFirstSeen);
+Address: => ADVOSimplifyCount := ONLY(MostRecentSimplify, SimplifyCount);
+Address: => MostRecentStyle := TOPN(Style, 1, -StyleCode:DateLastSeen, -StyleCode:DateFirstSeen);
+Address: => ADVOStyleCode := ONLY(MostRecentStyle, StyleCode);
+Address: => MostRecentThrowBack := TOPN(ThrowBack, 1, -ThrowBackIndicator:DateLastSeen, -ThrowBackIndicator:DateFirstSeen);
+Address: => ADVOThrowBackIndicator := ONLY(MostRecentThrowBack, ThrowBackIndicator);
+Address: => MostRecentVacancy := TOPN(Vacancy, 1, -VacancyIndicator:DateLastSeen, -VacancyIndicator:DateFirstSeen);
+Address: => ADVOVacancyIndicator := ONLY(MostRecentVacancy, VacancyIndicator);
+Address: => MostRecentVacation := TOPN(Vacation, 1, -MaxVacationMonths:DateLastSeen, -MaxVacationMonths:DateFirstSeen);
+Address: => ADVONumberOfVacationMonths := ONLY(MostRecentVacation, NumberOfCurrentVacationMonths);
+Address: => ADVOMaxVacationMonths := ONLY(MostRecentVacation, MaxVacationMonths);
+Address: => ADVOVacationPeriodsCount := ONLY(MostRecentVacation, VacationPeriodsCount);
+Address: => ADVOVacationBeginDate := ONLY(MostRecentVacation, VacationBeginDate);
+Address: => ADVOVacationEndDate := ONLY(MostRecentVacation, VacationEndDate);
+Address: => ADVODateFirstSeen := ADVODateSummary.ADVODateFirstSeen$Min;
+Address: => ADVODateLastSeen := ADVODateSummary.ADVODateLastSeen$Max;
+Address: => ADVODateVendorFirstReported := ADVODateSummary.ADVODateVendorFirstReported$Min;
+Address: => ADVODateVendorLastReported := ADVODateSummary.ADVODateVendorLastReported$Max;
+
 // Constants Defined for Credit Report Narrative Remarks categorizations - Note: As Constant values, these must use all UPPERCASE names as enforced by the KEL compiler
 CreditReportBankruptcy: ALLSTATE_DISPUTE_CATEGORY_1_STATUS_CODE_LIST := ['E'];
 CreditReportBankruptcy: ALLSTATE_DISPUTE_CATEGORY_4_STATUS_CODE_LIST := ['J', 'S'];
@@ -7021,7 +7280,7 @@ CreditReportTradeline: => StudentLoanIndustry := IndustryCode IN STUDENT_LOAN_IN
 CreditReportTradeline: => TravelAndEntertainmentIndustry := IndustryCode IN TRAVEL_AND_ENTERTAINMENT_INDUSTRY_CODE_LIST;
 CreditReportTradeline: => UtilityCellularIndustry := IndustryCode IN UTILITY_CELLULAR_INDUSTRY_CODE_LIST;
 
-CreditReport: => MostRecentBankruptcyAgeInMonths := CreditReportBankruptcy.AgeInMonths$Min; 
+CreditReport: => MostRecentBankruptcyAgeInMonths := CreditReportBankruptcy.AgeInMonths$Min;
 CreditReport: => TotalBankruptcies := COUNT(CreditReportBankruptcy);
 CreditReport: => TotalBankruptciesWithValidDate := COUNT(CreditReportBankruptcy(ValidDate));
 CreditReport: => TotalChapter7Bankruptcies := COUNT(CreditReportBankruptcy(Chapter7));
@@ -7094,64 +7353,7 @@ QUERY: RiskViewSnapshots(SearchForLexID, ArchiveDate) <= RiskView(rPerson.UID = 
 QUERY: PersonEntityData(SearchForLexID, ArchiveDate) <= Person(UID = SearchForLexID) ASOF reportedby(ArchiveDate); 
 
 // Query to grab all of a LexID's Relatives and First Degree Associations 
-QUERY: FirstDegreeRelativesAndAssociates(SearchForLexID, ArchiveDate) <= FirstDegreeAssociations(Subject.UID = SearchForLexID) 
-	{Subject,
-    FirstDegreeAssociation,
-    Title, 
-	TitleDescription := MAP( // Currently KEL doesn't support defining new attributes on the association itself (It will in the future) which would make this just TitleDescription,
-			Title = 1	=> 'Subject',
-			Title = 2	=> 'Husband',
-			Title = 3	=> 'Wife',
-			Title = 4	=> 'Spouse',
-			Title = 5	=> 'Ex-Husband',
-			Title = 6	=> 'Ex-Wife',
-			Title = 7	=> 'Ex-Spouse',
-			Title = 8	=> 'Widow',
-			Title = 9	=> 'Widower',
-			Title = 10	=> 'Father',
-			Title = 11	=> 'Mother',
-			Title = 12	=> 'Parent',
-			Title = 13	=> 'Grandfather',
-			Title = 14	=> 'Grandmother',
-			Title = 15	=> 'Grandparent',
-			Title = 16	=> 'Brother',
-			Title = 17	=> 'Sister',
-			Title = 18	=> 'Sibling',
-			Title = 19 	=> 'Son',
-			Title = 20	=> 'Daughter',
-			Title = 21	=> 'Child',
-			Title = 22	=> 'Grandson',
-			Title = 23	=> 'Granddaughter',
-			Title = 24 	=> 'Grandchild',
-			Title = 25 	=> 'In-law',
-			Title = 26 	=> 'Sister-in-law',
-			Title = 27 	=> 'Brother-in-law',
-			Title = 28 	=> 'Sibling-in-law',
-			Title = 29	=> 'Mother-in-law',
-			Title = 30	=> 'Father-in-law',
-			Title = 31 	=> 'Parent-in-law',
-			Title = 32	=> 'Stepfather',
-			Title = 33	=> 'Stepmother',
-			Title = 34 	=> 'Stepparent',
-			Title = 35	=> 'Stepbrother',
-			Title = 36 	=> 'Stepsister',
-			Title = 37	=> 'Stepsibling',
-			Title = 38	=> 'Aunt',
-			Title = 39	=> 'Uncle',
-			Title = 40	=> 'Niece',
-			Title = 41 	=> 'Nephew',
-			Title = 42 	=> 'Cousin',
-			Title = 43 	=> 'Relative',
-			Title = 44 	=> 'Associate',
-			Title = 45	=> 'Neighbor',
-			Title = 46 	=> 'Business',
-							'Transactional-Associate'),
-	RelationshipType,
-	RelationshipConfidence,
-	RelationshipScore,
-	Generation,
-	RelationshipDateFirstSeen,
-	RelationshipDateLastSeen} ASOF reportedby(ArchiveDate);
+QUERY: FirstDegreeRelativesAndAssociates(SearchForLexID, ArchiveDate) <= FirstDegreeAssociations(Subject.UID = SearchForLexID) {Subject, FirstDegreeAssociation, Title, TitleDescription, RelationshipType, RelationshipConfidence, RelationshipScore, Generation, RelationshipDateFirstSeen, RelationshipDateLastSeen} ASOF reportedby(ArchiveDate);
 
 // The following Queries have been added to support grabbing the data for multiple LexID's.  These eventually can be removed once KEL allows for SETs of LexID's to be passed into the Queries defined above
 // Basic query to grab the most recent Boca Shell Attributes
@@ -7200,63 +7402,7 @@ QUERY: AllRiskViewSnapshots(ArchiveDate) <= RiskView ASOF reportedby(ArchiveDate
 QUERY: AllPersonEntityData(ArchiveDate) <= Person ASOF reportedby(ArchiveDate);
 
 // Query to grab all Relatives and First Degree Associations
-QUERY: AllFirstDegreeRelativesAndAssociates(ArchiveDate) <= FirstDegreeAssociations {Subject,
-    FirstDegreeAssociation,
-    Title,
-	TitleDescription := MAP( // Currently KEL doesn't support defining new attributes on the association itself (It will in the future) which would make this just TitleDescription,
-			Title = 1	=> 'Subject',
-			Title = 2	=> 'Husband',
-			Title = 3	=> 'Wife',
-			Title = 4	=> 'Spouse',
-			Title = 5	=> 'Ex-Husband',
-			Title = 6	=> 'Ex-Wife',
-			Title = 7	=> 'Ex-Spouse',
-			Title = 8	=> 'Widow',
-			Title = 9	=> 'Widower',
-			Title = 10	=> 'Father',
-			Title = 11	=> 'Mother',
-			Title = 12	=> 'Parent',
-			Title = 13	=> 'Grandfather',
-			Title = 14	=> 'Grandmother',
-			Title = 15	=> 'Grandparent',
-			Title = 16	=> 'Brother',
-			Title = 17	=> 'Sister',
-			Title = 18	=> 'Sibling',
-			Title = 19 	=> 'Son',
-			Title = 20	=> 'Daughter',
-			Title = 21	=> 'Child',
-			Title = 22	=> 'Grandson',
-			Title = 23	=> 'Granddaughter',
-			Title = 24 	=> 'Grandchild',
-			Title = 25 	=> 'In-law',
-			Title = 26 	=> 'Sister-in-law',
-			Title = 27 	=> 'Brother-in-law',
-			Title = 28 	=> 'Sibling-in-law',
-			Title = 29	=> 'Mother-in-law',
-			Title = 30	=> 'Father-in-law',
-			Title = 31 	=> 'Parent-in-law',
-			Title = 32	=> 'Stepfather',
-			Title = 33	=> 'Stepmother',
-			Title = 34 	=> 'Stepparent',
-			Title = 35	=> 'Stepbrother',
-			Title = 36 	=> 'Stepsister',
-			Title = 37	=> 'Stepsibling',
-			Title = 38	=> 'Aunt',
-			Title = 39	=> 'Uncle',
-			Title = 40	=> 'Niece',
-			Title = 41 	=> 'Nephew',
-			Title = 42 	=> 'Cousin',
-			Title = 43 	=> 'Relative',
-			Title = 44 	=> 'Associate',
-			Title = 45	=> 'Neighbor',
-			Title = 46 	=> 'Business',
-							'Transactional-Associate'),
-	RelationshipType,
-	RelationshipConfidence,
-	RelationshipScore,
-	Generation,
-	RelationshipDateFirstSeen,
-	RelationshipDateLastSeen} ASOF reportedby(ArchiveDate);
+QUERY: AllFirstDegreeRelativesAndAssociates(ArchiveDate) <= FirstDegreeAssociations {Subject, FirstDegreeAssociation, Title, TitleDescription, RelationshipType, RelationshipConfidence, RelationshipScore, Generation, RelationshipDateFirstSeen, RelationshipDateLastSeen} ASOF reportedby(ArchiveDate);
 
 // The following Queries support different views of our Credit Report entity definition
 QUERY: CreditReportAttributes(SearchForTransactionID) <= CreditReport(TransactionID = SearchForTransactionID);
@@ -7288,3 +7434,10 @@ QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOff
 QUERY: CriminalOffenses(SearchForOffenderKey) <= CriminalOffense(OffenderKey = SearchForOffenderKey);
 
 QUERY: PersonLastConvictedDate(SearchForLexID) <= Person(UID=SearchForLexID){LastConvictedDate};   
+
+// Address Based Queries
+QUERY: PersonsAddresses(SearchForLexID) <= Person(UID = SearchForLexID).PersonAddress.Location;
+
+QUERY: AddressDump(ArchiveDate) <= Address; // ASOF reportedby(ArchiveDate);
+
+QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Range, ZIP, ArchiveDate) <= Address(PrimaryRange = Prim_Range AND Predirectional = Predir AND PrimaryName = Prim_Name AND Suffix = Suffix AND Postdirectional = Postdir AND SecondaryRange = Sec_Range AND ZIP5 = ZIP); // ASOF reportedby(ArchiveDate);
