@@ -1,4 +1,4 @@
-/* KEL Compiler Options and Configurations. */
+﻿/* KEL Compiler Options and Configurations. */
 #OPTION(persist, 2)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
@@ -2318,6 +2318,12 @@ SecondDegreeAssociations := ASSOCIATION(FLAT(Person FirstDegreeAssociation=LexID
 // Now make sure that I am not my own second degree relative (For example: I am my dad's relative)
 GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#FirstDegree, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2), #Subj<>#SecondDegree => SecondDegreeAssociations(#Subj, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2);
 //GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#FirstDegree, #SecondDegree), #Subj<>#SecondDegree, NOT FirstDegreeAssociations(#Subj, #SecondDegree) => SecondDegreeAssociations(#Subj, #SecondDegree, 9999/*Title*/, 'SECOND DEGREE'/*RelationshipType*/, ''/*RelationshipConfidence*/, 0/*RelationshipScore*/, ''/*Generation*/, '0'/*RelationshipDateFirstSeen*/, '0'/*RelationshipDateLastSeen*/);
+
+//The below GLOBAL definition removes duplicate lexids from SecondDegreeAssociations...but does not remove the first degree association lexids from second degree associations
+//GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#FirstDegree, #SecondDegree), #Subj<>#SecondDegree => SecondDegreeAssociations(#Subj, #SecondDegree, 9999/*Title*/, 'SECOND DEGREE'/*RelationshipType*/, ''/*RelationshipConfidence*/, 0/*RelationshipScore*/, ''/*Generation*/, '0'/*RelationshipDateFirstSeen*/, '0'/*RelationshipDateLastSeen*/); 
+
+//The below GLOBAL definition is an attempt to remove the first degree from the second degree results...returns the same records as the definition above
+//GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#FirstDegree, #SecondDegree), #Subj<>#SecondDegree, NOT FirstDegreeAssociations(#Subj, #SecondDegree) => SecondDegreeAssociations(#Subj, #SecondDegree, 9999/*Title*/, 'SECOND DEGREE'/*RelationshipType*/, ''/*RelationshipConfidence*/, 0/*RelationshipScore*/, ''/*Generation*/, '0'/*RelationshipDateFirstSeen*/, '0'/*RelationshipDateLastSeen*/); 
 
 USE hygenics_crim.File_Moxie_Crim_Offender2_Dev(FLAT, 
 						PersonOffenses(Offender=did));
@@ -6810,6 +6816,14 @@ Person: => RiskView_Reason25 := ONLY(RiskViewCurrentSnapshot, Reason25);
 Person: => SecondOrThirdDegreeFelonyCount := COUNT(PersonOffenses.Offense(IsSecondOrThirdDegreeFelony)); 
 Person: => LastConvictedDate := PersonOffenses.Offense.OffenseCharges.DateOfConviction$Max;
 
+// Person: => SuspectRelativesAndAssociatesCount := COUNT(SecondDegreeAssociations.SecondDegreeAssociation) + COUNT(FirstDegreeAssociations.FirstDegreeAssociation);
+// Person: => SuspectRelativesAndAssociatesSecondThirdDegreeFelonyCount := COUNT(Person.SecondDegreeAssociations.SecondDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony))	+ 
+																																				// COUNT(Person.FirstDegreeAssociations.FirstDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony));
+Person: => SuspectRelativesAndAssociatesCount := COUNT(FirstDegreeAssociations.FirstDegreeAssociation);
+Person: => SuspectRelativesAndAssociatesSecondThirdDegreeFelonyCount := COUNT(Person.FirstDegreeAssociations.FirstDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony));
+																																				//+ COUNT(Person.FirstDegreeAssociations.FirstDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony));
+                            
+   
 
 
 // White Box Attributes Section
@@ -7434,6 +7448,11 @@ QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOff
 QUERY: CriminalOffenses(SearchForOffenderKey) <= CriminalOffense(OffenderKey = SearchForOffenderKey);
 
 QUERY: PersonLastConvictedDate(SearchForLexID) <= Person(UID=SearchForLexID){LastConvictedDate};   
+
+QUERY: SuspectRelativesAssociatesCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectRelativesAndAssociatesCount};
+
+QUERY: SuspectRelativesAssociatesSecondThirdDegreeFelonyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectRelativesAndAssociatesSecondThirdDegreeFelonyCount};
+ 
 
 // Address Based Queries
 QUERY: PersonsAddresses(SearchForLexID) <= Person(UID = SearchForLexID).PersonAddress.Location;
