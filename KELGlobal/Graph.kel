@@ -4,20 +4,78 @@
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
 
 /* Global Entity definitions belong here. */
-
+ 
 // Defining the ERA to allow for ASOF functionality
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
 // Global Person Entity Definition
 Person := ENTITY(FLAT(UID=LexID,
-		STRING FirstName=NULL(),
-		STRING MiddleName=NULL(), 
-		STRING LastName=NULL(),
-		DATE DateOfBirth),
+	STRING FirstName=NULL(),
+	STRING MiddleName=NULL(), 
+	STRING LastName=NULL(),
+	DATE DateOfBirth,
+	DATE DateOfDeath),
 	MODEL(UID, 
-		FullName{FirstName, MiddleName, LastName}, 
-		ReportedDatesOfBirth{DateOfBirth}));
+				FullName{FirstName, MiddleName, LastName}, 
+				ReportedDatesOfBirth{DateOfBirth},
+				ReportedDatesOfDeath{DateOfDeath}));
+
+
+Bankruptcy := ENTITY(FLAT(UID(TMSID),
+		STRING TMSID=NULL('Garbage12345'),
+		STRING Source=NULL(),
+		DATE DateVendorFirstReported,   
+		DATE DateVendorLastReported, 
+		DATE DateCreated,
+		DATE CaseClosingDate,
+		DATE DateFiled,  
+		DATE ReopenDate,
+		STRING DismissStatus=NULL(),
+		INTEGER CaseStatus=NULL(),    
+		STRING CourtCode=NULL(),
+		STRING CourtName=NULL(),
+		STRING CourtLocation=NULL(),
+		INTEGER CaseNumber=NULL(),     
+		STRING OriginalCaseNumber=NULL(), 
+		INTEGER CaseID=NULL(),
+		STRING FilingStatus=NULL(), 
+		STRING OriginalChapter=NULL(),  
+		STRING AssetsStatus=NULL(),                           
+		STRING FilingType=NULL(),  
+		DATE MeetingDate,
+		INTEGER MeetingTime=NULL(),  
+		DATE ClaimsDeadline,
+		STRING JudgeName=NULL(),
+		STRING JudgesIdentification=NULL(),
+		STRING FilingJurisdiction=NULL(),
+		REAL AssetsValue=NULL(),         
+		REAL LiabilitiesValue=NULL(),    
+		BOOLEAN SplitCase=NULL(),
+		BOOLEAN FiledInError=NULL(),
+ 		DATE BarDate, 
+		BOOLEAN TransferIn=NULL(), 
+		DATE StatusDate,  
+		STRING StatusType=NULL(), 
+		DATE FilingDate,   
+		STRING Description=NULL()),
+	MODEL(UID, TMSID,
+		SourceDetails{Source}, 
+		DateInformation{DateVendorFirstReported, DateVendorLastReported, ReopenDate, DateCreated, DateFiled, ClaimsDeadline},
+		ClosingDate{CaseClosingDate},
+		StatusDetails{DismissStatus, CaseStatus, FilingStatus, AssetsStatus}, 
+		CourtDetails{CourtCode, CourtName, CourtLocation},
+		CaseDetails{CaseID, CaseNumber, OriginalCaseNumber}, 
+		ChapterDetails{OriginalChapter},
+		FileType{FilingType},
+		MeetingDetails{MeetingDate, MeetingTime}, 
+		JudgeDetails{JudgeName, JudgesIdentification, FilingJurisdiction}, 
+		PropertyValues{AssetsValue, LiabilitiesValue}, 
+		SplitDetails{SplitCase}, 
+		ErrorFiled{FiledInError},
+		Others{BarDate, TransferIn}, 
+		Status{StatusDate, StatusType},
+		Comments{FilingDate, Description}));
 
   
 CriminalOffense := ENTITY(FLAT(UID(offender_key),
@@ -2309,6 +2367,7 @@ PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRa
 PersonCreditReport := ASSOCIATION(FLAT(Person Subject=LexID, CreditReport Report=UID(TransactionID, LexID))); // Connects a Person to a Credit Report
 JointCreditReport := ASSOCIATION(FLAT(CreditReport SubjectReport=UID(TransactionID, LexID), CreditReport JointReport=UID(TransactionID, LexID))); // Connects a Credit Report for a Subject to the Credit Report for the joint applicant
 
+PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID)));
 
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
 
@@ -2336,7 +2395,16 @@ USE IDL_Header.header_ins(FLAT,
 		MiddleName = mname,
 		LastName = lname,
 		DateOfBirth = dob));						
- 
+  
+								 	 
+USE Header.File_Did_Death_Master_ssa(FLAT, 
+						Person(UID=did,
+									FirstName = fname,
+									MiddleName = mname,
+									LastName = lname,
+									DateOfBirth = dob8,
+									DateOfDeath = dod8));	
+
 
 USE hygenics_crim.File_Moxie_Court_Offenses_Dev(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
 	CriminalOffense(
@@ -2386,6 +2454,47 @@ USE ACA.Key_ACA_Addr_RID(FLAT, // This file doesn't contain Dates First/Last See
 		InstitutionTypeExpanded = inst_type_exp,
 		InstitutionName = institution,
 		RecordCountHelper = UniqueID));
+
+USE BankruptcyV3.Key_BankruptcyV3_Main_Full(FLAT,
+	Bankruptcy(TMSID = TMSID,
+		Source = source,
+		DateLastSeen = date_last_seen,
+		DateFirstSeen = date_first_seen,
+		DateVendorFirstReported = date_vendor_first_reported,   
+		DateVendorLastReported = date_vendor_last_reported,  
+		ReopenDate = reopen_date,
+ 		CaseClosingDate = case_closing_date,
+		DateCreated	= date_created,
+		DateFiled = date_filed,
+		DismissStatus = method_dismiss,
+		CaseStatus = case_status,
+		CourtCode = court_code,
+		CourtName = court_name,
+		CourtLocation = court_location,
+		CaseNumber = case_number,
+		OriginalCaseNumber = orig_case_number,
+		CaseID = caseid,
+		FilingStatus = filing_status,
+		OriginalChapter = orig_chapter,
+		AssetsStatus = assets_no_asset_indicator,                
+		FilingType = filer_type,  
+		MeetingDate = meeting_date,
+		MeetingTime = meeting_time,
+		ClaimsDeadline = claims_deadline,
+		JudgeName = judge_name,
+		JudgesIdentification = judges_identification,
+		FilingJurisdiction = filing_jurisdiction,
+		AssetsValue = assets,         
+		LiabilitiesValue = liabilities,    
+		SplitCase = splitcase,
+		FiledInError = filedinerror,                           
+		BarDate = bardate,
+		TransferIn = transferin,
+		StatusDate = status_date,
+		StatusType = status_type,
+		FilingDate = comment_filing_date,
+		Description = comment_description),
+	PersonBankruptcy(Subject = did));
 
 // Maps the ADVO index to the Address Entity
 USE ADVO.Key_Addr1(FLAT,
@@ -7312,6 +7421,35 @@ CreditReport: => TotalDismissedChapter11Bankruptcies := COUNT(CreditReportBankru
 CreditReport: => TotalDismissedChapter12Bankruptcies := COUNT(CreditReportBankruptcy(Chapter12 AND Dismissed));
 CreditReport: => TotalDismissedChapter13Bankruptcies := COUNT(CreditReportBankruptcy(Chapter13 AND Dismissed));
 
+//NEW Attributes For Bankruptcy Entity(chapter7,chapter11,12,13,discharge,dismissed all there are new attributes we r adding to our base files and this new attributes are mapped to one of the fields in the Entity def like originalchapter=7)
+ 						
+Bankruptcy: => Chapter7 := EXISTS(ChapterDetails(OriginalChapter = '7'));
+Bankruptcy: => Chapter11 := EXISTS(ChapterDetails(OriginalChapter = '11'));
+Bankruptcy: => Chapter12 := EXISTS(ChapterDetails(OriginalChapter = '12'));
+Bankruptcy: => Chapter13 := EXISTS(ChapterDetails(OriginalChapter = '13'));
+Bankruptcy: => Discharged := EXISTS(Status(StatusType = 'DISCHARGED'));
+Bankruptcy: => Dismissed := EXISTS(Status(StatusType = 'DISMISSED'));	
+
+// Adding  new attributes  MostRecentBankruptcyType,BankruptcyChapter,MostRecentDateFirstSeen, MostRecentDateLastSeen,MostRecentStatusDetails,MostRecentBankruptcyStatus for Bankruptcy Entity
+
+Bankruptcy: => MostRecentChapterDetails := TOPN(ChapterDetails, 1, -OriginalChapter:DateLastSeen, -OriginalChapter:DateFirstSeen);
+Bankruptcy: => BankruptcyChapter := ONLY(MostRecentChapterDetails, OriginalChapter);
+Bankruptcy: => MostRecentDateFirstSeen := TMSID:DateFirstSeen;
+Bankruptcy: => MostRecentDateLastSeen := TMSID:DateLastSeen;
+Bankruptcy: => MostRecentStatusDetails := TOPN(Status, 1, -StatusType:DateLastSeen, -StatusType:DateFirstSeen);
+Bankruptcy: => MostRecentBankruptcyStatus := IF(ONLY(MostRecentStatusDetails, StatusType) = '', 'Unknown', ONLY(MostRecentStatusDetails, StatusType)); 
+
+//Adding new attributes to person Entity
+
+Person: => MostRecentBankruptcy := PersonBankruptcy.Bankrupt(Helper=MAX(PersonBankruptcy.Subject.PersonBankruptcy.Bankrupt,Helper));
+Person: => BankruptcyType := ONLY(MostRecentBankruptcy, PersonBankruptcy.Bankrupt.BankruptcyChapter);
+Person: => LastBankruptcyDate := ONLY(MostRecentBankruptcy, PersonBankruptcy.Bankrupt.MostRecentDateLastSeen);
+Person: => BankruptcyStatus := ONLY(MostRecentBankruptcy, PersonBankruptcy.Bankrupt.MostRecentBankruptcyStatus);
+Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy.Bankrupt(EXISTS(DateInformation.AgeInMonths <= 60 AND NOT DateInformation.AgeInMonths:Null))); 
+
+Bankruptcy.DateInformation: => ValidDate := ISVALIDDATE(DateFiled);
+Bankruptcy.DateInformation: => AgeInMonths := IF(ValidDate, MONTHSBETWEEN(DateFiled,TODAY()), 65535);
+Bankruptcy: => Helper:= INTEGERFROMDATE(MostRecentDateFirstSeen)*100000000+INTEGERFROMDATE(MostRecentDateLastSeen);
 
 CriminalOffense: => IsSecondOrThirdDegreeFelony := EXISTS(OffenseCharges.Level IN SECOND_OR_THIRD_DEGREE_FELONY_CODE_LIST); 
 
@@ -7458,5 +7596,17 @@ QUERY: SuspectRelativesAssociatesSecondThirdDegreeFelonyCount(SearchForLexID) <=
 QUERY: PersonsAddresses(SearchForLexID) <= Person(UID = SearchForLexID).PersonAddress.Location;
 
 QUERY: AddressDump(ArchiveDate) <= Address; // ASOF reportedby(ArchiveDate);
+
+QUERY: Bankruptcy(SearchForTMSID) <= Bankruptcy(TMSID = SearchForTMSID); 
+
+QUERY: PersonBankruptcyTest <= PersonBankruptcy;
+
+QUERY: PersonsBankruptcies(SearchForLexID) <= Person(UID = SearchForLexID){UID, MostRecentBankruptcy}.PersonBankruptcy.Bankrupt;
+
+//QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID,BankruptcyCountInLast5Years,MostRecentBankruptcy}.PersonBankruptcy.Subject;
+
+//QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID, LastBankruptcyDate,BankruptcyType,BankruptcyStatus,BankruptcyCountInLast5Years,MostRecentBankruptcy,PersonBankruptcy.Bankrupt};
+
+QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID, LastBankruptcyDate, BankruptcyType, BankruptcyStatus, BankruptcyCountInLast5Years, MostRecentBankruptcy}; 
 
 QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Range, ZIP, ArchiveDate) <= Address(PrimaryRange = Prim_Range AND Predirectional = Predir AND PrimaryName = Prim_Name AND Suffix = Suffix AND Postdirectional = Postdir AND SecondaryRange = Sec_Range AND ZIP5 = ZIP); // ASOF reportedby(ArchiveDate);
