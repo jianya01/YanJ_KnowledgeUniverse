@@ -5,7 +5,7 @@ EXPORT Process_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJ
 	VersionFileName := Vault.Files(pDataSource).base_prefix + '::' + pBaseSuffix + '::VersionFile';
 	VersionFile := DATASET(VersionFileName, Vault_Layout.Layout_Version, THOR, OPT);
 	
-	NewVersionDate := get_EnvVariable(pPkgVar, pRoxieIP);
+	NewVersionDate := Vault.get_EnvVariable(pPkgVar, pRoxieIP);
 
 	UpdateVersionDs := DATASET([{NewVersionDate, pPkgVar}], Vault_Layout.Layout_Version);
 	

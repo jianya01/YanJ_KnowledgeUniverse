@@ -1,5 +1,4 @@
-﻿//WUID: W20160621-092100
-Vault.Build_Automation(Vault.Files('publicrecord', 'automationtest').Automationtest_Vault, //Vault File
+﻿Vault.Build_Automation(Vault.Files('publicrecord', 'automationtest').Automationtest_Vault, //Vault File
 											 Vault.Files().Automationtest, //Source File 
 											 Vault.Files().Automationtest_File, //Source File Name
 											 Vault_Layout.Layout_Automation_Vault,  //Current Vault Layout																			

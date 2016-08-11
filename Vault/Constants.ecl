@@ -6,7 +6,7 @@
 	EXPORT STRING srcCSVquote := '"';	
 	EXPORT STRING ProdDestinationgroup := 'analyt_thor400_90_prod';
 	EXPORT STRING DevDestinationgroup := 'thor400_72';
-	EXPORT STRING Dops_RoxieIP := 'http://roxiebatch.br.seisint.com:9856';
+	EXPORT STRING  Dops_RoxieIP := 'http://roxiebatch.br.seisint.com:9856';
 	EXPORT STRING IDops_RoxieIP := 'http://Iroxievip.sc.seisint.com:9876';
 	EXPORT STRING IHeader_Pkg_Var := 'iheader_build_version';
 	EXPORT STRING PublicRecord_Bankruptcy_Daily_pkg_Var := 'Bankruptcy_daily';
