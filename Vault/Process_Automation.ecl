@@ -1,11 +1,11 @@
-﻿IMPORT ut, Vault_Layout, did_add;
+﻿IMPORT ut, Vault_Layout;
 
 EXPORT Process_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoinFields, pCompareLeftFields, pCompareRightFields, pBaseprefix, pBaseSuffix, pBuildDate, pStrataBase, pStrataFrequency, pDataSource, pEmailSourceIn, pPkgVar, pRoxieIP) := FUNCTIONMACRO
 	
 	VersionFileName := Vault.Files(pDataSource).base_prefix + '::' + pBaseSuffix + '::VersionFile';
 	VersionFile := DATASET(VersionFileName, Vault_Layout.Layout_Version, THOR, OPT);
 	
-	NewVersionDate := did_add.get_EnvVariable(pPkgVar, pRoxieIP);
+	NewVersionDate := get_EnvVariable(pPkgVar, pRoxieIP);
 
 	UpdateVersionDs := DATASET([{NewVersionDate, pPkgVar}], Vault_Layout.Layout_Version);
 	
