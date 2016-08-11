@@ -7,7 +7,7 @@ EXPORT Build_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoi
 	pNewFile := PROJECT(pProdFile, TRANSFORM(pVaultLayout, SELF := LEFT, SELF := []));
 	
 	Current_Date := (UNSIGNED4) pBuildDate;
-	Yesterday := GLOBAL((UNSIGNED4)ut.date_math(pBuildDate, -1));		 
+	Yesterday := GLOBAL((UNSIGNED4)vault.date_math(pBuildDate, -1));		 
   Maxvault_rid := GLOBAL(MAX(pVaultFile, vault_rid));
 		 
 	pVaultLayout Take_Record(pOldFile vault_le, pNewFile vault_ri) := TRANSFORM
