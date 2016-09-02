@@ -2,7 +2,7 @@
 #OPTION(persist, 2)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
-
+ 
 /* Global Entity definitions belong here. */
  
 // Defining the ERA to allow for ASOF functionality
@@ -10,9 +10,9 @@ ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
 // Global Person Entity Definition
-Person := ENTITY(FLAT(UID=LexID,
+Person := ENTITY(FLAT(UID=LexID, 
 	STRING FirstName=NULL(),
-	STRING MiddleName=NULL(), 
+	STRING MiddleName=NULL(),  
 	STRING LastName=NULL(),
 	DATE DateOfBirth,
 	DATE DateOfDeath),
@@ -20,9 +20,9 @@ Person := ENTITY(FLAT(UID=LexID,
 				FullName{FirstName, MiddleName, LastName}, 
 				ReportedDatesOfBirth{DateOfBirth},
 				ReportedDatesOfDeath{DateOfDeath}));
-
-
-Bankruptcy := ENTITY(FLAT(UID(TMSID),
+ 
+ 
+Bankruptcy := ENTITY(FLAT(UID(TMSID), 
 		STRING TMSID=NULL('Garbage12345'),
 		STRING Source=NULL(),
 		DATE DateVendorFirstReported,   
@@ -78,17 +78,14 @@ Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		Comments{FilingDate, Description}));
 
   
-CriminalOffense := ENTITY(FLAT(UID(offender_key),
+CriminalOffense := ENTITY(FLAT(UID(offender_key), 
 		STRING OffenderKey=NULL(),
-		DATE DateOfConviction,
+		STRING OffenseScore=NULL(),
 		STRING Level=NULL(),
-		STRING CaseNumber=NULL(),
-		STRING FinalPlea=NULL(),
-		DATE DispositionDate,
-		STRING Description=NULL()),
+		STRING CaseNumber=NULL()),
 	MODEL(UID, 
 		OffenderKey, 
-		OffenseCharges{DateOfConviction, Level, CaseNumber, FinalPlea, DispositionDate, Description}));
+		OffenseCharges{OffenseScore, Level, CaseNumber}));
 
 Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), // For now we are using a hashed UID, eventually this will be replaced with the upcoming Location ID
 		STRING PrimaryRange=NULL('garbage12345'),
@@ -2384,9 +2381,6 @@ GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#F
 //The below GLOBAL definition is an attempt to remove the first degree from the second degree results...returns the same records as the definition above
 //GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#FirstDegree, #SecondDegree), #Subj<>#SecondDegree, NOT FirstDegreeAssociations(#Subj, #SecondDegree) => SecondDegreeAssociations(#Subj, #SecondDegree, 9999/*Title*/, 'SECOND DEGREE'/*RelationshipType*/, ''/*RelationshipConfidence*/, 0/*RelationshipScore*/, ''/*Generation*/, '0'/*RelationshipDateFirstSeen*/, '0'/*RelationshipDateLastSeen*/); 
 
-USE hygenics_crim.File_Moxie_Crim_Offender2_Dev(FLAT, 
-						PersonOffenses(Offender=did));
-
 USE IDL_Header.header_ins(FLAT, 
 	Person(UID=did,
 		DateFirstSeen = dt_first_seen, // Contains information for ASOF
@@ -2406,15 +2400,13 @@ USE Header.File_Did_Death_Master_ssa(FLAT,
 									DateOfDeath = dod8));	
 
 
-USE hygenics_crim.File_Moxie_Court_Offenses_Dev(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
+USE doxie_files.Key_Offenders_Risk(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
 	CriminalOffense(
-		OffenderKey = offender_key,
-		DateOfConviction = convict_dt,
-		Level = court_off_lev,
-		CaseNumber = court_case_number,
-		FinalPlea = court_final_plea,
-		DispositionDate = court_disp_date,
-		Description = pros_off_desc_1));
+			OffenderKey = offender_key,
+			OffenseScore = offense_score,
+			Level = criminal_offender_level,
+			CaseNumber = case_num),
+		PersonOffenses(Offender=sdid));
 
   
 /* The following USE statements map the various base files to the appropriate ENTITY definitions. */
@@ -2495,7 +2487,7 @@ USE BankruptcyV3.Key_BankruptcyV3_Main_Full(FLAT,
 		FilingDate = comment_filing_date,
 		Description = comment_description),
 	PersonBankruptcy(Subject = did));
-
+ 
 // Maps the ADVO index to the Address Entity
 USE ADVO.Key_Addr1(FLAT,
 	Address(
@@ -6922,18 +6914,21 @@ Person: => RiskView_Reason23 := ONLY(RiskViewCurrentSnapshot, Reason23);
 Person: => RiskView_Reason24 := ONLY(RiskViewCurrentSnapshot, Reason24);
 Person: => RiskView_Reason25 := ONLY(RiskViewCurrentSnapshot, Reason25);
 
-Person: => SecondOrThirdDegreeFelonyCount := COUNT(PersonOffenses.Offense(IsSecondOrThirdDegreeFelony)); 
-Person: => LastConvictedDate := PersonOffenses.Offense.OffenseCharges.DateOfConviction$Max;
+Person: => DeceasedDate := Person.ReportedDatesOfDeath; 
+ 
+//Person: => FelonyCount := COUNT(PersonOffenses.Offense{OffenderKey, OffenseCharges.CaseNumber, OffenseCharges.IsFelony}(IsFelony)); // 8/30/2016 This one is close...just doesn't handle blank case numbers
+
+Person: => FelonyCount := COUNT(PersonOffenses.Offense{OffenseCharges.CaseNumber, OffenseCharges.IsFelony}(IsFelony));
+
+//Person: => FelonyCount := COUNT(PersonOffenses.Offense{OffenderKey, OffenseCharges.IsFelony}(IsFelony)); this runs but still gives count of 4 for Thomas Moore
 
 // Person: => SuspectRelativesAndAssociatesCount := COUNT(SecondDegreeAssociations.SecondDegreeAssociation) + COUNT(FirstDegreeAssociations.FirstDegreeAssociation);
 // Person: => SuspectRelativesAndAssociatesSecondThirdDegreeFelonyCount := COUNT(Person.SecondDegreeAssociations.SecondDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony))	+ 
 																																				// COUNT(Person.FirstDegreeAssociations.FirstDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony));
-Person: => SuspectRelativesAndAssociatesCount := COUNT(FirstDegreeAssociations.FirstDegreeAssociation);
-Person: => SuspectRelativesAndAssociatesSecondThirdDegreeFelonyCount := COUNT(Person.FirstDegreeAssociations.FirstDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony));
-																																				//+ COUNT(Person.FirstDegreeAssociations.FirstDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony));
-                            
-   
-
+Person: => SuspectFirstDegreeRelativesAndAssociatesCount := COUNT(FirstDegreeAssociations(Title>=1 AND Title<=45)); //This works as of 8/16/2016
+Person: => SuspectFirstDegreeRelativesAndAssociatesFelonyCount := SUM(Person.FirstDegreeAssociations.FirstDegreeAssociation,FelonyCount);
+																																				
+                      
 
 // White Box Attributes Section
 Address: => ACAHit := IF(EXISTS(ACA), 'Y', 'N');
@@ -7190,7 +7185,7 @@ CreditReportTradeline: UTILITY_CELLULAR_INDUSTRY_CODE_LIST := ['UL', 'UP', 'UT']
 CreditReportTradeline: UTILITY_INDUSTRY_CODE_LIST := ['UA', 'UC', 'UD', 'UE', 'UF', 'UG', 'UH', 'UO', 'US', 'UV', 'UW', 'UZ'];
 CreditReportTradeline: UTILITY_INDUSTRY_INQUIRY_CODE_LIST := ['UA', 'UC', 'UD', 'UE', 'UF', 'UG', 'UH', 'UL', 'UO', 'UP', 'US', 'UT', 'UV', 'UW', 'UZ'];
 
-CriminalOffense: SECOND_OR_THIRD_DEGREE_FELONY_CODE_LIST := ['F2', 'F3'];
+CriminalOffense: FELONY_CODE_LIST := ['F4'];
 
 
 // Credit Report Based Attributes
@@ -7446,12 +7441,15 @@ Person: => BankruptcyType := ONLY(MostRecentBankruptcy, PersonBankruptcy.Bankrup
 Person: => LastBankruptcyDate := ONLY(MostRecentBankruptcy, PersonBankruptcy.Bankrupt.MostRecentDateLastSeen);
 Person: => BankruptcyStatus := ONLY(MostRecentBankruptcy, PersonBankruptcy.Bankrupt.MostRecentBankruptcyStatus);
 Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy.Bankrupt(EXISTS(DateInformation.AgeInMonths <= 60 AND NOT DateInformation.AgeInMonths:Null))); 
+Person: => SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount := SUM(Person.FirstDegreeAssociations(Title>=1 AND Title<=45).FirstDegreeAssociation,BankruptcyCountInLast5Years);
+//Person: => SecondDegreeRelativesAndAssociatesBankruptcyCount := SUM(Person.SecondDegreeAssociations(Title>=1 AND Title<=45).SecondDegreeAssociation,BankruptcyCountInLast5Years);
 
 Bankruptcy.DateInformation: => ValidDate := ISVALIDDATE(DateFiled);
 Bankruptcy.DateInformation: => AgeInMonths := IF(ValidDate, MONTHSBETWEEN(DateFiled,TODAY()), 65535);
 Bankruptcy: => Helper:= INTEGERFROMDATE(MostRecentDateFirstSeen)*100000000+INTEGERFROMDATE(MostRecentDateLastSeen);
 
-CriminalOffense: => IsSecondOrThirdDegreeFelony := EXISTS(OffenseCharges.Level IN SECOND_OR_THIRD_DEGREE_FELONY_CODE_LIST); 
+CriminalOffense.OffenseCharges: => IsFelony := Level = '4' AND OffenseScore = 'F';
+CriminalOffense: => CriminalOffenseChargesCount := COUNT(OffenseCharges(IsFelony)); 
 
 /* Queries specific to the Person Entity definition belong here. */
 
@@ -7545,7 +7543,7 @@ QUERY: AllLengthOfResidencySnapshots(ArchiveDate) <= LengthOfResidency ASOF repo
 QUERY: AllMaritalStatusSnapshots(ArchiveDate) <= MaritalStatus ASOF reportedby(ArchiveDate);
 
 // Query to grab all of the MarketView Snapshots
-QUERY: AllMarketViewSnapshots(ArchiveDate) <= MarketView ASOF reportedby(ArchiveDate);
+QUERY: AllMarketViewSnapshots(ArchiveDate) <= MarketView ASOF reportedby(ArchiveDate); 
 
 // Query to grab all of the RiskView Snapshots
 QUERY: AllRiskViewSnapshots(ArchiveDate) <= RiskView ASOF reportedby(ArchiveDate);
@@ -7579,34 +7577,41 @@ QUERY: PersonsCreditReport(SearchForLexID) <= Person(UID = SearchForLexID).Perso
 
 QUERY: PersonByLexID(SearchForLexID) <= Person(UID=SearchForLexID);
 
-QUERY: PersonSecondThirdDegreeFelonyCountByLexID(SearchForLexID) <= Person(UID=SearchForLexID){SecondOrThirdDegreeFelonyCount}; 
+QUERY: PersonDeceasedDate(SearchForLexID) <= Person(UID=SearchForLexID){DeceasedDate};
 
-QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense{Person.UID, Person.PersonOffenses.Offense.OffenderKey, OffenseCharges.Level};
+
+//Offenses Based Queries
+QUERY: PersonFelonyCountByLexID(SearchForLexID) <= Person(UID=SearchForLexID){FelonyCount}; 
+
+//QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense{Person.UID, Person.PersonOffenses.Offense.OffenderKey, OffenseCharges.Level};
 
 QUERY: CriminalOffenses(SearchForOffenderKey) <= CriminalOffense(OffenderKey = SearchForOffenderKey);
 
-QUERY: PersonLastConvictedDate(SearchForLexID) <= Person(UID=SearchForLexID){LastConvictedDate};   
+QUERY: SuspectFirstDegreeRelativesAssociates(SearchForLexID) <= Person(UID=SearchForLexID).FirstDegreeAssociations(Title>=1 AND Title<=45).FirstDegreeAssociation;
 
-QUERY: SuspectRelativesAssociatesCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectRelativesAndAssociatesCount};
+QUERY: SuspectFirstDegreeRelativesAssociatesCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesCount};
 
-QUERY: SuspectRelativesAssociatesSecondThirdDegreeFelonyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectRelativesAndAssociatesSecondThirdDegreeFelonyCount};
- 
+QUERY: SuspectFirstDegreeRelativesAssociatesFelonyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesFelonyCount};
+
+QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense{Person.UID, Person.PersonOffenses.Offense.OffenderKey, OffenseCharges.Level, OffenseCharges.OffenseScore};
+
+QUERY: PersonsOffensesNew(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense;   
 
 // Address Based Queries
 QUERY: PersonsAddresses(SearchForLexID) <= Person(UID = SearchForLexID).PersonAddress.Location;
 
 QUERY: AddressDump(ArchiveDate) <= Address; // ASOF reportedby(ArchiveDate);
 
+QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID, LastBankruptcyDate, BankruptcyType, BankruptcyStatus, BankruptcyCountInLast5Years, MostRecentBankruptcy}; 
+
+QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Range, ZIP, ArchiveDate) <= Address(PrimaryRange = Prim_Range AND Predirectional = Predir AND PrimaryName = Prim_Name AND Suffix = Suffix AND Postdirectional = Postdir AND SecondaryRange = Sec_Range AND ZIP5 = ZIP); // ASOF reportedby(ArchiveDate);
+
+//Bankruptcy Based Queries
 QUERY: Bankruptcy(SearchForTMSID) <= Bankruptcy(TMSID = SearchForTMSID); 
 
 QUERY: PersonBankruptcyTest <= PersonBankruptcy;
 
 QUERY: PersonsBankruptcies(SearchForLexID) <= Person(UID = SearchForLexID){UID, MostRecentBankruptcy}.PersonBankruptcy.Bankrupt;
 
-//QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID,BankruptcyCountInLast5Years,MostRecentBankruptcy}.PersonBankruptcy.Subject;
-
-//QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID, LastBankruptcyDate,BankruptcyType,BankruptcyStatus,BankruptcyCountInLast5Years,MostRecentBankruptcy,PersonBankruptcy.Bankrupt};
-
-QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID, LastBankruptcyDate, BankruptcyType, BankruptcyStatus, BankruptcyCountInLast5Years, MostRecentBankruptcy}; 
-
-QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Range, ZIP, ArchiveDate) <= Address(PrimaryRange = Prim_Range AND Predirectional = Predir AND PrimaryName = Prim_Name AND Suffix = Suffix AND Postdirectional = Postdir AND SecondaryRange = Sec_Range AND ZIP5 = ZIP); // ASOF reportedby(ArchiveDate);
+QUERY: SuspectFirstDegreeRelativesAssociatesBankruptcyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount};
+  
