@@ -2,10 +2,10 @@
 #OPTION(persist, 2)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
- 
+
 /* Global Entity definitions belong here. */
  
-// Defining the ERA to allow for ASOF functionality
+ // Defining the ERA to allow for ASOF functionality
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
@@ -22,7 +22,7 @@ Person := ENTITY(FLAT(UID=LexID,
 				ReportedDatesOfDeath{DateOfDeath}));
  
  
-Bankruptcy := ENTITY(FLAT(UID(TMSID), 
+Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		STRING TMSID=NULL('Garbage12345'),
 		STRING Source=NULL(),
 		DATE DateVendorFirstReported,   
@@ -58,7 +58,8 @@ Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		DATE StatusDate,  
 		STRING StatusType=NULL(), 
 		DATE FilingDate,   
-		STRING Description=NULL()),
+		STRING Description=NULL(),
+		STRING Disposition=NULL()),
 	MODEL(UID, TMSID,
 		SourceDetails{Source}, 
 		DateInformation{DateVendorFirstReported, DateVendorLastReported, ReopenDate, DateCreated, DateFiled, ClaimsDeadline},
@@ -75,8 +76,8 @@ Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		ErrorFiled{FiledInError},
 		Others{BarDate, TransferIn}, 
 		Status{StatusDate, StatusType},
+		DispositionStatus{Disposition},
 		Comments{FilingDate, Description}));
-
   
 CriminalOffense := ENTITY(FLAT(UID(offender_key), 
 		STRING OffenderKey=NULL(),
@@ -2364,7 +2365,7 @@ PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRa
 PersonCreditReport := ASSOCIATION(FLAT(Person Subject=LexID, CreditReport Report=UID(TransactionID, LexID))); // Connects a Person to a Credit Report
 JointCreditReport := ASSOCIATION(FLAT(CreditReport SubjectReport=UID(TransactionID, LexID), CreditReport JointReport=UID(TransactionID, LexID))); // Connects a Credit Report for a Subject to the Credit Report for the joint applicant
 
-PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID)));
+PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID), STRING NameType));
 
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
 
@@ -2468,9 +2469,8 @@ USE BankruptcyV3.Key_BankruptcyV3_Main_Full(FLAT,
 		CaseID = caseid,
 		FilingStatus = filing_status,
 		OriginalChapter = orig_chapter,
-		AssetsStatus = assets_no_asset_indicator,                
-		FilingType = filer_type,  
-		MeetingDate = meeting_date,
+		AssetsStatus = assets_no_asset_indicator,               
+	 	MeetingDate = meeting_date,
 		MeetingTime = meeting_time,
 		ClaimsDeadline = claims_deadline,
 		JudgeName = judge_name,
@@ -2485,8 +2485,21 @@ USE BankruptcyV3.Key_BankruptcyV3_Main_Full(FLAT,
 		StatusDate = status_date,
 		StatusType = status_type,
 		FilingDate = comment_filing_date,
-		Description = comment_description),
-	PersonBankruptcy(Subject = did));
+		Description = comment_description));
+
+	//Maps the Key_BankruptcyV3_Search_Full to the Bankruptcy Entity
+	
+USE BankruptcyV3.Key_BankruptcyV3_Search_Full(FLAT,
+	PersonBankruptcy(
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
+		Subject = did,
+		NameType = name_type),
+	Bankruptcy(
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
+		FilingType = filing_type,
+		Disposition = disposition));  
  
 // Maps the ADVO index to the Address Entity
 USE ADVO.Key_Addr1(FLAT,
@@ -6925,8 +6938,9 @@ Person: => FelonyCount := COUNT(PersonOffenses.Offense{OffenseCharges.CaseNumber
 // Person: => SuspectRelativesAndAssociatesCount := COUNT(SecondDegreeAssociations.SecondDegreeAssociation) + COUNT(FirstDegreeAssociations.FirstDegreeAssociation);
 // Person: => SuspectRelativesAndAssociatesSecondThirdDegreeFelonyCount := COUNT(Person.SecondDegreeAssociations.SecondDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony))	+ 
 																																				// COUNT(Person.FirstDegreeAssociations.FirstDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony));
-Person: => SuspectFirstDegreeRelativesAndAssociatesCount := COUNT(FirstDegreeAssociations(Title>=1 AND Title<=45)); //This works as of 8/16/2016
-Person: => SuspectFirstDegreeRelativesAndAssociatesFelonyCount := SUM(Person.FirstDegreeAssociations.FirstDegreeAssociation,FelonyCount);
+Person: => SuspectFirstDegreeRelativesAndAssociatesCount := COUNT(FirstDegreeAssociations(Title >= 1 AND Title <= 45)); //This works as of 8/16/2016
+Person: => SuspectFirstDegreeRelativesAndAssociatesFelonyCount := SUM(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation,FelonyCount);
+// Person: => SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount := SUM(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation,BankruptcyCountInLast5Years);
 																																				
                       
 
@@ -7431,22 +7445,25 @@ Bankruptcy: => MostRecentChapterDetails := TOPN(ChapterDetails, 1, -OriginalChap
 Bankruptcy: => BankruptcyChapter := ONLY(MostRecentChapterDetails, OriginalChapter);
 Bankruptcy: => MostRecentDateFirstSeen := TMSID:DateFirstSeen;
 Bankruptcy: => MostRecentDateLastSeen := TMSID:DateLastSeen;
-Bankruptcy: => MostRecentStatusDetails := TOPN(Status, 1, -StatusType:DateLastSeen, -StatusType:DateFirstSeen);
+Bankruptcy: => MostRecentStatusDetails := TOPN(Status, 1, -StatusDate, -StatusType:DateLastSeen, -StatusType:DateFirstSeen);
 Bankruptcy: => MostRecentBankruptcyStatus := IF(ONLY(MostRecentStatusDetails, StatusType) = '', 'Unknown', ONLY(MostRecentStatusDetails, StatusType)); 
+Bankruptcy: => MostRecentDispositionDetails := TOPN(DispositionStatus, 1,-Disposition:DateLastSeen,-Disposition:DateFirstSeen);
+Bankruptcy: => MostRecentBankruptcyDisposition := ONLY(MostRecentDispositionDetails,Disposition);
+Bankruptcy: => MostRecentFilingTypeDetails := TOPN(FileType, 1,-FilingType:DateLastSeen,-FilingType:DateFirstSeen);
+Bankruptcy: => MostRecentBankruptcyFilingType := ONLY(MostRecentFilingTypeDetails,FilingType);
 
 //Adding new attributes to person Entity
 
-Person: => MostRecentBankruptcy := PersonBankruptcy.Bankrupt(Helper=MAX(PersonBankruptcy.Subject.PersonBankruptcy.Bankrupt,Helper));
-Person: => BankruptcyType := ONLY(MostRecentBankruptcy, PersonBankruptcy.Bankrupt.BankruptcyChapter);
-Person: => LastBankruptcyDate := ONLY(MostRecentBankruptcy, PersonBankruptcy.Bankrupt.MostRecentDateLastSeen);
-Person: => BankruptcyStatus := ONLY(MostRecentBankruptcy, PersonBankruptcy.Bankrupt.MostRecentBankruptcyStatus);
-Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy.Bankrupt(EXISTS(DateInformation.AgeInMonths <= 60 AND NOT DateInformation.AgeInMonths:Null))); 
-Person: => SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount := SUM(Person.FirstDegreeAssociations(Title>=1 AND Title<=45).FirstDegreeAssociation,BankruptcyCountInLast5Years);
-//Person: => SecondDegreeRelativesAndAssociatesBankruptcyCount := SUM(Person.SecondDegreeAssociations(Title>=1 AND Title<=45).SecondDegreeAssociation,BankruptcyCountInLast5Years);
+Person: => MostRecentBankruptcy := PersonBankruptcy(NameType = 'D').Bankrupt(Helper=MAX(PersonBankruptcy(NameType = 'D').Subject.PersonBankruptcy(NameType = 'D').Bankrupt,Helper));
+Person: => BankruptcyFilingType := ONLY(MostRecentBankruptcy,PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentBankruptcyFilingType);
+Person: => LastBankruptcyDate := ONLY(MostRecentBankruptcy, PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentDateLastSeen);
+Person: => BankruptcyStatus := ONLY(MostRecentBankruptcy, PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentBankruptcyStatus);
+Person: => BankruptcyDisposition := ONLY(MostRecentBankruptcy, PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentBankruptcyDisposition);
+Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy(NameType = 'D').Bankrupt(EXISTS(DateInformation.AgeInDays <= 1826 AND NOT DateInformation.AgeInDays:Null))); 
 
-Bankruptcy.DateInformation: => ValidDate := ISVALIDDATE(DateFiled);
-Bankruptcy.DateInformation: => AgeInMonths := IF(ValidDate, MONTHSBETWEEN(DateFiled,TODAY()), 65535);
-Bankruptcy: => Helper:= INTEGERFROMDATE(MostRecentDateFirstSeen)*100000000+INTEGERFROMDATE(MostRecentDateLastSeen);
+Bankruptcy.DateInformation: => ValidDate := ISVALIDDATE(DateFiled:DateLastSeen);
+Bankruptcy.DateInformation: => AgeInDays := IF(ValidDate,DAYSBETWEEN(DateFiled:DateLastSeen,TODAY()), 65535); 
+Bankruptcy: => Helper:= INTEGERFROMDATE(MostRecentDateLastSeen)*100000000+INTEGERFROMDATE(MostRecentDateFirstSeen); 
 
 CriminalOffense.OffenseCharges: => IsFelony := Level = '4' AND OffenseScore = 'F';
 CriminalOffense: => CriminalOffenseChargesCount := COUNT(OffenseCharges(IsFelony)); 
@@ -7602,8 +7619,6 @@ QUERY: PersonsAddresses(SearchForLexID) <= Person(UID = SearchForLexID).PersonAd
 
 QUERY: AddressDump(ArchiveDate) <= Address; // ASOF reportedby(ArchiveDate);
 
-QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID, LastBankruptcyDate, BankruptcyType, BankruptcyStatus, BankruptcyCountInLast5Years, MostRecentBankruptcy}; 
-
 QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Range, ZIP, ArchiveDate) <= Address(PrimaryRange = Prim_Range AND Predirectional = Predir AND PrimaryName = Prim_Name AND Suffix = Suffix AND Postdirectional = Postdir AND SecondaryRange = Sec_Range AND ZIP5 = ZIP); // ASOF reportedby(ArchiveDate);
 
 //Bankruptcy Based Queries
@@ -7613,5 +7628,9 @@ QUERY: PersonBankruptcyTest <= PersonBankruptcy;
 
 QUERY: PersonsBankruptcies(SearchForLexID) <= Person(UID = SearchForLexID){UID, MostRecentBankruptcy}.PersonBankruptcy.Bankrupt;
 
-QUERY: SuspectFirstDegreeRelativesAssociatesBankruptcyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount};
+QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID,LastBankruptcyDate,BankruptcyFilingType,BankruptcyDisposition,BankruptcyCountInLast5Years,MostRecentBankruptcy}; 
+
+SHELL: BankruptcyShell <= Person{UID,BankruptcyFilingType,BankruptcyDisposition,LastBankruptcyDate,BankruptcyCountInLast5Years};
+
+// QUERY: SuspectFirstDegreeRelativesAssociatesBankruptcyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount};
   
