@@ -9,7 +9,7 @@
 // For future Workunit Identification it is suggested that you update this WORKUNIT name to something specific to the file you are profiling
 #WORKUNIT('name', 'SALT_Profile');
 
-IMPORT SALT34, SALTRoutines; 
+IMPORT SALT35, SALTRoutines; 
 
 
 // ---- Step 1.) Change the below record structure to Match your input file. NOTE: If you are just going to use a predefined ECL file/index reference such as ADVO.Key_Addr1 you DO NOT need to do this step: ----

@@ -1,4 +1,4 @@
-export boolean WithinEditN_WithLengths(string l,unsigned1 ll,string r,unsigned1 rl,unsigned1 d) := BEGINC++
+﻿export boolean WithinEditN_WithLengths(string l,unsigned1 ll,string r,unsigned1 rl,unsigned1 d) := BEGINC++
   #option pure
 	lenL = ll;
 	lenR = rl;
@@ -31,51 +31,51 @@ export boolean WithinEditN_WithLengths(string l,unsigned1 ll,string r,unsigned1 
 						l++;
 						r++;
 					}
-					// --------- new ----------
-      else if ( lenR > 2 && lenL > 2 && lenR == lenL &&
-                *l == r[1] && *r == l[1] && l[2] == r[2] && l[3] == r[3] )
-      {
-        lenR--;
-        lenL--;
-        l++;
-        r++;
-      }
- 
-      else if ( lenR > 1 && lenL > 1 && *l == r[1] && *r == l[1] &&
-          ( lenR > 2 && lenR >= lenL && l[1] == r[2] ) &&
-         !( lenL > 2 && lenL >= lenR && r[1] == l[2] ) )
-      { // Character missing from LHS
-        lenR--;
-        r++;
-      }
-      else if ( lenR > 1 && lenL > 1 && *l == r[1] && *r == l[1] &&
-         !( lenR > 2 && lenR >= lenL && l[1] == r[2] ) &&
-          ( lenL > 2 && lenL >= lenR && r[1] == l[2] ) )
-      { // Character missing from RHS
-        lenL--;
-        l++;
-      }
-      // --------- new ----------
-					else if ( lenR > 1 && *l == r[1] && ( lenR > lenL || lenR == lenL && l[1] != r[1] ) )
+		else if (( lenR > 3 && lenL > 3 && lenR == lenL &&
+										*l == r[1] && *r == l[1] && l[2] == r[2] && l[3] == r[3] ) ||
+										( (lenR == 3 || lenL == 3) && lenR == lenL &&
+										*l == r[1] && *r == l[1] && l[2] == r[2] ))
+					{ // adjacent transposition counts as an edit
+						lenR--;
+						lenL--;
+						l++;
+						r++;
+					}
+					else if ( lenR > 1 && lenL > 1 && *l == r[1] && *r == l[1] &&
+							( lenR > 2 && lenR >= lenL && l[1] == r[2] ) &&
+						 !( lenL > 2 && lenL >= lenR && r[1] == l[2] ) )
+					{ // Character missing from LHS
+						lenR--;
+						r++;
+					}
+					else if ( lenR > 1 && lenL > 1 && *l == r[1] && *r == l[1] &&
+						 !( lenR > 2 && lenR >= lenL && l[1] == r[2] ) &&
+							( lenL > 2 && lenL >= lenR && r[1] == l[2] ) )
+					{ // Character missing from RHS
+						lenL--;
+						l++;
+					}
+					else if ( lenR > 1 && *l == r[1] && ( lenR > lenL || (lenR == lenL && l[1] != r[1]) ) )
 					{ // Character missing from LHS
 							lenR--;
 							r++;
 					}
-					else if ( lenL > 1 && *r == l[1] && ( lenL > lenR || lenR == lenL && l[1] != r[1] ) )
+					else if ( lenL > 1 && *r == l[1] && ( lenL > lenR || (lenR == lenL && l[1] != r[1]) ) )
 					{ // Character missing from RHS
 							lenL--;
 							l++;
 					}
-          else if ( d>0 && lenR > 1 && *l == r[2] && ( lenR > lenL+1 || lenR == lenL && l[1] != r[1] && l[2] != r[2]) ) 
+					/*
+          else if ( d>0 && lenR > 2 && *l == r[2] && ( lenR > lenL+1 || lenR == lenL && l[1] != r[1] && l[2] != r[2]) ) 
           { // 2 consecutive characters missing from LHS
               lenR--;
               r++;
           }
-          else if ( d>0 && lenL > 1 && *r == l[2] && ( lenL > lenR+1 || lenR == lenL && l[1] != r[1] && l[2] != r[2]) )
+          else if ( d>0 && lenL > 2 && *r == l[2] && ( lenL > lenR+1 || lenR == lenL && l[1] != r[1] && l[2] != r[2]) )
           { // 2 consecutive characters missing from RHS
               lenL--;
               l++;
-          }									
+          }	*/								
 			}
 			lenL--;
 			lenR--;
