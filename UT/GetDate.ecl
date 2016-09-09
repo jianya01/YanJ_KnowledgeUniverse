@@ -1,4 +1,5 @@
-IMPORT lib_stringlib;
-export string8 GetDate := 
-stringlib.getDateYYYYMMDD();
-//'20020501';
+﻿/**
+ * Returns the current date in the local time zone.
+**/ 
+IMPORT STD;
+EXPORT STRING8 GetDate := (STRING)Std.Date.Today():DEPRECATED('Use Std.Date.Today() Instead');

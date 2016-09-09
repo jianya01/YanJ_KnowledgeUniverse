@@ -146,7 +146,7 @@ function
 		self := l;
 	end;
 	
-	directory_listings := project(pSprayInformation, tGetDirs(left));
+	directory_listings := nothor(project(global(pSprayInformation,few), tGetDirs(left)));
 	lblankfiles := dataset([{'', 0,''}],  lib_fileservices.FsFileNameRecord);
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// -- fSetLogicalFilenames function
@@ -272,8 +272,8 @@ function
 		SELF 									:= l;
 	END;
 	
-	dReadyToSprayout	:= global(project(directory_listings, tGetReadyToSpray(left, 0)), few);
-	dReadyToSpray			:= global(project(directory_listings, tGetReadyToSpray(left, 1)), few);
+	dReadyToSprayout	:= nothor(project(global(directory_listings,few), tGetReadyToSpray(left, 0)));
+	dReadyToSpray			:= nothor(project(global(directory_listings,few), tGetReadyToSpray(left, 1)));
 	
 	outputtoworkunit := nothor(output(dReadyToSprayout, all));
 		

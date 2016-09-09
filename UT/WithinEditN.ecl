@@ -1,4 +1,4 @@
-export boolean WithinEditN(string l,string r,unsigned1 d) := BEGINC++
+﻿export boolean WithinEditN(string l,string r,unsigned1 d) := BEGINC++
   #option pure
 	while ( lenL && l[lenL-1]==' ' ) lenL--;
 	while ( lenR && r[lenR-1]==' ' ) lenR--; // Trim incoming strings
@@ -53,12 +53,12 @@ export boolean WithinEditN(string l,string r,unsigned1 d) := BEGINC++
 						lenL--;
 						l++;
 					}
-					else if ( lenR > 1 && *l == r[1] && ( lenR > lenL || lenR == lenL && l[1] != r[1] ) )
+					else if ( lenR > 1 && *l == r[1] && ( lenR > lenL || (lenR == lenL && l[1] != r[1]) ) )
 					{ // Character missing from LHS
 							lenR--;
 							r++;
 					}
-					else if ( lenL > 1 && *r == l[1] && ( lenL > lenR || lenR == lenL && l[1] != r[1] ) )
+					else if ( lenL > 1 && *r == l[1] && ( lenL > lenR || (lenR == lenL && l[1] != r[1]) ) )
 					{ // Character missing from RHS
 							lenL--;
 							l++;
