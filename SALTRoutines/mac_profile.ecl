@@ -1,7 +1,7 @@
-import SALT34;
+﻿import SALT35;
 
 // pass it any dataset for salt base profiling (dIn)
-// return value will contain the results from SALT34.MAC_Character_Counts.FN_Profile
+// return value will contain the results from SALT35.MAC_Character_Counts.FN_Profile
 // for all field in the dataset
 export mac_profile( dIn ) := functionmacro
   loadxml('<xml/>');
@@ -33,15 +33,15 @@ export mac_profile( dIn ) := functionmacro
   %d_norm%:=
 		normalize(dIn,
 		          %field_cnt%,
-	            transform(SALT34.MAC_Character_Counts.Data_Layout,
+	            transform(SALT35.MAC_Character_Counts.Data_Layout,
 									      self.fldno:=counter,
 												self.fld:=choose(#expand(%'field_values'%))
 												)
 							);
 						
-	return SALT34.MAC_Character_Counts.FN_Profile(%d_norm%,
+	return SALT35.MAC_Character_Counts.FN_Profile(%d_norm%,
 		dataset([#expand(%'field_set'%)]
-		        , SALT34.MAC_Character_Counts.Field_Identification ) );
+		        , SALT35.MAC_Character_Counts.Field_Identification ) );
 
 	#end
 endmacro;

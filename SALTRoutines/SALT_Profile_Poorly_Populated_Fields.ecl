@@ -1,8 +1,8 @@
-// This function takes in a SALT profile and then outputs some potential fields that are poorly populated
+﻿// This function takes in a SALT profile and then outputs some potential fields that are poorly populated
 
-IMPORT SALT34;
+IMPORT SALT35;
 
-EXPORT SALT_Profile_Poorly_Populated_Fields(DATASET(SALT34.MAC_Character_Counts.ResultLine_Layout) InputSALTProfile, INTEGER NumberOfDataPatternsToShow = 5, REAL MinimumPercentBlank = 50.0) := FUNCTION
+EXPORT SALT_Profile_Poorly_Populated_Fields(DATASET(SALT35.MAC_Character_Counts.ResultLine_Layout) InputSALTProfile, INTEGER NumberOfDataPatternsToShow = 5, REAL MinimumPercentBlank = 50.0) := FUNCTION
 	SlimmedSALTProfile := PROJECT(InputSALTProfile, TRANSFORM({RECORDOF(LEFT) - cardinality - minval30 - maxval30 - asnumber_minval - asnumber_maxval - asnumber_mean - asnumber_var - len - words - characters}, SELF := LEFT));
 	
 	FieldPopulationLayout := RECORD
