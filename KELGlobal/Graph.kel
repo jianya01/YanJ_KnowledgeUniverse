@@ -134,6 +134,7 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		STRING ResidentialOrBusinessIndicator=NULL(),
 		STRING OnlyWayToGetMailIndicator=NULL(),
 		STRING RecordTypeCode=NULL(),
+		STRING AddressTypeCode=NULL(),
 		STRING MixedUsageCode=NULL(),
 		DATE VacationBeginDate,
 		DATE VacationEndDate,
@@ -151,6 +152,7 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		MixedUsage{MixedUsageCode},
 		OnlyWayToGetMail{OnlyWayToGetMailIndicator},
 		RecordType{RecordTypeCode},
+		AddressType{AddressTypeCode},
 		ResidentialOrBusiness{ResidentialOrBusinessIndicator},
 		SeasonalDelivery{SeasonalDeliveryIndicator, SeasonalStartSuppressionDate, SeasonalEndSuppressionDate},
 		Simplify{SimplifyCount},
@@ -2529,6 +2531,7 @@ USE ADVO.Key_Addr1(FLAT,
 		DeliveryPointBarcode = dbpc,
 		DeliveryPointBarcodeCheckDigit = chk_digit,
 		TypeCode = rec_type,
+		AddressTypeCode = address_type,
 		County = county,
 		Latitude = geo_lat,
 		Longitude = geo_long,
@@ -6927,7 +6930,7 @@ Person: => RiskView_Reason23 := ONLY(RiskViewCurrentSnapshot, Reason23);
 Person: => RiskView_Reason24 := ONLY(RiskViewCurrentSnapshot, Reason24);
 Person: => RiskView_Reason25 := ONLY(RiskViewCurrentSnapshot, Reason25);
 
-Person: => DeceasedDate := Person.ReportedDatesOfDeath; 
+Person: => FirstDeceasedDate := ReportedDatesOfDeath.DateOfDeath$Min; 
  
 //Person: => FelonyCount := COUNT(PersonOffenses.Offense{OffenderKey, OffenseCharges.CaseNumber, OffenseCharges.IsFelony}(IsFelony)); // 8/30/2016 This one is close...just doesn't handle blank case numbers
 
@@ -6968,6 +6971,8 @@ Address: => MostRecentOnlyWayToGetMail := TOPN(OnlyWayToGetMail, 1, -OnlyWayToGe
 Address: => ADVOOnlyWayToGetMailIndicator := ONLY(MostRecentOnlyWayToGetMail, OnlyWayToGetMailIndicator);
 Address: => MostRecentRecordType := TOPN(RecordType, 1, -RecordTypeCode:DateLastSeen, -RecordTypeCode:DateFirstSeen);
 Address: => ADVORecordTypeCode := ONLY(MostRecentRecordType, RecordTypeCode);
+Address: => MostRecentAddressType := TOPN(AddressType, 1, -AddressTypeCode:DateLastSeen, -AddressTypeCode:DateFirstSeen);
+Address: => ADVOAddressTypeCode := ONLY(MostRecentAddressType, AddressTypeCode);
 Address: => MostRecentResidentialOrBusiness := TOPN(ResidentialOrBusiness, 1, -ResidentialOrBusinessIndicator:DateLastSeen, -ResidentialOrBusinessIndicator:DateFirstSeen);
 Address: => ADVOResidentialOrBusinessIndicator := ONLY(MostRecentResidentialOrBusiness, ResidentialOrBusinessIndicator);
 Address: => MostRecentSeasonalDelivery := TOPN(SeasonalDelivery, 1, -SeasonalDeliveryIndicator:DateLastSeen, -SeasonalDeliveryIndicator:DateFirstSeen);
@@ -7594,7 +7599,7 @@ QUERY: PersonsCreditReport(SearchForLexID) <= Person(UID = SearchForLexID).Perso
 
 QUERY: PersonByLexID(SearchForLexID) <= Person(UID=SearchForLexID);
 
-QUERY: PersonDeceasedDate(SearchForLexID) <= Person(UID=SearchForLexID){DeceasedDate};
+QUERY: PersonDeceasedDate(SearchForLexID) <= Person(UID=SearchForLexID){FirstDeceasedDate};
 
 
 //Offenses Based Queries
@@ -7640,7 +7645,7 @@ SHELL: BankruptcyShell <= Person{UID,BankruptcyFilingType,BankruptcyDisposition,
 SHELL: ConsumerShell <= Person{UID,
 														BankruptcyCountInLast5Years, LastBankruptcyDate, BankruptcyFilingType, BankruptcyStatus,
 														FelonyCount, /* LastConvictedDate, NOT IN INITIAL SHELL */
-														DeceasedDate,
+														FirstDeceasedDate,
 														SuspectFirstDegreeRelativesAndAssociatesCount, 
 														//SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount, KEL BUG
 														SuspectFirstDegreeRelativesAndAssociatesFelonyCount}; 
@@ -7658,7 +7663,7 @@ SHELL: AddressShell <= Address{UID,
 															ADVODoNotDeliverIndicator,
 															ADVOCollegeIndicator, ADVOCollegeStartSuppressionDate, ADVOCollegeEndSuppressionDate,
 															ADVOStyleCode, ADVOSimplifyCount, ADVODropIndicator, ADVOResidentialOrBusinessIndicator,
-															ADVOOnlyWayToGetMailIndicator, ADVORecordTypeCode, TypeCode, ADVOMixedUsageCode,
+															ADVOOnlyWayToGetMailIndicator, ADVORecordTypeCode, ADVOAddressTypeCode, ADVOMixedUsageCode,
 															ADVODateFirstSeen, ADVODateLastSeen, ADVODateVendorFirstReported, ADVODateVendorLastReported,
 															ADVOVacationBeginDate, ADVOVacationEndDate, 
 															ADVONumberOfVacationMonths, ADVOMaxVacationMonths, ADVOVacationPeriodsCount,
@@ -7677,7 +7682,7 @@ QUERY: AddressShellInputParmaters(sPrimaryRange,sPredirectional,sPrimaryName,sSu
 															ADVODoNotDeliverIndicator,
 															ADVOCollegeIndicator, ADVOCollegeStartSuppressionDate, ADVOCollegeEndSuppressionDate,
 															ADVOStyleCode, ADVOSimplifyCount, ADVODropIndicator, ADVOResidentialOrBusinessIndicator,
-															ADVOOnlyWayToGetMailIndicator, ADVORecordTypeCode, TypeCode, ADVOMixedUsageCode,/*ADVOAddressType, ADVOAddressUsageType,*/
+															ADVOOnlyWayToGetMailIndicator, ADVORecordTypeCode, ADVOAddressTypeCode, ADVOMixedUsageCode,/*ADVOAddressType, ADVOAddressUsageType,*/
 															ADVODateFirstSeen, ADVODateLastSeen, ADVODateVendorFirstReported, ADVODateVendorLastReported,
 															ADVOVacationBeginDate, ADVOVacationEndDate, 
 															ADVONumberOfVacationMonths, ADVOMaxVacationMonths, ADVOVacationPeriodsCount,
