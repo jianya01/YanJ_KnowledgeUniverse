@@ -6942,8 +6942,8 @@ Person: => FelonyCount := COUNT(PersonOffenses.Offense{OffenseCharges.CaseNumber
 // Person: => SuspectRelativesAndAssociatesSecondThirdDegreeFelonyCount := COUNT(Person.SecondDegreeAssociations.SecondDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony))	+ 
 																																				// COUNT(Person.FirstDegreeAssociations.FirstDegreeAssociation.PersonOffenses.Offense(IsSecondOrThirdDegreeFelony));
 Person: => SuspectFirstDegreeRelativesAndAssociatesCount := COUNT(FirstDegreeAssociations(Title >= 1 AND Title <= 45)); //This works as of 8/16/2016
-Person: => SuspectFirstDegreeRelativesAndAssociatesFelonyCount := SUM(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation,FelonyCount);
-Person: => SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount := SUM(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation,BankruptcyCountInLast5Years);
+Person: => SuspectFirstDegreeRelativesAndAssociatesFelonyCount := COUNT(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation(FelonyCount > 0));
+Person: => SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount := COUNT(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation(BankruptcyCount > 0));
 																																				
                       
 
@@ -7464,7 +7464,8 @@ Person: => BankruptcyFilingType := ONLY(MostRecentBankruptcy, PersonBankruptcy(N
 Person: => LastBankruptcyDate := ONLY(MostRecentBankruptcy, PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentDateLastSeen);
 Person: => BankruptcyStatus := ONLY(MostRecentBankruptcy, PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentBankruptcyStatus);
 Person: => BankruptcyDisposition := ONLY(MostRecentBankruptcy, PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentBankruptcyDisposition);
-Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy(NameType = 'D').Bankrupt(EXISTS(DateInformation.AgeInDays <= 1826 AND NOT DateInformation.AgeInDays:Null))); 
+Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy(NameType = 'D').Bankrupt(EXISTS(DateInformation.AgeInDays <= 1826 AND NOT DateInformation.AgeInDays:Null)));
+Person: => BankruptcyCount := COUNT(PersonBankruptcy(NameType = 'D').Bankrupt(EXISTS(NOT DateInformation.AgeInDays:Null))); 
 
 Bankruptcy.DateInformation: => ValidDate := ISVALIDDATE(DateFiled:DateLastSeen);
 Bankruptcy.DateInformation: => AgeInDays := IF(ValidDate, DAYSBETWEEN(DateFiled:DateLastSeen, TODAY()), 65535); 
@@ -7569,7 +7570,7 @@ QUERY: AllMarketViewSnapshots(ArchiveDate) <= MarketView ASOF reportedby(Archive
 
 // Query to grab all of the RiskView Snapshots
 QUERY: AllRiskViewSnapshots(ArchiveDate) <= RiskView ASOF reportedby(ArchiveDate);
-
+  
 // Query to grab the entire Person Entity
 QUERY: AllPersonEntityData(ArchiveDate) <= Person ASOF reportedby(ArchiveDate);
 
@@ -7639,7 +7640,7 @@ SHELL: BankruptcyShell <= Person{UID, BankruptcyFilingType, BankruptcyDispositio
 
 QUERY: SuspectFirstDegreeRelativesAssociatesBankruptcyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount};
 
-
+    
   
 //SHELLs 
 SHELL: ConsumerShell <= Person{UID,
@@ -7670,7 +7671,7 @@ SHELL: AddressShell <= Address{UID,
 															//ACA
 															ACAHit, ACAInstitutionName, ACAInstitutionTypeCode, ACAInstitutionTypeExpanded
 															/*SquareFootage NOT IN INITIAL SHELL */};
-															
+									 						
 QUERY: AddressShellInputParmaters(sPrimaryRange,sPredirectional,sPrimaryName,sSuffix,sPostdirectional,sZIP5,sSecondaryRange)
 													<= Address(PrimaryRange = sPrimaryRange,Predirectional = sPredirectional,PrimaryName = sPrimaryName,Suffix = sSuffix,Postdirectional = sPostdirectional,ZIP5 = sZIP5,SecondaryRange = sSecondaryRange)
 															{UID,
