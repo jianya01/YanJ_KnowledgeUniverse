@@ -115,16 +115,18 @@ inputRecordStructure :=  RECORD
 
 
 // ---- Step 2.) Change the below Dataset to point at your input file. This can either be in the form of the DATASET, or as an ECL file/index reference (Including any appropriate IMPORT statements): ----
-inputDataset := DATASET('~' + 'thor_data400::base::corrections_court_offenses_public', inputRecordStructure, THOR); 
+RawInputDataset := DATASET('~' + 'thor_data400::base::corrections_court_offenses_public', inputRecordStructure, THOR); 
+OUTPUT(CHOOSEN(RawInputDataset, 25), NAMED('Sample_Raw_Input'));
 
-//IMPORT ADVO;
-//inputDataset := ADVO.Key_Addr1; 
-
+SALTRoutines.Mac_Flatten(RawInputDataset, inputDataset); 
+OUTPUT(CHOOSEN(inputDataset, 25), NAMED('Sample_Flattened_Input'));
 
 // ---- Step 3.) Run the BWR Script! Nothing else to change ----
 SaltProfileResults := SALTRoutines.mac_profile(inputDataset);
 
-OUTPUT(SaltProfileResults, NAMED('Full_Profile_Results'));
-OUTPUT(SALTRoutines.SALT_Profile_Poorly_Populated_Fields(SaltProfileResults, 5, 50.0), NAMED('Poorly_Populated_Fields'));
-OUTPUT(SALTRoutines.SALT_Profile_Field_Types(SaltProfileResults, 10), NAMED('Field_Types'));
-OUTPUT(SALTRoutines.SALT_Profile_Characters(SaltProfileResults, 15), NAMED('Characters'));
+OUTPUT(CHOOSEN(SaltProfileResults, 2000), NAMED('Full_Profile_Results'));
+OUTPUT(CHOOSEN(SALTRoutines.SALT_Profile_Poorly_Populated_Fields(SaltProfileResults, 5, 50.0), 2000), NAMED('Poorly_Populated_Fields'));
+SALTFieldTypes := SALTRoutines.SALT_Profile_Field_Types(SaltProfileResults, 5, 3);
+OUTPUT(CHOOSEN(SALTFieldTypes, 2000), NAMED('Field_Types'));
+OUTPUT(CHOOSEN(SALTRoutines.SALT_Profile_Produce_ENTITY(SALTFieldTypes), 6000), NAMED('Field_Types_ENTITY'));
+OUTPUT(CHOOSEN(SALTRoutines.SALT_Profile_Characters(SaltProfileResults, 15), 2000), NAMED('Characters'));

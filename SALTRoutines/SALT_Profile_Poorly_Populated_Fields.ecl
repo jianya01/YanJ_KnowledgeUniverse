@@ -16,14 +16,18 @@ EXPORT SALT_Profile_Poorly_Populated_Fields(DATASET(SALT35.MAC_Character_Counts.
 	FieldPopulationLayout getFieldPopulations(SlimmedSALTProfile SALTProfile) := TRANSFORM
 		SELF.Field_Number := (UNSIGNED)SALTProfile.Fldno;
 		SELF.Field_Name := SALTProfile.FieldName;
+		
+		zeroFrequentTerms := ROLLUP(SORT(PROJECT(SALTProfile.Frequent_Terms, TRANSFORM(RECORDOF(LEFT), SELF.Val := IF(LENGTH(TRIM(StringLib.StringFilterOut(LEFT.Val, '0123456789'), ALL)) > 0, LEFT.Val, (STRING)((INTEGER)LEFT.Val)); SELF := LEFT)), Val), LEFT.Val = RIGHT.Val, TRANSFORM(RECORDOF(LEFT), SELF.Cnt := LEFT.Cnt + RIGHT.Cnt; SELF.PCNT := LEFT.PCNT + RIGHT.PCNT; SELF := LEFT));
+		frequentTermsZero := (REAL)zeroFrequentTerms (LENGTH(TRIM(StringLib.StringFilterOut(Val, '0123456789'), ALL)) = 0 AND (INTEGER)Val = 0)[1].PCNT;
+		
 		blankPatternsPCNT := (REAL)SALTProfile.Patterns (TRIM(data_pattern) = '')[1].PCNT;
-		SELF.Status := MAP(blankPatternsPCNT = 100	=> 'Never Populated',
-							blankPatternsPCNT >= 99	=> 'Almost Never Populated (< 1%)',
-							blankPatternsPCNT >= 97	=> 'Very Rarely Populated (< 3%)',
-							blankPatternsPCNT >= 95	=> 'Rarely Populated (< 5%)',
-							blankPatternsPCNT >= 90	=> 'Poorly Populated (< 10%)',
+		SELF.Status := MAP(blankPatternsPCNT = 100 OR frequentTermsZero = 100	=> 'Never Populated',
+							blankPatternsPCNT >= 99 OR frequentTermsZero >= 99	=> 'Almost Never Populated (< 1%)',
+							blankPatternsPCNT >= 97 OR frequentTermsZero >= 97	=> 'Very Rarely Populated (< 3%)',
+							blankPatternsPCNT >= 95 OR frequentTermsZero >= 95	=> 'Rarely Populated (< 5%)',
+							blankPatternsPCNT >= 90 OR frequentTermsZero >= 90	=> 'Poorly Populated (< 10%)',
 														'');
-		SELF.Percent_Not_Populated := blankPatternsPCNT;				
+		SELF.Percent_Not_Populated := MAX(blankPatternsPCNT, frequentTermsZero);				
 		SELF.Patterns := IF(NumberOfDataPatternsToShow <= 0, SALTProfile.Patterns, CHOOSEN(SALTProfile.Patterns, NumberOfDataPatternsToShow));
 		SELF.Frequent_Terms := IF(NumberOfDataPatternsToShow <= 0, SALTProfile.Frequent_Terms, CHOOSEN(SALTProfile.Frequent_Terms, NumberOfDataPatternsToShow));
 	END;
