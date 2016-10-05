@@ -740,8 +740,13 @@ CLUE_Auto_Response := RECORD
   integer8 transaction_time{xpath('_call_latency_ms')};
  END;
 
+finalCLUE := RECORD
+	integer8 RecID;
+	CLUE_Auto_Response - errorcode - transaction_time;
+END;
+
 // Run this file for a 1,000,000 record sample during development
-EXPORT FileCLUEAuto := DATASET('~thor::sv::clueauto_poc::response::file1', CLUE_Auto_Response, THOR);
+EXPORT FileCLUEAuto := PROJECT(DATASET('~thor::sv::clueauto_poc::response::file1', CLUE_Auto_Response, THOR), TRANSFORM(finalCLUE, SELF.RecID := COUNTER; SELF := LEFT));
 
 // Run this for the full file (Roughly 280 logical files in this superfile for ~280,000,000 records)
-// EXPORT FileCLUEAuto := DATASET('~thor::sv::clueauto_poc::response::final', CLUE_Auto_Response, THOR);
+// EXPORT FileCLUEAuto := DATASET('~thor::sv::clueauto_poc::response::final_recid', finalCLUE, THOR);

@@ -589,17 +589,17 @@ EXPORT FileCLUECleaned := MODULE
 		SELF := le;
 	END;
 	
-	CLUE_Auto_Response cleanCLUEAuto(KELBlackBox.FileCLUEAuto le, UNSIGNED8 cntr) := TRANSFORM
-		SELF.RecordIdentifier := cntr;
+	CLUE_Auto_Response cleanCLUEAuto(KELBlackBox.FileCLUEAuto le) := TRANSFORM
+		SELF.RecordIdentifier := le.RecID;
 		SELF.ReportIdSection.reportrequestid.dateoforder := CleanDate(iESP2Date(le.ReportIdSection.reportrequestid.dateoforder.Year, le.ReportIdSection.reportrequestid.dateoforder.Month, le.ReportIdSection.reportrequestid.dateoforder.Day));
 		SELF.ReportIdSection.reportrequestid.dateofreceipt := CleanDate(iESP2Date(le.ReportIdSection.reportrequestid.dateofreceipt.Year, le.ReportIdSection.reportrequestid.dateofreceipt.Month, le.ReportIdSection.reportrequestid.dateofreceipt.Day));
 		SELF.ReportIdSection.reportrequestid.dateofcompletion := CleanDate(iESP2Date(le.ReportIdSection.reportrequestid.dateofcompletion.Year, le.ReportIdSection.reportrequestid.dateofcompletion.Month, le.ReportIdSection.reportrequestid.dateofcompletion.Day));
 		SELF.ReportIdSection.reportidsupplementa.relatedprocessingdate := CleanDate(iESP2Date(le.ReportIdSection.reportidsupplementa.relatedprocessingdate.Year, le.ReportIdSection.reportidsupplementa.relatedprocessingdate.Month, le.ReportIdSection.reportidsupplementa.relatedprocessingdate.Day));
-		SELF.subjectidsection.subjectidset := PROJECT(le.subjectidsection.subjectidset, cleanSubjectIDSection(LEFT, cntr, COUNTER));
-		SELF.recapprocessingsection.unitrecap := PROJECT(le.recapprocessingsection.unitrecap, cleanRecapProcessingSection(LEFT, cntr, COUNTER));
-		SELF.recapprocessingsection.inquiryrecap.RecordIdentifier := cntr;
+		SELF.subjectidsection.subjectidset := PROJECT(le.subjectidsection.subjectidset, cleanSubjectIDSection(LEFT, le.RecID, COUNTER));
+		SELF.recapprocessingsection.unitrecap := PROJECT(le.recapprocessingsection.unitrecap, cleanRecapProcessingSection(LEFT, le.RecID, COUNTER));
+		SELF.recapprocessingsection.inquiryrecap.RecordIdentifier := le.RecID;
 		SELF.recapprocessingsection.inquiryrecap.RecapRecordCounter := 1;
-		SELF.claimhistorysubjectsection.claimset := PROJECT(le.claimhistorysubjectsection.claimset, cleanClaimHistorySection(LEFT, cntr, COUNTER));
+		SELF.claimhistorysubjectsection.claimset := PROJECT(le.claimhistorysubjectsection.claimset, cleanClaimHistorySection(LEFT, le.RecID, COUNTER));
 		SELF.groupsearchidsection.groupcurrentaddress.datefirstseen := CleanDate(iESP2Date(le.groupsearchidsection.groupcurrentaddress.datefirstseen.Year, le.groupsearchidsection.groupcurrentaddress.datefirstseen.Month, le.groupsearchidsection.groupcurrentaddress.datefirstseen.Day));
 		SELF.groupsearchidsection.groupcurrentaddress.datelastseen := CleanDate(iESP2Date(le.groupsearchidsection.groupcurrentaddress.datelastseen.Year, le.groupsearchidsection.groupcurrentaddress.datelastseen.Month, le.groupsearchidsection.groupcurrentaddress.datelastseen.Day));
 		SELF.groupsearchidsection.groupcurrentaddress.dataassodate := CleanDate(iESP2Date(le.groupsearchidsection.groupcurrentaddress.dataassodate.Year, le.groupsearchidsection.groupcurrentaddress.dataassodate.Month, le.groupsearchidsection.groupcurrentaddress.dataassodate.Day));
@@ -617,7 +617,7 @@ EXPORT FileCLUECleaned := MODULE
 	END;
 
 	// --------------- Clean - CLUE Auto ---------------
-	EXPORT FileCLUEAutoCleaned := PROJECT(KELBlackBox.FileCLUEAuto, cleanCLUEAuto(LEFT, COUNTER));
+	EXPORT FileCLUEAutoCleaned := PROJECT(KELBlackBox.FileCLUEAuto, cleanCLUEAuto(LEFT));
 	
 	// --------------- Normalize - CLUE Auto ---------------
 	EXPORT FileCLUEAutoSubjectID := NORMALIZE(FileCLUEAutoCleaned, LEFT.subjectidsection.subjectidset, TRANSFORM(autot_subjectidentificationsetclueautov2report, SELF := RIGHT));
@@ -1096,13 +1096,13 @@ EXPORT FileCLUECleaned := MODULE
 		SELF := le;
 	END;
 	
-	CLUE_Property_Response cleanCLUEProperty(KELBlackBox.FileCLUEProperty le, UNSIGNED8 cntr) := TRANSFORM
-		SELF.RecordIdentifier := cntr;
+	CLUE_Property_Response cleanCLUEProperty(KELBlackBox.FileCLUEProperty le) := TRANSFORM
+		SELF.RecordIdentifier := le.RecID;
 		SELF.ReportIdSection.reportrequestid.dateoforder := CleanDate(iESP2Date(le.ReportIdSection.reportrequestid.dateoforder.Year, le.ReportIdSection.reportrequestid.dateoforder.Month, le.ReportIdSection.reportrequestid.dateoforder.Day));
 		SELF.ReportIdSection.reportrequestid.dateofreceipt := CleanDate(iESP2Date(le.ReportIdSection.reportrequestid.dateofreceipt.Year, le.ReportIdSection.reportrequestid.dateofreceipt.Month, le.ReportIdSection.reportrequestid.dateofreceipt.Day));
 		SELF.ReportIdSection.reportrequestid.dateofcompletion := CleanDate(iESP2Date(le.ReportIdSection.reportrequestid.dateofcompletion.Year, le.ReportIdSection.reportrequestid.dateofcompletion.Month, le.ReportIdSection.reportrequestid.dateofcompletion.Day));
 		SELF.ReportIdSection.reportidsupplementa.relatedprocessingdate := CleanDate(iESP2Date(le.ReportIdSection.reportidsupplementa.relatedprocessingdate.Year, le.ReportIdSection.reportidsupplementa.relatedprocessingdate.Month, le.ReportIdSection.reportidsupplementa.relatedprocessingdate.Day));
-		SELF.searchinformationsection.subjectidset := PROJECT(le.searchinformationsection.subjectidset, cleanSubjectIDSectionProperty(LEFT, cntr, COUNTER));
+		SELF.searchinformationsection.subjectidset := PROJECT(le.searchinformationsection.subjectidset, cleanSubjectIDSectionProperty(LEFT, le.RecID, COUNTER));
 		SELF.searchinformationsection.policy.fromdate := CleanDate(iESP2Date(le.searchinformationsection.policy.fromdate.Year, le.searchinformationsection.policy.fromdate.Month, le.searchinformationsection.policy.fromdate.Day));
 		SELF.searchinformationsection.policy.todate := CleanDate(iESP2Date(le.searchinformationsection.policy.todate.Year, le.searchinformationsection.policy.todate.Month, le.searchinformationsection.policy.todate.Day));
 		SELF.searchinformationsection.policy.inceptiondate := CleanDate(iESP2Date(le.searchinformationsection.policy.inceptiondate.Year, le.searchinformationsection.policy.inceptiondate.Month, le.searchinformationsection.policy.inceptiondate.Day));
@@ -1121,14 +1121,14 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.searchinformationsection.formeraddress.datefirstseen := CleanDate(iESP2Date(le.searchinformationsection.formeraddress.datefirstseen.Year, le.searchinformationsection.formeraddress.datefirstseen.Month, le.searchinformationsection.formeraddress.datefirstseen.Day));
 		SELF.searchinformationsection.formeraddress.datelastseen := CleanDate(iESP2Date(le.searchinformationsection.formeraddress.datelastseen.Year, le.searchinformationsection.formeraddress.datelastseen.Month, le.searchinformationsection.formeraddress.datelastseen.Day));
 		SELF.searchinformationsection.formeraddress.dataassodate := CleanDate(iESP2Date(le.searchinformationsection.formeraddress.dataassodate.Year, le.searchinformationsection.formeraddress.dataassodate.Month, le.searchinformationsection.formeraddress.dataassodate.Day));
-		SELF.claimhistoryrisksection.claimset := PROJECT(le.claimhistoryrisksection.claimset, cleanClaimSetProperty(LEFT, cntr, COUNTER));
-		SELF.claimhistoryinsuredsection.claimsets := PROJECT(le.claimhistoryinsuredsection.claimsets, cleanClaimSetProperty(LEFT, cntr, COUNTER));
+		SELF.claimhistoryrisksection.claimset := PROJECT(le.claimhistoryrisksection.claimset, cleanClaimSetProperty(LEFT, le.RecID, COUNTER));
+		SELF.claimhistoryinsuredsection.claimsets := PROJECT(le.claimhistoryinsuredsection.claimsets, cleanClaimSetProperty(LEFT, le.RecID, COUNTER));
 		
 		SELF := le;
 	END;
 	
 	// --------------- Clean - CLUE Property ---------------
-	EXPORT FileCLUEPropertyCleaned := PROJECT(KELBlackBox.FileCLUEProperty, cleanCLUEProperty(LEFT, COUNTER));
+	EXPORT FileCLUEPropertyCleaned := PROJECT(KELBlackBox.FileCLUEProperty, cleanCLUEProperty(LEFT));
 	
 	// --------------- Normalize - CLUE Property ---------------
 	EXPORT FileCLUEPropertySubjectID := NORMALIZE(FileCLUEPropertyCleaned, LEFT.searchinformationsection.subjectidset, TRANSFORM(propertyt_subjectidsetcluepropertyv2report, SELF := RIGHT));
