@@ -1,4 +1,4 @@
-IMPORT STD, SALT35, SALTRoutines;
+﻿IMPORT STD, SALT35, SALTRoutines;
 
 FieldTypeLayout := RECORD
 	UNSIGNED8 Field_Number;
@@ -37,7 +37,7 @@ EXPORT SALT_Profile_Produce_ENTITY(DATASET(FieldTypeLayout) FieldTypes, INTEGER 
 		
 		FieldName := STD.Str.ToTitleCase(STD.Str.FindReplace(STD.Str.FindReplace(le.Field_Name, '__', ' '), '_', ' '));
 		FieldMapping := STD.Str.FindReplace(STD.Str.FindReplace(le.Field_Name, '__', '.'), '_', '');
-		SELF.Line := TRIM(FieldName) + ' = ' + TRIM(FieldMapping) + ',';
+		SELF.Line := TRIM(FieldName, ALL) + ' = ' + TRIM(FieldMapping) + ',';
 	END;
 	
 	head := DATASET([{0, '// ----- ENTITY Fields -----'}], ResultLayout);
