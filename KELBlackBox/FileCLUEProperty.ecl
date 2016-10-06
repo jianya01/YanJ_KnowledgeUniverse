@@ -509,7 +509,7 @@ finalCLUE := RECORD
 END;
 
 // Run this file for a 1,000,000 record sample during development
-EXPORT FileCLUEProperty := PROJECT(DATASET('~thor::sv::clueproperty_poc::response::file1', CLUE_Property_Response, THOR), TRANSFORM(finalCLUE, SELF.RecID := COUNTER; SELF := LEFT));
+// EXPORT FileCLUEProperty := PROJECT(DATASET('~thor::sv::clueproperty_poc::response::file1', CLUE_Property_Response, THOR), TRANSFORM(finalCLUE, SELF.RecID := COUNTER; SELF := LEFT));
 
 // Run this for the full file (Roughly 280 logical files in this superfile for ~280,000,000 records)
-// EXPORT FileCLUEProperty := DATASET('~thor::sv::clueproperty_poc::response::final_recid', finalCLUE, THOR);
+EXPORT FileCLUEProperty := DATASET('~thor::sv::clueproperty_poc::response::final_recid', finalCLUE, THOR);

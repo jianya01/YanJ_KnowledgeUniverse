@@ -273,7 +273,7 @@ EXPORT FileCLUECleaned := MODULE
 		string2 recordoccurrb{xpath('RecordOccurrB')};
 		string2 classification{xpath('Classification')};
 		string1 groupusage{xpath('GroupUsage')};
-		string2 _type{xpath('Type')};
+		string2 type{xpath('Type')};
 		string20 number{xpath('Number')};
 		STRING8 fromdate;
 		STRING8 todate;
@@ -378,7 +378,7 @@ EXPORT FileCLUECleaned := MODULE
 		string1 fsilicenseclass{xpath('FsiLicenseClass')};
 		string1 fsilicensenumber{xpath('FsiLicenseNumber')};
 		string1 fsilicensestate{xpath('FsiLicenseState')};
-		string10 _type{xpath('Type')};
+		string10 type{xpath('Type')};
 		string15 restriction{xpath('Restriction')};
 		STRING8 issuedate;
 		STRING8 expdatev;
@@ -428,7 +428,7 @@ EXPORT FileCLUECleaned := MODULE
 		string1 fsivin{xpath('FsiVin')};
 		string1 fsimakeormodel{xpath('FsiMakeOrModel')};
 		string1 fsimodelyear{xpath('FsiModelYear')};
-		string1 _type{xpath('Type')};
+		string1 type{xpath('Type')};
 		string1 brandedindicator{xpath('BrandedIndicator')};
 		string1 leasedindicator{xpath('LeasedIndicator')};
 		string10 dateofloss{xpath('DateOfLoss')};
@@ -540,9 +540,11 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.currentlicense.issuedate := CleanDate(iESP2Date(le.currentlicense.issuedate.Year, le.currentlicense.issuedate.Month, le.currentlicense.issuedate.Day));
 		SELF.currentlicense.expdatev := CleanDate(iESP2Date(le.currentlicense.expdatev.Year, le.currentlicense.expdatev.Month, le.currentlicense.expdatev.Day));
 		SELF.currentlicense.dataassodatev := CleanDate(iESP2Date(le.currentlicense.dataassodatev.Year, le.currentlicense.dataassodatev.Month, le.currentlicense.dataassodatev.Day));
+		SELF.currentlicense.type := le.currentlicense._type;
 		SELF.priorlicense.issuedate := CleanDate(iESP2Date(le.priorlicense.issuedate.Year, le.priorlicense.issuedate.Month, le.priorlicense.issuedate.Day));
 		SELF.priorlicense.expdatev := CleanDate(iESP2Date(le.priorlicense.expdatev.Year, le.priorlicense.expdatev.Month, le.priorlicense.expdatev.Day));
 		SELF.priorlicense.dataassodatev := CleanDate(iESP2Date(le.priorlicense.dataassodatev.Year, le.priorlicense.dataassodatev.Month, le.priorlicense.dataassodatev.Day));
+		SELF.priorlicense.type := le.priorlicense._type;
 		SELF.currentaddress.datefirstseen := CleanDate(iESP2Date(le.currentaddress.datefirstseen.Year, le.currentaddress.datefirstseen.Month, le.currentaddress.datefirstseen.Day));
 		SELF.currentaddress.datelastseen := CleanDate(iESP2Date(le.currentaddress.datelastseen.Year, le.currentaddress.datelastseen.Month, le.currentaddress.datelastseen.Day));
 		SELF.currentaddress.dataassodate := CleanDate(iESP2Date(le.currentaddress.dataassodate.Year, le.currentaddress.dataassodate.Month, le.currentaddress.dataassodate.Day));
@@ -555,6 +557,7 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.priorpolicy.cancellationdate := CleanDate(iESP2Date(le.priorpolicy.cancellationdate.Year, le.priorpolicy.cancellationdate.Month, le.priorpolicy.cancellationdate.Day));
 		SELF.priorpolicy.lapseloaddate := CleanDate(iESP2Date(le.priorpolicy.lapseloaddate.Year, le.priorpolicy.lapseloaddate.Month, le.priorpolicy.lapseloaddate.Day));
 		SELF.priorpolicy.lapselastcanceldate := CleanDate(iESP2Date(le.priorpolicy.lapselastcanceldate.Year, le.priorpolicy.lapselastcanceldate.Month, le.priorpolicy.lapselastcanceldate.Day));
+		SELF.priorpolicy.type := le.priorpolicy._type;
 		
 		SELF := le;
 	END;
@@ -578,12 +581,15 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.policy.cancellationdate := CleanDate(iESP2Date(le.policy.cancellationdate.Year, le.policy.cancellationdate.Month, le.policy.cancellationdate.Day));
 		SELF.policy.lapseloaddate := CleanDate(iESP2Date(le.policy.lapseloaddate.Year, le.policy.lapseloaddate.Month, le.policy.lapseloaddate.Day));
 		SELF.policy.lapselastcanceldate := CleanDate(iESP2Date(le.policy.lapselastcanceldate.Year, le.policy.lapselastcanceldate.Month, le.policy.lapselastcanceldate.Day));
+		SELF.policy.type := le.policy._type;
 		SELF.address.datefirstseen := CleanDate(iESP2Date(le.address.datefirstseen.Year, le.address.datefirstseen.Month, le.address.datefirstseen.Day));
 		SELF.address.datelastseen := CleanDate(iESP2Date(le.address.datelastseen.Year, le.address.datelastseen.Month, le.address.datelastseen.Day));
 		SELF.address.dataassodate := CleanDate(iESP2Date(le.address.dataassodate.Year, le.address.dataassodate.Month, le.address.dataassodate.Day));
 		SELF.driverslicense.issuedate := CleanDate(iESP2Date(le.driverslicense.issuedate.Year, le.driverslicense.issuedate.Month, le.driverslicense.issuedate.Day));
 		SELF.driverslicense.expdatev := CleanDate(iESP2Date(le.driverslicense.expdatev.Year, le.driverslicense.expdatev.Month, le.driverslicense.expdatev.Day));
 		SELF.driverslicense.dataassodatev := CleanDate(iESP2Date(le.driverslicense.dataassodatev.Year, le.driverslicense.dataassodatev.Month, le.driverslicense.dataassodatev.Day));
+		SELF.driverslicense.type := le.driverslicense._type;
+		SELF.vehicle.type := le.vehicle._type;
 		SELF.Payments := PROJECT(le.Payments, TRANSFORM(autot_claimpaymentrecordreport, SELF.RecordIdentifier := recIdentifier; SELF.ClaimIDRecordCounter := cntr; SELF.PaymentRecordCounter := COUNTER; SELF := LEFT));
 		
 		SELF := le;
@@ -612,6 +618,7 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.groupsearchidsection.grouppriorpolicy.cancellationdate := CleanDate(iESP2Date(le.groupsearchidsection.grouppriorpolicy.cancellationdate.Year, le.groupsearchidsection.grouppriorpolicy.cancellationdate.Month, le.groupsearchidsection.grouppriorpolicy.cancellationdate.Day));
 		SELF.groupsearchidsection.grouppriorpolicy.lapseloaddate := CleanDate(iESP2Date(le.groupsearchidsection.grouppriorpolicy.lapseloaddate.Year, le.groupsearchidsection.grouppriorpolicy.lapseloaddate.Month, le.groupsearchidsection.grouppriorpolicy.lapseloaddate.Day));
 		SELF.groupsearchidsection.grouppriorpolicy.lapselastcanceldate := CleanDate(iESP2Date(le.groupsearchidsection.grouppriorpolicy.lapselastcanceldate.Year, le.groupsearchidsection.grouppriorpolicy.lapselastcanceldate.Month, le.groupsearchidsection.grouppriorpolicy.lapselastcanceldate.Day));
+		SELF.groupsearchidsection.grouppriorpolicy.type := le.groupsearchidsection.grouppriorpolicy._type;
 		
 		SELF := le;
 	END;
@@ -854,7 +861,7 @@ EXPORT FileCLUECleaned := MODULE
 		string2 recordoccurrb{xpath('RecordOccurrB')};
 		string2 classification{xpath('Classification')};
 		string1 groupusage{xpath('GroupUsage')};
-		string2 _type{xpath('Type')};
+		string2 type{xpath('Type')};
 		string20 number{xpath('Number')};
 		STRING8 fromdate;
 		STRING8 todate;
@@ -1072,6 +1079,7 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.policy.cancellationdate := CleanDate(iESP2Date(le.policy.cancellationdate.Year, le.policy.cancellationdate.Month, le.policy.cancellationdate.Day));
 		SELF.policy.lapseloaddate := CleanDate(iESP2Date(le.policy.lapseloaddate.Year, le.policy.lapseloaddate.Month, le.policy.lapseloaddate.Day));
 		SELF.policy.lapselastcanceldate := CleanDate(iESP2Date(le.policy.lapselastcanceldate.Year, le.policy.lapselastcanceldate.Month, le.policy.lapselastcanceldate.Day));
+		SELF.policy.type := le.policy._type;
 		SELF.riskperson.dateofbirth := CleanDate(iESP2Date(le.riskperson.dateofbirth.Year, le.riskperson.dateofbirth.Month, le.riskperson.dateofbirth.Day));
 		SELF.riskperson.dataassociationdate := CleanDate(iESP2Date(le.riskperson.dataassociationdate.Year, le.riskperson.dataassociationdate.Month, le.riskperson.dataassociationdate.Day));
 		SELF.riskperson.dateofdeath := CleanDate(iESP2Date(le.riskperson.dateofdeath.Year, le.riskperson.dateofdeath.Month, le.riskperson.dateofdeath.Day));
@@ -1109,6 +1117,7 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.searchinformationsection.policy.cancellationdate := CleanDate(iESP2Date(le.searchinformationsection.policy.cancellationdate.Year, le.searchinformationsection.policy.cancellationdate.Month, le.searchinformationsection.policy.cancellationdate.Day));
 		SELF.searchinformationsection.policy.lapseloaddate := CleanDate(iESP2Date(le.searchinformationsection.policy.lapseloaddate.Year, le.searchinformationsection.policy.lapseloaddate.Month, le.searchinformationsection.policy.lapseloaddate.Day));
 		SELF.searchinformationsection.policy.lapselastcanceldate := CleanDate(iESP2Date(le.searchinformationsection.policy.lapselastcanceldate.Year, le.searchinformationsection.policy.lapselastcanceldate.Month, le.searchinformationsection.policy.lapselastcanceldate.Day));
+		SELF.searchinformationsection.policy.type := le.searchinformationsection.policy._type;
 		SELF.searchinformationsection.riskaddress.datefirstseen := CleanDate(iESP2Date(le.searchinformationsection.riskaddress.datefirstseen.Year, le.searchinformationsection.riskaddress.datefirstseen.Month, le.searchinformationsection.riskaddress.datefirstseen.Day));
 		SELF.searchinformationsection.riskaddress.datelastseen := CleanDate(iESP2Date(le.searchinformationsection.riskaddress.datelastseen.Year, le.searchinformationsection.riskaddress.datelastseen.Month, le.searchinformationsection.riskaddress.datelastseen.Day));
 		SELF.searchinformationsection.riskaddress.dataassodate := CleanDate(iESP2Date(le.searchinformationsection.riskaddress.dataassodate.Year, le.searchinformationsection.riskaddress.dataassodate.Month, le.searchinformationsection.riskaddress.dataassodate.Day));
