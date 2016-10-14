@@ -6,8 +6,8 @@ IMPORT KELBlackBox, KELGlobal, SALT35, SALTRoutines, UT;
 MaxResults := 250; // The maximum number of records to show in the workunit
 
 // CLUETransactionID := 280; // 3 Risk Claims
-CLUETransactionID := 29490; // 25 Risk Claims
-// CLUETransactionID := 1115381; // 1 Risk Claim, 25 Insured Claims
+//CLUETransactionID := 29490; // 25 Risk Claims
+ CLUETransactionID := 1115333; // 1 Risk Claim, 25 Insured Claims
 
 RawProperty := KELBlackBox.FileCLUECleaned.FileCLUEPropertyCleaned(RecordIdentifier = CLUETransactionID);
 PropertyEntity := KELGlobal.Q_C_L_U_E_Property_Result(CLUETransactionID).Res0;
