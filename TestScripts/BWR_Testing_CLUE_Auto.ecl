@@ -5,9 +5,9 @@ IMPORT KELBlackBox, KELGlobal, SALT35, SALTRoutines, UT;
 
 MaxResults := 250; // The maximum number of records to show in the workunit
 
-// CLUETransactionID := 280; // 3 Risk Claims
-CLUETransactionID := 29490; // 25 Risk Claims
-// CLUETransactionID := 1115381; // 1 Risk Claim, 25 Insured Claims
+
+CLUETransactionID := 2951; // 2 unit recaps  1 inquiry recap
+
 
 RawAuto := KELBlackBox.FileCLUECleaned.FileCLUEAutoCleaned(RecordIdentifier = CLUETransactionID);
 AutoEntity := KELGlobal.Q_C_L_U_E_Auto(CLUETransactionID).Res0;
