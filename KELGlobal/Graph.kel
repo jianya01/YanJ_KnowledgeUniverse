@@ -11,12 +11,15 @@ ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
 // Global Person Entity Definition
 Person := ENTITY(FLAT(UID=LexID, 
-	    STRING FirstName=NULL(),
-	    STRING MiddleName=NULL(),  
-	    STRING LastName=NULL(),
-	    DATE DateOfBirth,
-	    DATE DateOfDeath),
+	STRING FirstName=NULL(),
+	STRING FirstName=NULL(),
+	STRING MiddleName=NULL(),  
+	STRING LastName=NULL(),
+	DATE DateOfBirth,
+	DATE DateOfDeath,
+	INTEGER FelonyCount=NULL(-1)), //NULL??
 	MODEL(UID, 
+				FelonyCount,
 		FullName{FirstName, MiddleName, LastName}, 
 		ReportedDatesOfBirth{DateOfBirth},
 		ReportedDatesOfDeath{DateOfDeath}));
@@ -2970,6 +2973,11 @@ USE doxie_files.Key_Offenders_Risk(FLAT, // This file doesn't contain Dates Firs
 			CaseNumber = case_num),
 		PersonOffenses(Offender=sdid));
 
+
+USE doxie_files.Key_Corrections_Offenders(FLAT,
+	Person(
+		UID=did,
+		FelonyCount=felony_count));
   
 /* The following USE statements map the various base files to the appropriate ENTITY definitions. */
 
@@ -7993,7 +8001,7 @@ Person: => FirstDeceasedDate := ReportedDatesOfDeath.DateOfDeath$Min;
  
 //Person: => FelonyCount := COUNT(PersonOffenses.Offense{OffenderKey, OffenseCharges.CaseNumber, OffenseCharges.IsFelony}(IsFelony)); // 8/30/2016 This one is close...just doesn't handle blank case numbers
 
-Person: => FelonyCount := COUNT(PersonOffenses.Offense{OffenseCharges.CaseNumber, OffenseCharges.IsFelony}(IsFelony));
+Person: => FelonyCountLogic := COUNT(PersonOffenses.Offense{OffenseCharges.CaseNumber, OffenseCharges.IsFelony}(IsFelony));
 
 //Person: => FelonyCount := COUNT(PersonOffenses.Offense{OffenderKey, OffenseCharges.IsFelony}(IsFelony)); this runs but still gives count of 4 for Thomas Moore
 
@@ -8527,10 +8535,10 @@ Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy(NameType = 'D')
 Person: => BankruptcyCount := COUNT(PersonBankruptcy(NameType = 'D').Bankrupt(EXISTS(NOT DateInformation.AgeInDays:Null))); 
 
 Bankruptcy.DateInformation: => ValidDate := ISVALIDDATE(DateFiled:DateLastSeen);
-Bankruptcy.DateInformation: => AgeInDays := IF(ValidDate, DAYSBETWEEN(DateFiled:DateLastSeen, TODAY()), 65535); 
+Bankruptcy.DateInformation: => AgeInDays := IF(ValidDate, DAYSBETWEEN(DateFiled:DateLastSeen, TODAY()), 65535); //why false = 65535??
 Bankruptcy: => Helper:= INTEGERFROMDATE(MostRecentDateLastSeen) * 100000000 + INTEGERFROMDATE(MostRecentDateFirstSeen); 
 
-CriminalOffense.OffenseCharges: => IsFelony := Level = '4' AND OffenseScore = 'F';
+CriminalOffense.OffenseCharges: => IsFelony := Level = '4' AND OffenseScore = 'F'; //Only Possible Felony??
 CriminalOffense: => CriminalOffenseChargesCount := COUNT(OffenseCharges(IsFelony)); 
 
 /* Queries specific to the Person Entity definition belong here. */
@@ -8675,7 +8683,7 @@ QUERY: SuspectFirstDegreeRelativesAssociatesCount(SearchForLexID) <= Person(UID=
 
 QUERY: SuspectFirstDegreeRelativesAssociatesFelonyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesFelonyCount};
 
-QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense{Person.UID, Person.PersonOffenses.Offense.OffenderKey, OffenseCharges.Level, OffenseCharges.OffenseScore};
+QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense{Person.UID, Person.PersonOffenses.Offense.OffenderKey, OffenseCharges.Level, OffenseCharges.OffenseScore, OffenseCharges.CaseNumber, Person.FelonyCount};
 
 QUERY: PersonsOffensesNew(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense;   
 
@@ -8729,10 +8737,19 @@ QUERY: CLUEAutoRecap(SearchForID) <= CLUEAutoRecap(rCLUEAuto =SearchForID);
 SHELL: ConsumerShell <= Person{UID,
 														BankruptcyCountInLast5Years, LastBankruptcyDate, BankruptcyFilingType, BankruptcyDisposition,
 														FelonyCount, /* LastConvictedDate, NOT IN INITIAL SHELL */
-														FirstDeceasedDate,
+														FirstDeceasedDate, 
 														SuspectFirstDegreeRelativesAndAssociatesCount,
 														SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount,
 														SuspectFirstDegreeRelativesAndAssociatesFelonyCount}; 
+														
+/* QUERY: ConsumerShellInput(SearchLexID) <= Person(UID = SearchLexID){UID,
+   BankruptcyCountInLast5Years, LastBankruptcyDate, BankruptcyFilingType, BankruptcyDisposition,
+   					FelonyCount, //LastConvictedDate, NOT IN INITIAL SHELL 
+   					FirstDeceasedDate,
+   					SuspectFirstDegreeRelativesAndAssociatesCount,
+   					SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount,
+   					SuspectFirstDegreeRelativesAndAssociatesFelonyCount};
+*/
 
 
 //QUERY: AddresShell <= Address(ACAHit = 'Y'){UID,	//Filter ACAHits
