@@ -8531,11 +8531,12 @@ Person: => BankruptcyFilingType := ONLY(MostRecentBankruptcy, PersonBankruptcy(N
 Person: => LastBankruptcyDate := ONLY(MostRecentBankruptcy, PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentDateLastSeen);
 Person: => BankruptcyStatus := ONLY(MostRecentBankruptcy, PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentBankruptcyStatus);
 Person: => BankruptcyDisposition := ONLY(MostRecentBankruptcy, PersonBankruptcy(NameType = 'D').Bankrupt.MostRecentBankruptcyDisposition);
-Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy(NameType = 'D').Bankrupt(EXISTS(DateInformation.AgeInDays <= 1826 AND NOT DateInformation.AgeInDays:Null)));
-Person: => BankruptcyCount := COUNT(PersonBankruptcy(NameType = 'D').Bankrupt(EXISTS(NOT DateInformation.AgeInDays:Null))); 
+Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy(NameType = 'D').Bankrupt(EXISTS(DateInformation.FilingAgeInDays <= 1826 AND NOT DateInformation.FilingAgeInDays:Null)));
+Person: => BankruptcyCount := COUNT(PersonBankruptcy(NameType = 'D').Bankrupt(EXISTS(NOT DateInformation.FilingAgeInDays:Null))); 
+Person: => BankruptcyAge := MONTHSBETWEEN(LastBankruptcyDate, TODAY()); 
 
-Bankruptcy.DateInformation: => ValidDate := ISVALIDDATE(DateFiled:DateLastSeen);
-Bankruptcy.DateInformation: => AgeInDays := IF(ValidDate, DAYSBETWEEN(DateFiled:DateLastSeen, TODAY()), 65535); //why false = 65535??
+Bankruptcy.DateInformation: => ValidDate := ISVALIDDATE(DateFiled);
+Bankruptcy.DateInformation: => FilingAgeInDays := IF(ValidDate, DAYSBETWEEN(DateFiled, TODAY()), 65535); //why false = 65535??
 Bankruptcy: => Helper:= INTEGERFROMDATE(MostRecentDateLastSeen) * 100000000 + INTEGERFROMDATE(MostRecentDateFirstSeen); 
 
 CriminalOffense.OffenseCharges: => IsFelony := Level = '4' AND OffenseScore = 'F'; //Only Possible Felony??
@@ -8701,9 +8702,9 @@ QUERY: PersonBankruptcyTest <= PersonBankruptcy;
 
 QUERY: PersonsBankruptcies(SearchForLexID) <= Person(UID = SearchForLexID){UID, MostRecentBankruptcy}.PersonBankruptcy.Bankrupt;
 
-QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID, LastBankruptcyDate, BankruptcyFilingType, BankruptcyDisposition, BankruptcyCountInLast5Years, MostRecentBankruptcy}; 
+QUERY: PersonDump(SearchForLexID) <= Person(UID = SearchForLexID){UID, LastBankruptcyDate, BankruptcyFilingType, BankruptcyDisposition, BankruptcyCountInLast5Years, BankruptcyAge, MostRecentBankruptcy}; 
 
-SHELL: BankruptcyShell <= Person{UID, BankruptcyFilingType, BankruptcyDisposition, LastBankruptcyDate, BankruptcyCountInLast5Years};
+SHELL: BankruptcyShell <= Person{UID, BankruptcyFilingType, BankruptcyDisposition, LastBankruptcyDate, BankruptcyCountInLast5Years, BankruptcyAge};
 
 QUERY: SuspectFirstDegreeRelativesAssociatesBankruptcyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount};
 
@@ -8735,7 +8736,7 @@ QUERY: CLUEAutoRecap(SearchForID) <= CLUEAutoRecap(rCLUEAuto =SearchForID);
   
 //SHELLs 
 SHELL: ConsumerShell <= Person{UID,
-														BankruptcyCountInLast5Years, LastBankruptcyDate, BankruptcyFilingType, BankruptcyDisposition,
+														BankruptcyCountInLast5Years, LastBankruptcyDate, BankruptcyFilingType, BankruptcyDisposition, BankruptcyAge,
 														FelonyCount, /* LastConvictedDate, NOT IN INITIAL SHELL */
 														FirstDeceasedDate, 
 														SuspectFirstDegreeRelativesAndAssociatesCount,
