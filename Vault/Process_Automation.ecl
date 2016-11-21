@@ -12,8 +12,8 @@ EXPORT Process_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJ
 	CreateVersionDs := OUTPUT(UpdateVersionDs,, VersionFileName, OVERWRITE, COMPRESSED);
 
 	pEmailSourceInTrim := TRIM(pEmailSourceIn, LEFT, RIGHT);		
-	FailureAutomationsubject  := 'The ' + pEmailSourceInTrim + ' Automation Failed for ' + ut.GetDate;
-	FailureAutomationbody     := 'The ' + pEmailSourceInTrim + ' Automation Failed for ' + ut.GetDate + '\n' +
+	FailureAutomationsubject  := 'The ' + pEmailSourceInTrim + ' Automation Failed for ' + (STRING)std.date.today();
+	FailureAutomationbody     := 'The ' + pEmailSourceInTrim + ' Automation Failed for ' + (STRING)std.date.today() + '\n' +
 															 'The Workunit is ' + WORKUNIT + '\n'+
 															 'ErrorMessage is ' + FAILMESSAGE + '\n\n';		
 								 
