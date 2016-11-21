@@ -519,7 +519,7 @@ EXPORT FileCLDPCleaned := MODULE
 		SELF := le;
 	END;
 // --------------- Clean - CD Property ---------------
-EXPORT FileCDPropertyCleaned := PROJECT(KELBlackBox.FileCDProperty, cleanCDProperty(left));
+EXPORT FileCDPropertyCleaned := PROJECT(SORT(KELBlackBox.FileCDProperty, RECORD), cleanCDProperty(left));
 	
 // --------------- Normalize - CD Property ---------------
 EXPORT FileCDPropertySubjectID := NORMALIZE(FileCDPropertyCleaned, LEFT.searchinformationsection.subjectidset, TRANSFORM(propertyt_subjectidsetcdpropertyreport, SELF := RIGHT));
