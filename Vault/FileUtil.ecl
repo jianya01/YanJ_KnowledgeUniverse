@@ -1,4 +1,5 @@
-﻿EXPORT FileUtil := MODULE
+﻿IMPORT STD;
+EXPORT FileUtil := MODULE
 
 	EXPORT FN_ExtractFile(DATASET Dset, STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION
 	
@@ -11,8 +12,8 @@
    	
 	EXPORT FN_OutputFile(DATASET Dset, STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION
 
-   		FileNameNewLogical := TRIM(IF(Append = '', FileNamePrefix + '::' + WORKUNIT[2..9] + '::' + Suffix, 
-																		FileNamePrefix + '::' + Append + '::' + Suffix), ALL);
+   		FileNameNewLogical := TRIM(IF(Append = '', FileNamePrefix + '::' +  Suffix + '::' + WORKUNIT[2..9], 
+																		FileNamePrefix + '::' + Suffix + '::' + Append), ALL);
 
 		  RETURN OUTPUT(Dset, , FileNameNewLogical, OVERWRITE, __COMPRESSED__);	
 					 
@@ -20,13 +21,13 @@
    
   EXPORT FN_PromoteFile(STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION   	
    
-   		FileNameNewLogical 				:= TRIM(IF(TRIM(Append,LEFT,RIGHT) = '', FileNamePrefix + '::' + WORKUNIT[2..9] + '::' + Suffix, 
-																				FileNamePrefix + '::' + Append + '::' + Suffix), ALL);
-   		FileNameProd	 						:= TRIM(FileNamePrefix + '::prod::' + Suffix, ALL);
-   		FileNameFather 						:= TRIM(FileNamePrefix + '::father::' + Suffix, ALL);
-   		FileNameGrandFather 			:= TRIM(FileNamePrefix + '::grandfather::' + Suffix, ALL);
+   		FileNameNewLogical 				:= TRIM(IF(TRIM(Append,LEFT,RIGHT) = '', FileNamePrefix +  '::' +  Suffix + '::' + WORKUNIT[2..9], 
+																				FileNamePrefix + '::' + Suffix + '::' + Append ), ALL);
+   		FileNameProd	 						:= TRIM(FileNamePrefix + '::' + Suffix + '::prod' , ALL);
+   		FileNameFather 						:= TRIM(FileNamePrefix + '::' + Suffix + '::father' , ALL);
+   		FileNameGrandFather 			:= TRIM(FileNamePrefix + '::' + Suffix + '::grandfather' , ALL);
    
-   		PromotionList := FileServices.PromoteSuperFileList([FileNameProd,
+   		PromotionList := STD.File.PromoteSuperFileList([FileNameProd,
    																												FileNameFather,
    																												FileNameGrandFather],
    																											  FileNameNewLogical, TRUE);

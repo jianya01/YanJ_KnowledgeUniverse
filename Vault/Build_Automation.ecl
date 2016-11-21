@@ -33,18 +33,19 @@ EXPORT Build_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoi
 	CombineFile := pVaultFile(NOT IsActive) +	re(NOT IsNewRecord) + vault_ridProject;	
 	
 	pEmailSourceTrim := TRIM(pEmailSource, LEFT, RIGHT);
-  Successsubject  := 'The ' + pEmailSourceTrim + ' Build Completed for ' + ut.GetDate;
-	Successbody     := 'The ' + pEmailSourceTrim + ' Build Completed for ' + ut.GetDate + '\n' +
+  Successsubject  := 'The ' + pEmailSourceTrim + ' Build Completed for ' + (STRING)std.date.today();
+	Successbody     := 'The ' + pEmailSourceTrim + ' Build Completed for ' + (STRING)std.date.today() + '\n' +
 										 'The Workunit is ' + WORKUNIT +'\n';		
 										
-	Failuresubject  := 'The ' + pEmailSourceTrim + ' Build Failed for ' + ut.GetDate;
-	Failurebody     := 'The ' + pEmailSourceTrim + ' Build Failed for ' + ut.GetDate + '\n' +
+	Failuresubject  := 'The ' + pEmailSourceTrim + ' Build Failed for ' + (STRING)std.date.today();
+	Failurebody     := 'The ' + pEmailSourceTrim + ' Build Failed for ' + (STRING)std.date.today() + '\n' +
 										 'The Workunit is ' + WORKUNIT + '\n'+
 										 'ErrorMessage is ' + FAILMESSAGE + '\n\n';		
 	
 	CreateFile := SEQUENTIAL(Vault.FileUtil.FN_OutputAndPromoteFile(CombineFile, pBaseprefix, pBaseSuffix, WORKUNIT[2..9] + WORKUNIT[11..16]),
-													 STD.File.SetFileDescription(Vault.Files(pDataSource, pBaseSuffix).base_prod_vault_file, STD.Str.FilterOut(pProdFilename, '~')),
+													 STD.File.SetFileDescription(Vault.Files(pDataSource,pBaseSuffix).base_prod_vault_file, STD.Str.FilterOut(pProdFilename, '~')),
 													 Vault.Strata_Automation(pVaultFile, Current_Date, Yesterday, pBaseSuffix, pStrataBase, pStrataFrequency),
+													 Vault.Build_LogFile(pVaultFile, Current_Date, Yesterday, pBaseprefix, pBaseSuffix,pDataSource),
 													 Fileservices.Sendemail(Vault.EmailAddresses.Vault_EmailAddresses, Successsubject, Successbody))
 												 : FAILURE(Fileservices.Sendemail(Vault.EmailAddresses.Vault_EmailAddresses, Failuresubject, Failurebody));
 									

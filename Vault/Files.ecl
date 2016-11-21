@@ -3,7 +3,7 @@
 EXPORT Files(STRING DataSource = '', STRING FileSuffix = '') := MODULE
 
 	EXPORT base_prefix := '~thor::base::' + DataSource;
-	EXPORT base_prod_vault_file := base_prefix + '::prod::' + FileSuffix;
+	EXPORT base_prod_vault_file := base_prefix + '::' + FileSuffix +'::prod';
 	
 	EXPORT PublicRecord_Offenders_File := '~foreign::10.241.20.205::thor_data400::base::corrections_offenders_public';	
 	EXPORT PublicRecord_Offenders := DATASET(PublicRecord_Offenders_File, {Vault_Layout.Layout_PublicRecord_Offenders_Public_Vault - Vault_Layout.Layout_Prefix_Vault}, THOR);
@@ -13,9 +13,9 @@ EXPORT Files(STRING DataSource = '', STRING FileSuffix = '') := MODULE
 	// EXPORT Bankruptcy_Main := DATASET(Bankruptcy_Main_File, Vault_Layout.Layout_Bankruptcy_Main_Vault - Vault_Layout.Layout_Prefix_Vault, THOR);
 	// EXPORT Bankruptcy_Main_Vault := DATASET(base_prod_vault_file, Vault_Layout.Layout_Bankruptcy_Main_Vault, THOR, OPT);
 
-	// EXPORT Automationtest_File := '~thor::base::ar::automation_test_child_total';	
-	// EXPORT Automationtest := DATASET(Automationtest_File, {Vault_Layout.Layout_Automation_Vault - Vault_Layout.Layout_Prefix_Vault}, THOR);
-	// EXPORT Automationtest_Vault := DATASET(base_prod_vault_file, Vault_Layout.Layout_Automation_Vault, THOR, OPT);
+	EXPORT Automationtest_File := '~thor::temp::vault_test3';	
+	EXPORT Automationtest := DATASET(Automationtest_File, {Vault_Layout.Layout_test - Vault_Layout.Layout_Prefix_Vault}, THOR);
+	EXPORT Automationtest_Vault := DATASET(base_prod_vault_file, Vault_Layout.Layout_test, THOR, OPT);
 	
 	// EXPORT sample_File := '~thor::base::ar::sample_child1';	
 	// EXPORT sampletest := DATASET(sample_File, {Vault_Layout.Layout_Automation_Vault - Vault_Layout.Layout_Prefix_Vault}, THOR);
