@@ -1,4 +1,4 @@
-﻿IMPORT KELBlackBox;
+﻿IMPORT _Control;
 
 LayoutOffense := RECORD
   unsigned6 did;
@@ -27,4 +27,7 @@ LayoutOffense := RECORD
 
 blankDataset := dataset([], LayoutOffense);
 
-EXPORT Key_Corrections_Offenders := INDEX(blankDataset, {did}, {blankDataset}, '~thor_data400::key::corrections_offenders_risk::20160929::bocashell_did');
+fileName := '~thor_data400::key::corrections_offenders_risk::20160929::bocashell_did';
+EXPORT Key_Corrections_Offenders := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	INDEX(blankDataset, {did}, {blankDataset}, fileName),
+	INDEX(blankDataset, {did}, {blankDataset}, fileName) (KEYED((UNSIGNED8)DID IN _Control.LexIDFilterSet)));

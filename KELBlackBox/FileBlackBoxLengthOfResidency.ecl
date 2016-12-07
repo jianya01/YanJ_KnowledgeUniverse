@@ -1,6 +1,6 @@
-/* BlackBox File for Length of Residency Attributes */
+﻿/* BlackBox File for Length of Residency Attributes */
 
-IMPORT KELBlackBox;
+IMPORT _Control, KELBlackBox;
 
 LayoutLengthOfResidency := RECORD
   unsigned4 date_first_seen;
@@ -11,7 +11,9 @@ LayoutLengthOfResidency := RECORD
   unsigned2 length_of_residency;
   unsigned4 addr_dt_first_seen;
   unsigned4 addr_dt_last_seen;
- END;
+END;
 
-EXPORT FileBlackBoxLengthOfResidency := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::length_of_residency', LayoutLengthOfResidency, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
-//EXPORT FileBlackBoxLengthOfResidency := DATASET('~bpahl::base::ar::prod::length_of_residencyslim', LayoutLengthOfResidency, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+fileName := KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::length_of_residency';
+EXPORT FileBlackBoxLengthOfResidency := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutLengthOfResidency, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
+	DATASET(fileName, LayoutLengthOfResidency, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));

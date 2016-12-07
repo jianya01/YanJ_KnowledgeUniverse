@@ -1,3 +1,4 @@
+﻿IMPORT _Control;
 
 LayoutPolicyHeader := RECORD
   unsigned8 rid;
@@ -54,7 +55,9 @@ LayoutPolicyHeader := RECORD
   string20 policy_number;
   string2 insurance_type;
   string20 claim_number;
- END;
+END;
 
-
-EXPORT header_ins := DATASET('~thor::base::insuranceheader::idl_policy_header', LayoutPolicyHeader, THOR);
+fileName := '~thor::base::insuranceheader::idl_policy_header';
+EXPORT header_ins := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutPolicyHeader, THOR),
+	DATASET(fileName, LayoutPolicyHeader, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));

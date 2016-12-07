@@ -1,6 +1,6 @@
-/* BlackBox File for RiskView Attributes */
+﻿/* BlackBox File for RiskView Attributes */
 
-IMPORT KELBlackBox;
+IMPORT _Control, KELBlackBox;
 
 LayoutRiskView := RECORD
   unsigned4 date_first_seen;
@@ -353,5 +353,7 @@ LayoutRiskView := RECORD
   unsigned8 did;
 END;
 
-EXPORT FileBlackBoxRiskView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::riskview', LayoutRiskView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
-//EXPORT FileBlackBoxRiskView := DATASET('~bpahl::base::ar::prod::riskviewslim', LayoutRiskView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+fileName := KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::riskview';
+EXPORT FileBlackBoxRiskView := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutRiskView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
+	DATASET(fileName, LayoutRiskView, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));

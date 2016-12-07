@@ -1,6 +1,6 @@
-/* BlackBox File for Boca Shell Attributes */
+﻿/* BlackBox File for Boca Shell Attributes */
 
-IMPORT KELBlackBox;
+IMPORT _Control, KELBlackBox;
 
 LayoutBocaShell := RECORD
   unsigned4 date_first_seen;
@@ -1150,7 +1150,9 @@ LayoutBocaShell := RECORD
   unsigned5 estimated_income;
   string20 historydatetimestamp;
   string200 errorcode;
- END;
+END;
 
-EXPORT FileBlackBoxBocaShell := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::bocashell', LayoutBocaShell, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
-//EXPORT FileBlackBoxBocaShell := DATASET('~bpahl::base::cdw::prod::bocashellslim', LayoutBocaShell, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+fileName := KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::bocashell';
+EXPORT FileBlackBoxBocaShell := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutBocaShell, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
+	DATASET(fileName, LayoutBocaShell, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));
