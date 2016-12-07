@@ -1,15 +1,14 @@
-﻿ //EXPORT Bankruptcy := 'todo';
-//LayoutBankruptcy := RECORD
+﻿IMPORT _Control;
 
-  layout_status := RECORD,maxlength(10000)
+layout_status := RECORD,maxlength(10000)
    string8 status_date;
    string30 status_type;
-  END;
+END;
 
 layout_comments := RECORD,maxlength(10000)
    string8 filing_date;
    string30 description;
-  END;
+END;
 
 LayoutBankruptcy := RECORD,maxlength(32766)
   string8 process_date;
@@ -21,7 +20,7 @@ LayoutBankruptcy := RECORD,maxlength(32766)
   string8 date_modified;
   string1 method_dismiss;
   string1 case_status;
-	string5 court_code;
+  string5 court_code;
   string50 court_name;
   string40 court_location;
   string7 case_number;
@@ -102,13 +101,15 @@ LayoutBankruptcy := RECORD,maxlength(32766)
   string12 did;
   string9 app_ssn;
   string1 delete_flag;
-DATASET(layout_status) status;
-DATASET(layout_comments) comments;
- unsigned8 scrubsbits1;
- END;
+  DATASET(layout_status) status;
+  DATASET(layout_comments) comments;
+  unsigned8 scrubsbits1;
+END;
  
-
- Key_BankruptcyV3_Main_Full_input := DATASET('~thor::base::bankruptcy::main_v3', LayoutBankruptcy, THOR); 
+fileName := '~thor::base::bankruptcy::main_v3';
+Key_BankruptcyV3_Main_Full_input := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutBankruptcy, THOR),
+	DATASET(fileName, LayoutBankruptcy, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));
 
 
 normalizedRecord := RECORD
@@ -130,5 +131,3 @@ normalizedRecord normalizeBankruptcy(key_bankruptcyV3_main_full_input le, UNSIGN
 END;
 
 Export key_bankruptcyV3_main_full := NORMALIZE(key_bankruptcyV3_main_full_input, MAX(COUNT(LEFT.Status), COUNT(LEFT.Comments)), normalizeBankruptcy(LEFT, COUNTER));
-
-

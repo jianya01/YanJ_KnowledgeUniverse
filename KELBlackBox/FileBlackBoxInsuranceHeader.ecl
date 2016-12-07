@@ -1,6 +1,6 @@
-/* BlackBox File for Insurance Header Attributes */
+﻿/* BlackBox File for Insurance Header Attributes */
 
-IMPORT KELBlackBox;
+IMPORT _Control, KELBlackBox;
 
 LayoutInsuranceHeader := RECORD
   unsigned8 lexid;
@@ -36,7 +36,9 @@ LayoutInsuranceHeader := RECORD
   unsigned6 hhid_indiv;
   unsigned6 hhid_relat;
   unsigned8 rid;
- END;
- 
-EXPORT FileBlackBoxInsuranceHeader := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insuranceheader', LayoutInsuranceHeader, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
-//EXPORT FileBlackBoxInsuranceHeader := DATASET('~bpahl::base::cdw::prod::insuranceheaderslim', LayoutInsuranceHeader, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+END;
+
+fileName := KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insuranceheader';
+EXPORT FileBlackBoxInsuranceHeader := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutInsuranceHeader, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
+	DATASET(fileName, LayoutInsuranceHeader, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));

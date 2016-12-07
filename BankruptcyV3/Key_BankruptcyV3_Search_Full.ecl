@@ -1,4 +1,5 @@
-﻿
+﻿IMPORT _Control;
+
 LayoutBankruptcySearch := RECORD
   string8 process_date;
   string12 caseid;
@@ -122,6 +123,9 @@ LayoutBankruptcySearch := RECORD
   unsigned2 ultweight;
   unsigned8 source_rec_id;
   unsigned8 scrubsbits1;
- END;
+END;
 
- Export Key_BankruptcyV3_Search_Full := DATASET('~thor::base::bankruptcy::search_v3', LayoutBankruptcySearch, THOR); 
+fileName := '~thor::base::bankruptcy::search_v3';
+EXPORT Key_BankruptcyV3_Search_Full := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutBankruptcySearch, THOR),
+	DATASET(fileName, LayoutBankruptcySearch, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));

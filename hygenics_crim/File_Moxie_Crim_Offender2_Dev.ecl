@@ -1,3 +1,4 @@
+﻿IMPORT _Control;
 
 LayoutOffenders := RECORD
   string8 process_date;
@@ -119,13 +120,9 @@ LayoutOffenders := RECORD
   string1 conviction_override_date_type;
   string2 offense_score;
   unsigned8 offender_persistent_id;
- END;
+END;
 
-
-
-EXPORT File_Moxie_Crim_Offender2_Dev := DATASET('~thor::base::crim::corrections_offenders_public', LayoutOffenders, THOR);
-
-//EXPORT Slim_Down_Offenders_File := OUTPUT(DS(did>'19402208424'),,'thor::base::crim::corrections_offenders_public_slim', THOR);
-
-
-
+fileName := '~thor::base::crim::corrections_offenders_public';
+EXPORT File_Moxie_Crim_Offender2_Dev := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutOffenders, THOR),
+	DATASET(fileName, LayoutOffenders, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));

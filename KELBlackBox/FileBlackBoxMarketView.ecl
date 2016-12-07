@@ -1,4 +1,4 @@
-IMPORT KELBlackBox;
+﻿IMPORT _Control, KELBlackBox;
 
 LayoutMarketView := RECORD
   unsigned4 date_first_seen;
@@ -404,5 +404,7 @@ LayoutMarketView := RECORD
   string1 truetouch_onlinebidmrktplc;
 END;
 
-EXPORT FileBlackBoxMarketView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::marketview', LayoutMarketView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
-//EXPORT FileBlackBoxMarketView := DATASET('~bpahl::base::cdw::prod::marketviewslim', LayoutMarketView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+fileName := KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::marketview';
+EXPORT FileBlackBoxMarketView := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutMarketView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
+	DATASET(fileName, LayoutMarketView, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));

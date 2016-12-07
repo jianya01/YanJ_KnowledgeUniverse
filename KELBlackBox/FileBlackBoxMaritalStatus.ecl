@@ -1,6 +1,6 @@
-/* BlackBox File for Marital Status Attributes */
+﻿/* BlackBox File for Marital Status Attributes */
 
-IMPORT KELBlackBox;
+IMPORT _Control, KELBlackBox;
 
 LayoutMaritalStatus := RECORD
   unsigned4 date_first_seen;
@@ -19,7 +19,9 @@ LayoutMaritalStatus := RECORD
   string1 marital_status_v1;
   integer4 div_dt;
   integer4 mar_dt;
- END;
+END;
 
-EXPORT FileBlackBoxMaritalStatus := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::maritalstatus', LayoutMaritalStatus, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
-//EXPORT FileBlackBoxMaritalStatus := DATASET('~bpahl::base::ar::prod::maritalstatusslim', LayoutMaritalStatus, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+fileName := KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::maritalstatus';
+EXPORT FileBlackBoxMaritalStatus := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutMaritalStatus, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
+	DATASET(fileName, LayoutMaritalStatus, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));

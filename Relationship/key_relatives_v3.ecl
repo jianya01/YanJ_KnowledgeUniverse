@@ -1,3 +1,5 @@
+﻿IMPORT _Control;
+
 relativeLayoutOutputTitled := RECORD
 	string15 type;
 	string10 confidence;
@@ -238,6 +240,8 @@ cleaned := project(combo,
 																				 self.dob2 := 0;
 																				 self.age_first_seen := 0;
 																				 self := left));
-																				 
-EXPORT key_relatives_v3 := INDEX(cleaned, {did1}, {cleaned}, '~thor_data400::key::relatives_v3_qa');
-//EXPORT key_relatives_v3 := INDEX(cleaned, {did1}, {cleaned}, '~bpahl::key::relatives_v3_qa_slim'); // Slimmed down version so that this can be run in Alpha Dev - contains first degree relatives for LexID <= 10,000 and any LexID's in ClaimsFiles.FileParties
+
+fileName := '~thor_data400::key::relatives_v3_qa';
+EXPORT key_relatives_v3 := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	INDEX(cleaned, {did1}, {cleaned}, fileName),
+	INDEX(cleaned, {did1}, {cleaned}, fileName) (KEYED((UNSIGNED8)DID1 IN _Control.LexIDFilterSet)));

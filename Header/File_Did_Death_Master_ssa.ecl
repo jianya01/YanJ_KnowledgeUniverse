@@ -1,4 +1,5 @@
-﻿
+﻿IMPORT _Control;
+
 LayoutDeathMaster := RECORD
   string12 did;
   unsigned1 did_score;
@@ -21,7 +22,9 @@ LayoutDeathMaster := RECORD
   string2 crlf;
   string1 state_death_flag;
   string3 death_rec_src;
- END;
+END;
 
-EXPORT File_Did_Death_Master_ssa := DATASET('~thor::base::did_death_master_ssa_20160709', LayoutDeathMaster, THOR);
-
+fileName := '~thor::base::did_death_master_ssa_20160709';
+EXPORT File_Did_Death_Master_ssa := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutDeathMaster, THOR),
+	DATASET(fileName, LayoutDeathMaster, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));

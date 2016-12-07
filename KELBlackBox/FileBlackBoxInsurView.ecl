@@ -1,6 +1,6 @@
-/* BlackBox File for InsurView Attributes */
+﻿/* BlackBox File for InsurView Attributes */
 
-IMPORT KELBlackBox;
+IMPORT _Control, KELBlackBox;
 
 LayoutInsurView := RECORD
   string8 load_dt;
@@ -42,5 +42,7 @@ LayoutInsurView := RECORD
   string1 relexid_flag;
 END;
 
-EXPORT FileBlackBoxInsurView := DATASET(KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insurview', LayoutInsurView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
-//EXPORT FileBlackBoxInsurView := DATASET('~bpahl::base::cdw::prod::insurviewslim', LayoutInsurView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs);
+fileName := KELBlackBox.FileBlackBoxLocation + 'thor::base::cdw::prod::insurview';
+EXPORT FileBlackBoxInsurView := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+	DATASET(fileName, LayoutInsurView, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
+	DATASET(fileName, LayoutInsurView, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));
