@@ -132,5 +132,68 @@ EXPORT FileUtil := MODULE
 						              destinationIP, 
 													destinationpath+TRIM(date)+'_P'+TRIM(dset_fname.name[StringLib.stringfind(dset_fname.name, '_inputdata_p', 1) + 12 ..], ALL)+'.dat',,,,TRUE)));										 
 	END;	
-		
+
+	SHARED FileStats := RECORD
+		STRING File_Name;
+		UNSIGNED8 Record_Count;
+		UNSIGNED8 Uncompressed_Size_Bytes;
+		REAL8 Uncompressed_Size_KB;
+		REAL8 Uncompressed_Size_MB;
+		REAL8 Uncompressed_Size_GB;
+		REAL8 Uncompressed_Size_TB;
+		UNSIGNED8 Compressed_Size_Bytes;
+		REAL8 Compressed_Size_KB;
+		REAL8 Compressed_Size_MB;
+		REAL8 Compressed_Size_GB;
+		REAL8 Compressed_Size_TB;
+		REAL8 Compression_Percentage;
+	END;
+	EXPORT getFileSizeStats(STRING fileName) := FUNCTION
+		recordCount := (UNSIGNED8)STD.File.GetLogicalFileAttribute(fileName, 'recordCount');
+		size := (UNSIGNED8)STD.File.GetLogicalFileAttribute(fileName, 'size');
+		compressedSize := (UNSIGNED8)STD.File.GetLogicalFileAttribute(fileName, 'compressedSize');
+	
+		FinalDataset := DATASET([{fileName, 
+			recordCount, 
+			size, // B
+			ROUND((size / 1000), 3), // KB
+			ROUND((size / 1000000), 3), // MB
+			ROUND((size / 1000000000), 3), // GB
+			ROUND((size / 1000000000000), 3), // TB
+			compressedSize, // B
+			ROUND((compressedSize / 1000), 3), // KB
+			ROUND((compressedSize / 1000000), 3), // MB
+			ROUND((compressedSize / 1000000000), 3), // GB
+			ROUND((compressedSize / 1000000000000), 3), // TB
+			ROUND((((size - compressedSize) / size) * 100), 3)
+		}], FileStats);
+	
+		RETURN FinalDataset;
+	END;
+	
+	EXPORT combineFileSizeStats (DATASET(FileStats) fileStatsSet) := FUNCTION
+		combined := ROLLUP(PROJECT(fileStatsSet, TRANSFORM(RECORDOF(LEFT), SELF.File_Name := '1'; SELF := LEFT)), TRUE, 
+		TRANSFORM(FileStats, 
+			SELF.File_Name := (STRING)((UNSIGNED8)LEFT.File_Name + (UNSIGNED8)RIGHT.File_Name); 
+			SELF.Record_Count := LEFT.Record_Count + RIGHT.Record_Count; 
+			SELF.Uncompressed_Size_Bytes := LEFT.Uncompressed_Size_Bytes + RIGHT.Uncompressed_Size_Bytes; 
+			SELF.Compressed_Size_Bytes := LEFT.Compressed_Size_Bytes + RIGHT.Compressed_Size_Bytes;
+			SELF := LEFT));
+
+		combinedStats := PROJECT(combined,
+			TRANSFORM(FileStats,
+				SELF.File_Name := LEFT.File_Name + ' Files Examined';
+				SELF.Uncompressed_Size_KB := ROUND((LEFT.Uncompressed_Size_Bytes / 1000), 3);
+				SELF.Uncompressed_Size_MB := ROUND((LEFT.Uncompressed_Size_Bytes / 1000000), 3);
+				SELF.Uncompressed_Size_GB := ROUND((LEFT.Uncompressed_Size_Bytes / 1000000000), 3);
+				SELF.Uncompressed_Size_TB := ROUND((LEFT.Uncompressed_Size_Bytes / 1000000000000), 3);
+				SELF.Compressed_Size_KB := ROUND((LEFT.Compressed_Size_Bytes / 1000), 3);
+				SELF.Compressed_Size_MB := ROUND((LEFT.Compressed_Size_Bytes / 1000000), 3);
+				SELF.Compressed_Size_GB := ROUND((LEFT.Compressed_Size_Bytes / 1000000000), 3);
+				SELF.Compressed_Size_TB := ROUND((LEFT.Compressed_Size_Bytes / 1000000000000), 3);
+				SELF.Compression_Percentage := ROUND((((LEFT.Uncompressed_Size_Bytes - LEFT.Compressed_Size_Bytes) / LEFT.Uncompressed_Size_Bytes) * 100), 3);
+				SELF := LEFT));
+	
+		RETURN combinedStats;
+	END;
 END;
