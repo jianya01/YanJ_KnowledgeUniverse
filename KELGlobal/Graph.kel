@@ -2,7 +2,7 @@
 #OPTION(persist, 2)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
- 
+    
 /* Global Entity definitions belong here. */
  
 // Defining the ERA to allow for ASOF functionality
@@ -173,6 +173,27 @@ ACAInfo := ENTITY(FLAT(Address parent=UID(PrimaryRange, Predirectional, PrimaryN
 		STRING InstitutionTypeExpanded=NULL(), 
 		STRING InstitutionName=NULL(), 
 		INTEGER RecordCountHelper=NULL()));
+
+//Aircraft Entity Definition
+Aircraft := ENTITY(FLAT(UID = aircraft_id,
+		STRING NNumber,
+		STRING SerialNumber,
+		STRING ManufacturerModelCode,
+		STRING EngineManufacturerModelCode,
+		INTEGER YearManufactured,
+		DATE LastActionDate,
+		INTEGER Type,
+		STRING TypeEngine,
+		STRING StatusCode,
+		STRING TransponderCode,					//Mode_s_code in base file
+		STRING FractionalOwner,
+		STRING ManufacturerName,
+		STRING ModelName),
+	MODEL(UID,
+		NNumber, SerialNumber, ManufacturerModelCode, EngineManufacturerModelCode, YearManufactured, Type, TypeEngine, ManufacturerName, ModelName, TransponderCode,
+		OwnershipStatus{StatusCode, FractionalOwner},
+		LastActionDate{LastActionDate}));
+ 		
 
 // Global Credit Report Entity Definition
 CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
@@ -3616,6 +3637,8 @@ PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRa
 PersonCreditReport := ASSOCIATION(FLAT(Person Subject=LexID, CreditReport Report=UID(TransactionID, LexID))); // Connects a Person to a Credit Report
 JointCreditReport := ASSOCIATION(FLAT(CreditReport SubjectReport=UID(TransactionID, LexID), CreditReport JointReport=UID(TransactionID, LexID))); // Connects a Credit Report for a Subject to the Credit Report for the joint applicant
 
+AircraftOwner := ASSOCIATION(FLAT(Aircraft Plane, Person Owner, INTEGER RegistrantType, DATE CertificateIssueDate, STRING Certification));
+AircraftAddress := ASSOCIATION(FLAT(Aircraft Plane, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID), STRING NameType));
 
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
@@ -3753,6 +3776,71 @@ USE BankruptcyV3.Key_BankruptcyV3_Search_Full(FLAT,
 		DateLastSeen = date_last_seen,
 		FilingType = filing_type,
 		Disposition = disposition));  
+
+//Maps the FAA key_aircraft_id to Aircraft Entity
+USE FAA.key_aircraft_id(FLAT,
+	Aircraft(
+		UID = aircraft_id,
+		NNumber = n_number,
+		SerialNumber = serial_number,
+		ManufacturerModelCode = mfr_mdl_code,
+		EngineManufacturerModelCode = eng_mfr_mdl,
+		YearManufactured = year_mfr,
+		LastActionDate = last_action_date,
+		Type = type_aircraft,
+		TypeEngine = type_engine,
+		StatusCode = status_code,
+		TransponderCode = mode_s_code,					
+		FractionalOwner = fract_owner,
+		ManufacturerName = aircraft_mfr_name,
+		ModelName = model_name),
+	AircraftOwner(
+		Plane = aircraft_id,
+		Owner = did_out,
+		RegistrantType = type_registrant,
+		CertificateIssueDate = cert_issue_date,
+		Certification = certification),
+	AircraftAddress(
+		Plane = aircraft_id,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range),
+	Address(
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName	=	prim_name,
+		Suffix = addr_suffix,
+		Postdirectional	=	postdir,
+		UnitDesignation	=	unit_desig,
+		SecondaryRange =	sec_range,
+		PostalCity =	p_city_name,
+		VanityCity =	v_city_name,
+		State =	st,
+		ZIP5 = zip,
+		ZIP4 = z4,
+		CarrierRouteNumber = cart,
+		CarrierRouteSortationAtZIP = cr_sort_sz,
+		LineOfTravel =	lot,
+		LineOfTravelOrder	=	lot_order,
+		DeliveryPointBarcode =	dpbc,
+		DeliveryPointBarcodeCheckDigit =	chk_digit,
+		TypeCode =	rec_type,
+		County =	county,
+		Latitude =	geo_lat,
+		Longitude	=	geo_long,
+		MetropolitanStatisticalArea	=	msa,
+		GeoBlock =	geo_blk,
+		GeoMatch =	geo_match,
+		ACECleanerErrorCode	=	err_stat),
+	Person(
+		UID = did_out,
+		FirstName = fname,
+		MiddleName = mname,  
+		LastName = lname));
  
 // Maps the ADVO index to the Address Entity
 USE ADVO.Key_Addr1(FLAT,
@@ -9934,13 +10022,19 @@ QUERY: SuspectFirstDegreeRelativesAssociatesFelonyCount(SearchForLexID) <= Perso
 QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense{Person.UID, Person.PersonOffenses.Offense.OffenderKey, OffenseCharges.Level, OffenseCharges.OffenseScore, OffenseCharges.CaseNumber, Person.FelonyCount};
 
 QUERY: PersonsOffensesNew(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense;   
-
+ 
 // Address Based Queries
 QUERY: PersonsAddresses(SearchForLexID) <= Person(UID = SearchForLexID).PersonAddress.Location;
 
 QUERY: AddressDump(ArchiveDate) <= Address; // ASOF reportedby(ArchiveDate);
 
 QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Range, ZIP, ArchiveDate) <= Address(PrimaryRange = Prim_Range AND Predirectional = Predir AND PrimaryName = Prim_Name AND Suffix = Suffix AND Postdirectional = Postdir AND SecondaryRange = Sec_Range AND ZIP5 = ZIP); // ASOF reportedby(ArchiveDate);
+
+//Aircraft Based Queries
+QUERY: AircraftDump <= Aircraft;
+QUERY: AircraftOwnerDump <= AircraftOwner{Plane, Owner, RegistrantType, CertificateIssueDate, Certification};
+QUERY: AircraftPerson <= Aircraft{AircraftOwner.Owner};
+QUERY: AircraftOwnerName <= Aircraft{UID, NNumber, SerialNumber, AircraftOwner.Owner{UID,FullName}};
 
 //Bankruptcy Based Queries
 QUERY: Bankruptcy(SearchForTMSID) <= Bankruptcy(TMSID = SearchForTMSID); 
