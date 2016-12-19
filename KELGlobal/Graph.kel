@@ -2,7 +2,7 @@
 #OPTION(persist, 2)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
-    
+#OPTION(allowskew)
 /* Global Entity definitions belong here. */
  
 // Defining the ERA to allow for ASOF functionality
@@ -175,6 +175,7 @@ ACAInfo := ENTITY(FLAT(Address parent=UID(PrimaryRange, Predirectional, PrimaryN
 		INTEGER RecordCountHelper=NULL()));
 
 //Aircraft Entity Definition
+/*
 Aircraft := ENTITY(FLAT(UID = aircraft_id,
 		STRING NNumber,
 		STRING SerialNumber,
@@ -193,7 +194,27 @@ Aircraft := ENTITY(FLAT(UID = aircraft_id,
 		NNumber, SerialNumber, ManufacturerModelCode, EngineManufacturerModelCode, YearManufactured, Type, TypeEngine, ManufacturerName, ModelName, TransponderCode,
 		OwnershipStatus{StatusCode, FractionalOwner},
 		LastActionDate{LastActionDate}));
- 		
+*/
+ 	 	
+Aircraft := ENTITY(FLAT(UID(NNumber),
+		STRING NNumber,
+		STRING SerialNumber,
+		STRING ManufacturerModelCode,
+		STRING EngineManufacturerModelCode,
+		INTEGER YearManufactured,
+		DATE LastActionDate,
+		INTEGER Type,
+		STRING TypeEngine,
+		STRING StatusCode,
+		STRING TransponderCode,					//Mode_s_code in base file
+		STRING FractionalOwner,
+		STRING ManufacturerName,
+		STRING ModelName),
+	MODEL(UID,
+		NNumber, SerialNumber, ManufacturerModelCode, EngineManufacturerModelCode, YearManufactured, Type, TypeEngine, ManufacturerName, ModelName, TransponderCode,
+		OwnershipStatus{StatusCode, FractionalOwner},
+		LastActionDate{LastActionDate}));
+
 
 // Global Credit Report Entity Definition
 CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
@@ -3637,8 +3658,6 @@ PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRa
 PersonCreditReport := ASSOCIATION(FLAT(Person Subject=LexID, CreditReport Report=UID(TransactionID, LexID))); // Connects a Person to a Credit Report
 JointCreditReport := ASSOCIATION(FLAT(CreditReport SubjectReport=UID(TransactionID, LexID), CreditReport JointReport=UID(TransactionID, LexID))); // Connects a Credit Report for a Subject to the Credit Report for the joint applicant
 
-AircraftOwner := ASSOCIATION(FLAT(Aircraft Plane, Person Owner, INTEGER RegistrantType, DATE CertificateIssueDate, STRING Certification));
-AircraftAddress := ASSOCIATION(FLAT(Aircraft Plane, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID), STRING NameType));
 
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
@@ -3656,6 +3675,13 @@ GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#F
 //The below GLOBAL definition is an attempt to remove the first degree from the second degree results...returns the same records as the definition above
 //GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), FirstDegreeAssociations(#FirstDegree, #SecondDegree), #Subj<>#SecondDegree, NOT FirstDegreeAssociations(#Subj, #SecondDegree) => SecondDegreeAssociations(#Subj, #SecondDegree, 9999/*Title*/, 'SECOND DEGREE'/*RelationshipType*/, ''/*RelationshipConfidence*/, 0/*RelationshipScore*/, ''/*Generation*/, '0'/*RelationshipDateFirstSeen*/, '0'/*RelationshipDateLastSeen*/); 
 
+/* Aircraft Associations*/
+/*
+AircraftOwner := ASSOCIATION(FLAT(Aircraft Plane, Person Owner, INTEGER RegistrantType, DATE CertificateIssueDate, STRING Certification));
+AircraftAddress := ASSOCIATION(FLAT(Aircraft Plane, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+*/
+AircraftOwner := ASSOCIATION(FLAT(Aircraft Plane = UID(NNumber), Person Owner, INTEGER RegistrantType, DATE CertificateIssueDate, STRING Certification));
+AircraftAddress := ASSOCIATION(FLAT(Aircraft Plane = UID(NNumber), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
   
 /* The following USE statements map the various base files to the appropriate ENTITY definitions. */
 
@@ -3777,10 +3803,72 @@ USE BankruptcyV3.Key_BankruptcyV3_Search_Full(FLAT,
 		FilingType = filing_type,
 		Disposition = disposition));  
 
+ 
+// Maps the ADVO index to the Address Entity
+USE ADVO.Key_Addr1(FLAT,
+	Address(
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
+		ADVODateFirstSeen = date_first_seen,
+		ADVODateLastSeen = date_last_seen,
+		ADVODateVendorFirstReported = date_vendor_first_reported,
+		ADVODateVendorLastReported = date_vendor_last_reported,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		UnitDesignation = unit_desig,
+		SecondaryRange = sec_range,
+		PostalCity = p_city_name,
+		VanityCity = v_city_name,
+		State = st,
+		ZIP5 = zip,
+		ZIP4 = zip4,
+		CarrierRouteNumber = cart,
+		CarrierRouteSortationAtZIP = cr_sort_sz,
+		LineOfTravel = lot,
+		LineOfTravelOrder = lot_order,
+		DeliveryPointBarcode = dbpc,
+		DeliveryPointBarcodeCheckDigit = chk_digit,
+		TypeCode = rec_type,
+		AddressTypeCode = address_type,
+		County = county,
+		Latitude = geo_lat,
+		Longitude = geo_long,
+		MetropolitanStatisticalArea = msa,
+		GeoBlock = geo_blk,
+		GeoMatch = geo_match,
+		ACECleanerErrorCode = err_stat,
+		VacancyIndicator = address_vacancy_indicator,
+		ThrowBackIndicator = throw_back_indicator,
+		SeasonalDeliveryIndicator = seasonal_delivery_indicator,
+		SeasonalStartSuppressionDate = seasonal_start_suppression_date,
+		SeasonalEndSuppressionDate = seasonal_end_suppression_date,
+		DoNotDeliverIndicator = dnd_indicator,
+		CollegeIndicator = college_indicator,
+		CollegeStartSuppressionDate = college_start_suppression_date,
+		CollegeEndSuppressionDate = college_end_suppression_date,
+		StyleCode = address_style_flag,
+		SimplifyCount = simplify_address_count,
+		DropIndicator = drop_indicator,
+		ResidentialOrBusinessIndicator = residential_or_business_ind,
+		OnlyWayToGetMailIndicator = owgm_indicator,
+		RecordTypeCode = record_type_code,
+		MixedUsageCode = mixed_address_usage,
+		VacationBeginDate = vac_begdt,
+		VacationEndDate = vac_enddt,
+		NumberOfCurrentVacationMonths = months_vac_curr,
+		MaxVacationMonths = months_vac_max,
+		VacationPeriodsCount = vac_count));
+
 //Maps the FAA key_aircraft_id to Aircraft Entity
+/*
 USE FAA.key_aircraft_id(FLAT,
 	Aircraft(
 		UID = aircraft_id,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
 		NNumber = n_number,
 		SerialNumber = serial_number,
 		ManufacturerModelCode = mfr_mdl_code,
@@ -3841,64 +3929,75 @@ USE FAA.key_aircraft_id(FLAT,
 		FirstName = fname,
 		MiddleName = mname,  
 		LastName = lname));
- 
-// Maps the ADVO index to the Address Entity
-USE ADVO.Key_Addr1(FLAT,
-	Address(
-		DateFirstSeen = date_first_seen, // Contains information for ASOF
-		DateLastSeen = date_last_seen, // Contains information for ASOF
-		ADVODateFirstSeen = date_first_seen,
-		ADVODateLastSeen = date_last_seen,
-		ADVODateVendorFirstReported = date_vendor_first_reported,
-		ADVODateVendorLastReported = date_vendor_last_reported,
+*/
+
+//Maps the FAA key_aircraft_id to Aircraft Entity
+USE FAA.aircraft_did_reg(FLAT,
+	Aircraft(
+		NNumber = n_number,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
+		SerialNumber = serial_number,
+		ManufacturerModelCode = mfr_mdl_code,
+		EngineManufacturerModelCode = eng_mfr_mdl,
+		YearManufactured = year_mfr,
+		LastActionDate = last_action_date,
+		Type = type_aircraft,
+		TypeEngine = type_engine,
+		StatusCode = status_code,
+		TransponderCode = mode_s_code,					
+		FractionalOwner = fract_owner,
+		ManufacturerName = aircraft_mfr_name,
+		ModelName = model_name),
+	AircraftOwner(
+		NNumber = n_number,
+		Owner = did_out,
+		RegistrantType = type_registrant,
+		CertificateIssueDate = cert_issue_date,
+		Certification = certification),
+	AircraftAddress(
+		NNumber = n_number,
 		PrimaryRange = prim_range,
 		Predirectional = predir,
 		PrimaryName = prim_name,
 		Suffix = addr_suffix,
 		Postdirectional = postdir,
-		UnitDesignation = unit_desig,
-		SecondaryRange = sec_range,
-		PostalCity = p_city_name,
-		VanityCity = v_city_name,
-		State = st,
 		ZIP5 = zip,
-		ZIP4 = zip4,
+		SecondaryRange = sec_range),
+	Address(
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName	=	prim_name,
+		Suffix = addr_suffix,
+		Postdirectional	=	postdir,
+		UnitDesignation	=	unit_desig,
+		SecondaryRange =	sec_range,
+		PostalCity =	p_city_name,
+		VanityCity =	v_city_name,
+		State =	st,
+		ZIP5 = zip,
+		ZIP4 = z4,
 		CarrierRouteNumber = cart,
 		CarrierRouteSortationAtZIP = cr_sort_sz,
-		LineOfTravel = lot,
-		LineOfTravelOrder = lot_order,
-		DeliveryPointBarcode = dbpc,
-		DeliveryPointBarcodeCheckDigit = chk_digit,
-		TypeCode = rec_type,
-		AddressTypeCode = address_type,
-		County = county,
-		Latitude = geo_lat,
-		Longitude = geo_long,
-		MetropolitanStatisticalArea = msa,
-		GeoBlock = geo_blk,
-		GeoMatch = geo_match,
-		ACECleanerErrorCode = err_stat,
-		VacancyIndicator = address_vacancy_indicator,
-		ThrowBackIndicator = throw_back_indicator,
-		SeasonalDeliveryIndicator = seasonal_delivery_indicator,
-		SeasonalStartSuppressionDate = seasonal_start_suppression_date,
-		SeasonalEndSuppressionDate = seasonal_end_suppression_date,
-		DoNotDeliverIndicator = dnd_indicator,
-		CollegeIndicator = college_indicator,
-		CollegeStartSuppressionDate = college_start_suppression_date,
-		CollegeEndSuppressionDate = college_end_suppression_date,
-		StyleCode = address_style_flag,
-		SimplifyCount = simplify_address_count,
-		DropIndicator = drop_indicator,
-		ResidentialOrBusinessIndicator = residential_or_business_ind,
-		OnlyWayToGetMailIndicator = owgm_indicator,
-		RecordTypeCode = record_type_code,
-		MixedUsageCode = mixed_address_usage,
-		VacationBeginDate = vac_begdt,
-		VacationEndDate = vac_enddt,
-		NumberOfCurrentVacationMonths = months_vac_curr,
-		MaxVacationMonths = months_vac_max,
-		VacationPeriodsCount = vac_count));
+		LineOfTravel =	lot,
+		LineOfTravelOrder	=	lot_order,
+		DeliveryPointBarcode =	dpbc,
+		DeliveryPointBarcodeCheckDigit =	chk_digit,
+		TypeCode =	rec_type,
+		County =	county,
+		Latitude =	geo_lat,
+		Longitude	=	geo_long,
+		MetropolitanStatisticalArea	=	msa,
+		GeoBlock =	geo_blk,
+		GeoMatch =	geo_match,
+		ACECleanerErrorCode	=	err_stat),
+	Person(
+		UID = did_out,
+		FirstName = fname,
+		MiddleName = mname,  
+		LastName = lname));
+
+
 
 // Maps the Relatives V3 index to the FirstDegreeAssociations
 USE Relationship.key_relatives_v3(FLAT,
@@ -9361,6 +9460,35 @@ Person: => SuspectFirstDegreeRelativesAndAssociatesCount := COUNT(FirstDegreeAss
 Person: => SuspectFirstDegreeRelativesAndAssociatesFelonyCount := COUNT(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation(FelonyCount > 0));
 Person: => SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount := COUNT(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation(BankruptcyCount > 0));
 
+/* 
+Person: => AircraftCount := COUNT(AircraftOwner.Plane(NOT NNumber:Null){NNumber});
+Person: => AircraftCount30 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 30){NNumber});
+Person: => AircraftCount90 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 90){NNumber});
+Person: => AircraftCount180 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 180){NNumber});
+Person: => AircraftCount12 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 365){NNumber});
+Person: => AircraftCount24 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 2*365){NNumber});
+Person: => AircraftCount36 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 3*365){NNumber});
+Person: => AircraftCount60 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 5*365){NNumber});
+
+// Aircraft white box attributes
+Aircraft: => FirstSeenDate := NNumber:DateFirstSeen;
+// Aircraft: => MinDate := FirstSeenDate$GROUP{NNumber}:Min;
+Aircraft: => MinDate := MIN(Aircraft(NNumber = Aircraft.NNumber), FirstSeenDate);
+*/
+
+//Aircraft1
+Person: => AircraftCount := COUNT(AircraftOwner.Plane(NOT NNumber:Null){NNumber});
+Person: => AircraftCount30 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 30){NNumber});
+Person: => AircraftCount90 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 90){NNumber});
+Person: => AircraftCount180 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 180){NNumber});
+Person: => AircraftCount12 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 365){NNumber});
+Person: => AircraftCount24 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 2*365){NNumber});
+Person: => AircraftCount36 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 3*365){NNumber});
+Person: => AircraftCount60 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 5*365){NNumber});
+
+// Aircraft1 white box attributes
+Aircraft: => FirstSeenDate := NNumber:DateFirstSeen;
+
 Address: => ACAHit := IF(EXISTS(ACA), 'Y', 'N');
 // Due to a current KEL limitation need to manually dedup/count a separate ACAInfo ENTITY until the built in kel RecordCount field can be accessed (https://github.com/hpcc-systems/KEL/issues/1346)
 Address: => ACAWithCounts := ACAInfo{parent, InstitutionName, InstitutionTypeCode, InstitutionTypeExpanded, Frequency := COUNT(GROUP)};
@@ -9410,6 +9538,7 @@ Address: => ADVODateFirstSeen := ADVODateSummary.ADVODateFirstSeen$Min;
 Address: => ADVODateLastSeen := ADVODateSummary.ADVODateLastSeen$Max;
 Address: => ADVODateVendorFirstReported := ADVODateSummary.ADVODateVendorFirstReported$Min;
 Address: => ADVODateVendorLastReported := ADVODateSummary.ADVODateVendorLastReported$Max;
+
 
 // Constants Defined for Credit Report Narrative Remarks categorizations - Note: As Constant values, these must use all UPPERCASE names as enforced by the KEL compiler
 CreditReportBankruptcy: ALLSTATE_DISPUTE_CATEGORY_1_STATUS_CODE_LIST := ['E'];
@@ -10018,11 +10147,11 @@ QUERY: SuspectFirstDegreeRelativesAssociates(SearchForLexID) <= Person(UID=Searc
 QUERY: SuspectFirstDegreeRelativesAssociatesCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesCount};
 
 QUERY: SuspectFirstDegreeRelativesAssociatesFelonyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesFelonyCount};
-
+ 
 QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense{Person.UID, Person.PersonOffenses.Offense.OffenderKey, OffenseCharges.Level, OffenseCharges.OffenseScore, OffenseCharges.CaseNumber, Person.FelonyCount};
 
 QUERY: PersonsOffensesNew(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense;   
- 
+  
 // Address Based Queries
 QUERY: PersonsAddresses(SearchForLexID) <= Person(UID = SearchForLexID).PersonAddress.Location;
 
@@ -10032,10 +10161,12 @@ QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Ran
 
 //Aircraft Based Queries
 QUERY: AircraftDump <= Aircraft;
-QUERY: AircraftOwnerDump <= AircraftOwner{Plane, Owner, RegistrantType, CertificateIssueDate, Certification};
-QUERY: AircraftPerson <= Aircraft{AircraftOwner.Owner};
-QUERY: AircraftOwnerName <= Aircraft{UID, NNumber, SerialNumber, AircraftOwner.Owner{UID,FullName}};
-
+QUERY: AircraftOwnerDump <= AircraftOwner{Plane, Plane.NNumber, Owner, RegistrantType, CertificateIssueDate, Certification};
+QUERY: AircraftOwnerName <= Aircraft{UID, NNumber, FirstSeenDate, AircraftOwner.Owner{UID, AircraftCount, AircraftCount30, AircraftCount90, AircraftCount180, AircraftCount12, AircraftCount24, AircraftCount36, AircraftCount60}};
+QUERY: PersonAircraftCounts <= Person(AircraftCount != 0){UID, AircraftCount, AircraftCount30, AircraftCount90, AircraftCount180, AircraftCount12, AircraftCount24, AircraftCount36, AircraftCount60};
+// QUERY: AircraftLocation <= Address(EXISTS(AircraftAddress.Plane)){UID, AircraftAddress.Plane.NNumber, ZIP4} ;
+// QUERY: AircraftLocation <= Aircraft{UID, AircraftAddress.Location.ZIP4};       //Problems with Join for now.
+ 
 //Bankruptcy Based Queries
 QUERY: Bankruptcy(SearchForTMSID) <= Bankruptcy(TMSID = SearchForTMSID); 
 
