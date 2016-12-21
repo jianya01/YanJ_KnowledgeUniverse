@@ -8,4 +8,4 @@ OUTPUT(KELGlobal.Q_Aircraft_Owner_Dump.Res0, NAMED('AircraftOwnerAssociation'));
 
 OUTPUT(KELGlobal.Q_Aircraft_Owner_Name.Res0, NAMED('AircraftCounts'));
 OUTPUT(KELGlobal.Q_Person_Aircraft_Counts.Res0, NAMED('PersonAircraftCount'));
-// OUTPUT(KELGlobal.Q_Aircraft_Location.Res0, NAMED('AircraftAddress')); //Not working for now
+OUTPUT(KELGlobal.Q_Aircraft_Location.Res0, NAMED('AircraftAddress')); //Not working for now
