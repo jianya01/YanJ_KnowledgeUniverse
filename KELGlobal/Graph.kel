@@ -3951,12 +3951,16 @@ USE FAA.aircraft_did_reg(FLAT,
 		ModelName = model_name),
 	AircraftOwner(
 		NNumber = n_number,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
 		Owner = did_out,
 		RegistrantType = type_registrant,
 		CertificateIssueDate = cert_issue_date,
 		Certification = certification),
 	AircraftAddress(
 		NNumber = n_number,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
 		PrimaryRange = prim_range,
 		Predirectional = predir,
 		PrimaryName = prim_name,
@@ -3965,6 +3969,8 @@ USE FAA.aircraft_did_reg(FLAT,
 		ZIP5 = zip,
 		SecondaryRange = sec_range),
 	Address(
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
 		PrimaryRange = prim_range,
 		Predirectional = predir,
 		PrimaryName	=	prim_name,
@@ -3992,6 +3998,8 @@ USE FAA.aircraft_did_reg(FLAT,
 		GeoMatch =	geo_match,
 		ACECleanerErrorCode	=	err_stat),
 	Person(
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
 		UID = did_out,
 		FirstName = fname,
 		MiddleName = mname,  
@@ -9478,16 +9486,17 @@ Aircraft: => MinDate := MIN(Aircraft(NNumber = Aircraft.NNumber), FirstSeenDate)
 
 //Aircraft1
 Person: => AircraftCount := COUNT(AircraftOwner.Plane(NOT NNumber:Null){NNumber});
-Person: => AircraftCount30 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 30){NNumber});
-Person: => AircraftCount90 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 90){NNumber});
-Person: => AircraftCount180 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 180){NNumber});
-Person: => AircraftCount12 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 365){NNumber});
-Person: => AircraftCount24 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 2*365){NNumber});
-Person: => AircraftCount36 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 3*365){NNumber});
-Person: => AircraftCount60 := COUNT(AircraftOwner.Plane(ABS(DAYSBETWEEN(FirstSeenDate, CURRENTDATE())) <= 5*365){NNumber});
+Person: => AircraftCount30 := COUNT(AircraftOwner.Plane(DaysOld <= 30){NNumber});
+Person: => AircraftCount90 := COUNT(AircraftOwner.Plane(DaysOld <= 90){NNumber});
+Person: => AircraftCount180 := COUNT(AircraftOwner.Plane(DaysOld <= 180){NNumber});
+Person: => AircraftCount12 := COUNT(AircraftOwner.Plane(DaysOld <= 365){NNumber});
+Person: => AircraftCount24 := COUNT(AircraftOwner.Plane(DaysOld <= 2*365){NNumber});
+Person: => AircraftCount36 := COUNT(AircraftOwner.Plane(DaysOld <= 3*365){NNumber});
+Person: => AircraftCount60 := COUNT(AircraftOwner.Plane(DaysOld <= 5*365){NNumber});
 
 // Aircraft1 white box attributes
-Aircraft: => FirstSeenDate := NNumber:DateFirstSeen;
+//Aircraft: => FirstSeenDate := NNumber:DateFirstSeen;
+Aircraft: => DaysOld := ABS(DAYSBETWEEN(NNumber:DateFirstSeen, CURRENTDATE()));
 
 Address: => ACAHit := IF(EXISTS(ACA), 'Y', 'N');
 // Due to a current KEL limitation need to manually dedup/count a separate ACAInfo ENTITY until the built in kel RecordCount field can be accessed (https://github.com/hpcc-systems/KEL/issues/1346)
@@ -10162,7 +10171,7 @@ QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Ran
 //Aircraft Based Queries
 QUERY: AircraftDump <= Aircraft;
 QUERY: AircraftOwnerDump <= AircraftOwner{Plane, Plane.NNumber, Owner, RegistrantType, CertificateIssueDate, Certification};
-QUERY: AircraftOwnerName <= Aircraft{UID, NNumber, FirstSeenDate, AircraftOwner.Owner{UID, AircraftCount, AircraftCount30, AircraftCount90, AircraftCount180, AircraftCount12, AircraftCount24, AircraftCount36, AircraftCount60}};
+QUERY: AircraftOwnerName <= Aircraft{UID, NNumber, DaysOld, AircraftOwner.Owner{UID, AircraftCount, AircraftCount30, AircraftCount90, AircraftCount180, AircraftCount12, AircraftCount24, AircraftCount36, AircraftCount60}};
 QUERY: PersonAircraftCounts <= Person(AircraftCount != 0){UID, AircraftCount, AircraftCount30, AircraftCount90, AircraftCount180, AircraftCount12, AircraftCount24, AircraftCount36, AircraftCount60};
 QUERY: AircraftLocation <= Address(EXISTS(AircraftAddress.Plane)){UID, AircraftAddress.Plane.NNumber, ZIP4} ;
 // QUERY: AircraftLocation <= Aircraft{UID, AircraftAddress.Location.ZIP4};       //Problems with Join for now.
