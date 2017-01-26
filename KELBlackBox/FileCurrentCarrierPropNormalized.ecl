@@ -382,7 +382,7 @@ SHARED t_inquiryhistorysectionccstandaloneresultscust := RECORD
   END;
 
 SHARED CC_Property_Response := RECORD
-integer8 recid;
+integer8 RecordIdentifier;
   t_insurancexmlinfo xmlinfo{xpath('XmlInfo')};
   t_reportidsectionccstandaloneresultscust reportidsection{xpath('ReportIdSection')};
   t_recapprocessingsectionccstandaloneresultscust recapprocessingsection{xpath('RecapProcessingSection')};
@@ -398,7 +398,7 @@ integer8 recid;
 // **************Normalizations ******************
 // **1** recapprocessingsection - 
  {integer8 RecordIdentifier, integer RecapRecordCounter, t_recapprocessingrecordreport} getRecapMessages(CC_Property_Response L, t_recapprocessingrecordreport R, integer cntr) := transform
-            self.RecordIdentifier := L.recid;
+            self.RecordIdentifier := L.RecordIdentifier;
             self.RecapRecordCounter := cntr;
             Self := R;
    				  END;
@@ -407,7 +407,7 @@ EXPORT FileCCPropSubjectRecap := normalize(KELBlackBox.FileCurrentCarrierPropert
 
 // **2** generalmessagessection - messages
   {integer8 RecordIdentifier, integer MessageRecordCounter, t_narrativearecordreport} getGenMessages(CC_Property_Response L, t_narrativearecordreport R, integer cntr) := transform
-               self.RecordIdentifier := L.recid;
+               self.RecordIdentifier := L.RecordIdentifier;
                self.MessageRecordCounter := cntr;
                Self := R;
       				  END;
@@ -421,7 +421,7 @@ EXPORT FileCCPropGeneralMessages:= normalize(KELBlackBox.FileCurrentCarrierPrope
 
 // **3** subjectSearchInformationSection - SubjectSearchId Sets
 	{integer8 RecordIdentifier, integer SubjectIDRecordCounter, t_subjectidsetccstandaloneresultscust} getSubIDsets(CC_Property_Response L, t_subjectidsetccstandaloneresultscust R, integer cntr) := transform
-               self.RecordIdentifier := L.recid;
+               self.RecordIdentifier := L.RecordIdentifier;
                self.SubjectIDRecordCounter := cntr;
                Self := R;
    						END;
@@ -434,7 +434,7 @@ EXPORT FileCCPropSubIDSets:= normalize(KELBlackBox.FileCurrentCarrierProperty, l
 
 // **4** additionalinformationsection - messages
  {integer8 RecordIdentifier, integer AddMessageRecordCounter, t_narrativearecordreport} getAddMessages(CC_Property_Response L, t_narrativearecordreport R, integer cntr) := transform
-            self.RecordIdentifier := L.recid;
+            self.RecordIdentifier := L.RecordIdentifier;
             self.AddMessageRecordCounter := cntr;
             Self := R;
    				 END;
@@ -444,12 +444,18 @@ EXPORT FileCCPropAdditionalMesg:= normalize(KELBlackBox.FileCurrentCarrierProper
  
 // **5** attachmentsection			- personrecord
 {integer8 RecordIdentifier, integer PersonRecordCounter, t_personaldatasectionccstandaloneresultscust} getAttSectMessages(CC_Property_Response L, t_personaldatasectionccstandaloneresultscust R, integer cntr) := transform
-            self.RecordIdentifier := L.recid;
+            self.RecordIdentifier := L.RecordIdentifier;
             self.PersonRecordCounter := cntr;
             Self := R;
    				 END;
 
 EXPORT FileCCPropAttachmentSect:= normalize(KELBlackBox.FileCurrentCarrierProperty, left.attachmentsection.PersonalDataSections, getAttSectMessages(LEFT, Right, counter));
     		
+CC_Property_Response cleanCCProp(KELBlackBox.FileCurrentCarrierProperty le) := TRANSFORM
+		SELF.RecordIdentifier := le.RecordIdentifier;
+		SELF := le;
+	END;
+
+EXPORT FileCCPropertyRoot := PROJECT(KELBlackBox.FileCurrentCarrierProperty, cleanCCProp(LEFT));				
 				
 END;

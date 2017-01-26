@@ -391,11 +391,11 @@ CC_Property_Response := RECORD
  END;
 
 finalCCProperty := RECORD
-	integer8 RecID;
+	integer8 RecordIdentifier;
 	CC_Property_Response;// - errorcode - transaction_time;
 END;
 
 // Run this file for a 1,000,000 record sample during development
-// EXPORT FileCurrentCarrierProperty := PROJECT(DATASET('~thor::sv::currentcarrierprop_poc::response::1mfile1', CC_Property_Response, THOR), TRANSFORM(finalCCProperty, SELF.RecID := COUNTER; SELF := LEFT));
+EXPORT FileCurrentCarrierProperty := PROJECT(DATASET('~thor::sv::currentcarrierprop_poc::response::Jan::1Mfile1', CC_Property_Response, THOR), TRANSFORM(finalCCProperty, SELF.RecordIdentifier := COUNTER; SELF := LEFT));
 // Test sample
-EXPORT FileCurrentCarrierProperty := PROJECT(DATASET('~thor::sv::currentcarrierprop_poc::response::500file1', CC_Property_Response, THOR), TRANSFORM(finalCCProperty, SELF.RecID := COUNTER; SELF := LEFT));
+// EXPORT FileCurrentCarrierProperty := PROJECT(DATASET('~thor::sv::currentcarrierprop_poc::response::500file1', CC_Property_Response, THOR), TRANSFORM(finalCCProperty, SELF.RecID := COUNTER; SELF := LEFT));
