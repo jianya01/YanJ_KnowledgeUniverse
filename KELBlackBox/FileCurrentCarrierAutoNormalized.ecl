@@ -4,6 +4,21 @@ IMPORT KELBlackBox;
 
 EXPORT FileCurrentCarrierAutoNormalized := MODULE
 
+	SHARED iESP2Date(STRING Year, STRING Month, STRING Day) := FUNCTION
+		RETURN(INTFORMAT((INTEGER)Year, 4, 1) + INTFORMAT((INTEGER)Month, 2, 1) + INTFORMAT((INTEGER)Day, 2, 1));
+	END;
+	
+	SHARED CleanDate(STRING Date) := FUNCTION
+		YYYY := Date[1..4];
+		MM := DATE[5..6];
+		DD := DATE[7..8];
+
+		RETURN(MAP(KEL.Routines.IsValidDate((UNSIGNED4)(YYYY + MM + DD))										=> YYYY + MM + DD, // Full date is valid
+				KEL.Routines.IsValidDate((UNSIGNED4)(YYYY + MM + '01')) AND (INTEGER)DD = 0						=> YYYY + MM + '01', // YYYYMM valid and DD is 00
+				KEL.Routines.IsValidDate((UNSIGNED4)(YYYY + '0101')) AND (INTEGER)MM = 0 AND (INTEGER)DD = 0	=> YYYY + '0101', // YYYY valid and MMDD is 0000
+								 																							'0')); // Invalid date, set to 0
+	END;
+	
 SHARED t_insurancebatch := RECORD
     string seqnumber{xpath('SeqNumber')};
     string id{xpath('Id')};
@@ -35,9 +50,9 @@ SHARED t_reportrequestidrecordreport := RECORD
     string6 accountnumber{xpath('AccountNumber')};
     string3 accountsuffix{xpath('AccountSuffix')};
     string15 specialbillid{xpath('SpecialBillId')};
-    t_editsdate dateoforder{xpath('DateOfOrder')};
-    t_editsdate dateofreceipt{xpath('DateOfReceipt')};
-    t_editsdate dateofcompletion{xpath('DateOfCompletion')};
+    STRING8 dateoforder{xpath('DateOfOrder')};
+    STRING8 dateofreceipt{xpath('DateOfReceipt')};
+    STRING8 dateofcompletion{xpath('DateOfCompletion')};
     string1 processingcompletionstatus{xpath('ProcessingcompletionStatus')};
     string2 reportusage{xpath('ReportUsage')};
     string14 referencenumber{xpath('ReferenceNumber')};
@@ -164,8 +179,8 @@ SHARED t_addressrecordreport := RECORD
     string4 zip4{xpath('Zip4')};
     string2 yearsataddress{xpath('YearsAtAddress')};
     string2 mthsataddress{xpath('MthsAtAddress')};
-    t_editsdate datefirstseen{xpath('DateFirstSeen')};
-    t_editsdate datelastseen{xpath('DateLastSeen')};
+    STRING8 datefirstseen{xpath('DateFirstSeen')};
+    STRING8 datelastseen{xpath('DateLastSeen')};
     string1 fsihousenumber{xpath('FsiHouseNumber')};
     string1 fsistreetname{xpath('FsiStreetName')};
     string1 fsiaptnumber{xpath('FsiAptNumber')};
@@ -179,7 +194,7 @@ SHARED t_addressrecordreport := RECORD
     string1 fsidatelastseen{xpath('FsiDateLastSeen')};
     string1 ownrentindicator{xpath('OwnrentIndicator')};
     string15 countyname{xpath('CountyName')};
-    t_editsdate dataassodate{xpath('DataAssoDate')};
+    STRING8 dataassodate{xpath('DataAssoDate')};
     string1 datasourceindicator{xpath('DataSourceIndicator')};
     string2 typecode{xpath('TypeCode')};
     string10 censustract{xpath('CensusTract')};
@@ -205,7 +220,7 @@ SHARED t_personrecordreport := RECORD
      string20 first{xpath('First')};
      string15 middle{xpath('Middle')};
      string3 suffix{xpath('Suffix')};
-     t_editsdate dateofbirth{xpath('DateOfBirth')};
+     STRING8 dateofbirth{xpath('DateOfBirth')};
      string3 age{xpath('Age')};
      string1 sex{xpath('Sex')};
      string9 ssn{xpath('SSN')};
@@ -216,7 +231,7 @@ SHARED t_personrecordreport := RECORD
      string20 relationshipdesc{xpath('RelationshipDesc')};
      string1 individualaddressassociationind{xpath('IndividualAddressAssociationInd')};
      string1 nameassociationindicator{xpath('NameAssociationIndicator')};
-     t_editsdate dataassociationdate{xpath('DataAssociationDate')};
+     STRING8 dataassociationdate{xpath('DataAssociationDate')};
      string1 maritalstatus{xpath('MaritalStatus')};
      string1 fsiprefix{xpath('FsiPrefix')};
      string1 fsilast{xpath('FsiLast')};
@@ -239,7 +254,7 @@ SHARED t_personrecordreport := RECORD
      string1 datasourceindicator{xpath('DataSourceIndicator')};
      string3 eyecolor{xpath('EyeColor')};
      string3 haircolor{xpath('HairColor')};
-     t_editsdate dateofdeath{xpath('DateOfDeath')};
+     STRING8 dateofdeath{xpath('DateOfDeath')};
      string2 numberofdependents{xpath('NumberOfDependents')};
      string1 fraudalertind{xpath('FraudAlertInd')};
      string1 multipolicyind{xpath('MultiPolicyInd')};
@@ -266,16 +281,18 @@ SHARED t_driverlicenserecordreport := RECORD
      string1 fsilicensestate{xpath('FsiLicenseState')};
      string10 _type{xpath('Type')};
      string15 restriction{xpath('Restriction')};
-     t_editsdate issuedate{xpath('IssueDate')};
-     t_editsdate expdatev{xpath('ExpDatev')};
-     t_editsdate dataassodatev{xpath('DataAssoDatev')};
+     STRING8 issuedate{xpath('IssueDate')};
+     STRING8 expdatev{xpath('ExpDatev')};
+     STRING8 dataassodatev{xpath('DataAssoDatev')};
      string1 datasourceindicator{xpath('DataSourceIndicator')};
      string1 typeindicator{xpath('TypeIndicator')};
      string3 unitnumber2{xpath('UnitNumber2')};
     END;
 
 SHARED t_subjectidsetccstandaloneresultscust := RECORD
-    t_personrecordreport subject{xpath('Subject')};
+    		UNSIGNED8 RecordIdentifier;
+		UNSIGNED8 SubjectIDRecordCounter;
+		t_personrecordreport subject{xpath('Subject')};
     t_requiredaddressinformationccstandaloneresultscust requiredaddressinformation{xpath('RequiredAddressInformation')};
     t_driverlicenserecordreport currentlicense{xpath('CurrentLicense')};
     t_driverlicenserecordreport priorlicense{xpath('PriorLicense')};
@@ -296,7 +313,9 @@ SHARED t_additionalinformationsectionccstandaloneresultscust := RECORD
   END;
 
 SHARED t_personaldatasectionccstandaloneresultscust := RECORD
-    t_personrecordreport personrecord{xpath('PersonRecord')};
+    UNSIGNED8 RecordIdentifier;
+		UNSIGNED8 PersonRecordCounter;
+		t_personrecordreport personrecord{xpath('PersonRecord')};
     t_driverlicenserecordreport driverlicenserecord{xpath('DriverLicenseRecord')};
    END;
 
@@ -368,7 +387,7 @@ SHARED t_inquiryhistoryheaderrecordreport := RECORD
     string2 recordoccurra{xpath('RecordOccurrA')};
     string2 recordoccurrb{xpath('RecordOccurrB')};
     string2 classification{xpath('Classification')};
-    t_editsdate dateofinquiry{xpath('DateOfInquiry')};
+    STRING8 dateofinquiry{xpath('DateOfInquiry')};
     string50 inquirername{xpath('InquirerName')};
     string60 quoteback{xpath('Quoteback')};
     string10 inquirerid{xpath('InquirerId')};
@@ -392,71 +411,157 @@ integer8 RecordIdentifier;
   t_subjectsearchinformationsectionccstandaloneresultscust subjectsearchinformationsection{xpath('SubjectSearchInformationSection')};
   t_additionalinformationsectionccstandaloneresultscust additionalinformationsection{xpath('AdditionalInformationSection')};
   t_attachmentsectionccstandaloneresultscust attachmentsection{xpath('AttachmentSection')};
-  t_inquiryhistorysectionccstandaloneresultscust inquiryhistorysection{xpath('InquiryHistorySection')};
+ // t_inquiryhistorysectionccstandaloneresultscust inquiryhistorysection{xpath('InquiryHistorySection')};
   string errorcode;
   integer8 transaction_time{xpath('_call_latency_ms')};
  END;
 
-// **************Normalizations ******************
-// **1** recapprocessingsection - 
- {integer8 RecordIdentifier, integer RecapRecordCounter, t_recapprocessingrecordreport} getRecapMessages(CC_Auto_Response L, t_recapprocessingrecordreport R, integer cntr) := transform
-            self.RecordIdentifier := L.RecordIdentifier;
-            self.RecapRecordCounter := cntr;
-            Self := R;
-   				  END;
-      
-EXPORT FileCCAutoSubjectRecap := normalize(KELBlackBox.FileCurrentCarrierAuto, left.recapprocessingsection.subjectlevelinquiryrecap, getRecapMessages(LEFT, Right, counter));
-
-// **2** generalmessagessection - messages
-  {integer8 RecordIdentifier, integer MessageRecordCounter, t_narrativearecordreport} getGenMessages(CC_Auto_Response L, t_narrativearecordreport R, integer cntr) := transform
-               self.RecordIdentifier := L.RecordIdentifier;
-               self.MessageRecordCounter := cntr;
-               Self := R;
-      				  END;
-         
-
-EXPORT FileCCAutoGeneralMessages:= normalize(KELBlackBox.FileCurrentCarrierAuto, left.generalmessagessection.messages, getGenMessages(LEFT, Right, counter));
- 
-    		 
-
-
-
-// **3** subjectSearchInformationSection - SubjectSearchId Sets
-	{integer8 RecordIdentifier, integer SubjectIDRecordCounter, t_subjectidsetccstandaloneresultscust} getSubIDsets(CC_Auto_Response L, t_subjectidsetccstandaloneresultscust R, integer cntr) := transform
-               self.RecordIdentifier := L.RecordIdentifier;
-               self.SubjectIDRecordCounter := cntr;
-               Self := R;
-   						END;
-         
-
-
-EXPORT FileCCAutoSubIDSets:= normalize(KELBlackBox.FileCurrentCarrierAuto, left.subjectsearchinformationsection.subjectidsets, getSubIDsets(LEFT, Right, counter));
- 
-      
-
-// **4** additionalinformationsection - messages
- {integer8 RecordIdentifier, integer AddMessageRecordCounter, t_narrativearecordreport} getAddMessages(CC_Auto_Response L, t_narrativearecordreport R, integer cntr) := transform
-            self.RecordIdentifier := L.RecordIdentifier;
-            self.AddMessageRecordCounter := cntr;
-            Self := R;
-   				 END;
-      
-
-EXPORT FileCCAutoAdditionalMesg:= normalize(KELBlackBox.FileCurrentCarrierAuto, left.additionalinformationsection.DisclaimAndPoliciesSet.messages, getAddMessages(LEFT, Right, counter));
- 
-// **5** attachmentsection			- personrecord
-{integer8 RecordIdentifier, integer PersonRecordCounter, t_personaldatasectionccstandaloneresultscust} getAttSectMessages(CC_Auto_Response L, t_personaldatasectionccstandaloneresultscust R, integer cntr) := transform
-            self.RecordIdentifier := L.RecordIdentifier;
-            self.PersonRecordCounter := cntr;
-            Self := R;
-   				 END;
-
-EXPORT FileCCAutoAttachmentSect:= normalize(KELBlackBox.FileCurrentCarrierAuto, left.attachmentsection.PersonalDataSections, getAttSectMessages(LEFT, Right, counter));
-
+// Cleaning Functions
+ t_subjectidsetccstandaloneresultscust cleanSubjectIDSection(RECORDOF(KELBlackBox.FileCurrentCarrierAuto.subjectsearchinformationsection.subjectidsets) le, UNSIGNED8 recIdentifier, UNSIGNED8 cntr) := TRANSFORM
+		SELF.RecordIdentifier := recIdentifier;
+		SELF.SubjectIDRecordCounter := cntr;
+		SELF.subject.dateofbirth := CleanDate(iESP2Date(le.subject.dateofbirth.Year, le.subject.dateofbirth.Month, le.subject.dateofbirth.Day));
+		SELF.subject.dataassociationdate := CleanDate(iESP2Date(le.subject.dataassociationdate.Year, le.subject.dataassociationdate.Month, le.subject.dataassociationdate.Day));
+		SELF.subject.dateofdeath := CleanDate(iESP2Date(le.subject.dateofdeath.Year, le.subject.dateofdeath.Month, le.subject.dateofdeath.Day));
+		SELF.requiredaddressinformation.currentorriskaddress.datefirstseen := CleanDate(iESP2Date(le.requiredaddressinformation.currentorriskaddress.datefirstseen.Year, le.requiredaddressinformation.currentorriskaddress.datefirstseen.Month, le.requiredaddressinformation.currentorriskaddress.datefirstseen.Day));
+		SELF.requiredaddressinformation.currentorriskaddress.datelastseen := CleanDate(iESP2Date(le.requiredaddressinformation.currentorriskaddress.datelastseen.Year, le.requiredaddressinformation.currentorriskaddress.datelastseen.Month, le.requiredaddressinformation.currentorriskaddress.datelastseen.Day));
+		SELF.requiredaddressinformation.currentorriskaddress.dataassodate := CleanDate(iESP2Date(le.requiredaddressinformation.currentorriskaddress.dataassodate.Year, le.requiredaddressinformation.currentorriskaddress.dataassodate.Month, le.requiredaddressinformation.currentorriskaddress.dataassodate.Day));
+		SELF.requiredaddressinformation.mailingaddress.datefirstseen := CleanDate(iESP2Date(le.requiredaddressinformation.mailingaddress.datefirstseen.Year, le.requiredaddressinformation.mailingaddress.datefirstseen.Month, le.requiredaddressinformation.mailingaddress.datefirstseen.Day));
+		SELF.requiredaddressinformation.mailingaddress.datelastseen := CleanDate(iESP2Date(le.requiredaddressinformation.mailingaddress.datelastseen.Year, le.requiredaddressinformation.mailingaddress.datelastseen.Month, le.requiredaddressinformation.mailingaddress.datelastseen.Day));
+		SELF.requiredaddressinformation.mailingaddress.dataassodate := CleanDate(iESP2Date(le.requiredaddressinformation.mailingaddress.dataassodate.Year, le.requiredaddressinformation.mailingaddress.dataassodate.Month, le.requiredaddressinformation.mailingaddress.dataassodate.Day));
+		SELF.requiredaddressinformation.prioraddress.datefirstseen := CleanDate(iESP2Date(le.requiredaddressinformation.prioraddress.datefirstseen.Year, le.requiredaddressinformation.prioraddress.datefirstseen.Month, le.requiredaddressinformation.prioraddress.datefirstseen.Day));
+		SELF.requiredaddressinformation.prioraddress.datelastseen := CleanDate(iESP2Date(le.requiredaddressinformation.prioraddress.datelastseen.Year, le.requiredaddressinformation.prioraddress.datelastseen.Month, le.requiredaddressinformation.prioraddress.datelastseen.Day));
+		SELF.requiredaddressinformation.prioraddress.dataassodate := CleanDate(iESP2Date(le.requiredaddressinformation.prioraddress.dataassodate.Year, le.requiredaddressinformation.prioraddress.dataassodate.Month, le.requiredaddressinformation.prioraddress.dataassodate.Day));
+		SELF.currentlicense.issuedate := CleanDate(iESP2Date(le.currentlicense.issuedate.Year, le.currentlicense.issuedate.Month, le.currentlicense.issuedate.Day));
+		SELF.currentlicense.expdatev := CleanDate(iESP2Date(le.currentlicense.expdatev.Year, le.currentlicense.expdatev.Month, le.currentlicense.expdatev.Day));
+		SELF.currentlicense.dataassodatev := CleanDate(iESP2Date(le.currentlicense.dataassodatev.Year, le.currentlicense.dataassodatev.Month, le.currentlicense.dataassodatev.Day));
+		SELF.priorlicense.issuedate := CleanDate(iESP2Date(le.priorlicense.issuedate.Year, le.priorlicense.issuedate.Month, le.priorlicense.issuedate.Day));
+		SELF.priorlicense.expdatev := CleanDate(iESP2Date(le.priorlicense.expdatev.Year, le.priorlicense.expdatev.Month, le.priorlicense.expdatev.Day));
+		SELF.priorlicense.dataassodatev := CleanDate(iESP2Date(le.priorlicense.dataassodatev.Year, le.priorlicense.dataassodatev.Month, le.priorlicense.dataassodatev.Day));
+		SELF := le;
+	END;
+	
+t_personaldatasectionccstandaloneresultscust cleanPersonalDataSections(RECORDOF(KELBlackBox.FileCurrentCarrierAuto.attachmentsection.personaldatasections) le, UNSIGNED8 recIdentifier, UNSIGNED8 cntr) := TRANSFORM
+		SELF.RecordIdentifier := recIdentifier;
+		SELF.PersonRecordCounter := cntr;
+		SELF.personrecord.dateofbirth := CleanDate(iESP2Date(le.personrecord.dateofbirth.Year, le.personrecord.dateofbirth.Month, le.personrecord.dateofbirth.Day));
+		SELF.personrecord.dataassociationdate := CleanDate(iESP2Date(le.personrecord.dataassociationdate.Year, le.personrecord.dataassociationdate.Month, le.personrecord.dataassociationdate.Day));
+		SELF.personrecord.dateofdeath := CleanDate(iESP2Date(le.personrecord.dateofdeath.Year, le.personrecord.dateofdeath.Month, le.personrecord.dateofdeath.Day));
+		SELF.driverlicenserecord.issuedate := CleanDate(iESP2Date(le.driverlicenserecord.issuedate.Year, le.driverlicenserecord.issuedate.Month, le.driverlicenserecord.issuedate.Day));
+		SELF.driverlicenserecord.expdatev := CleanDate(iESP2Date(le.driverlicenserecord.expdatev.Year, le.driverlicenserecord.expdatev.Month, le.driverlicenserecord.expdatev.Day));
+		SELF.driverlicenserecord.dataassodatev := CleanDate(iESP2Date(le.driverlicenserecord.dataassodatev.Year, le.driverlicenserecord.dataassodatev.Month, le.driverlicenserecord.dataassodatev.Day));
+		SELF := le;
+		END;
+// ROOT		
 CC_Auto_Response cleanCCAuto(KELBlackBox.FileCurrentCarrierAuto le) := TRANSFORM
 		SELF.RecordIdentifier := le.RecordIdentifier;
+		SELF.ReportIdSection.reportrequestid.dateoforder := CleanDate(iESP2Date(le.ReportIdSection.reportrequestid.dateoforder.Year, le.ReportIdSection.reportrequestid.dateoforder.Month, le.ReportIdSection.reportrequestid.dateoforder.Day));
+		SELF.ReportIdSection.reportrequestid.dateofreceipt := CleanDate(iESP2Date(le.ReportIdSection.reportrequestid.dateofreceipt.Year, le.ReportIdSection.reportrequestid.dateofreceipt.Month, le.ReportIdSection.reportrequestid.dateofreceipt.Day));
+		SELF.ReportIdSection.reportrequestid.dateofcompletion := CleanDate(iESP2Date(le.ReportIdSection.reportrequestid.dateofcompletion.Year, le.ReportIdSection.reportrequestid.dateofcompletion.Month, le.ReportIdSection.reportrequestid.dateofcompletion.Day));
+		SELF.groupaddresssection.groupcurrentaddress.datefirstseen := CleanDate(iESP2Date(le.groupaddresssection.groupcurrentaddress.datefirstseen.Year, le.groupaddresssection.groupcurrentaddress.datefirstseen.Month, le.groupaddresssection.groupcurrentaddress.datefirstseen.Day));
+		SELF.groupaddresssection.groupcurrentaddress.datelastseen := CleanDate(iESP2Date(le.groupaddresssection.groupcurrentaddress.datelastseen.Year, le.groupaddresssection.groupcurrentaddress.datelastseen.Month, le.groupaddresssection.groupcurrentaddress.datelastseen.Day));
+		SELF.groupaddresssection.groupcurrentaddress.dataassodate := CleanDate(iESP2Date(le.groupaddresssection.groupcurrentaddress.dataassodate.Year, le.groupaddresssection.groupcurrentaddress.dataassodate.Month, le.groupaddresssection.groupcurrentaddress.dataassodate.Day));
+		SELF.groupaddresssection.groupriskaddress.datefirstseen := CleanDate(iESP2Date(le.groupaddresssection.groupriskaddress.datefirstseen.Year, le.groupaddresssection.groupriskaddress.datefirstseen.Month, le.groupaddresssection.groupriskaddress.datefirstseen.Day));
+		SELF.groupaddresssection.groupriskaddress.datelastseen := CleanDate(iESP2Date(le.groupaddresssection.groupriskaddress.datelastseen.Year, le.groupaddresssection.groupriskaddress.datelastseen.Month, le.groupaddresssection.groupriskaddress.datelastseen.Day));
+		SELF.groupaddresssection.groupriskaddress.dataassodate := CleanDate(iESP2Date(le.groupaddresssection.groupriskaddress.dataassodate.Year, le.groupaddresssection.groupriskaddress.dataassodate.Month, le.groupaddresssection.groupriskaddress.dataassodate.Day));
+		SELF.groupaddresssection.groupprioraddress.datefirstseen := CleanDate(iESP2Date(le.groupaddresssection.groupprioraddress.datefirstseen.Year, le.groupaddresssection.groupprioraddress.datefirstseen.Month, le.groupaddresssection.groupprioraddress.datefirstseen.Day));
+		SELF.groupaddresssection.groupprioraddress.datelastseen := CleanDate(iESP2Date(le.groupaddresssection.groupprioraddress.datelastseen.Year, le.groupaddresssection.groupprioraddress.datelastseen.Month, le.groupaddresssection.groupprioraddress.datelastseen.Day));
+		SELF.groupaddresssection.groupprioraddress.dataassodate := CleanDate(iESP2Date(le.groupaddresssection.groupprioraddress.dataassodate.Year, le.groupaddresssection.groupprioraddress.dataassodate.Month, le.groupaddresssection.groupprioraddress.dataassodate.Day));
+		SELF.groupaddresssection.groupmailingaddress.datefirstseen := CleanDate(iESP2Date(le.groupaddresssection.groupmailingaddress.datefirstseen.Year, le.groupaddresssection.groupmailingaddress.datefirstseen.Month, le.groupaddresssection.groupmailingaddress.datefirstseen.Day));
+		SELF.groupaddresssection.groupmailingaddress.datelastseen := CleanDate(iESP2Date(le.groupaddresssection.groupmailingaddress.datelastseen.Year, le.groupaddresssection.groupmailingaddress.datelastseen.Month, le.groupaddresssection.groupmailingaddress.datelastseen.Day));
+		SELF.groupaddresssection.groupmailingaddress.dataassodate := CleanDate(iESP2Date(le.groupaddresssection.groupmailingaddress.dataassodate.Year, le.groupaddresssection.groupmailingaddress.dataassodate.Month, le.groupaddresssection.groupmailingaddress.dataassodate.Day));
+		SELF.subjectsearchinformationsection.subjectidsets := PROJECT(le.subjectsearchinformationsection.subjectidsets, cleanSubjectIDSection(LEFT, le.RecordIdentifier, COUNTER));
+		SELF.attachmentsection.personaldatasections := PROJECT(le.attachmentsection.personaldatasections, cleanPersonalDataSections(LEFT, le.RecordIdentifier, COUNTER));
 		SELF := le;
 	END;
 
-EXPORT FileCCAutoRoot := PROJECT(KELBlackBox.FileCurrentCarrierAuto, cleanCCAuto(LEFT));				
+EXPORT FileCCAutoRoot := PROJECT(KELBlackBox.FileCurrentCarrierAuto, cleanCCAuto(LEFT));		
+
+//  Recap processing - reportlevelinquiryrecap 		
+EXPORT FileCCAutoReportRecap := PROJECT(FileCCAutoRoot, 
+																	TRANSFORM({INTEGER8 RecordIdentifier, RECORDOF(FileCCAutoRoot.recapprocessingsection) - subjectlevelinquiryrecap}, 
+																		SELF.RecordIdentifier := Left.RecordIdentifier; 
+																		SELF := LEFT.recapprocessingsection));
+
+//  General Messages - reportsectionheader																				
+EXPORT FileCCAutoGenMesg_ReportSection := PROJECT(FileCCAutoRoot, 
+																	TRANSFORM({INTEGER8 RecordIdentifier, RECORDOF(FileCCAutoRoot.generalmessagessection) - messages}, 
+																		SELF.RecordIdentifier := Left.RecordIdentifier; 
+																		SELF := LEFT.generalmessagessection));																			
+
+//  AttachmentSection - reportsectionheader		
+EXPORT FileCCAutoAttachSect_ReportSection := PROJECT(FileCCAutoRoot, 
+																	TRANSFORM({INTEGER8 RecordIdentifier, RECORDOF(FileCCAutoRoot.attachmentsection) - personaldatasections - vehicledatasets}, 
+																		SELF.RecordIdentifier := Left.RecordIdentifier; 
+																		SELF := LEFT.attachmentsection));	
+
+//  subjectSearchInformationSection - reportsectionheader
+EXPORT FileCCAutoSubjectSearch_ReportSection := PROJECT(FileCCAutoRoot, 
+																	TRANSFORM({INTEGER8 RecordIdentifier, RECORDOF(FileCCAutoRoot.subjectsearchinformationsection) - subjectidsets}, 
+																		SELF.RecordIdentifier := Left.RecordIdentifier; 
+																		SELF := LEFT.subjectsearchinformationsection));	
+
+
+
+// **************Normalizations ******************
+// **1** recapprocessingsection - subject level
+{integer8 RecordIdentifier, integer RecapRecordCounter, t_recapprocessingrecordreport} getRecapMessages(CC_Auto_Response L, t_recapprocessingrecordreport R, integer cntr) := transform
+               self.RecordIdentifier := L.RecordIdentifier;
+               self.RecapRecordCounter := cntr;
+               Self := R;
+      				  END;
+         
+EXPORT FileCCAutoSubjectRecap := normalize(FileCCAutoRoot, left.recapprocessingsection.subjectlevelinquiryrecap, getRecapMessages(LEFT, Right, counter));
+
+
+// **2** generalmessagessection - messages
+{integer8 RecordIdentifier, integer MessageRecordCounter, t_narrativearecordreport} getGenMessages(CC_Auto_Response L, t_narrativearecordreport R, integer cntr) := transform
+                  self.RecordIdentifier := L.RecordIdentifier;
+                  self.MessageRecordCounter := cntr;
+                  Self := R;
+         				  END;
+       
+EXPORT FileCCAutoGeneralMessages:= normalize(FileCCAutoRoot, left.generalmessagessection.messages, getGenMessages(LEFT, Right, counter));
+
+// **3** subjectSearchInformationSection - SubjectSearchId Sets
+t_subjectidsetccstandaloneresultscust getSubIDsets(CC_Auto_Response L, t_subjectidsetccstandaloneresultscust R, integer cntr) := transform
+                  self.RecordIdentifier := L.RecordIdentifier;
+                  self.SubjectIDRecordCounter := cntr;
+                  Self := R;
+      						END;
+            
+EXPORT FileCCAutoSubIDSets:= normalize(FileCCAutoRoot, left.subjectsearchinformationsection.subjectidsets, getSubIDsets(LEFT, Right, counter));
+EXPORT FileCCAutoSubIDSets2:= NORMALIZE(FileCCAutoRoot, LEFT.subjectsearchinformationsection.subjectidsets, TRANSFORM(t_subjectidsetccstandaloneresultscust, SELF := RIGHT));
+ 
+// **4** additionalinformationsection - messages
+{integer8 RecordIdentifier, integer AddMessageRecordCounter, t_narrativearecordreport} getAddMessages(CC_Auto_Response L, t_narrativearecordreport R, integer cntr) := transform
+               self.RecordIdentifier := L.RecordIdentifier;
+               self.AddMessageRecordCounter := cntr;
+               Self := R;
+      				 END;
+         
+   
+EXPORT FileCCAutoAdditionalMesg:= normalize(FileCCAutoRoot, left.additionalinformationsection.DisclaimAndPoliciesSet.messages, getAddMessages(LEFT, Right, counter));
+
+ 
+// **5** attachmentsection			- personrecord
+t_personaldatasectionccstandaloneresultscust getAttSectMessages(CC_Auto_Response L, t_personaldatasectionccstandaloneresultscust R, integer cntr) := transform
+               self.RecordIdentifier := L.RecordIdentifier;
+               self.PersonRecordCounter := cntr;
+               Self := R;
+      				 END;
+   
+EXPORT FileCCAutoAttachmentSect:= normalize(FileCCAutoRoot, left.attachmentsection.PersonalDataSections, getAttSectMessages(LEFT, Right, counter));
+EXPORT FileCCAutoAttachmentSect2:= NORMALIZE(FileCCAutoRoot, LEFT.attachmentsection.PersonalDataSections, TRANSFORM(t_personaldatasectionccstandaloneresultscust, SELF := RIGHT));
+ 
+
+// **6** attachmentsection			- vehicledatasets
+{integer8 RecordIdentifier, integer VehicleCounter, t_discoveredselectedvehicledataset} getAttSectMessages(CC_Auto_Response L, t_discoveredselectedvehicledataset R, integer cntr) := transform
+               self.RecordIdentifier := L.RecordIdentifier;
+               self.VehicleCounter := cntr;
+               Self := R;
+      				 END;
+   
+EXPORT FileCCAutoAttachmentSectVehicle:= normalize(FileCCAutoRoot, left.attachmentsection.VehicleDataSets, getAttSectMessages(LEFT, Right, counter));
+																		
 END;
