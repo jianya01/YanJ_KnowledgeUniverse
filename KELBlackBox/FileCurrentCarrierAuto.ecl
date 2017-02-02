@@ -391,12 +391,12 @@ CC_Auto_Response := RECORD
  END;
 
 finalCCAuto := RECORD
-	integer8 RecID;
+	integer8 RecordIdentifier;
 	CC_Auto_Response;// - errorcode - transaction_time;
 END;
 
 // Run this file for a 1,000,000 record sample during development
-EXPORT FileCurrentCarrierAuto := PROJECT(DATASET('~thor::sv::currentcarrierauto_poc::response::1mfile1', CC_Auto_Response, THOR), TRANSFORM(finalCCAuto, SELF.RecID := COUNTER; SELF := LEFT));
+EXPORT FileCurrentCarrierAuto := PROJECT(DATASET('~thor::sv::currentcarrierauto_poc::response::1mfile1', CC_Auto_Response, THOR), TRANSFORM(finalCCAuto, SELF.RecordIdentifier := COUNTER; SELF := LEFT));
 
 // For testing only
 // ds:=DATASET('~thor::sg::CurrentCarrierAuto::Response::Sample50', finalCCAuto, THOR);
