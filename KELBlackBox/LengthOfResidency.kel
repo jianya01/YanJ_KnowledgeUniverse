@@ -1,0 +1,44 @@
+﻿PACKAGE LengthOfResidency;
+
+// Entity Definition 
+pLengthOfResidency := ENTITY(FLAT(Person rPerson=LexID,
+		DATE SnapshotDateFirstSeen=NULL(''),
+		DATE SnapshotDateLastSeen=NULL(''),
+		STRING ActiveFlag,
+		INTEGER RID,
+		INTEGER LengthOfResidence,
+		DATE AddressDateFirstSeen,
+		DATE AddressDateLastSeen));
+
+// Maps the Length of Residency BlackBox Attributes to the Person Entity
+USE KELBlackBox.FileBlackBoxLengthOfResidency(FLAT,
+	pLengthOfResidency(
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
+		SnapshotDateFirstSeen = date_first_seen,
+		SnapshotDateLastSeen = date_last_seen,
+		ActiveFlag = active_flag,
+		RID = rid,
+		LengthOfResidence = length_of_residency,
+		AddressDateFirstSeen = addr_dt_first_seen,
+		AddressDateLastSeen = addr_dt_last_seen));
+			
+// Pick out the most recently seen snapshot for each set of BlackBox Attributes	
+Person: => LengthOfResidencyCurrentDate := pLengthOfResidency.SnapshotDateLastSeen$Max;
+Person: => LengthOfResidencyCurrentSnapshot := pLengthOfResidency(SnapshotDateLastSeen=Person.LengthOfResidencyCurrentDate);
+
+// Snapshot containing all attributes in black box entity
+Person: => Snapshot := pLengthOfResidency{SnapshotDateFirstSeen, SnapshotDateLastSeen, ActiveFlag, RID,	LengthOfResidence, AddressDateFirstSeen, AddressDateLastSeen};
+  
+// Define the single value most recent current snapshot for each attribute	
+Person: => SnapshotDateFirstSeen := ONLY(LengthOfResidencyCurrentSnapshot, SnapshotDateFirstSeen);
+Person: => SnapshotDateLastSeen := ONLY(LengthOfResidencyCurrentSnapshot, SnapshotDateLastSeen);
+Person: => ActiveFlag := ONLY(LengthOfResidencyCurrentSnapshot, ActiveFlag);
+Person: => RID := ONLY(LengthOfResidencyCurrentSnapshot, RID);
+Person: => LengthOfResidence := ONLY(LengthOfResidencyCurrentSnapshot, LengthOfResidence);
+Person: => AddressDateFirstSeen := ONLY(LengthOfResidencyCurrentSnapshot, AddressDateFirstSeen);
+Person: => AddressDateLastSeen := ONLY(LengthOfResidencyCurrentSnapshot, AddressDateLastSeen);
+
+// Shell should include Snapshot, followed by each attribute name	
+SHELL: LengthOfResidency <= Person{UID, Snapshot, SnapshotDateFirstSeen, SnapshotDateLastSeen, ActiveFlag, RID, LengthOfResidence, AddressDateFirstSeen, AddressDateLastSeen};
+END;
