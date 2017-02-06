@@ -19,7 +19,7 @@ EXPORT Build_Records(DATASET(Consumer_Credit_Layout.Layout_EditsArchive_Append) 
 											   SELF := EditsToXml.AssignCR51(LEFT.Edits),
 											   SELF := LEFT));
 									 
-	BankRuptcy := PROJECT(Report_Data(Edits[7..10]='FI61'),
+	Bankruptcy := PROJECT(Report_Data(Edits[7..10]='FI61'),
 								TRANSFORM(Layout_Report.Layout_BankruptcyRecord,	
 								SELF := EditsToXml.AssignFI61(LEFT.Edits),
 								SELF := LEFT));
