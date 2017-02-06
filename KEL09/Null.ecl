@@ -364,9 +364,7 @@ EXPORT Null := MODULE
     RETURN %'newFields'%;
   ENDMACRO;
   EXPORT __CLEANANDDO(source, stmt) := FUNCTIONMACRO
-    LOCAL __wrapped(TYPEOF(source) source) := stmt;
-    LOCAL __result := __wrapped(PROJECT(source, TRANSFORM(RECORDOF(source), #EXPAND(__BuildClean(source)) )));
-    RETURN __result;
+    RETURN stmt;
   ENDMACRO;
   EXPORT __CLEARFLAGS(source) := FUNCTIONMACRO
     // rationalle: only the outer model fields can be single valued - only they need to have MultipleValuesDetected cleared
