@@ -1,0 +1,68 @@
+﻿PACKAGE MaritalStatus;
+ 
+// Entity Definition	
+pMaritalStatus := ENTITY(FLAT(Person rPerson=LexID,
+		DATE SnapshotDateFirstSeen=NULL(''),
+		DATE SnapshotDateLastSeen=NULL(''),
+		STRING ActiveFlag,
+		INTEGER RID,
+		STRING MaritalStatusV2,
+		BOOLEAN NameChange,
+		BOOLEAN RelativeVehicle,
+		BOOLEAN RelativePropertySameLastName,
+		INTEGER TimeSinceSpouseRecentDate=NULL(-999),
+		BOOLEAN TimeSinceSpouseRecentMiss,
+		INTEGER FemaleMaleHHID,
+		INTEGER Parent,
+		STRING MaritalStatusV1,
+		DATE DivorceDate=NULL(''),
+		DATE MarriageDate=NULL('')));
+
+// Maps the MaritalStatus BlackBox Attributes to the Person Entity
+USE KELBlackBox.FileBlackBoxMaritalStatus(FLAT,
+	pMaritalStatus(
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
+		SnapshotDateFirstSeen = date_first_seen,
+		SnapshotDateLastSeen = date_last_seen,
+		ActiveFlag = active_flag,
+		RID = rid,
+		MaritalStatusV2 = marital_status_v2,
+		NameChange = name_change,
+		RelativeVehicle = rel_vehicle,
+		RelativePropertySameLastName = rel_prop_same_lname,
+		TimeSinceSpouseRecentDate = ts_sp_recent_dt,
+		TimeSinceSpouseRecentMiss = ts_sp_recent_miss,
+		FemaleMaleHHID = fm_hhid,
+		Parent = parent,
+		MaritalStatusV1 = marital_status_v1,
+		DivorceDate = div_dt,
+		MarriageDate = mar_dt));
+
+// Pick out the most recently seen snapshot for each set of BlackBox Attributes			
+Person: => MaritalStatusCurrentDate := pMaritalStatus.SnapshotDateLastSeen$Max;
+Person: => MaritalStatusCurrentSnapshot := pMaritalStatus(SnapshotDateLastSeen=Person.MaritalStatusCurrentDate);
+
+// Snapshot containing all attributes in black box entity
+Person: => Snapshot := pMaritalStatus{SnapshotDateFirstSeen, SnapshotDateLastSeen, ActiveFlag, RID,  MaritalStatusV2, NameChange, RelativeVehicle, RelativePropertySameLastName, TimeSinceSpouseRecentDate, TimeSinceSpouseRecentMiss, FemaleMaleHHID, Parent, MaritalStatusV1, DivorceDate, MarriageDate};
+
+// Define the single value most recent current snapshot for each attribute		
+Person: => SnapshotDateFirstSeen := ONLY(MaritalStatusCurrentSnapshot, SnapshotDateFirstSeen);
+Person: => SnapshotDateLastSeen := ONLY(MaritalStatusCurrentSnapshot, SnapshotDateLastSeen);
+Person: => ActiveFlag := ONLY(MaritalStatusCurrentSnapshot, ActiveFlag);
+Person: => RID := ONLY(MaritalStatusCurrentSnapshot, RID);
+Person: => MaritalStatusV2 := ONLY(MaritalStatusCurrentSnapshot, MaritalStatusV2);
+Person: => NameChange := ONLY(MaritalStatusCurrentSnapshot, NameChange);
+Person: => RelativeVehicle := ONLY(MaritalStatusCurrentSnapshot, RelativeVehicle);
+Person: => RelativePropertySameLastName := ONLY(MaritalStatusCurrentSnapshot, RelativePropertySameLastName);
+Person: => TimeSinceSpouseRecentDate := ONLY(MaritalStatusCurrentSnapshot, TimeSinceSpouseRecentDate);
+Person: => TimeSinceSpouseRecentMiss := ONLY(MaritalStatusCurrentSnapshot, TimeSinceSpouseRecentMiss);
+Person: => FemaleMaleHHID := ONLY(MaritalStatusCurrentSnapshot, FemaleMaleHHID);
+Person: => Parent := ONLY(MaritalStatusCurrentSnapshot, Parent);
+Person: => MaritalStatusV1 := ONLY(MaritalStatusCurrentSnapshot, MaritalStatusV1);
+Person: => DivorceDate := ONLY(MaritalStatusCurrentSnapshot, DivorceDate);
+Person: => MarriageDate := ONLY(MaritalStatusCurrentSnapshot, MarriageDate);
+
+// Shell should include Snapshot, followed by each attribute name	
+SHELL: MaritalStatus <= Person{UID, Snapshot,SnapshotDateFirstSeen, SnapshotDateLastSeen, ActiveFlag, RID,  MaritalStatusV2, NameChange, RelativeVehicle, RelativePropertySameLastName, TimeSinceSpouseRecentDate, TimeSinceSpouseRecentMiss, FemaleMaleHHID, Parent, MaritalStatusV1, DivorceDate, MarriageDate};
+END;
