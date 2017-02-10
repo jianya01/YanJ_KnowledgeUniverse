@@ -1,5 +1,4 @@
 ﻿EXPORT FromFlat := MODULE
-
     EXPORT BuildMapping(from, to, source, dest, nullval, frule) := FUNCTIONMACRO
         LOADXML('<xml/>');
         #DECLARE(f)
@@ -47,10 +46,8 @@
               #APPEND(f,'__NotNullFlag;')
           #END
         #END
-
         RETURN %'f'%;
     ENDMACRO;
-
     EXPORT BuildMappingFromSpec(to, from, source, spec) := FUNCTIONMACRO
         LOADXML('<xml/>');
         #DECLARE(f)
@@ -75,7 +72,6 @@
         #END
         RETURN %'f'%;
     ENDMACRO;
-
     EXPORT BuildFromFlat(from,to,spec):=FUNCTIONMACRO
         LOADXML('<xml/>');
         #DECLARE(f) #SET(f,'PROJECT('+#TEXT(from)+',TRANSFORM('+#TEXT(to)+',')
@@ -115,11 +111,9 @@
         #END
         RETURN %'f'%;
     ENDMACRO;
-
     EXPORT Convert(from,to,spec):=FUNCTIONMACRO
         RETURN #EXPAND(KEL.FromFlat.BuildFromFlat(from,to,spec));
     ENDMACRO;
-
     EXPORT ReducedRecord(from,fieldlist):=FUNCTIONMACRO
     // build a record with the same 'shape' as *from* but with only the fields from *fieldlist*
         LOADXML('<xml/>');
@@ -165,7 +159,6 @@
         // get rid of the trailing semicolon 
         RETURN REGEXREPLACE(';$', %'f'%, '', NOCASE);
     ENDMACRO;
-
     EXPORT TopLevelNames(from):=FUNCTIONMACRO
     // build a list of top level names from the specified record
         LOADXML('<xml/>'); 
@@ -197,5 +190,4 @@
         // get rid of the trailing comma so the generated ECL looks 'normal'
         RETURN REGEXREPLACE(',$', %'f'%, '', NOCASE);
     ENDMACRO;
-
  END;

@@ -4,10 +4,8 @@
   // and Kel.Null.
   SHARED __NotNullFlag := 1;
   SHARED __NullFlag := 0;
-
   // Flag indicating single-valued property had multiple values on intake
   EXPORT MultipleValuesDetected := 2;
-
   EXPORT int := INTEGER;
   EXPORT uid := UNSIGNED8;
   EXPORT biguid := DATA16;
@@ -18,7 +16,6 @@
   EXPORT unk := STRING;
   EXPORT flags := UNSIGNED1;
   EXPORT epoch := UNSIGNED2;
-
   // Construct a nullable type
   EXPORT ntyp(BaseType) := FUNCTIONMACRO
     LOCAL __rec := {BaseType v};
@@ -27,17 +24,14 @@
   SHARED ntyp_local(BaseType, Default) := FUNCTIONMACRO
     RETURN { BaseType v := Default, flags f := __NullFlag };
   ENDMACRO;
-
   // Construct a nullable child dataset type
   EXPORT ndataset(BaseType) := FUNCTIONMACRO
     RETURN { DATASET(BaseType) v := DATASET([], BaseType), Kel.typ.flags f := __NullFlag };
   ENDMACRO;
-
   // Construct a nullable child dataset type -- old version -- revert with codegen=noembeddedchildsets
   EXPORT ondataset(BaseType) := FUNCTIONMACRO
     RETURN { DATASET(BaseType) v := DATASET([], BaseType), Kel.typ.flags f := __NullFlag };
   ENDMACRO;
-
   EXPORT nint := ntyp_local(int, 0);
   EXPORT nuid := ntyp_local(uid, 0);
   EXPORT nbiguid := ntyp_local(biguid, x'00');
@@ -46,7 +40,6 @@
   EXPORT nkdate := ntyp_local(kdate, 0);
   EXPORT nfloat := ntyp_local(float, 0);
   EXPORT nunk := ntyp_local(unk, '');
-
   // Numeric type ranges
   EXPORT MAXINT := 9223372036854775807;
   EXPORT MININT := -9223372036854775808;
@@ -54,7 +47,6 @@
   EXPORT MINFLOAT := -1.797693e+308;
   EXPORT MAXEPOCH := 65535;
   EXPORT MINEPOCH := 0;
-
   // Flag handling macros
   EXPORT SetFlag(__in, __flag) := FUNCTIONMACRO
     LOCAL __v := __in;

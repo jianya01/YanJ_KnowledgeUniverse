@@ -1,12 +1,9 @@
 ﻿IMPORT KEL09 AS KEL;
 IMPORT * FROM KEL09.Null;
-
 EXPORT Aggregates := MODULE
-
     // ************************************************************
     // Non-rank-based aggregates 
     // ************************************************************
-
     // internal helper functions 	
     // ------------------------------------------------------------
     EXPORT CalcRange(inset, field) := FUNCTIONMACRO
@@ -22,25 +19,21 @@ EXPORT Aggregates := MODULE
             RETURN AVE(inset(field != 0), field);
         #END
     ENDMACRO;
-
     // aggregates on nullable values in a non-nullable set
     // all but SUM are NULL if the set is empty
     // ------------------------------------------------------------
-
     // Wrapper for built-in functions
     EXPORT AggN(func, inset, field) := FUNCTIONMACRO
         LOCAL __fs := inset(__NN(field));
         LOCAL __v := #EXPAND(#TEXT(func) + '(__fs, __T(' + #TEXT(field) + '))');
         RETURN IF(COUNT(__fs)=0, __N(TYPEOF(__v)), __CN(__v));
     ENDMACRO;
-
     // Specific instances of AggN
     EXPORT MinN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggN(MIN, inset, field); ENDMACRO;
     EXPORT MaxN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggN(MAX, inset, field); ENDMACRO;
     EXPORT AveN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggN(AVE, inset, field); ENDMACRO;
     EXPORT VarianceN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggN(VARIANCE, inset, field); ENDMACRO;
     EXPORT CalcStdDevN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggN(Kel.Aggregates.CalcStdDev, inset, field); ENDMACRO;
-
     // Sum is null aware but does not return a nullable value - it returns 0 on an empty set
     EXPORT SumN(inset, field) := FUNCTIONMACRO
         LOCAL __fs := inset(__NN(field));
@@ -56,9 +49,7 @@ EXPORT Aggregates := MODULE
         LOCAL __v := AVE(__fs, __T(field));
         RETURN IF(COUNT(__fs) = 0, __N(TYPEOF(__v)), __CN(__v));
     ENDMACRO;
-
     //  weighted versions
-
     EXPORT WAveN(inset, field) := FUNCTIONMACRO
         LOCAL __fs := inset(__NN(field));
         LOCAL __num := SUM(__fs, __T(field)*__RecordCount);
@@ -82,7 +73,6 @@ EXPORT Aggregates := MODULE
         LOCAL __i1 := Kel.Aggregates.WVarianceN(inset, field);
         RETURN IF(NOT __NN(__i1), __N(Kel.Typ.float), __CN(SQRT(__T(__i1))));
     ENDMACRO;
-
     // Sum is null aware but does not return a nullable value - it returns 0 on an empty set
     EXPORT WSumN(inset, field) := FUNCTIONMACRO
         LOCAL __fs := inset(__NN(field));
@@ -122,14 +112,12 @@ EXPORT Aggregates := MODULE
         LOCAL __v := #EXPAND(#TEXT(func) + '(__fs, __T(' + #TEXT(field) + '))');
         RETURN IF(COUNT(__fs)=0, __N(TYPEOF(__v)), __CN(__v));
     ENDMACRO;
-
     // Specific instances of AggNN
     EXPORT MinNN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNN(MIN, inset, field); ENDMACRO;
     EXPORT MaxNN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNN(MAX, inset, field); ENDMACRO;
     EXPORT AveNN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNN(AVE, inset, field); ENDMACRO;
     EXPORT VarianceNN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNN(VARIANCE, inset, field); ENDMACRO;
     EXPORT CalcStdDevNN(inset, field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNN(Kel.Aggregates.CalcStdDev, inset, field); ENDMACRO;
-
     // SumNN returns a nullable value but it is null only if the set itself is null
     EXPORT SumNN(inset, field) := FUNCTIONMACRO
         LOCAL __s := __T(inset);
@@ -150,7 +138,6 @@ EXPORT Aggregates := MODULE
         LOCAL __result := AVE(__fs, __T(field));
         RETURN IF(COUNT(__fs) = 0, __N(TYPEOF(__result)), __CN(__result));
     ENDMACRO;
-
     // no field, but the set is nullable
     EXPORT CountN(inset) := FUNCTIONMACRO
         LOCAL __s := __T(inset);
@@ -158,7 +145,6 @@ EXPORT Aggregates := MODULE
     ENDMACRO;
         
     //  weighted versions
-
     EXPORT WAveNN(inset, field) := FUNCTIONMACRO
         LOCAL __s := __T(inset);
         LOCAL __fs := __s(__NN(field));
@@ -184,7 +170,6 @@ EXPORT Aggregates := MODULE
         LOCAL __i1 := Kel.Aggregates.WVarianceNN(inset, field);
         RETURN IF(NOT __NN(__i1), __N(Kel.Typ.float), __CN(SQRT(__T(__i1))));
     ENDMACRO;
-
     // SumNN returns a nullable value but it is null only if the set itself is null
     EXPORT WSumNN(inset, field) := FUNCTIONMACRO
         LOCAL __s := __T(inset);
@@ -192,7 +177,6 @@ EXPORT Aggregates := MODULE
         LOCAL __v := SUM(__fs, __T(field)*__RecordCount);
         RETURN IF(__NL(inset), __N(TYPEOF(__v)), __CN(__v));
     ENDMACRO;
-
     EXPORT WAveNZNN(inset, field) := FUNCTIONMACRO
         LOCAL __s := __T(inset);
         LOCAL __fs := __s(__T(field) != 0);     // we rely on __T(NULL)==0
@@ -238,22 +222,18 @@ EXPORT Aggregates := MODULE
       LOCAL __flag := IF(__empty, __NullFlag, __NotNullFlag);
       RETURN { TYPEOF(__val) v := __val, Kel.Typ.flags f := __flag };
     ENDMACRO;
-
     EXPORT CalcStdDevNGHelp(inset, field, filter) := FUNCTIONMACRO
         RETURN SQRT(VARIANCE(inset, field, filter));
     ENDMACRO;
-
     EXPORT MinNG(field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNG(MIN, field, -1); ENDMACRO;
     EXPORT MaxNG(field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNG(MAX, field, 1); ENDMACRO;
     EXPORT AveNG(field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNG(AVE, field, 0); ENDMACRO;
     EXPORT VarianceNG(field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNG(VARIANCE, field, 0); ENDMACRO;
     EXPORT CalcStdDevNG(field) := FUNCTIONMACRO RETURN Kel.Aggregates.AggNG(Kel.Aggregates.CalcStdDevNGHelp, field, 0); ENDMACRO;
-
     // Sum is null aware but does not return a nullable value
     EXPORT SumNG(field) := FUNCTIONMACRO
         RETURN SUM(GROUP, __T(field), __NN(field));
     ENDMACRO;
-
     // Versions of non-builtin aggregates for grouped aggregates
     EXPORT CalcRangeNG(field) := FUNCTIONMACRO
       LOCAL __empty := COUNT(GROUP, __NN(field))=0;
@@ -267,9 +247,7 @@ EXPORT Aggregates := MODULE
       LOCAL __flag := IF(COUNT(GROUP, __NN(field))=0, __NullFlag, __NotNullFlag);
       RETURN { TYPEOF(__val) v := __val, Kel.Typ.flags f := __flag };
     ENDMACRO;
-
     //  weighted versions
-
     EXPORT WAveNG(field) := FUNCTIONMACRO
         LOCAL __flag := IF(COUNT(GROUP, __NN(field))=0, __NullFlag, __NotNullFlag);
         LOCAL __num := SUM(GROUP, __T(field)*__RecordCount, __NN(field));
@@ -293,11 +271,9 @@ EXPORT Aggregates := MODULE
         LOCAL __i1 := Kel.Aggregates.WVarianceNN(field);
         RETURN IF(NOT __NN(__i1), __N(Kel.Typ.float), __CN(SQRT(__T(__i1))));
     ENDMACRO;
-
     EXPORT WSumNG(field) := FUNCTIONMACRO
          RETURN SUM(GROUP, __T(field)*__RecordCount, __NN(field));
     ENDMACRO;
-
     EXPORT WAveNZNG(field) := FUNCTIONMACRO
         LOCAL __flag := IF(COUNT(GROUP, __NN(field))=0, __NullFlag, __NotNullFlag);
         LOCAL __num := SUM(GROUP, __T(field)*__RecordCount, __T(field)!=0);
@@ -307,11 +283,9 @@ EXPORT Aggregates := MODULE
     ENDMACRO;
         
     // (Count grouped doesn't happen)       
-
     // ************************************************************
     // Rank-based aggregates
     // ************************************************************
-
     // The type of an expanded and ranked dataset.
     EXPORT RankedField := RECORD
       KEL.Typ.int number;      // Which rankField (see RankingPrepare) this value is from
@@ -319,7 +293,6 @@ EXPORT Aggregates := MODULE
       KEL.Typ.int pos;         // The position (rank) of the value in the group
       KEL.Typ.int size;        // The size of the group
     END;
-
     // The type of an expanded and ranked dataset - nullable version
     EXPORT RankedFieldN := RECORD
       KEL.Typ.int number;      // Which rankField (see RankingPrepare) this value is from
@@ -327,7 +300,6 @@ EXPORT Aggregates := MODULE
       KEL.Typ.int pos;         // The position (rank) of the value in the group
       KEL.Typ.int size;        // The size of the group
     END;
-
     // Selector for which RankedField type
     EXPORT RankedFieldAs(nullable) := FUNCTIONMACRO
       #IF(nullable)
@@ -336,7 +308,6 @@ EXPORT Aggregates := MODULE
         RETURN KEL.Aggregates.RankedField;
       #END
     ENDMACRO;
-
     // Return the default value for the value field in a RankedField record - must match field above
     EXPORT RankedFieldDefault(nullable) := FUNCTIONMACRO
       #IF(nullable)
@@ -345,7 +316,6 @@ EXPORT Aggregates := MODULE
         RETURN 0;
       #END
     ENDMACRO;
-
     // Cast a field to the type of a ranked field - must match field above
     EXPORT RankedFieldCast(f, nullable) := FUNCTIONMACRO
       #IF(nullable)
@@ -354,7 +324,6 @@ EXPORT Aggregates := MODULE
         RETURN f;
       #END
     ENDMACRO;
-
     // Projects dIn to the layout lOut and expands all fields in fieldList into numbered records for
     // each field (similar to ML.ToField).  Unlike ML.ToField this macro can duplicate additional
     // fields from the input into the output.
@@ -375,7 +344,6 @@ EXPORT Aggregates := MODULE
                                                   SELF.value:=CASE(#EXPAND(%'expandList'%),KEL.Aggregates.RankedFieldDefault(nullable)),
                                                   SELF:=LEFT, SELF:=[]));
     ENDMACRO;
-
     // Build a partial record definition based on the given dataset and the given list of fields
     EXPORT BuildRecord(dIn, fieldList) := FUNCTIONMACRO
       #IF(fieldList)
@@ -397,7 +365,6 @@ EXPORT Aggregates := MODULE
           RETURN '';
       #END
     ENDMACRO;
-
     // Build a sort specification based on the given dataset and the given list of fields
     EXPORT BuildSortSpec(dIn, groupList, nullable) := FUNCTIONMACRO
       #IF(NOT nullable)
@@ -419,7 +386,6 @@ EXPORT Aggregates := MODULE
         RETURN %'spec'%;
       #END
     ENDMACRO;
-
     // Build a filter to count only non-null values
     EXPORT BuildCountCriteria(nullable) := FUNCTIONMACRO
       #IF(nullable)
@@ -428,7 +394,6 @@ EXPORT Aggregates := MODULE
         RETURN '';
       #END
     ENDMACRO;
-
     // Create a dataset which ranks each field in rankFields within the entire input dataset.
     // For every original record there will be a N new records (where N is the number of fields
     // in rankFields) where each new record has the index of it's rank field, the value of it's
@@ -442,12 +407,10 @@ EXPORT Aggregates := MODULE
       LOCAL __Ordered := SORT(__Expanded, number, value);
       RETURN PROJECT(__Ordered, TRANSFORM(KEL.Aggregates.RankedField, SELF.pos:=COUNTER-__MaxRank*(LEFT.number-1), SELF.size:=__MaxRank, SELF:=LEFT));
     ENDMACRO;
-
     // Same as RankingPrepare except that groupFields are retained from the input recordset
     // and ranks are calculated within each group defined by those fields.
     EXPORT RankingPrepareGrouped(inset, groupFields, rankFields, nullable, weighted) := FUNCTIONMACRO
       LoadXml('<xml/>');
-
       // Expand the dataset
       LOCAL __FullLayout := { #EXPAND(KEL.Aggregates.BuildRecord(inset, groupFields)) KEL.Aggregates.RankedFieldAs(nullable) 
                              #IF(weighted)
@@ -455,7 +418,6 @@ EXPORT Aggregates := MODULE
                              #END
                             };
       LOCAL __Expanded := KEL.Aggregates.ExpandFields(inset, __FullLayout, rankFields, nullable);
-
       // Sort the dataset and add raw position number
       LOCAL __Ordered := SORT(__Expanded #EXPAND(KEL.Aggregates.BuildSortSpec(inset, groupFields, nullable)));
       LOCAL __Ordered1 :=
@@ -465,7 +427,6 @@ EXPORT Aggregates := MODULE
           __Ordered;
         #END
       LOCAL __Counted := PROJECT(__Ordered1, TRANSFORM(__FullLayout, SELF.pos:=COUNTER, SELF.size:=0, SELF:=LEFT));
-
       // Find the minimum raw position for each group
       #DECLARE(groupSpec) #SET(groupSpec, groupFields)
       #IF(groupFields)
@@ -475,7 +436,6 @@ EXPORT Aggregates := MODULE
                                          KEL.typ.int size := COUNT(GROUP #EXPAND(KEL.Aggregates.BuildCountCriteria(nullable))),
                                          #EXPAND(%'groupSpec'%) number },
                                          #EXPAND(%'groupSpec'%) number, FEW);
-
       // Build a join condition for the group
       #DECLARE(joinCond) #SET(joinCond, '')
       #IF(groupFields)
@@ -488,11 +448,9 @@ EXPORT Aggregates := MODULE
           #END
         #END
       #END
-
       // Join these minimums back in order to make each group it's own sequence
       RETURN JOIN(__Counted, __Mins, LEFT.number=RIGHT.number #EXPAND(%'joinCond'%), TRANSFORM(RECORDOF(__Counted), SELF.pos:=LEFT.pos-RIGHT.minpos+1, SELF.size:=RIGHT.size, SELF:=LEFT), SMART);
     ENDMACRO;
-
     // Calculate the weight of this particular item when calculating an NTile value.
     // 'tiles' is the number of breaks (percentile=100, quadtile=4, median=2),
     // 'tile' is the particular break (which percentile, which quadtile, or 1 for median),
@@ -527,7 +485,6 @@ EXPORT Aggregates := MODULE
                  item = __base + 1            => __weight,
                  /* ELSE */                    0);
     END;
-
     EXPORT RankWeight(KEL.Typ.int r, KEL.Typ.int itemCount, KEL.Typ.int item) := FUNCTION
         RETURN MAP(itemCount = 0 AND item = 1          => 1,
                    itemCount = 0                       => 0,
@@ -536,8 +493,6 @@ EXPORT Aggregates := MODULE
                    r = item                            => 1,
                    /* ELSE */                             0);
     END;
-
-
     EXPORT RankWeightDown(KEL.Typ.int r, KEL.Typ.int itemCount, KEL.Typ.int item) := FUNCTION
         LOCAL __ra := itemCount-r+1;
         LOCAL __r  := IF(__ra <= 0, 1, __ra);
@@ -546,7 +501,6 @@ EXPORT Aggregates := MODULE
                    __r = item                          => 1,
                    /* ELSE */                             0);
     END;
-
     // Table project dIn into lWeights and then filter the result so that
     // only fields with a non-zero value in one of the 'aggs' fields
     // are retained.
@@ -560,11 +514,9 @@ EXPORT Aggregates := MODULE
           #APPEND(filter, ' OR '+%'@label'%+'!=0')
         #END
       #END
-
       LOCAL __Weighted := PROJECT(dIn, TRANSFORM({dIn, lWeights}, SELF:=ROW(tWeights(ROW(LEFT, KEL.Aggregates.RankedFieldAs(nullable)))), SELF:=LEFT));
       RETURN __Weighted(FALSE #EXPAND(%'filter'%));
     ENDMACRO;
-
     // Aggregate the records in dIn (which contains a value field generated
     // in RankingPrepare and which contains a set of weights generally calculated
     // using NTileWeights and RankingsSelect.
@@ -595,7 +547,6 @@ EXPORT Aggregates := MODULE
           #END
         #END
       #END
-
       #DECLARE(groupSpec) #SET(groupSpec, '')
       #EXPORTXML(fields, lOut)
       #FOR(fields)
@@ -605,10 +556,8 @@ EXPORT Aggregates := MODULE
           #END
         #END
       #END
-
       RETURN AGGREGATE(dIn, lOut, TRANSFORM(lOut, #EXPAND(%'eTransform'%) SELF:=LEFT, SELF:=[]), TRANSFORM(lOut, #EXPAND(%'eMerge'%) SELF:=RIGHT1), #EXPAND(%'groupSpec'%) FEW);
     ENDMACRO;
-
     // Calculate a set of ranked aggregates against an entire dataset.
     //   dIn = Input dataset
     //   rankFields = The fields the aggregates will be calculated against
@@ -622,7 +571,6 @@ EXPORT Aggregates := MODULE
       LOCAL __PreResults := KEL.Aggregates.RankingsGather(Weights, lResult, lWeights, '', TRUE);
       RETURN PROJECT(__PreResults, tNormalize(LEFT));
     ENDMACRO;
-
     // Calculate a set of ranked aggregates for each group within a dataset.  This method can be used on
     // datasets with a fairly small number of groups (where the set of unique combinations of groupFields
     // can reside on a single node).
@@ -639,7 +587,6 @@ EXPORT Aggregates := MODULE
       LOCAL __PreResults := KEL.Aggregates.RankingsGather(__Weights, lResult, lWeights, groupFields, TRUE);
       RETURN PROJECT(__PreResults, tNormalize(LEFT));
     ENDMACRO;
-
     // Calculate a set of ranked aggregates for each group within a dataset.  This method can be used on
     // datasets with a large number of groups as long as no one group has so many records it cannot reside
     // on a single node.
@@ -665,7 +612,6 @@ EXPORT Aggregates := MODULE
       Rolled := ROLLUP(GROUP(dIn, #EXPAND(groupFields), ALL), GROUP, RollGroup(LEFT, ROWS(LEFT)));
       RETURN PROJECT(Rolled, tNormalize(LEFT));
     ENDMACRO;
-
     // Calculate a set of ranked aggregates for each group within a dataset.  This method can be used on
     // any dataset but the Small and Large variants should be used directly if there is sufficient information
     // about the dataset.
