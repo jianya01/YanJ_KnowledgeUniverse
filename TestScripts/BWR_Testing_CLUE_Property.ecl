@@ -5,38 +5,24 @@ IMPORT KELBlackBox, KELGlobal, SALT35, SALTRoutines, UT;
 
 MaxResults := 250; // The maximum number of records to show in the workunit
 
-// CLUETransactionID := 280; // 3 Risk Claims
-//CLUETransactionID := 29490; // 25 Risk Claims
- CLUETransactionID := 1115333; // 1 Risk Claim, 25 Insured Claims
+// TransactionIDs := DATASET([{280}], {UNSIGNED TransactionID}); // 3 Risk Claims
+TransactionIDs := DATASET([{29490}], {UNSIGNED TransactionID}); // 25 Risk Claims
+// TransactionIDs := DATASET([{1115333}], {UNSIGNED TransactionID}); // 1 Risk Claim, 25 Insured Claims
 
-RawProperty := KELBlackBox.FileCLUECleaned.FileCLUEPropertyCleaned(RecordIdentifier = CLUETransactionID);
-PropertyEntity := KELGlobal.Q_C_L_U_E_Property_Result(CLUETransactionID).Res0;
-PropertyAll := KELGlobal.Q_Dump_C_L_U_E_Property_Result.Res0;
-OUTPUT(CHOOSEN(RawProperty, MaxResults), NAMED('RawProperty'));
-OUTPUT(CHOOSEN(PropertyEntity, MaxResults), NAMED('PropertyEntity'));
-OUTPUT(CHOOSEN(PropertyAll, MaxResults), NAMED('PropertyAll'));
+// Main SHELLs
+OUTPUT(CHOOSEN(KELGlobal.S_C_L_U_E_Property.Result(UID = TransactionIDs[1].TransactionID), MaxResults), NAMED('CLUEProperty'));
 
-RawPropertySearchInfo := KELBlackBox.FileCLUECleaned.FileCLUEPropertySubjectID(RecordIdentifier = CLUETransactionID);
-PropertySearchInfoEntity := KELGlobal.Q_C_L_U_E_Property_Search_Information(CLUETransactionID).Res0;
-PropertySearchInfoAll := KELGlobal.Q_Dump_C_L_U_E_Property_Search_Information.Res0;
-OUTPUT(CHOOSEN(RawPropertySearchInfo, MaxResults), NAMED('RawPropertySearchInfo'));
-OUTPUT(CHOOSEN(PropertySearchInfoEntity, MaxResults), NAMED('PropertySearchInfoEntity'));
-OUTPUT(CHOOSEN(PropertySearchInfoAll, MaxResults), NAMED('PropertySearchInfoAll'));
+OUTPUT(CHOOSEN(KELGlobal.S_C_L_U_E_Property_State_Farm.Result(UID = TransactionIDs[1].TransactionID), MaxResults), NAMED('CLUEPropertyStateFarm'));
 
-RawPropertyRiskClaims := KELBlackBox.FileCLUECleaned.FileCLUEPropertyRiskClaim(RecordIdentifier = CLUETransactionID);
-RawPropertyRiskClaimsPayments := KELBlackBox.FileCLUECleaned.FileCLUEPropertyRiskClaimPayments(RecordIdentifier = CLUETransactionID);
-PropertyRiskClaimsEntity := KELGlobal.Q_C_L_U_E_Property_Risk_Claim(CLUETransactionID).Res0;
-PropertyRiskClaimsAll := KELGlobal.Q_Dump_C_L_U_E_Property_Risk_Claim.Res0;
-OUTPUT(CHOOSEN(RawPropertyRiskClaims, MaxResults), NAMED('RawPropertyRiskClaims'));
-OUTPUT(CHOOSEN(RawPropertyRiskClaimsPayments, MaxResults), NAMED('RawPropertyRiskClaimsPayments'));
-OUTPUT(CHOOSEN(PropertyRiskClaimsEntity, MaxResults), NAMED('PropertyRiskClaimsEntity'));
-OUTPUT(CHOOSEN(PropertyRiskClaimsAll, MaxResults), NAMED('PropertyRiskClaimsAll'));
+/* Debugging Queries - Raw File Results */
+OUTPUT(CHOOSEN(KELBlackBox.FileCLUECleaned.FileCLUEPropertyCleaned(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawProperty'));
+OUTPUT(CHOOSEN(KELBlackBox.FileCLUECleaned.FileCLUEPropertySubjectID(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawSubjectID'));
+OUTPUT(CHOOSEN(KELBlackBox.FileCLUECleaned.FileCLUEPropertyRiskClaim(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawRiskClaims'));
+OUTPUT(CHOOSEN(KELBlackBox.FileCLUECleaned.FileCLUEPropertyRiskClaimPayments(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawRiskClaimsPayments'));
+OUTPUT(CHOOSEN(KELBlackBox.FileCLUECleaned.FileCLUEPropertyInsuredClaim(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawInsuredClaims'));
+OUTPUT(CHOOSEN(KELBlackBox.FileCLUECleaned.FileCLUEPropertyInsuredClaimPayments(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawInsuredClaimsPayments'));
 
-RawPropertyInsuredClaims := KELBlackBox.FileCLUECleaned.FileCLUEPropertyInsuredClaim(RecordIdentifier = CLUETransactionID);
-RawPropertyInsuredClaimsPayments := KELBlackBox.FileCLUECleaned.FileCLUEPropertyInsuredClaimPayments(RecordIdentifier = CLUETransactionID);
-PropertyInsuredClaimsEntity := KELGlobal.Q_C_L_U_E_Property_Insured_Claim(CLUETransactionID).Res0;
-PropertyInsuredClaimsAll := KELGlobal.Q_Dump_C_L_U_E_Property_Insured_Claim.Res0;
-OUTPUT(CHOOSEN(RawPropertyInsuredClaims, MaxResults), NAMED('RawPropertyInsuredClaims'));
-OUTPUT(CHOOSEN(RawPropertyInsuredClaimsPayments, MaxResults), NAMED('RawPropertyInsuredClaimsPayments'));
-OUTPUT(CHOOSEN(PropertyInsuredClaimsEntity, MaxResults), NAMED('PropertyInsuredClaimsEntity'));
-OUTPUT(CHOOSEN(PropertyInsuredClaimsAll, MaxResults), NAMED('PropertyInsuredClaimsAll'));
+/* Debugging Queries - KEL Results (NOTE: You must set #OPTION(persist, 0) in ClaimsAuto.kel before uncommenting these to run all at once, otherwise pick one and run) */
+OUTPUT(CHOOSEN(KELGlobal.Q_C_L_U_E_Property_Search_Information(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('SearchInformation'));
+OUTPUT(CHOOSEN(KELGlobal.Q_C_L_U_E_Property_Risk_Claims(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('RiskClaims'));
+OUTPUT(CHOOSEN(KELGlobal.Q_C_L_U_E_Property_Insured_Claims(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('InsuredClaims'));
