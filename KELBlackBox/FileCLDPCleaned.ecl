@@ -526,7 +526,47 @@ EXPORT FileCDPropertySubjectID := NORMALIZE(FileCDPropertyCleaned, LEFT.searchin
 	
 	EXPORT FileCDPropertyRiskClaim := NORMALIZE(FileCDPropertyCleaned, LEFT.claimhistoryrisksection.claimset, TRANSFORM(propertyt_claimsetcdpropertyreport, SELF := RIGHT));
 	EXPORT FileCDPropertyRiskClaimPayments := NORMALIZE(FileCDPropertyRiskClaim, LEFT.Payments, TRANSFORM(propertyt_claimpaymentrecordreport, SELF := RIGHT));
+	EXPORT FileCDPropertyRiskClaimPaymentsFlat := NORMALIZE(FileCDPropertyRiskClaimPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+              SELF.ClaimCatType := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Type,
+                     2 => LEFT.ClaimCat2Type,
+                     3 => LEFT.ClaimCat3Type,
+                     4 => LEFT.ClaimCat4Type,
+                     5 => LEFT.ClaimCat5Type, '');
+              SELF.ClaimCatAmount := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Amount,
+                     2 => LEFT.ClaimCat2Amount,
+                     3 => LEFT.ClaimCat3Amount,
+                     4 => LEFT.ClaimCat4Amount,
+                     5 => LEFT.ClaimCat5Amount, '');
+              SELF.ClaimCatDisp := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Disp,
+                     2 => LEFT.ClaimCat2Disp,
+                     3 => LEFT.ClaimCat3Disp,
+                     4 => LEFT.ClaimCate4Disp,
+                     5 => LEFT.ClaimCat5Disp, '');
+              SELF := LEFT))(ClaimCatType != '');
 	
 	EXPORT FileCDPropertyInsuredClaim := NORMALIZE(FileCDPropertyCleaned, LEFT.claimhistoryinsuredsection.claimset, TRANSFORM(propertyt_claimsetcdpropertyreport, SELF := RIGHT));
 	EXPORT FileCDPropertyInsuredClaimPayments := NORMALIZE(FileCDPropertyInsuredClaim, LEFT.Payments, TRANSFORM(propertyt_claimpaymentrecordreport, SELF := RIGHT));
+	EXPORT FileCDPropertyInsuredClaimPaymentsFlat := NORMALIZE(FileCDPropertyInsuredClaimPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+              SELF.ClaimCatType := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Type,
+                     2 => LEFT.ClaimCat2Type,
+                     3 => LEFT.ClaimCat3Type,
+                     4 => LEFT.ClaimCat4Type,
+                     5 => LEFT.ClaimCat5Type, '');
+              SELF.ClaimCatAmount := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Amount,
+                     2 => LEFT.ClaimCat2Amount,
+                     3 => LEFT.ClaimCat3Amount,
+                     4 => LEFT.ClaimCat4Amount,
+                     5 => LEFT.ClaimCat5Amount, '');
+              SELF.ClaimCatDisp := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Disp,
+                     2 => LEFT.ClaimCat2Disp,
+                     3 => LEFT.ClaimCat3Disp,
+                     4 => LEFT.ClaimCate4Disp,
+                     5 => LEFT.ClaimCat5Disp, '');
+              SELF := LEFT))(ClaimCatType != '');
 END;
