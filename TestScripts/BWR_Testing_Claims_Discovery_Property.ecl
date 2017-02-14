@@ -19,6 +19,6 @@ OUTPUT(CHOOSEN(KELBlackBox.FileCLDPCleaned.FileCDPropertyInsuredClaim(RecordIden
 OUTPUT(CHOOSEN(KELBlackBox.FileCLDPCleaned.FileCDPropertyInsuredClaimPayments(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawInsuredClaimsPayments'));
 
 /* Debugging Queries - KEL Results (NOTE: You must set #OPTION(persist, 0) in ClaimsAuto.kel before uncommenting these to run all at once, otherwise pick one and run) */
-OUTPUT(CHOOSEN(KELGlobal.Q_Claims_Discovery_Property_Search_Information(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('SearchInformation'));
-OUTPUT(CHOOSEN(KELGlobal.Q_Claims_Discovery_Property_Risk_Claims(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('RiskClaims'));
-OUTPUT(CHOOSEN(KELGlobal.Q_Claims_Discovery_Property_Insured_Claims(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('InsuredClaims'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_Claims_Discovery_Property_Search_Information(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('SearchInformation'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_Claims_Discovery_Property_Risk_Claims(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('RiskClaims'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_Claims_Discovery_Property_Insured_Claims(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('InsuredClaims'));

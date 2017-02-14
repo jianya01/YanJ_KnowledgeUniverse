@@ -16,6 +16,6 @@ OUTPUT(CHOOSEN(KELBlackBox.FileCarrierDiscoveryAutoNormalized.FileCDiscAutoGenMe
 OUTPUT(CHOOSEN(KELBlackBox.FileCarrierDiscoveryAutoNormalized.FileCDiscAutoAddInfo(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawAdditionalInfo'));
 
 /* Debugging Queries - KEL Results (NOTE: You must set #OPTION(persist, 0) in ClaimsAuto.kel before uncommenting these to run all at once, otherwise pick one and run) */
-OUTPUT(CHOOSEN(KELGlobal.Q_Carrier_Discovery_Auto_Subject(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Subject'));
-OUTPUT(CHOOSEN(KELGlobal.Q_Carrier_Discovery_Auto_Recap(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Recap'));
-OUTPUT(CHOOSEN(KELGlobal.Q_Carrier_Discovery_Auto_Attachment(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Attachment')); 
+// OUTPUT(CHOOSEN(KELGlobal.Q_Carrier_Discovery_Auto_Subject(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Subject'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_Carrier_Discovery_Auto_Recap(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Recap'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_Carrier_Discovery_Auto_Attachment(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Attachment')); 

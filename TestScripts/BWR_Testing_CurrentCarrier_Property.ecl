@@ -17,6 +17,6 @@ OUTPUT(CHOOSEN(KELBlackBox.FileCurrentCarrierPropNormalized.FileCCPropSubjectRec
 OUTPUT(CHOOSEN(KELBlackBox.FileCurrentCarrierPropNormalized.FileCCPropAttachmentSect(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawAttachment'));
 
 /* Debugging Queries - KEL Results (NOTE: You must set #OPTION(persist, 0) in ClaimsAuto.kel before uncommenting these to run all at once, otherwise pick one and run) */
-OUTPUT(CHOOSEN(KELGlobal.Q_Current_Carrier_Property_Subject(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Subject'));
-OUTPUT(CHOOSEN(KELGlobal.Q_Current_Carrier_Property_Recap(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Recap'));
-OUTPUT(CHOOSEN(KELGlobal.Q_Current_Carrier_Property_Attachment(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Attachment')); 
+// OUTPUT(CHOOSEN(KELGlobal.Q_Current_Carrier_Property_Subject(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Subject'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_Current_Carrier_Property_Recap(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Recap'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_Current_Carrier_Property_Attachment(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Attachment')); 

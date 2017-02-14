@@ -18,6 +18,6 @@ OUTPUT(CHOOSEN(KELBlackBox.FileCLUECleaned.FileCLUEAutoPayments(RecordIdentifier
 OUTPUT(CHOOSEN(KELBlackBox.FileCLUECleaned.FileCLUEAutoUnitRecap(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawAutoUnitRecap'));
 
 /* Debugging Queries - KEL Results (NOTE: You must set #OPTION(persist, 0) in ClaimsAuto.kel before uncommenting these to run all at once, otherwise pick one and run) */
-OUTPUT(CHOOSEN(KELGlobal.Q_C_L_U_E_Auto_Subject_I_D(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('SubjectID'));
-OUTPUT(CHOOSEN(KELGlobal.Q_C_L_U_E_Auto_Claim(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Claim'));
-OUTPUT(CHOOSEN(KELGlobal.Q_C_L_U_E_Auto_Recap(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Recap'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_C_L_U_E_Auto_Subject_I_D(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('SubjectID'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_C_L_U_E_Auto_Claim(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Claim'));
+// OUTPUT(CHOOSEN(KELGlobal.Q_C_L_U_E_Auto_Recap(TransactionIDs[1].TransactionID).Res0, MaxResults), NAMED('Recap'));
