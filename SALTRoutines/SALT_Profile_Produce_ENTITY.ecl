@@ -1,5 +1,4 @@
-﻿IMPORT STD, SALT35, SALTRoutines;
-
+﻿﻿IMPORT STD, SALT35, SALTRoutines;
 FieldTypeLayout := RECORD
 	UNSIGNED8 Field_Number;
 	STRING Field_Name;
@@ -7,7 +6,6 @@ FieldTypeLayout := RECORD
 	STRING Potential_ECL_Field_Type;
 	RECORDOF(SALT35.MAC_Character_Counts.ResultLine_Layout) - cardinality - minval30 - maxval30 - asnumber_minval - asnumber_maxval - asnumber_mean - asnumber_var - len - words - characters - fldno - fieldname;
 END;
-
 EXPORT SALT_Profile_Produce_ENTITY(DATASET(FieldTypeLayout) FieldTypes, INTEGER NumberOfDataPatternsToShow = 5, INTEGER NumberOfFrequentTermsToShow = 3) := FUNCTION
 	populatedFields := FieldTypes (TRIM(Potential_KEL_Field_Type) != 'Never Populated: STRING' AND TRIM(Potential_KEL_Field_Type) != 'Never Populated: INTEGER');
 	
@@ -36,7 +34,7 @@ EXPORT SALT_Profile_Produce_ENTITY(DATASET(FieldTypeLayout) FieldTypes, INTEGER 
 		SELF.LineNumber := 90004 + cntr;
 		
 		FieldName := STD.Str.ToTitleCase(STD.Str.FindReplace(STD.Str.FindReplace(le.Field_Name, '__', ' '), '_', ' '));
-		FieldMapping := STD.Str.FindReplace(STD.Str.FindReplace(le.Field_Name, '__', '.'), '_', '');
+		FieldMapping := STD.Str.FindReplace(le.Field_Name, '__', '.');
 		SELF.Line := TRIM(FieldName, ALL) + ' = ' + TRIM(FieldMapping) + ',';
 	END;
 	
