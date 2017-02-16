@@ -2,11 +2,11 @@
 #OPTION(persist, 2)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
-  
+
 // Defining the ERA to allow for ASOF functionality
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
- 
+
 // Global Person Entity Definition
 Person := ENTITY(FLAT(UID=LexID, 
 		STRING FirstName=NULL(),
@@ -21,7 +21,7 @@ Person := ENTITY(FLAT(UID=LexID,
 		ReportedDatesOfBirth{DateOfBirth},
 		ReportedDatesOfDeath{DateOfDeath}));
  
- 
+
 Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		STRING TMSID=NULL('Garbage12345'),
 		STRING Source=NULL(),
@@ -87,7 +87,7 @@ CriminalOffense := ENTITY(FLAT(UID(offender_key),
 	MODEL(UID, 
 		OffenderKey, 
 		OffenseCharges{OffenseScore, Level, CaseNumber}));
- 
+
 Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), // For now we are using a hashed UID, eventually this will be replaced with the upcoming Location ID
 		STRING PrimaryRange=NULL('garbage12345'),
 		STRING Predirectional=NULL('garbage12345'),
@@ -172,8 +172,27 @@ ACAInfo := ENTITY(FLAT(Address parent=UID(PrimaryRange, Predirectional, PrimaryN
 		STRING InstitutionName=NULL(), 
 		INTEGER RecordCountHelper=NULL()));
 
+Aircraft := ENTITY(FLAT(UID(NNumber),
+		STRING NNumber,
+		STRING SerialNumber,
+		STRING ManufacturerModelCode,
+		STRING EngineManufacturerModelCode,
+		INTEGER YearManufactured,
+		DATE LastActionDate,
+		INTEGER Type,
+		STRING TypeEngine,
+		STRING StatusCode,
+		STRING TransponderCode,					//Mode_s_code in base file
+		STRING FractionalOwner,
+		STRING ManufacturerName,
+		STRING ModelName),
+	MODEL(UID,
+		NNumber, SerialNumber, ManufacturerModelCode, EngineManufacturerModelCode, YearManufactured, Type, TypeEngine, ManufacturerName, ModelName, TransponderCode,
+		OwnershipStatus{StatusCode, FractionalOwner},
+		LastActionDate{LastActionDate}));
 
-// The following ASSOCIATIONs link together our various ENTITY definitions
+		
+
 PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange))); // Connects a Person to an Address
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID), STRING NameType));
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
@@ -189,8 +208,10 @@ GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree),
 			SecondDegreeAssociations(#Subj, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2);
 
 
-// The following USE statements map the various base files to the appropriate ENTITY definitions
-USE IDL_Header.header_ins(FLAT, 
+AircraftOwner := ASSOCIATION(FLAT(Aircraft Plane = UID(NNumber), Person Owner, INTEGER RegistrantType, DATE CertificateIssueDate, STRING Certification));
+AircraftAddress := ASSOCIATION(FLAT(Aircraft Plane = UID(NNumber), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+
+// The following USE statements map the various base files to the appropriate ENTITY definitionsUSE IDL_Header.header_ins(FLAT, 
 	Person(UID=did,
 		DateFirstSeen = dt_first_seen, // Contains information for ASOF
 		DateLastSeen = dt_last_seen, // Contains information for ASOF
@@ -303,6 +324,7 @@ USE BankruptcyV3.Key_BankruptcyV3_Search_Full(FLAT,
 		DateLastSeen = date_last_seen,
 		FilingType = filing_type,
 		Disposition = disposition));  
+
  
 // Maps the ADVO index to the Address Entity
 USE ADVO.Key_Addr1(FLAT,
@@ -361,6 +383,82 @@ USE ADVO.Key_Addr1(FLAT,
 		NumberOfCurrentVacationMonths = months_vac_curr,
 		MaxVacationMonths = months_vac_max,
 		VacationPeriodsCount = vac_count));
+
+//Maps the FAA key_aircraft_id to Aircraft Entity
+USE FAA.aircraft_did_reg(FLAT,
+	Aircraft(
+		NNumber = n_number,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
+		SerialNumber = serial_number,
+		ManufacturerModelCode = mfr_mdl_code,
+		EngineManufacturerModelCode = eng_mfr_mdl,
+		YearManufactured = year_mfr,
+		LastActionDate = last_action_date,
+		Type = type_aircraft,
+		TypeEngine = type_engine,
+		StatusCode = status_code,
+		TransponderCode = mode_s_code,					
+		FractionalOwner = fract_owner,
+		ManufacturerName = aircraft_mfr_name,
+		ModelName = model_name),
+	AircraftOwner(
+		NNumber = n_number,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
+		Owner = did_out,
+		RegistrantType = type_registrant,
+		CertificateIssueDate = cert_issue_date,
+		Certification = certification),
+	AircraftAddress(
+		NNumber = n_number,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range),
+	Address(
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		UnitDesignation = unit_desig,
+		SecondaryRange = sec_range,
+		PostalCity = p_city_name,
+		VanityCity = v_city_name,
+		State = st,
+		ZIP5 = zip,
+		ZIP4 = z4,
+		CarrierRouteNumber = cart,
+		CarrierRouteSortationAtZIP = cr_sort_sz,
+		LineOfTravel = lot,
+		LineOfTravelOrder = lot_order,
+		DeliveryPointBarcode = dpbc,
+		DeliveryPointBarcodeCheckDigit = chk_digit,
+		TypeCode = rec_type,
+		County = county,
+		Latitude = geo_lat,
+		Longitude = geo_long,
+		MetropolitanStatisticalArea = msa,
+		GeoBlock = geo_blk,
+		GeoMatch = geo_match,
+		ACECleanerErrorCode = err_stat),
+	Person(
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
+		UID = did_out,
+		FirstName = fname,
+		MiddleName = mname,  
+		LastName = lname));
+
+
 
 // Maps the Relatives V3 index to the FirstDegreeAssociations
 USE Relationship.key_relatives_v3(FLAT,
@@ -451,8 +549,20 @@ IMPORT MarketMagnifier FROM KELBlackBox.MarketMagnifier;
 IMPORT RiskView FROM KELBlackBox.RiskView;
 
 
- 
+
 // Global Attribute Definitions
+
+Person: => AircraftCount := COUNT(AircraftOwner.Plane(NOT NNumber:Null){NNumber});
+Person: => AircraftCount30 := COUNT(AircraftOwner.Plane(DaysOld <= 30){NNumber});
+Person: => AircraftCount90 := COUNT(AircraftOwner.Plane(DaysOld <= 90){NNumber});
+Person: => AircraftCount180 := COUNT(AircraftOwner.Plane(DaysOld <= 180){NNumber});
+Person: => AircraftCount12 := COUNT(AircraftOwner.Plane(DaysOld <= 365){NNumber});
+Person: => AircraftCount24 := COUNT(AircraftOwner.Plane(DaysOld <= 2*365){NNumber});
+Person: => AircraftCount36 := COUNT(AircraftOwner.Plane(DaysOld <= 3*365){NNumber});
+Person: => AircraftCount60 := COUNT(AircraftOwner.Plane(DaysOld <= 5*365){NNumber});
+
+Aircraft: => DaysOld := ABS(DAYSBETWEEN(NNumber:DateFirstSeen, CURRENTDATE()));
+
 Address: => ACAHit := IF(EXISTS(ACA), 'Y', 'N');
 Address: => ACAWithCounts := ACAInfo{parent, InstitutionName, InstitutionTypeCode, InstitutionTypeExpanded, Frequency := COUNT(GROUP)};
 Address: => TopACA := ONLY(TOPN(ACAWithCounts, 1, -Frequency));
@@ -511,13 +621,13 @@ Bankruptcy: => Chapter11 := EXISTS(ChapterDetails(OriginalChapter = '11'));
 Bankruptcy: => Chapter12 := EXISTS(ChapterDetails(OriginalChapter = '12'));
 Bankruptcy: => Chapter13 := EXISTS(ChapterDetails(OriginalChapter = '13'));
 Bankruptcy: => Discharged := EXISTS(Status(StatusType = 'DISCHARGED'));
-Bankruptcy: => Dismissed := EXISTS(Status(StatusType = 'DISMISSED'));
+Bankruptcy: => Dismissed := EXISTS(Status(StatusType = 'DISMISSED'));	
 Bankruptcy: => MostRecentChapterDetails := TOPN(ChapterDetails, 1, -OriginalChapter:DateLastSeen, -OriginalChapter:DateFirstSeen);
 Bankruptcy: => BankruptcyChapter := ONLY(MostRecentChapterDetails, OriginalChapter);
 Bankruptcy: => MostRecentDateFirstSeen := TMSID:DateFirstSeen;
 Bankruptcy: => MostRecentDateLastSeen := TMSID:DateLastSeen;
 Bankruptcy: => MostRecentStatusDetails := TOPN(Status, 1, -StatusDate, -StatusType:DateLastSeen, -StatusType:DateFirstSeen);
-Bankruptcy: => MostRecentBankruptcyStatus := IF(ONLY(MostRecentStatusDetails, StatusType) = '', 'Unknown', ONLY(MostRecentStatusDetails, StatusType));
+Bankruptcy: => MostRecentBankruptcyStatus := IF(ONLY(MostRecentStatusDetails, StatusType) = '', 'Unknown', ONLY(MostRecentStatusDetails, StatusType)); 
 Bankruptcy: => MostRecentDispositionDetails := TOPN(DispositionStatus, 1, -Disposition:DateLastSeen, -Disposition:DateFirstSeen);
 Bankruptcy: => MostRecentBankruptcyDisposition := ONLY(MostRecentDispositionDetails, Disposition);
 Bankruptcy: => MostRecentFilingTypeDetails := TOPN(FileType, 1, -FilingType:DateLastSeen, -FilingType:DateFirstSeen);
@@ -714,7 +824,7 @@ QUERY: PersonByLexID(SearchForLexID) <= Person(UID=SearchForLexID);
 
 QUERY: PersonDeceasedDate(SearchForLexID) <= Person(UID=SearchForLexID){FirstDeceasedDate};
 
-// Offenses Based Queries
+//Offenses Based Queries
 QUERY: PersonFelonyCountByLexID(SearchForLexID) <= Person(UID=SearchForLexID){FelonyCount}; 
 
 QUERY: CriminalOffenses(SearchForOffenderKey) <= CriminalOffense(OffenderKey = SearchForOffenderKey);
@@ -724,11 +834,11 @@ QUERY: SuspectFirstDegreeRelativesAssociates(SearchForLexID) <= Person(UID=Searc
 QUERY: SuspectFirstDegreeRelativesAssociatesCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesCount};
 
 QUERY: SuspectFirstDegreeRelativesAssociatesFelonyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesFelonyCount};
-
+ 
 QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense{Person.UID, Person.PersonOffenses.Offense.OffenderKey, OffenseCharges.Level, OffenseCharges.OffenseScore, OffenseCharges.CaseNumber, Person.FelonyCount};
 
 QUERY: PersonsOffensesNew(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense;   
-
+  
 // Address Based Queries
 QUERY: PersonsAddresses(SearchForLexID) <= Person(UID = SearchForLexID).PersonAddress.Location;
 
@@ -736,7 +846,15 @@ QUERY: AddressDump(ArchiveDate) <= Address; // ASOF reportedby(ArchiveDate);
 
 QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Range, ZIP, ArchiveDate) <= Address(PrimaryRange = Prim_Range AND Predirectional = Predir AND PrimaryName = Prim_Name AND Suffix = Suffix AND Postdirectional = Postdir AND SecondaryRange = Sec_Range AND ZIP5 = ZIP); // ASOF reportedby(ArchiveDate);
 
-// Bankruptcy Based Queries
+//Aircraft Based Queries
+QUERY: AircraftDump <= Aircraft;
+QUERY: AircraftOwnerDump <= AircraftOwner{Plane, Plane.NNumber, Owner, RegistrantType, CertificateIssueDate, Certification};
+QUERY: AircraftOwnerName <= Aircraft{UID, NNumber, DaysOld, AircraftOwner.Owner{UID, AircraftCount, AircraftCount30, AircraftCount90, AircraftCount180, AircraftCount12, AircraftCount24, AircraftCount36, AircraftCount60}};
+QUERY: PersonAircraftCounts <= Person(AircraftCount != 0){UID, AircraftCount, AircraftCount30, AircraftCount90, AircraftCount180, AircraftCount12, AircraftCount24, AircraftCount36, AircraftCount60};
+QUERY: AircraftLocation <= Address(EXISTS(AircraftAddress.Plane)){UID, AircraftAddress.Plane.NNumber, ZIP4} ;
+// QUERY: AircraftLocation <= Aircraft{UID, AircraftAddress.Location.ZIP4};       //Problems with Join for now.
+ 
+//Bankruptcy Based Queries
 QUERY: Bankruptcy(SearchForTMSID) <= Bankruptcy(TMSID = SearchForTMSID); 
 
 QUERY: PersonBankruptcyTest <= PersonBankruptcy;
@@ -754,7 +872,7 @@ SHELL: ConsumerShell <= Person{UID,
 		BankruptcyCountInLast5Years, LastBankruptcyDate, BankruptcyFilingType, BankruptcyDisposition, BankruptcyAge,
 		FelonyCount, FirstDeceasedDate, SuspectFirstDegreeRelativesAndAssociatesCount,
 		SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount, SuspectFirstDegreeRelativesAndAssociatesFelonyCount}; 
- 
+
 SHELL: AddressShell <= Address{UID,
 		// UID Fields
 		PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange,				

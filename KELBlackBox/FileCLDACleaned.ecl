@@ -650,6 +650,26 @@ SHARED cdautot_claimhistory_subjectsectionclaimsdiscoveryautoreport := RECORD
 	
 	EXPORT FileCDAutoClaim := NORMALIZE(FileCDAutoCleaned, LEFT.claimhistorysubjectsection.claimset, TRANSFORM(cdautot_claimsetclaimsdiscoveryautoreport, SELF := RIGHT));
 	EXPORT FileCDAutoPayments := NORMALIZE(FileCDAutoClaim, LEFT.Payments, TRANSFORM(cdautot_claimpaymentrecordreport, SELF := RIGHT));
+	EXPORT FileCDAutoPaymentsFlat := NORMALIZE(FileCDAutoPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+              SELF.ClaimCatType := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Type,
+                     2 => LEFT.ClaimCat2Type,
+                     3 => LEFT.ClaimCat3Type,
+                     4 => LEFT.ClaimCat4Type,
+                     5 => LEFT.ClaimCat5Type, '');
+              SELF.ClaimCatAmount := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Amount,
+                     2 => LEFT.ClaimCat2Amount,
+                     3 => LEFT.ClaimCat3Amount,
+                     4 => LEFT.ClaimCat4Amount,
+                     5 => LEFT.ClaimCat5Amount, '');
+              SELF.ClaimCatDisp := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Disp,
+                     2 => LEFT.ClaimCat2Disp,
+                     3 => LEFT.ClaimCat3Disp,
+                     4 => LEFT.ClaimCate4Disp,
+                     5 => LEFT.ClaimCat5Disp, '');
+              SELF := LEFT))(ClaimCatType != '');
 	
 	EXPORT FileCDAutoUnitRecap := NORMALIZE(FileCDAutoCleaned, LEFT.recapprocessingsection.unitrecap, TRANSFORM(cdautot_recapprocessingrecordreport, SELF := RIGHT));
 
