@@ -1,2 +1,2 @@
-﻿EXPORT LexIDFilterSet := [64065265, 98832706, 3191934, 3400050, 9648756, 39116613]; // Include every single LexID in the base files (Full File Runs)
+﻿EXPORT LexIDFilterSet := []; // Include every single LexID in the base files (Full File Runs)
 // EXPORT LexIDFilterSet := [3815228, 14026833]; // Filter the base files to only keep the records which have a LexID in this set (Filtered File Runs)
