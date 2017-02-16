@@ -1,42 +1,40 @@
-#workunit('name', 'Testing_CreditReport_Attributes');
+﻿#workunit('name', 'Testing_CreditReport_Attributes');
 #option('expandSelectCreateRow', true); // Added to improve overall compile time
 
-IMPORT KELBlackBox, KELGlobal, UT;
+IMPORT KELBlackBox, UT;
+IMPORT KELGlobal AS KELCodeLocation;
 
-MaxResults := 250; // The maximum number of records to show in the workunit
+Transaction := DATASET([{'8778015R13971833', 1514226899}], {STRING TransactionID, UNSIGNED6 LexID}); // Bankruptcies/Collections
+//Transaction := DATASET([{'0F19ADA9C0X3382', 1514226899}], {STRING TransactionID, UNSIGNED6 LexID}); // Bankruptcies/Collections/Tradeline/Inquiries
 
-//TransactionID := '8778105R14224580'; // Joint Report
-CreditReport := DATASET([{'8778015R13971833', 1514226899}], {STRING TransactionID, UNSIGNED6 LexID}); // Bankruptcies/Collections
-//CreditReport := DATASET([{'0F19ADA9C0X3382', 1514226899}], {STRING TransactionID, UNSIGNED6 LexID}); // Bankruptcies/Collections/Tradeline/Inquiries
+// NCFVersion := 1; // Run NCF Version 1
+NCFVersion := 2; // Run NCF Version 2
 
-HistoryDate := (INTEGER)UT.GetDate; // Run with Today's Date
+IncludeDebugQueries := true; // Only OUTPUT the top level CreditReport
+// IncludeDebugQueries := false; // OUTPUT all CreditReport* ENTITY results
 
-CreditReportSummary := KELGlobal.Q_Credit_Report_Attributes(CreditReport[1].TransactionID).Res0;
-OUTPUT(CreditReportSummary, NAMED('Credit_Report'));
-
-PersonsCreditReport := KELGlobal.Q_Persons_Credit_Report(CreditReport[1].LexID).Res0;
-OUTPUT(PersonsCreditReport, NAMED('Persons_Credit_Report'));
-
-Bankruptcy := KELGlobal.Q_Credit_Report_Bankruptcy_Attributes(CreditReport[1].TransactionID).Res0;
-OUTPUT(Bankruptcy, NAMED('Bankruptcy'));
-
-Collection := KELGlobal.Q_Credit_Report_Collection_Attributes(CreditReport[1].TransactionID).Res0;
-OUTPUT(Collection, NAMED('Collection'));
-
-Employment := KELGlobal.Q_Credit_Report_Employment_Attributes(CreditReport[1].TransactionID).Res0;
-OUTPUT(Employment, NAMED('Employment'));
-
-Inquiry := KELGlobal.Q_Credit_Report_Inquiry_Attributes(CreditReport[1].TransactionID).Res0;
-OUTPUT(Inquiry, NAMED('Inquiry'));
-
-Judgement := KELGlobal.Q_Credit_Report_Judgement_Attributes(CreditReport[1].TransactionID).Res0;
-OUTPUT(Judgement, NAMED('Judgement'));
-
-Lien := KELGlobal.Q_Credit_Report_Lien_Attributes(CreditReport[1].TransactionID).Res0;
-OUTPUT(Lien, NAMED('Lien'));
-
-Tradeline := KELGlobal.Q_Credit_Report_Tradeline_Attributes(CreditReport[1].TransactionID).Res0;
-OUTPUT(Tradeline, NAMED('Tradeline'));
-
-NarrativeRemarks := KELGlobal.Q_Credit_Report_Narrative_Remarks_Attributes(CreditReport[1].TransactionID).Res0;
-OUTPUT(NarrativeRemarks, NAMED('Narrative_Remarks'));
+#if(NCFVersion = 1)
+	OUTPUT(KELCodeLocation.S_Credit_Report_V1.Result(Transaction_I_D_ = Transaction[1].TransactionID), NAMED('CreditReport'));
+	#if(IncludeDebugQueries)
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Bankruptcy_V1(Transaction[1].TransactionID).Res0, NAMED('CreditReportBankruptcy'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Collection_V1(Transaction[1].TransactionID).Res0, NAMED('CreditReportCollection'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Employment_V1(Transaction[1].TransactionID).Res0, NAMED('CreditReportEmployment'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Inquiry_V1(Transaction[1].TransactionID).Res0, NAMED('CreditReportInquiry'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Judgement_V1(Transaction[1].TransactionID).Res0, NAMED('CreditReportJudgement'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Lien_V1(Transaction[1].TransactionID).Res0, NAMED('CreditReportLien'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Narrative_Remarks_V1(Transaction[1].TransactionID).Res0, NAMED('CreditReportNarrativeRemarks'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Tradeline_V1(Transaction[1].TransactionID).Res0, NAMED('CreditReportTradeline'));
+	#end
+#else
+	OUTPUT(KELCodeLocation.S_Credit_Report_V2.Result(Transaction_I_D_ = Transaction[1].TransactionID), NAMED('CreditReport'));
+	#if(IncludeDebugQueries)
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Bankruptcy_V2(Transaction[1].TransactionID).Res0, NAMED('CreditReportBankruptcy'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Collection_V2(Transaction[1].TransactionID).Res0, NAMED('CreditReportCollection'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Employment_V2(Transaction[1].TransactionID).Res0, NAMED('CreditReportEmployment'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Inquiry_V2(Transaction[1].TransactionID).Res0, NAMED('CreditReportInquiry'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Judgement_V2(Transaction[1].TransactionID).Res0, NAMED('CreditReportJudgement'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Lien_V2(Transaction[1].TransactionID).Res0, NAMED('CreditReportLien'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Narrative_Remarks_V2(Transaction[1].TransactionID).Res0, NAMED('CreditReportNarrativeRemarks'));
+	OUTPUT(KELCodeLocation.Q_Credit_Report_Tradeline_V2(Transaction[1].TransactionID).Res0, NAMED('CreditReportTradeline'));
+	#end
+#end

@@ -36,7 +36,7 @@ EXPORT SALT_Profile_Produce_ENTITY(DATASET(FieldTypeLayout) FieldTypes, INTEGER 
 		SELF.LineNumber := 90004 + cntr;
 		
 		FieldName := STD.Str.ToTitleCase(STD.Str.FindReplace(STD.Str.FindReplace(le.Field_Name, '__', ' '), '_', ' '));
-		FieldMapping := STD.Str.FindReplace(STD.Str.FindReplace(le.Field_Name, '__', '.'), '_', '');
+		FieldMapping := STD.Str.FindReplace(le.Field_Name, '__', '.');
 		SELF.Line := TRIM(FieldName, ALL) + ' = ' + TRIM(FieldMapping) + ',';
 	END;
 	

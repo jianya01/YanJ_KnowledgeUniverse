@@ -631,6 +631,29 @@ EXPORT FileCLUECleaned := MODULE
 	
 	EXPORT FileCLUEAutoClaim := NORMALIZE(FileCLUEAutoCleaned, LEFT.claimhistorysubjectsection.claimset, TRANSFORM(autot_claimsetclueautov2report, SELF := RIGHT));
 	EXPORT FileCLUEAutoPayments := NORMALIZE(FileCLUEAutoClaim, LEFT.Payments, TRANSFORM(autot_claimpaymentrecordreport, SELF := RIGHT));
+  
+	EXPORT FileCLUEAutoPaymentsFlat := NORMALIZE(FileCLUEAutoPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+              SELF.ClaimCatType := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Type,
+                     2 => LEFT.ClaimCat2Type,
+                     3 => LEFT.ClaimCat3Type,
+                     4 => LEFT.ClaimCat4Type,
+                     5 => LEFT.ClaimCat5Type, '');
+              SELF.ClaimCatAmount := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Amount,
+                     2 => LEFT.ClaimCat2Amount,
+                     3 => LEFT.ClaimCat3Amount,
+                     4 => LEFT.ClaimCat4Amount,
+                     5 => LEFT.ClaimCat5Amount, '');
+              SELF.ClaimCatDisp := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Disp,
+                     2 => LEFT.ClaimCat2Disp,
+                     3 => LEFT.ClaimCat3Disp,
+                     4 => LEFT.ClaimCate4Disp,
+                     5 => LEFT.ClaimCat5Disp, '');
+              SELF := LEFT))(ClaimCatType != '');
+	
+	
 	
 	EXPORT FileCLUEAutoUnitRecap := NORMALIZE(FileCLUEAutoCleaned, LEFT.recapprocessingsection.unitrecap, TRANSFORM(autot_recapprocessingrecordreport, SELF := RIGHT));
 
@@ -1145,6 +1168,50 @@ EXPORT FileCLUECleaned := MODULE
 	EXPORT FileCLUEPropertyRiskClaim := NORMALIZE(FileCLUEPropertyCleaned, LEFT.claimhistoryrisksection.claimset, TRANSFORM(propertyt_claimsetcluepropertyreport, SELF := RIGHT));
 	EXPORT FileCLUEPropertyRiskClaimPayments := NORMALIZE(FileCLUEPropertyRiskClaim, LEFT.Payments, TRANSFORM(propertyt_claimpaymentrecordreport, SELF := RIGHT));
 	
+  EXPORT FileCLUEPropertyRiskClaimPaymentsFlat := NORMALIZE(FileCLUEPropertyRiskClaimPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+              SELF.ClaimCatType := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Type,
+                     2 => LEFT.ClaimCat2Type,
+                     3 => LEFT.ClaimCat3Type,
+                     4 => LEFT.ClaimCat4Type,
+                     5 => LEFT.ClaimCat5Type, '');
+              SELF.ClaimCatAmount := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Amount,
+                     2 => LEFT.ClaimCat2Amount,
+                     3 => LEFT.ClaimCat3Amount,
+                     4 => LEFT.ClaimCat4Amount,
+                     5 => LEFT.ClaimCat5Amount, '');
+              SELF.ClaimCatDisp := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Disp,
+                     2 => LEFT.ClaimCat2Disp,
+                     3 => LEFT.ClaimCat3Disp,
+                     4 => LEFT.ClaimCate4Disp,
+                     5 => LEFT.ClaimCat5Disp, '');
+              SELF := LEFT))(ClaimCatType != '');
+	
+	
 	EXPORT FileCLUEPropertyInsuredClaim := NORMALIZE(FileCLUEPropertyCleaned, LEFT.claimhistoryinsuredsection.claimsets, TRANSFORM(propertyt_claimsetcluepropertyreport, SELF := RIGHT));
 	EXPORT FileCLUEPropertyInsuredClaimPayments := NORMALIZE(FileCLUEPropertyInsuredClaim, LEFT.Payments, TRANSFORM(propertyt_claimpaymentrecordreport, SELF := RIGHT));
+  
+	EXPORT FileCLUEPropertyInsuredClaimPaymentsFlat := NORMALIZE(FileCLUEPropertyInsuredClaimPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+              SELF.ClaimCatType := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Type,
+                     2 => LEFT.ClaimCat2Type,
+                     3 => LEFT.ClaimCat3Type,
+                     4 => LEFT.ClaimCat4Type,
+                     5 => LEFT.ClaimCat5Type, '');
+              SELF.ClaimCatAmount := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Amount,
+                     2 => LEFT.ClaimCat2Amount,
+                     3 => LEFT.ClaimCat3Amount,
+                     4 => LEFT.ClaimCat4Amount,
+                     5 => LEFT.ClaimCat5Amount, '');
+              SELF.ClaimCatDisp := CASE(COUNTER,
+                     1 => LEFT.ClaimCat1Disp,
+                     2 => LEFT.ClaimCat2Disp,
+                     3 => LEFT.ClaimCat3Disp,
+                     4 => LEFT.ClaimCate4Disp,
+                     5 => LEFT.ClaimCat5Disp, '');
+              SELF := LEFT))(ClaimCatType != '');
+
 END;

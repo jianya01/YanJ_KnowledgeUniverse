@@ -1,0 +1,3 @@
+﻿SEQUENTIAL(NCF.Spray_TIP_File, // WUID: W20160714-171955
+					 NCF.Create_TIP_Records // WUID: W20160804-000758
+					 );
