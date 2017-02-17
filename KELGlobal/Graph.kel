@@ -191,7 +191,16 @@ Aircraft := ENTITY(FLAT(UID(NNumber),
 		OwnershipStatus{StatusCode, FractionalOwner},
 		LastActionDate{LastActionDate}));
 
-		
+
+Watercraft := ENTITY(FLAT(UID(WatercraftKey),
+		DATE	 DateVendorFirstReported,
+		DATE   DateVendorLastReported,
+		STRING WatercraftKey,
+		STRING SequenceKey), 
+MODEL(UID,
+		DateInformation{DateVendorFirstReported, DateVendorLastReported},
+		WatercraftKey, SequenceKey));
+			
 
 PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange))); // Connects a Person to an Address
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID), STRING NameType));
@@ -211,14 +220,18 @@ GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree),
 AircraftOwner := ASSOCIATION(FLAT(Aircraft Plane = UID(NNumber), Person Owner, INTEGER RegistrantType, DATE CertificateIssueDate, STRING Certification));
 AircraftAddress := ASSOCIATION(FLAT(Aircraft Plane = UID(NNumber), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
 
+WatercraftOwner := ASSOCIATION(FLAT(Watercraft WCraft=UID(WatercraftKey), Person Owner));
+WatercraftAddress := ASSOCIATION(FLAT(Watercraft WCraft=UID(WatercraftKey), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange))); 
+
 // The following USE statements map the various base files to the appropriate ENTITY definitionsUSE IDL_Header.header_ins(FLAT, 
+USE IDL_Header.header_ins(FLAT, 
 	Person(UID=did,
 		DateFirstSeen = dt_first_seen, // Contains information for ASOF
 		DateLastSeen = dt_last_seen, // Contains information for ASOF
 		FirstName = fname,
 		MiddleName = mname,
 		LastName = lname,
-		DateOfBirth = dob));						
+		DateOfBirth = dob));					
 
 USE Header.File_Did_Death_Master_ssa(FLAT, 
 	Person(UID=did,
@@ -455,10 +468,68 @@ USE FAA.aircraft_did_reg(FLAT,
 		DateLastSeen = date_last_seen,
 		UID = did_out,
 		FirstName = fname,
-		MiddleName = mname,  
+		MiddleName = mname,   
 		LastName = lname));
 
-
+USE Watercraft.File_Base_Search_Prod(FLAT,
+	Watercraft(
+		WatercraftKey = watercraft_key,
+		SequenceKey = sequence_key,
+		DateFirstSeen = date_first_seen,     //This is for ASOF functionality
+		DateLastSeen = date_last_seen,				//This is for ASOF functionality
+		DateVendorFirstReported = date_vendor_first_reported,
+		DateVendorLastReported = date_vendor_last_reported),
+	WatercraftOwner(
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen,
+		WatercraftKey = watercraft_key,
+		Owner = did),
+	WatercraftAddress(
+		DateFirstSeen = date_first_seen,   //This is for ASOF functionality
+		DateLastSeen = date_last_seen,		//This is for ASOF functionality
+		WatercraftKey = watercraft_key,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip5,
+		SecondaryRange = sec_range), 
+	Address(
+		DateFirstSeen = date_first_seen,		//This is for ASOF functionality
+		DateLastSeen = date_last_seen,			//This is for ASOF functionality
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName	=	prim_name,
+		Suffix = suffix,
+		Postdirectional	=	postdir,
+		UnitDesignation	=	unit_desig,
+		SecondaryRange =	sec_range,
+		PostalCity =	p_city_name,
+		VanityCity =	v_city_name,
+		State =	st,
+		ZIP5 = zip5,
+		ZIP4 = zip4,
+		CarrierRouteNumber = cart,
+		CarrierRouteSortationAtZIP = cr_sort_sz,
+		LineOfTravel =	lot,
+		LineOfTravelOrder	=	lot_order,
+		DeliveryPointBarcode =	dpbc,
+		DeliveryPointBarcodeCheckDigit =	chk_digit,
+		TypeCode =	rec_type,
+		County =	county,
+		Latitude =	geo_lat,
+		Longitude	=	geo_long,
+		MetropolitanStatisticalArea	=	msa,
+		GeoBlock =	geo_blk,
+		GeoMatch =	geo_match),
+	Person(
+		DateFirstSeen = date_first_seen,		//This is for ASOF functionality
+		DateLastSeen = date_last_seen,		 //This is for ASOF functionality
+		UID = did,
+		FirstName = fname,
+		MiddleName = mname,  
+		LastName = lname));
 
 // Maps the Relatives V3 index to the FirstDegreeAssociations
 USE Relationship.key_relatives_v3(FLAT,
@@ -554,6 +625,18 @@ Person: => AircraftCount36 := COUNT(AircraftOwner.Plane(DaysOld <= 3*365){NNumbe
 Person: => AircraftCount60 := COUNT(AircraftOwner.Plane(DaysOld <= 5*365){NNumber});
 
 Aircraft: => DaysOld := ABS(DAYSBETWEEN(NNumber:DateFirstSeen, CURRENTDATE()));
+
+
+Person: => WatercraftCount := COUNT(WatercraftOwner.WCraft(NOT WatercraftKey:Null){WatercraftKey});
+Person: => WatercraftCount01 := COUNT(WatercraftOwner.WCraft(DaysOld <= 30){WatercraftKey}); 
+Person: => WatercraftCount03 := COUNT(WatercraftOwner.WCraft(DaysOld <= 90){WatercraftKey});
+Person: => WatercraftCount06 := COUNT(WatercraftOwner.WCraft(DaysOld <= 180){WatercraftKey});
+Person: => WatercraftCount12 := COUNT(WatercraftOwner.WCraft(DaysOld <= 365){WatercraftKey});
+Person: => WatercraftCount24 := COUNT(WatercraftOwner.WCraft(DaysOld <= 2*365){WatercraftKey});
+Person: => WatercraftCount60 := COUNT(WatercraftOwner.WCraft(DaysOld <= 5*365){WatercraftKey});
+
+Watercraft: => DaysOld := ABS(DAYSBETWEEN(WatercraftKey:DateFirstSeen, CURRENTDATE())); 
+
 
 Address: => ACAHit := IF(EXISTS(ACA), 'Y', 'N');
 Address: => ACAWithCounts := ACAInfo{parent, InstitutionName, InstitutionTypeCode, InstitutionTypeExpanded, Frequency := COUNT(GROUP)};
@@ -835,6 +918,16 @@ QUERY: AircraftOwnerName <= Aircraft{UID, NNumber, DaysOld, AircraftOwner.Owner{
 QUERY: PersonAircraftCounts <= Person(AircraftCount != 0){UID, AircraftCount, AircraftCount30, AircraftCount90, AircraftCount180, AircraftCount12, AircraftCount24, AircraftCount36, AircraftCount60};
 QUERY: AircraftLocation <= Address(EXISTS(AircraftAddress.Plane)){UID, AircraftAddress.Plane.NNumber, ZIP4} ;
 // QUERY: AircraftLocation <= Aircraft{UID, AircraftAddress.Location.ZIP4};       //Problems with Join for now.
+
+
+//////////////////		Watercraft Queries //////////////////////////////////
+QUERY: WatercraftDump <= Watercraft;
+QUERY: WatercraftOwnerDump <= WatercraftOwner{WCraft, Owner};
+QUERY: WatercraftOwnerName <= Watercraft{UID, WatercraftKey, WatercraftOwner.Owner{UID, WatercraftCount, WatercraftCount01, WatercraftCount03, WatercraftCount06, WatercraftCount12, WatercraftCount24, WatercraftCount60}};
+QUERY: PersonWatercraftCount <= Person(WatercraftCount != 0){UID, WatercraftCount, WatercraftCount01, WatercraftCount03, WatercraftCount06, WatercraftCount12, WatercraftCount24, WatercraftCount60};
+QUERY: WatercraftLocation <= Address(EXISTS(WatercraftAddress.WCraft)){UID, WatercraftAddress.WCraft.WatercraftKey, PrimaryRange, PrimaryName, ZIP4} ;
+///////////////////////////////////  End of Watercraft Queries  //////////////////////////////////
+
  
 //Bankruptcy Based Queries
 QUERY: Bankruptcy(SearchForTMSID) <= Bankruptcy(TMSID = SearchForTMSID); 
