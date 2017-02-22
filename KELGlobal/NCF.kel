@@ -1,5 +1,5 @@
 ﻿// KEL Compiler Options and Configurations
-#OPTION(persist, 2)
+#OPTION(persist, 0)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
  
@@ -1084,6 +1084,9 @@ CreditReportInquiry: STATE_FARM_MISCELLANEOUS_INDUSTRY_INQUIRY_CODE_LIST := ['ZB
 CreditReportInquiry: STATE_FARM_REAL_ESTATE_INDUSTRY_INQUIRY_CODE_LIST := ['RA', 'RC', 'RE', 'RH', 'RM', 'RP', 'RR', 'RZ', 'ZL', 'ZT'];
 CreditReportInquiry: STATE_FARM_UTILITY_INDUSTRY_INQUIRY_CODE_LIST := ['UA', 'UC', 'UD', 'UE', 'UF', 'UG', 'UH', 'UL', 'UO', 'UP', 'US', 'UT', 'UV', 'UW', 'UZ'];
 CreditReportInquiry: UTILITY_INDUSTRY_INQUIRY_CODE_LIST := ['UA', 'UC', 'UD', 'UE', 'UF', 'UG', 'UH', 'UL', 'UO', 'UP', 'US', 'UT', 'UV', 'UW', 'UZ'];
+CreditReportInquiry: KOB_COLLECTION_XP := ['YB','YD','YF'];
+CreditReportInquiry: KOB_COLLECTION_EQ := [''];
+CreditReportInquiry: KOB_COLLECTION_TU := ['BY','CY','DY','EY','FY','HY'];
 
 CreditReportInquiry: => NarrativeRemarkCount := COUNT(CreditReportNarrativeRemarks);
 CreditReportInquiry: => AdamAutoIndustry := IndustryID IN ADAM_AUTO_INDUSTRY_CODE_LIST;
@@ -1126,7 +1129,9 @@ CreditReportInquiry: => RealEstateAndUtilityIndustry := IndustryID IN REAL_ESTAT
 CreditReportInquiry: => RetailIndustry := IndustryID IN RETAIL_INDUSTRY_INQUIRY_CODE_LIST;
 CreditReportInquiry: => StateFarmAutoIndustry := IndustryID IN STATE_FARM_AUTO_INDUSTRY_CODE_LIST;
 CreditReportInquiry: => StateFarmRealEstateAndUtilityIndustry := IndustryID IN STATE_FARM_REAL_ESTATE_INDUSTRY_INQUIRY_CODE_LIST OR IndustryID IN UTILITY_INDUSTRY_INQUIRY_CODE_LIST;
-
+CreditReportInquiry: => KOB_COLLECTION := MAP(BureauCode = XP => KOB_COLLECTION_XP,
+                                         BureauCode = EQ => KOB_COLLECTION_EQ,
+                                         BureauCode = TU => KOB_COLLECTION_TU,BLANK_SET);
 
 // Judgements CONSTANTs and Attributes
 CreditReportJudgement: => NarrativeRemarkCount := COUNT(CreditReportNarrativeRemarks);
@@ -3283,6 +3288,67 @@ CreditReportBankruptcy: => PR_DISMISSED_BKP_13 := MAP(BureauCode = XP => PR_DISM
 CreditReportBankruptcy: => NC_DISPUTE_STATUS_PENDING := MAP(BureauCode = XP => NC_DISPUTE_STATUS_PENDING_XP ,
                                          BureauCode = EQ => NC_DISPUTE_STATUS_PENDING_EQ,
                                          BureauCode = TU => NC_DISPUTE_STATUS_PENDING_TU,BLANK_SET);																																		 																	 																			 																		 
+
+//Global Attributes
+CreditReportBankruptcy: => GPRDischargedBKP := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISCHARGED_BKP;
+CreditReportBankruptcy: => GPRDismissedBKP := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISMISSED_BKP;
+CreditReportBankruptcy: => GPRBankruptcy13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_BANKRUPTCY_13;
+CreditReportBankruptcy: => GPRDischargedBKP13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISCHARGED_BKP_13;
+CreditReportBankruptcy: => GPRDismissedBKP13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISMISSED_BKP_13;
+CreditReportBankruptcy: => G1NCDispute := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportBankruptcy.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportBankruptcy.NC_DISPUTE_STATUS_PENDING)));
+CreditReportBankruptcy: => G2Dispute := G1NCDispute OR ConsumerDisputeFlag = 'Y';
+
+
+CreditReportCollection: => GAuthorizedUser := NOT ECOACode:Null AND ECOACode IN ECOA_A;
+CreditReportCollection: => GCORetail := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_RETAIL;
+CreditReportCollection: => GCOBankFinance := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_BANK_FINANCE;
+CreditReportCollection: => GCOCableCellular := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_CABLE_CELLULAR;
+CreditReportCollection: => GCOUtility := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_UTILITIES;
+CreditReportCollection: => GCORental := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_RENTAL; 
+CreditReportCollection: => GCOGovernment := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_GOVERNMENT;  
+CreditReportCollection: => GCOInsurance := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_INSURANCE;
+CreditReportCollection: => G1ECOADeceased := NOT ECOACode:Null AND ECOACode IN ECOA_DECEASED;
+CreditReportCollection: => G1KOBMedical := NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_MEDICAL;
+CreditReportCollection: => G1TypeMedical := NOT AccountTypeCode:Null AND AccountTypeCode IN TYPE_MEDICAL;
+CreditReportCollection: => G1StatusDispute := NOT CollectionItemStatus:Null AND CollectionItemStatus IN CO_STATUS_DISPUTE;
+CreditReportCollection: => G1StatusPaid := NOT CollectionItemStatus:Null AND CollectionItemStatus IN CO_STATUS_PAID;
+CreditReportCollection: => G1StatusBankruptcy := NOT CollectionItemStatus:Null AND ((CollectionItemStatus IN CO_STATUS_BKP_INCLUDED) OR (CollectionItemStatus IN CO_STATUS_BKP_EXCLUDED));           
+CreditReportCollection: => G1StatusCOBKPExclusion := NOT CollectionItemStatus:Null AND CollectionItemStatus IN CO_STATUS_BKP_EXCLUDED;
+CreditReportCollection: => G1NCMedical := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_MEDICAL) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_MEDICAL) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_MEDICAL) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_MEDICAL)));
+CreditReportCollection: => G1NCDispute := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING)));
+CreditReportCollection: => G1NCDeceased := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_DECEASED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_DECEASED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_DECEASED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_DECEASED)));
+CreditReportCollection: => G1NCBankruptcy := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_BANKRUPTCY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_BANKRUPTCY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_BANKRUPTCY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_BANKRUPTCY)));
+CreditReportCollection: => G1NCCOBankruptcyExclusion := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION)));
+CreditReportCollection: => G1CIIBankruptcy := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY;
+CreditReportCollection: => G1CIICOBankruptcyExclusion := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_CO_BANKRUPTCY_EXCLUSION;
+CreditReportCollection: => G1CCMedical := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_MEDICAL;
+CreditReportCollection: => G2Deceased := G1ECOADeceased OR G1NCDeceased;
+CreditReportCollection: => G2Dispute := G1NCDispute OR G1StatusDispute OR (ConsumerDisputeFlag='Y');
+CreditReportCollection: => G2Medical := G1KOBMedical OR G1TypeMedical OR G1NCMedical OR G1CCMedical;
+CreditReportCollection: => G2Bankruptcy := G1NCBankruptcy OR G1CIIBankruptcy OR G1StatusBankruptcy;
+CreditReportCollection: => G2COBankruptcyExclusion := G1NCCOBankruptcyExclusion OR G1CIICOBankruptcyExclusion OR G1StatusCOBKPExclusion;
+CreditReportCollection: => G2COPaidPaying := G1StatusPaid OR (ABS(MONTHSBETWEEN(DateOfLastActivity, DateAssigned)) >=0) OR (BalanceAmount < OriginalAmount) OR (BalanceAmount <= 0);
+CreditReportCollection: => G2COPaid := G1StatusPaid OR BalanceAmount <= 0;
+CreditReportCollection: => G3COExcluded := G2Medical OR G2Dispute OR GAuthorizedUser OR G2Deceased OR (OriginalAmount <= 0) OR (DateAssigned:Null OR ABS(MONTHSBETWEEN(DateAssigned, DateReported)) > 83) OR (ABS(MONTHSBETWEEN(DateOf1stDelinquency, DateReported)) > 83);
+
+CreditReportInquiry: => GCreditInquiry := BureauCode IN ['XPN','TRU'] OR (BureauCode IN ['EFX'] AND Abbreviation IN IQ_ABBREVIATION_CREDIT);
+CreditReportInquiry: => GMedicalInquiry := LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_MEDICAL;
+CreditReportInquiry: => GAutoFinanceInquiry := (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_AUTO_FINANCE) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_AUTO_LEASE) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN IQ_KOB_AUTO_RESELLER);
+CreditReportInquiry: => GFinanceInquiry := (LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_FINANCE) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN IQ_KOB_FINANCE_RESELLER);
+CreditReportInquiry: => GRetailInquiry := ((LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_RETAIL) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB2_RETAIL)) AND NOT GAutoFinanceInquiry;												
+CreditReportInquiry: => GBankInquiry := (LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_BANK) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB2_BANK);
+CreditReportInquiry: => GPersonalFinanceInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_PERSONAL_FINANCE;
+CreditReportInquiry: => GSalesFinanceInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_SALES_FINANCE;																				
+CreditReportInquiry: => GMortgageInquiry := (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_MORTGAGE) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN IQ_KOB_MORTGAGE_RESELLER);
+CreditReportInquiry: => GCreditUnionInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_CREDIT_UNION;
+CreditReportInquiry: => GStudentLoanInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_STUDENT_LOAN;
+CreditReportInquiry: => GUtilityInquiry := LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_UTILITY;
+CreditReportInquiry: => GGovernmentInquiry := LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_GOVERNMENT;
+CreditReportInquiry: => GCollectionInquiry := LENGTH(KindOfBusiness) = 2 AND (SUBSTR(KindOfBusiness,1,1) IN IQ_KOB1_COLLECTION OR KindOfBusiness IN KOB_COLLECTION);
+CreditReportInquiry: => GInsuranceInquiry := LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_INSURANCE;
+CreditReportInquiry: => GTenantScreenInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN IQ_KOB_TENANT_RESELLER;
+CreditReportInquiry: => GOtherFinanceInquiry := GFinanceInquiry AND NOT GAutoFinanceInquiry AND NOT GPersonalFinanceInquiry AND NOT GMortgageInquiry AND NOT GStudentLoanInquiry AND NOT GCreditUnionInquiry;
+
                                          																				 
 // Testing/Debug KEL Outputs
 QUERY: CreditReportBankruptcyV1(SearchForTransactionID) <= CreditReportBankruptcy(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
