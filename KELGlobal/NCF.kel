@@ -243,6 +243,7 @@ CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, R
 		STRING MonthlyPaymentType, // v2+ Field
 		INTEGER AmountPastDue,
 		STRING AccountType,
+		STRING AccountPurposeType, // v2+ Field
 		STRING CurrentRateCode,
 		STRING StatusCode, // v2+ Field
 		STRING AccountConditionCode, // v2+ Field
@@ -263,6 +264,13 @@ CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, R
 		STRING PreviousRateCode3,
 		DATE PreviousRateDate3,
 		STRING PaymentHistory84Months, // v2+ Field
+		BOOLEAN PaymentHistory84MonthsContainsGridSatisfactory, // v2+ Field
+		BOOLEAN PaymentHistory84MonthsContainsGrid30DPD, // v2+ Field
+		BOOLEAN PaymentHistory84MonthsContainsGrid60DPD, // v2+ Field
+		BOOLEAN PaymentHistory84MonthsContainsGrid90DPD, // v2+ Field
+		BOOLEAN PaymentHistory84MonthsContainsGrid120180DPD, // v2+ Field
+		BOOLEAN PaymentHistory84MonthsContainsGridDEROG, // v2+ Field
+		BOOLEAN PaymentHistory84MonthsContainsGridCollection, // v2+ Field
 		STRING ConsumerDisputeFlag, // v2+ Field
 		STRING ConsumerInfoIndicator, // v2+ Field
 		STRING PaymentFrequency, // v2+ Field
@@ -284,11 +292,13 @@ CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, R
 	MODEL(UID, rCreditReport,
 		BureauCode, TradeKey, KindOfBusiness, DateReported, DateAccountOpened, DateOfLastActivity, IndustryCode, ReportingMemberNumber, MemberName, 
 		AutoLenderMemberName, TapeSupplierIndicator, HighestCreditAmount, CreditLimit, ChargeOffAmount, Terms, AccountNumber, ECOACode, PortfolioTypeCode, 
-		AccountBalance, ScheduledPaymentAmount, ActualPaymentAmount, ActualPaymentNullIndicator, MonthlyPaymentType, AmountPastDue, AccountType, 
+		AccountBalance, ScheduledPaymentAmount, ActualPaymentAmount, ActualPaymentNullIndicator, MonthlyPaymentType, AmountPastDue, AccountType, AccountPurposeType, 
 		CurrentRateCode, StatusCode, AccountConditionCode, MonthsReviewed, AccountDesignatorCode, ThirtyDayCounter, SixtyDayCounter, NinetyDayCounter, 
 		DerogCounter, OldHistoricalWorstRatingCode, OldHistoricalWorstRatingDate, StatusDate, LastPaymentDate, PreviousRateCode1, PreviousRateDate1, 
-		PreviousRateCode2, PreviousRateDate2, PreviousRateCode3, PreviousRateDate3, PaymentHistory84Months, ConsumerDisputeFlag, ConsumerInfoIndicator, 
-		PaymentFrequency, ActivityDesignatorCode, MortgageID, DeferredPaymentStartDate, DeferredPaymentAmount, BalloonPaymentAmount, 
+		PreviousRateCode2, PreviousRateDate2, PreviousRateCode3, PreviousRateDate3, PaymentHistory84Months, PaymentHistory84MonthsContainsGridSatisfactory,
+		PaymentHistory84MonthsContainsGrid30DPD, PaymentHistory84MonthsContainsGrid60DPD, PaymentHistory84MonthsContainsGrid90DPD,
+		PaymentHistory84MonthsContainsGrid120180DPD, PaymentHistory84MonthsContainsGridDEROG, PaymentHistory84MonthsContainsGridCollection, ConsumerDisputeFlag,
+		ConsumerInfoIndicator, PaymentFrequency, ActivityDesignatorCode, MortgageID, DeferredPaymentStartDate, DeferredPaymentAmount, BalloonPaymentAmount, 
 		BalloonPaymentDueDate, PaymentPatternStartDate, TrendedDataStartDate,
 		Trended{MonthCounter, BalanceAmount, LoanAmountCreditLimit, ScheduledPayment, ActualPayment, LastPayment, ActualPaymentNullInd}));
 
@@ -921,6 +931,13 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Data(FLAT,
 		StatusDate = StatusDate,
 		LastPaymentDate = LastPaymentDate,
 		PaymentHistory84Months = PaymentHistory84Months,
+		PaymentHistory84MonthsContainsGridSatisfactory = PaymentHistory84MonthsContainsGridSatisfactory,
+		PaymentHistory84MonthsContainsGrid30DPD = PaymentHistory84MonthsContainsGrid30DPD,
+		PaymentHistory84MonthsContainsGrid60DPD = PaymentHistory84MonthsContainsGrid60DPD,
+		PaymentHistory84MonthsContainsGrid90DPD = PaymentHistory84MonthsContainsGrid90DPD,
+		PaymentHistory84MonthsContainsGrid120180DPD = PaymentHistory84MonthsContainsGrid120180DPD,
+		PaymentHistory84MonthsContainsGridDEROG = PaymentHistory84MonthsContainsGridDEROG,
+		PaymentHistory84MonthsContainsGridCollection = PaymentHistory84MonthsContainsGridCollection,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
 		ConsumerInfoIndicator = ConsumerInfoIndicator,
 		PaymentFrequency = PaymentFrequency,
@@ -3348,7 +3365,197 @@ CreditReportInquiry: => InsuranceInquiry := LENGTH(KindOfBusiness) = 2 AND SUBST
 CreditReportInquiry: => TenantScreenInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN IQ_KOB_TENANT_RESELLER; //GTenantScreenInquiry
 CreditReportInquiry: => OtherFinanceInquiry := FinanceInquiry AND NOT AutoFinanceInquiry AND NOT PersonalFinanceInquiry AND NOT MortgageInquiry AND NOT StudentLoanInquiry AND NOT CreditUnionInquiry; //GOtherFinanceInquiry
 
-                                         																				 
+CreditReportTradeline: => AuthorizedUser := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_A; //GAuthorizedUser
+CreditReportTradeline: => IndividualAccount := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_I; //GIndividualAccount
+CreditReportTradeline: => PrimaryAccount := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_PRIMARY; //GPrimaryAccount
+CreditReportTradeline: => JointAccount := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_J; //GJointAccount
+CreditReportTradeline: => SharedAccount := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_SHARED; //GSharedAccount
+CreditReportTradeline: => ECOADeceased := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_DECEASED; //G1ECOADeceased
+CreditReportTradeline: => ECOAClosed := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_CLOSED; //G1ECOAClosed
+CreditReportTradeline: => KOBCollection := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_COLLECTION; //G1KOBCollection
+CreditReportTradeline: => KOBMedical := NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_MEDICAL; //G1KOBMedical
+CreditReportTradeline: => KOBAutoFinance := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_AUTO_FINANCE; //G1KOBAutoFinance
+CreditReportTradeline: => KOBAutoLease := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_AUTO_LEASE; //G1KOBAutoLease
+CreditReportTradeline: => KOBFinance := (NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_FINANCE) OR (NOT KindOfBusiness:Null AND KindOfBusiness IN KOB2_FINANCE); //G1KOBFinance
+CreditReportTradeline: => KOBRetail := (NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_RETAIL) OR (NOT KindOfBusiness:Null AND KindOfBusiness IN KOB2_RETAIL); //G1KOBRetail
+CreditReportTradeline: => KOBRecreationalItem := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_RECREATIONAL_ITEM; //G1KOBRecreationalItem
+CreditReportTradeline: => KOBBank := (NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_BANK) OR (NOT KindOfBusiness:Null AND KindOfBusiness IN KOB2_BANK); //G1KOBBank
+CreditReportTradeline: => KOBPersonalFinance := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_PERSONAL_FINANCE; //G1KOBPersonalFinance
+CreditReportTradeline: => KOBNationalCreditCard := (NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_NATIONAL_CREDIT_CARD) OR (NOT KindOfBusiness:Null AND KindOfBusiness IN KOB2_NATIONAL_CREDIT_CARD); //G1KOBNationalCreditCard
+CreditReportTradeline: => KOBCreditUnion := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_CREDIT_UNION; //G1KOBCreditUnion
+CreditReportTradeline: => KOBSalesFinance := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_SALES_FINANCE; //G1KOBSalesFinance
+CreditReportTradeline: => KOBMortgage := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_MORTGAGE; //G1KOBMortgage
+CreditReportTradeline: => KOBHomeEquity := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_HOME_EQUITY; //G1KOBHomeEquity
+CreditReportTradeline: => KOBStudentLoan := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_STUDENT_LOAN; //G1KOBStudentLoan
+CreditReportTradeline: => KOBUtility := NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_UTILITY; //G1KOBUtility
+CreditReportTradeline: => KOBInstallment := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_INSTALLMENT; //G1KOBInstallment
+CreditReportTradeline: => KOBGovernment := NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_GOVERNMENT; //G1KOBGOVERNMENT
+CreditReportTradeline: => KOBInsurance := NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_INSURANCE; //G1KOBINSURANCE
+CreditReportTradeline: => KOBLOC := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_LOC; //G1KOBLOC
+CreditReportTradeline: => KOBCableCellular := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_CABLE_CELLULAR; //G1KOBCABLECELLULAR
+CreditReportTradeline: => KOBChildSupport := NOT KindOfBusiness:Null AND KindOfBusiness IN KOB_CHILD_SUPPORT; //G1KOBCHILDSUPPORT
+CreditReportTradeline: => TypeCollection := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_COLLECTION; //G1TYPECollection
+CreditReportTradeline: => TypeFamilySupport := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_FAMILY_SUPPORT; //G1TYPEFamilySupport
+CreditReportTradeline: => TypeCommercialAccount := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_COMMERCIAL; //G1TYPECommercialAccount
+CreditReportTradeline: => TypeReturnedCheck := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_RETURNED_CHECK; //G1TYPEReturnedCheck
+CreditReportTradeline: => TypeMedical := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_MEDICAL; //G1TYPEMedical
+CreditReportTradeline: => TypeAuto := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_AUTO; //G1TYPEAuto
+CreditReportTradeline: => TypeAutoLease := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_AUTO_LEASE; //G1TYPEAutoLease
+CreditReportTradeline: => TypeLease := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_LEASE; //G1TYPELease
+CreditReportTradeline: => TypeRental := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_RENTAL; //G1TYPERental
+CreditReportTradeline: => TypeCreditCard := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_CREDIT_CARD; //G1TYPECreditCard
+CreditReportTradeline: => TypeStudentLoan := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_STUDENT_LOAN; //G1TYPEStudentLoan
+CreditReportTradeline: => TypeMortgage := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_MORTGAGE; //G1TYPEMortgage
+CreditReportTradeline: => Type2ndMortgage := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_2ND_MORTGAGE; //G1TYPE2NDMortgage
+CreditReportTradeline: => TypeHELOC := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_HELOC; //G1TYPEHELOC
+CreditReportTradeline: => TypeHomeEquity := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_HOME_EQUITY; //G1TYPEHomeEquity
+CreditReportTradeline: => TypeSecured := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_SECURED; //G1TYPESecured
+CreditReportTradeline: => TypeRecreationalItem := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_RECREATIONAL_ITEM; //G1TYPERecreationalItem
+CreditReportTradeline: => TypeInstallment := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_INSTALLMENT; //G1TYPEInstallment
+CreditReportTradeline: => TypePersonalFinance := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_PERSONAL_FINANCE; //G1TYPEPersonalFinance
+CreditReportTradeline: => TypeLOC := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_LOC; //G1TYPELOC
+CreditReportTradeline: => TypeSalesFinance := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_SALES_FINANCE; //G1TYPESalesFinance
+CreditReportTradeline: => TypeGovernmentLoan := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_GOV_LOAN; //G1TYPEGovernmentLoan
+CreditReportTradeline: => TypeGovernmentDebt := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_GOV_DEBT; //GovernmentDebt
+CreditReportTradeline: => TypeUtility := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_UTILITY; //G1TYPEUtility
+CreditReportTradeline: => TypeCellular := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_CELLULAR; //G1TYPECellular
+CreditReportTradeline: => NCCollection := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_COLLECTION) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_COLLECTION) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_COLLECTION) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_COLLECTION))); //G1NCCollection
+CreditReportTradeline: => NCFamilySupport := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CHILD_FAMILY_SUPPORT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CHILD_FAMILY_SUPPORT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CHILD_FAMILY_SUPPORT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CHILD_FAMILY_SUPPORT))); //G1NCFamilySupport
+CreditReportTradeline: => NCCommercialAccount := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_COMMERCIAL_ACCOUNT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_COMMERCIAL_ACCOUNT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_COMMERCIAL_ACCOUNT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_COMMERCIAL_ACCOUNT))); //G1NCCommercialAccount
+CreditReportTradeline: => NCMedical := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_MEDICAL) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_MEDICAL) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_MEDICAL) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_MEDICAL))); //G1NCMedical
+CreditReportTradeline: => NCReturnedCheck := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_RETURNED_CHECK) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_RETURNED_CHECK) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_RETURNED_CHECK) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_RETURNED_CHECK))); //G1NCReturnedCheck
+CreditReportTradeline: => NCAuto := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_AUTO) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_AUTO) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_AUTO) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_AUTO))); //G1NCAuto
+CreditReportTradeline: => NCAutoLease := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_AUTO_LEASE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_AUTO_LEASE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_AUTO_LEASE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_AUTO_LEASE))); //G1NCAutoLease
+CreditReportTradeline: => NCLease := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_LEASE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_LEASE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_LEASE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_LEASE))); //G1NCLease
+CreditReportTradeline: => NCRental := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_RENTAL) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_RENTAL) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_RENTAL) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_RENTAL))); //G1NCRental
+CreditReportTradeline: => NCCreditCard := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CREDIT_CARD) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CREDIT_CARD) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CREDIT_CARD) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CREDIT_CARD))); //G1NCCreditCard
+CreditReportTradeline: => NCPersonalFinance := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_PERSONAL_FINANCE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_PERSONAL_FINANCE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_PERSONAL_FINANCE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_PERSONAL_FINANCE))); //G1NCPersonalFinance
+CreditReportTradeline: => NCSalesFinance := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_SALES_FINANCE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_SALES_FINANCE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_SALES_FINANCE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_SALES_FINANCE))); //G1NCSalesFinance
+CreditReportTradeline: => NCStudentLoan := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_STUDENT_LOAN) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_STUDENT_LOAN) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_STUDENT_LOAN) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_STUDENT_LOAN))); //G1NCStudentLoan
+CreditReportTradeline: => NCMortgage := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_MORTGAGE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_MORTGAGE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_MORTGAGE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_MORTGAGE))); //G1NCMortgage
+CreditReportTradeline: => NCHomeEquity := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_HOME_EQUITY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_HOME_EQUITY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_HOME_EQUITY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_HOME_EQUITY))); //G1NCHomeEquity
+CreditReportTradeline: => NC2ndMortgage := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_2ND_MORTGAGE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_2ND_MORTGAGE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_2ND_MORTGAGE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_2ND_MORTGAGE))); //G1NC2ndMortgage
+CreditReportTradeline: => NCHELOC := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_HELOC) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_HELOC) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_HELOC) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_HELOC))); //G1NCHELOC
+CreditReportTradeline: => NCSecured := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_SECURED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_SECURED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_SECURED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_SECURED))); //G1NCSecured
+CreditReportTradeline: => NCLOC := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_LOC) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_LOC) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_LOC) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_LOC))); //G1NCLOC
+CreditReportTradeline: => NCUtility := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_UTILITY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_UTILITY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_UTILITY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_UTILITY))); //G1NCUtility
+CreditReportTradeline: => NCForeclosure := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_FORECLOSURE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_FORECLOSURE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_FORECLOSURE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_FORECLOSURE))); //G1NCForeclosure
+CreditReportTradeline: => NCGovernmentLoan := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_GOVERNMENT_LOAN) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_GOVERNMENT_LOAN) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_GOVERNMENT_LOAN) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_GOVERNMENT_LOAN))); //G1NCGovernmentLoan
+CreditReportTradeline: => NCRecreationalItem := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_RECREATIONAL_ITEM) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_RECREATIONAL_ITEM) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_RECREATIONAL_ITEM) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_RECREATIONAL_ITEM))); //G1NCRecreationalItem
+CreditReportTradeline: => NCREPO := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_REPO) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_REPO) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_REPO) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_REPO))); //G1NCREPO
+CreditReportTradeline: => NCDispute := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_DISPUTE_STATUS_PENDING))); //G1NCDispute
+CreditReportTradeline: => NCClosed := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CLOSED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CLOSED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CLOSED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CLOSED))); //G1NCClosed
+CreditReportTradeline: => NCClosedIfZeroBalance := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CLOSED_IF_ZERO_BALANCE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CLOSED_IF_ZERO_BALANCE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CLOSED_IF_ZERO_BALANCE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CLOSED_IF_ZERO_BALANCE))); //G1NCClosedIfZeroBalance
+CreditReportTradeline: => NCDeceased := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_DECEASED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_DECEASED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_DECEASED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_DECEASED))); //G1NCDeceased
+CreditReportTradeline: => NCDeferred := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_DEFERRED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_DEFERRED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_DEFERRED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_DEFERRED))); //G1NCDeferred
+CreditReportTradeline: => NCCurrent120180 := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CURRENT_120_180) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CURRENT_120_180) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CURRENT_120_180) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CURRENT_120_180))); //G1NCCurrent120180
+CreditReportTradeline: => NCBankruptcy := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY))); //G1NCBankruptcy
+CreditReportTradeline: => NCBankruptcy13 := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY_13) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY_13) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY_13) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY_13))); //G1NCBankruptcy13
+CreditReportTradeline: => NCBankruptcyDischarged := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY_DISCHARGED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY_DISCHARGED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY_DISCHARGED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY_DISCHARGED))); //G1NCBankruptcyDischarged
+CreditReportTradeline: => NCBankruptcyDismissed := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY_DISMISSED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY_DISMISSED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY_DISMISSED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY_DISMISSED))); //G1NCBankruptcyDismissed
+CreditReportTradeline: => NCBankruptcyWithdrawn := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY_WITHDRAWN) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY_WITHDRAWN) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY_WITHDRAWN) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY_WITHDRAWN))); //G1NCBankruptcyWithdrawn
+CreditReportTradeline: => NCGovernmentDebt := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_GOVERNMENT_DEBT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_GOVERNMENT_DEBT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_GOVERNMENT_DEBT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_GOVERNMENT_DEBT))); //G1NCGovernmentDebt
+CreditReportTradeline: => NCHighcreditIsChargeoffAmt := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CHARGEOFF_AMNT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CHARGEOFF_AMNT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CHARGEOFF_AMNT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CHARGEOFF_AMNT))); //G1NCHighcreditIsChargeoffAmt
+CreditReportTradeline: => NCHighcreditIsCreditLimit := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CREDIT_LIMIT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CREDIT_LIMIT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CREDIT_LIMIT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CREDIT_LIMIT))); //G1NCHighcreditIsCreditLimit
+CreditReportTradeline: => NCInstallment := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_INSTALLMENT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_INSTALLMENT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_INSTALLMENT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_INSTALLMENT))); //G1NCInstallment
+CreditReportTradeline: => NCMilitary := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_MILITARY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_MILITARY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_MILITARY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_MILITARY))); //G1NCMilitary
+CreditReportTradeline: => NCDEROG := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_DEROG) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_DEROG) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_DEROG) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_DEROG))); //G1NCDEROG
+CreditReportTradeline: => NCLostStolen := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_LOST_STOLEN) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_LOST_STOLEN) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_LOST_STOLEN) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_LOST_STOLEN))); //G1NCLostStolen
+CreditReportTradeline: => NCPaidPayingBadDebt := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_PAID_PAYING_BAD_DEBT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_PAID_PAYING_BAD_DEBT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_PAID_PAYING_BAD_DEBT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_PAID_PAYING_BAD_DEBT))); //G1NCPAIDPAYINGBADDEBT
+CreditReportTradeline: => AccountTypeC := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_C; //G1AccountTypeC
+CreditReportTradeline: => AccountTypeR := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_R; //G1AccountTypeR
+CreditReportTradeline: => AccountTypeI := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_I; //G1AccountTypeI
+CreditReportTradeline: => AccountTypeM := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_M; //G1AccountTypeM
+CreditReportTradeline: => AccountTypeO := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_O; //G1AccountTypeO
+CreditReportTradeline: => AccountTypeValid := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_VALID; //G1AccountTypeValid
+CreditReportTradeline: => ActivityDesignatorLostStolen := NOT ActivityDesignatorCode:Null AND ActivityDesignatorCode IN ACTIVITY_DESIGNATOR_LOST_STOLEN; //G1ActivityDesignatorLostStolen
+CreditReportTradeline: => ActivityDesignatorClosed := NOT ActivityDesignatorCode:Null AND ActivityDesignatorCode IN ACTIVITY_DESIGNATOR_CLOSED; //G1ActivityDesignatorClosed
+CreditReportTradeline: => ActivityDesignatorDEROG := NOT ActivityDesignatorCode:Null AND ActivityDesignatorCode IN ACTIVITY_DESIGNATOR_DEROG; //G1ActivityDesignatorDEROG
+CreditReportTradeline: => RateDeceased := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_DECEASED; //G1Ratedeceased
+CreditReportTradeline: => RateLostStolen := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_LOST_STOLEN; //G1RateLostStolen
+CreditReportTradeline: => RateSatisfactory := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_SATISFACTORY; //G1RateSatisfactory
+CreditReportTradeline: => Rate30DPD := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_30DPD; //G1Rate30DPD
+CreditReportTradeline: => Rate60DPD := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_60DPD; //G1Rate60DPD
+CreditReportTradeline: => Rate90DPD := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_90DPD; //G1Rate90DPD
+CreditReportTradeline: => Rate120180DPD := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_120_180DPD; //G1Rate120180DPD
+CreditReportTradeline: => RateCollection := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_COLLECTION; //G1RateCollection
+CreditReportTradeline: => RateDispute := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_DISPUTED; //G1RateDispute
+CreditReportTradeline: => RateClosed := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_CLOSED; //G1RateClosed
+CreditReportTradeline: => RateDEROG := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_DEROG; //G1RateDEROG
+CreditReportTradeline: => RateBankruptcy13 := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_BANKRUPTCY_13; //G1RateBankruptcy13
+CreditReportTradeline: => RatePaidPayingDebt := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_PAID_PAYING_BAD_DEBT; //G1RatePaidPayingDebt
+CreditReportTradeline: => RateBankruptcy := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_BANKRUPTCY; //G1RateBankruptcy
+CreditReportTradeline: => RateUR := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_UR; //G1RateUR
+CreditReportTradeline: => RateForeclosure := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_FORECLOSURE; //G1RateForeclosure
+CreditReportTradeline: => RateREPO := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_REPO; //G1RateREPO
+CreditReportTradeline: => RateDefaultedStudentLoan := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_DEFAULTED_STUDENT_LOAN; //G1RateDefaultedStudentLoan
+CreditReportTradeline: => OldRate30DPD := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_30DPD; //G1OldRate30DPD
+CreditReportTradeline: => OldRate60DPD := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_60DPD; //G1OldRate60DPD
+CreditReportTradeline: => OldRate90DPD := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_90DPD; //G1OldRate90DPD
+CreditReportTradeline: => OldRate120180DPD := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_120_180DPD; //G1OldRate120180DPD
+CreditReportTradeline: => OldRateCollection := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_COLLECTION; //G1OldRateCollection
+CreditReportTradeline: => OldRateDerog := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_DEROG; //G1OldRateDerog
+CreditReportTradeline: => GridSatisfactoryEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGridSatisfactory = TRUE; //G1GRID_SATISFACTORY_EVER
+CreditReportTradeline: => Grid30DPDEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGrid30DPD = TRUE; //G1GRID30DPDEVER
+CreditReportTradeline: => Grid60DPDEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGrid60DPD = TRUE; //G1Grid60DPDEver
+CreditReportTradeline: => Grid90DPDEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGrid90DPD = TRUE; //G1Grid90DPDEver
+CreditReportTradeline: => Grid120180Ever := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGrid120180DPD = TRUE; //G1Grid120180DPDEver
+CreditReportTradeline: => GridDEROGEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGridDEROG = TRUE; //G1GridDEROGEver
+CreditReportTradeline: => GridCollectionEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGridCollection = TRUE; //G1GridCollectionEver
+CreditReportTradeline: => FrequencyDeferred := NOT PaymentFrequency:Null AND PaymentFrequency IN FREQUENCY_DEFERRED; //G1FrequencyDeferred
+CreditReportTradeline: => FrequencySinglePaymentLoan := NOT PaymentFrequency:Null AND PaymentFrequency IN FREQUENCY_SINGLE_PAYMENT_LOAN; //G1FrequencySinglePaymentLoan
+CreditReportTradeline: => StatusCollection := (NOT StatusCode:Null AND StatusCode IN STATUS_COLLECTION) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_COLLECTION); //G1StatusCollection
+CreditReportTradeline: => StatusDeceased := (NOT StatusCode:Null AND StatusCode IN STATUS_DECEASED) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_DECEASED); //G1StatusDeceased
+CreditReportTradeline: => StatusLostStolen := (NOT StatusCode:Null AND StatusCode IN STATUS_LOST_STOLEN) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_LOST_STOLEN); //G1StatusLostStolen
+CreditReportTradeline: => StatusCurrentSAT := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_SAT) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_SAT); //G1StatusCurrentSAT
+CreditReportTradeline: => StatusCurrent30DPD := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_30DPD) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_30DPD); //G1StatusCurrent30DPD
+CreditReportTradeline: => StatusCurrent60DPD := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_60DPD) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_60DPD); //G1StatusCurrent60DPD
+CreditReportTradeline: => StatusCurrent90DPD := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_90DPD) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_90DPD); //G1StatusCurrent90DPD
+CreditReportTradeline: => StatusCurrent120180DPD := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_120_180DPD) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_120_180DPD); //G1StatusCurrent120180DPD
+CreditReportTradeline: => StatusClosed := (NOT StatusCode:Null AND StatusCode IN STATUS_CLOSED) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CLOSED); //G1StatusClosed
+CreditReportTradeline: => StatusDerogatory := (NOT StatusCode:Null AND StatusCode IN STATUS_DEROGATORY) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_DEROGATORY); //G1StatusDerogatory
+CreditReportTradeline: => StatusBankruptcy := (NOT StatusCode:Null AND StatusCode IN STATUS_BANKRUPTCY) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_BANKRUPTCY); //G1StatusBankruptcy
+CreditReportTradeline: => StatusBankruptcy13 := (NOT StatusCode:Null AND StatusCode IN STATUS_BANKRUPTCY_13) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_BANKRUPTCY_13); //G1StatusBankruptcy13
+CreditReportTradeline: => StatusForeclosure := (NOT StatusCode:Null AND StatusCode IN STATUS_FORECLOSURE) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_FORECLOSURE); //G1StatusForeclosure
+CreditReportTradeline: => StatusREPO := (NOT StatusCode:Null AND StatusCode IN STATUS_REPO) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_REPO); //G1StatusREPO
+CreditReportTradeline: => StatusPaidPayingBadDebt := (NOT StatusCode:Null AND StatusCode IN STATUS_PAID_PAYING_BAD_DEBT) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_PAID_PAYING_BAD_DEBT); //G1StatusPaidPayingBadDebt
+CreditReportTradeline: => CIIBankruptcy := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY; //G1CIIBankruptcy
+CreditReportTradeline: => CIIBankruptcy13 := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_13; //G1CIIBankruptcy13
+CreditReportTradeline: => CIIBankruptcyDischarged := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_DISCHARGED; //G1CIIBANKRUPTCYDISCHARGED
+CreditReportTradeline: => CIIBankruptcyDismissed := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_DISMISSED; //G1CIIBANKRUPTCYDISMISSED
+CreditReportTradeline: => CIIBankruptcyWithdrawn := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_WITHDRAWN; //G1CIIBANKRUPTCYWITHDRAWN
+CreditReportTradeline: => CIIPaidPayingBadDebt := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_PAID_PAYING_BAD_DEBT; //G1CIIPAIDPAYINGBADDEBT
+CreditReportTradeline: => G1CII_DEROG := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_DEROG; //G1CII_DEROG
+
+// Level 2 Globals
+CreditReportTradeline: => Deceased := ECOADeceased OR NCDeceased OR RateDeceased OR StatusDeceased; //G2Deceased
+CreditReportTradeline: => FamilySupport := TypeFamilySupport OR NCFamilySupport; //G2FamilySupport
+CreditReportTradeline: => CommercialAccount := TypeCommercialAccount OR NCCommercialAccount; //G2CommercialAccount
+CreditReportTradeline: => ReturnedCheck := TypeReturnedCheck OR  NCReturnedCheck ; //G2ReturnedCheck
+CreditReportTradeline: => Dispute := NCDispute OR RateDispute OR (ConsumerDisputeFlag='Y'); //G2Dispute 
+CreditReportTradeline: => LostStolen := NCLostStolen OR ActivityDesignatorLostStolen OR RateLostStolen OR StatusLostStolen; //G2LostStolen 
+CreditReportTradeline: => Medical := KOBMedical OR TypeMedical OR NCMedical; //G2Medical 
+CreditReportTradeline: => Deferred := NCDeferred OR FrequencyDeferred; //G2Deferred 
+CreditReportTradeline: => GovernmentTrade := KOBGovernment OR TypeGovernmentLoan OR NCGovernmentLoan OR TypeGovernmentDebt OR TypeGovernmentLoan;//G2GovernmentTrade 
+CreditReportTradeline: => GovernmentLoan := TypeGovernmentLoan OR NCGovernmentLoan;//G2GovernmentLoan  
+CreditReportTradeline: => GovernmentDebt := GovernmentTrade AND NOT GovernmentLoan;//G3GovernmentDebt  
+CreditReportTradeline: => RentalOrLease := TypeRental OR NCRental OR TypeLease OR NCLease;//G2RentalOrLease 
+CreditReportTradeline: => UtilityTrade := KOBUtility OR TypeUtility OR NCUtility;//G2UtilityTrade 
+CreditReportTradeline: => AllExcluded := LostStolen OR CommercialAccount OR Medical;//G3AllExcluded 
+CreditReportTradeline: => SpecialExclusion := ReturnedCheck OR FamilySupport;//G3SpecialExclusion
+CreditReportTradeline: => OpenEndedAccount := AccountTypeO;//G2OpenEndedAccount
+CreditReportTradeline: => AllInstallment := KOBInstallment OR TypeInstallment OR AccountTypeI;//G2AllInstallment
+CreditReportTradeline: => AllRevolving := AccountTypeR OR (AccountTypeC OR KOBLOC OR TypeHELOC OR TypeLOC OR NCHELOC OR NCLOC);//G2AllRevolving
+CreditReportTradeline: => CreditUnion := KOBCreditUnion;//G2CreditUnion
+CreditReportTradeline: => RetailCreditCard := KOBRetail AND (TypeCreditCard OR NCCreditCard OR AccountTypeR) AND NOT (AccountTypeC OR AccountTypeI OR AccountTypeM); //G2RetailCreditCard
+CreditReportTradeline: => RetailNonCreditCard := KOBRetail AND NOT RetailCreditCard AND NOT AccountTypeM; //G3RetailNonCreditCard
+CreditReportTradeline: => BankCard := (KOBNationalCreditCard OR ((KOBBank OR KOBFinance) AND (TypeCreditCard OR NCCreditCard OR AccountTypeR))) AND NOT(AccountTypeI OR AccountTypeM OR AccountTypeC); //G2BankCard
+CreditReportTradeline: => MortgageOrHomeEquity := (KOBMortgage OR KOBHomeEquity OR ((KOBFinance OR KOBBank) AND (AccountTypeM OR TypeMortgage OR Type2ndMortgage OR TypeHELOC OR NCMortgage OR NCHomeEquity OR NCHELOC OR NCForeclosure OR RateForeclosure OR StatusForeclosure))) AND NOT AccountTypeO AND NOT RentalOrLease; //G3MortgageORHomeEquity
+CreditReportTradeline: => HomeEquity := MortgageOrHomeEquity AND (KOBHomeEquity OR AccountTypeC OR AccountTypeR OR TypeHELOC OR NCHELOC OR NCHomeEquity OR TypeHomeEquity OR TypeLOC OR NCLOC); //G4HomeEquity
+CreditReportTradeline: => Mortgage := MortgageOrHomeEquity AND NOT HomeEquity; //G5Mortgage
+CreditReportTradeline: => HomeEquityLineOfCredit := HomeEquity AND (AccountTypeC OR AccountTypeR OR TypeHELOC OR NCHELOC OR (TypeSecured AND TypeLOC) OR (NCSecured AND NCLOC)); //G5HomeEquityLineOfCredit
+CreditReportTradeline: => HomeEquityLoan := HomeEquity AND NOT HomeEquityLineOfCredit; //G6HomeEquityLoan
+
 // Testing/Debug KEL Outputs
 QUERY: CreditReportBankruptcyV1(SearchForTransactionID) <= CreditReportBankruptcy(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
 QUERY: CreditReportCollectionV1(SearchForTransactionID) <= CreditReportCollection(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
