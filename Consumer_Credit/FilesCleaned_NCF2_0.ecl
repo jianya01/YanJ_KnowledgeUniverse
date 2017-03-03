@@ -136,8 +136,27 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.ConsumerDisputeFlag		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
 		SELF							:= LEFT));
 
+	SHARED NormalizedTradelineHistory := RECORD
+		STRING Transaction_ID;
+		UNSIGNED LexID;
+		STRING Date_Reported;
+		UNSIGNED RecordTypeCounter;
+		UNSIGNED1 RecordCounter;
+		STRING1 RecordValue;
+	END;
+	SHARED NormalizedTradelineHistory NormalizeTradelineHistory(STRING Input, STRING Transaction_ID, UNSIGNED LexID, STRING Date_Reported, UNSIGNED RecordTypeCounter) := FUNCTION
+		NormalizedResult := NORMALIZE(DATASET([{1}], {UNSIGNED1 a}), LENGTH(TRIM(Input)), TRANSFORM(NormalizedTradelineHistory,
+														SELF.Transaction_ID := Transaction_ID;
+														SELF.LexID := LexID;
+														SELF.Date_Reported := Date_Reported;
+														SELF.RecordTypeCounter := RecordTypeCounter;
+														SELF.RecordCounter := COUNTER;
+														SELF.RecordValue := Input[COUNTER]));
+		RETURN NormalizedResult;
+	END;
+	
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	EXPORT TradeLine_Data := PROJECT(Consumer_Credit.Files.TradeLine_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), BOOLEAN PaymentHistory84MonthsContainsGridSatisfactory, BOOLEAN PaymentHistory84MonthsContainsGrid30DPD, BOOLEAN PaymentHistory84MonthsContainsGrid60DPD, BOOLEAN PaymentHistory84MonthsContainsGrid90DPD, BOOLEAN PaymentHistory84MonthsContainsGrid120180DPD, BOOLEAN PaymentHistory84MonthsContainsGridDEROG, BOOLEAN PaymentHistory84MonthsContainsGridCollection, BOOLEAN AutoLenderMemberName, BOOLEAN TapeSupplierIndicatorBool, STRING2 IndustryCode, STRING BureauCode, STRING TradeKey, STRING KOB, STRING ECOA, STRING PortfolioTypeCode, STRING CreditLimit, STRING ChargeOffAmount, STRING ScheduledPaymentAmount, STRING MonthlyPaymentType, STRING AccountPurposeType, STRING ActualPaymentAmount, STRING ActualPaymentNullInd, STRING StatusCode, STRING AccountConditionCode, STRING DerogCounter, STRING OldHistoricWorstRatingCode, STRING OldHistoricWorstRatingDate, STRING StatusDate, STRING LastPaymentDate, STRING PaymentHistory84Months, STRING ConsumerDisputeFlag, STRING ConsumerInfoIndicator, STRING PaymentFrequency, STRING ActivityDesignatorCode, STRING MortgageID, STRING DeferredPaymentStartDate, STRING DeferredPaymentAmount, STRING BalloonPaymentAmount, STRING BalloonPaymentDueDate, STRING PaymentPatternStartDate, BOOLEAN PaymentHistory84MonthsContainsGridL3Satisfactory},
+	EXPORT TradeLine_Data := PROJECT(Consumer_Credit.Files.TradeLine_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), DATASET(NormalizedTradelineHistory) PaymentHistory84MonthDataset, BOOLEAN AutoLenderMemberName, BOOLEAN TapeSupplierIndicatorBool, STRING2 IndustryCode, STRING BureauCode, STRING TradeKey, STRING KOB, STRING ECOA, STRING PortfolioTypeCode, STRING CreditLimit, STRING ChargeOffAmount, STRING ScheduledPaymentAmount, STRING MonthlyPaymentType, STRING AccountPurposeType, STRING ActualPaymentAmount, STRING ActualPaymentNullInd, STRING StatusCode, STRING AccountConditionCode, STRING DerogCounter, STRING OldHistoricWorstRatingCode, STRING OldHistoricWorstRatingDate, STRING StatusDate, STRING LastPaymentDate, STRING PaymentHistory84Months, STRING ConsumerDisputeFlag, STRING ConsumerInfoIndicator, STRING PaymentFrequency, STRING ActivityDesignatorCode, STRING MortgageID, STRING DeferredPaymentStartDate, STRING DeferredPaymentAmount, STRING BalloonPaymentAmount, STRING BalloonPaymentDueDate, STRING PaymentPatternStartDate},
 		SELF.AutoLenderMemberName		:= REGEXFIND('AUTO|MOTOR|AMERICAN HONDA FINANCE CORP|AUDI FINANCIAL SERVICES|BMW FINANCIAL SERVICES|CHRYSLER CREDIT CORPORATION|INFINITI FINANCIAL SERVICES|LEXUS FINANCIAL SERVICES|MERCEDES-BENZ CREDIT|PORSCHE FINANCIAL SERVICES|SAFCO|SOUTHEAST TOYOTA FINANCE|SUBARU LEASING CORP|VOLKSWAGAN CREDIT|DAIMLER / CHRYLSER ACCEPTANCE CORP|CHRYSLER FINANCIAL COMPANY|GMAC|VOLVO FINANCIAL SERVICES|WFS FINANCIAL|SAFECO IND', STD.Str.ToUpperCase(LEFT.MemberName));
 		SELF.TapeSupplierIndicatorBool	:= LEFT.TapeSupplierIndicator = '*'; // * == TRUE, Blank == FALSE
 		SELF.DateReported				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateReported);
@@ -167,36 +186,10 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.OldHistoricWorstRatingCode	:= IF(LEFT.Transaction_ID[1] = '8', '1', '1');
 		SELF.OldHistoricWorstRatingDate	:= IF(LEFT.Transaction_ID[1] = '8', '20100201', '02002010');
 		SELF.StatusDate					:= IF(LEFT.Transaction_ID[1] = '8', '20100201', '20100201');
-		SELF.LastPaymentDate			:= IF(LEFT.Transaction_ID[1] = '8', '02032017', '02032017');
-		SELF.PaymentHistory84Months		:= IF(LEFT.Transaction_ID[1] = '8', '1/2/3/4/5', '1/2/3/4/5');
-		SELF.PaymentHistory84MonthsContainsGridSatisfactory := MAP(SELF.BureauCode = 'EFX' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '01'))) > 0,
-																									 SELF.BureauCode = 'XPN' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '01N'))) > 0,
-																									 SELF.BureauCode = 'TRU' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '01'))) > 0,
-																									 FALSE);
-		SELF.PaymentHistory84MonthsContainsGrid30DPD := MAP(SELF.BureauCode = 'EFX' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '2'))) > 0,
-																									 SELF.BureauCode = 'XPN' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '2'))) > 0,
-																									 SELF.BureauCode = 'TRU' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '2'))) > 0,
-																									 FALSE);
-		SELF.PaymentHistory84MonthsContainsGrid60DPD := MAP(SELF.BureauCode = 'EFX' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '3'))) > 0,
-																									 SELF.BureauCode = 'XPN' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '3'))) > 0,
-																									 SELF.BureauCode = 'TRU' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '3'))) > 0,
-																									 FALSE);
-		SELF.PaymentHistory84MonthsContainsGrid90DPD := MAP(SELF.BureauCode = 'EFX' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '4'))) > 0,
-																									 SELF.BureauCode = 'XPN' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '4'))) > 0,
-																									 SELF.BureauCode = 'TRU' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '4'))) > 0,
-																									 FALSE);
-		SELF.PaymentHistory84MonthsContainsGrid120180DPD := MAP(SELF.BureauCode = 'EFX' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '5'))) > 0,
-																									 SELF.BureauCode = 'XPN' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '567'))) > 0,
-																									 SELF.BureauCode = 'TRU' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '5'))) > 0,
-																									 FALSE);
-		SELF.PaymentHistory84MonthsContainsGridDEROG := MAP(SELF.BureauCode = 'EFX' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '89Y'))) > 0,
-																									 SELF.BureauCode = 'XPN' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '89Y'))) > 0,
-																									 SELF.BureauCode = 'TRU' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '89Y'))) > 0,
-																									 FALSE);
-		SELF.PaymentHistory84MonthsContainsGridCollection := MAP(SELF.BureauCode = 'EFX' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), ''))) > 0,
-																									 SELF.BureauCode = 'XPN' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), '93'))) > 0,
-																									 SELF.BureauCode = 'TRU' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months), ''))) > 0,
-																									 FALSE);
+		LastPaymentDate					:= IF(LEFT.Transaction_ID[1] = '8', '02032017', '02032017');
+		SELF.LastPaymentDate			:= IF(SELF.BureauCode IN ['XPN', 'EFX'], LastPaymentDate[5..8] + LastPaymentDate[1..2] + LastPaymentDate[3..4], LastPaymentDate[1..4] + LastPaymentDate[5..6] + LastPaymentDate[7..8]);
+		SELF.PaymentHistory84Months		:= IF(LEFT.Transaction_ID[1] = '8', '111234567654321111111111', '77654321111111111111112121111111');
+		SELF.PaymentHistory84MonthDataset := NormalizeTradelineHistory(SELF.PaymentHistory84Months, LEFT.Transaction_ID, LEFT.LexID, LEFT.Date_Reported, LEFT.RecordTypeCounter);
 		SELF.ConsumerDisputeFlag		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
 		SELF.ConsumerInfoIndicator		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
 		SELF.PaymentFrequency			:= IF(LEFT.Transaction_ID[1] = '8', 'B', 'D');
@@ -207,11 +200,9 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.BalloonPaymentAmount		:= IF(LEFT.Transaction_ID[1] = '8', '500', '500');
 		SELF.BalloonPaymentDueDate		:= IF(LEFT.Transaction_ID[1] = '8', '02002011', '20110201');
 		SELF.PaymentPatternStartDate	:= IF(LEFT.Transaction_ID[1] = '8', '20110101', '20110101');
-		// SELF.PaymentHistory84MonthsContainsGridL3Satisfactory	:= MAP(SELF.BureauCode = 'EFX' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months[1..(3-(STD.Date.MonthsBetween(SELF.PaymentPatternStartDate,SELF.DateReported)-1))]), '01'))) > 0,
-																																	// SELF.BureauCode = 'XPN' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months[1..(3-(STD.Date.MonthsBetween(SELF.PaymentPatternStartDate,SELF.DateReported)-1))]), '01N'))) > 0,
-																																	// SELF.BureauCode = 'TRU' => LENGTH(TRIM(StringLib.StringFilter(StringLib.StringToUpperCase(SELF.PaymentHistory84Months[1..(3-(STD.Date.MonthsBetween(SELF.PaymentPatternStartDate,SELF.DateReported)-1))]), '01'))) > 0,
-																																	// FALSE);
 		SELF							:= LEFT));
+	
+	EXPORT Tradeline_History_Data := PROJECT(TradeLine_Data.PaymentHistory84MonthDataset, TRANSFORM(NormalizedTradelineHistory, SELF := LEFT));
 	
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
 	EXPORT TradeLine_Trended_Data := PROJECT((UT.DS_OneRecord + UT.DS_OneRecord), TRANSFORM({STRING Transaction_ID, UNSIGNED LexID, UNSIGNED Date_Reported, UNSIGNED RecordTypeCounter, UNSIGNED1 MonthCounter, UNSIGNED BalanceAmount, UNSIGNED LoanAmountCreditLimit, UNSIGNED ScheduledPayment, UNSIGNED ActualPayment, UNSIGNED LastPaymentDate, UNSIGNED1 ActualPaymentNullInd},

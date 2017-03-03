@@ -215,7 +215,7 @@ CreditReportLien := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, Record
 		STRING ACBCreditorClass,
 		DATE DateReleased),
 	MODEL(*));
-
+ 
 CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
 		STRING BureauCode, // v2+ Field
@@ -256,7 +256,7 @@ CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, R
 		STRING OldHistoricalWorstRatingCode, // v2+ Field
 		STRING OldHistoricalWorstRatingDate, // v2+ Field, set to STRING as it can contain 0's in odd places
 		DATE StatusDate, // v2+ Field
-		STRING LastPaymentDate, // v2+ Field, set to STRING as it can contain different orders for YYYYMMDD/MMDDYYYY/DDMMYYYY
+		DATE LastPaymentDate, // v2+ Field, needs to be cleaned in CleanFiles_NCF2_0.ecl
 		STRING PreviousRateCode1,
 		DATE PreviousRateDate1,
 		STRING PreviousRateCode2,
@@ -264,13 +264,8 @@ CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, R
 		STRING PreviousRateCode3,
 		DATE PreviousRateDate3,
 		STRING PaymentHistory84Months, // v2+ Field
-		BOOLEAN PaymentHistory84MonthsContainsGridSatisfactory, // v2+ Field
-		BOOLEAN PaymentHistory84MonthsContainsGrid30DPD, // v2+ Field
-		BOOLEAN PaymentHistory84MonthsContainsGrid60DPD, // v2+ Field
-		BOOLEAN PaymentHistory84MonthsContainsGrid90DPD, // v2+ Field
-		BOOLEAN PaymentHistory84MonthsContainsGrid120180DPD, // v2+ Field
-		BOOLEAN PaymentHistory84MonthsContainsGridDEROG, // v2+ Field
-		BOOLEAN PaymentHistory84MonthsContainsGridCollection, // v2+ Field
+		INTEGER PaymentMonth, // v2+ Field
+		STRING PaymentCode, // v2+ Field
 		STRING ConsumerDisputeFlag, // v2+ Field
 		STRING ConsumerInfoIndicator, // v2+ Field
 		STRING PaymentFrequency, // v2+ Field
@@ -295,12 +290,11 @@ CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, R
 		AccountBalance, ScheduledPaymentAmount, ActualPaymentAmount, ActualPaymentNullIndicator, MonthlyPaymentType, AmountPastDue, AccountType, AccountPurposeType, 
 		CurrentRateCode, StatusCode, AccountConditionCode, MonthsReviewed, AccountDesignatorCode, ThirtyDayCounter, SixtyDayCounter, NinetyDayCounter, 
 		DerogCounter, OldHistoricalWorstRatingCode, OldHistoricalWorstRatingDate, StatusDate, LastPaymentDate, PreviousRateCode1, PreviousRateDate1, 
-		PreviousRateCode2, PreviousRateDate2, PreviousRateCode3, PreviousRateDate3, PaymentHistory84Months, PaymentHistory84MonthsContainsGridSatisfactory,
-		PaymentHistory84MonthsContainsGrid30DPD, PaymentHistory84MonthsContainsGrid60DPD, PaymentHistory84MonthsContainsGrid90DPD,
-		PaymentHistory84MonthsContainsGrid120180DPD, PaymentHistory84MonthsContainsGridDEROG, PaymentHistory84MonthsContainsGridCollection, ConsumerDisputeFlag,
+		PreviousRateCode2, PreviousRateDate2, PreviousRateCode3, PreviousRateDate3, PaymentHistory84Months, ConsumerDisputeFlag,
 		ConsumerInfoIndicator, PaymentFrequency, ActivityDesignatorCode, MortgageID, DeferredPaymentStartDate, DeferredPaymentAmount, BalloonPaymentAmount, 
 		BalloonPaymentDueDate, PaymentPatternStartDate, TrendedDataStartDate,
-		Trended{MonthCounter, BalanceAmount, LoanAmountCreditLimit, ScheduledPayment, ActualPayment, LastPayment, ActualPaymentNullInd}));
+		Trended{MonthCounter, BalanceAmount, LoanAmountCreditLimit, ScheduledPayment, ActualPayment, LastPayment, ActualPaymentNullInd},
+		PaymentHistory84MonthsSM{PaymentMonth, PaymentCode}));
 
 CreditReportNarrativeRemarks := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter, NarrativeRemarkCounter),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
@@ -931,13 +925,6 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Data(FLAT,
 		StatusDate = StatusDate,
 		LastPaymentDate = LastPaymentDate,
 		PaymentHistory84Months = PaymentHistory84Months,
-		PaymentHistory84MonthsContainsGridSatisfactory = PaymentHistory84MonthsContainsGridSatisfactory,
-		PaymentHistory84MonthsContainsGrid30DPD = PaymentHistory84MonthsContainsGrid30DPD,
-		PaymentHistory84MonthsContainsGrid60DPD = PaymentHistory84MonthsContainsGrid60DPD,
-		PaymentHistory84MonthsContainsGrid90DPD = PaymentHistory84MonthsContainsGrid90DPD,
-		PaymentHistory84MonthsContainsGrid120180DPD = PaymentHistory84MonthsContainsGrid120180DPD,
-		PaymentHistory84MonthsContainsGridDEROG = PaymentHistory84MonthsContainsGridDEROG,
-		PaymentHistory84MonthsContainsGridCollection = PaymentHistory84MonthsContainsGridCollection,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
 		ConsumerInfoIndicator = ConsumerInfoIndicator,
 		PaymentFrequency = PaymentFrequency,
@@ -972,6 +959,14 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Data(FLAT,
 		PreviousRateDate2 = PrevRateDate2,
 		PreviousRateCode3 = PrevRateCode3,
 		PreviousRateDate3 = PrevRateDate3),
+	PERMITS([v2]));
+	
+USE Consumer_Credit.FilesCleaned_NCF2_0.Tradeline_History_Data(FLAT,
+	CreditReportTradeline(
+		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
+		PaymentMonth = RecordCounter,
+		PaymentCode = RecordValue),
 	PERMITS([v2]));
 
 USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Trended_Data(FLAT,
@@ -1647,9 +1642,9 @@ CreditReportTradeline: GRID_120_180DPD_TU := ['5'];
 CreditReportTradeline: GRID_DEROG_XP := ['8','9','Y'];
 CreditReportTradeline: GRID_DEROG_EQ := ['8','9','Y'];
 CreditReportTradeline: GRID_DEROG_TU := ['8','9','Y'];																				 
-CreditReportTradeline: GRID_SATISFACTORY_STRING_XP := ['01N'];
-CreditReportTradeline: GRID_SATISFACTORY_STRING_EQ := ['01'];
-CreditReportTradeline: GRID_SATISFACTORY_STRING_TU := ['01']; 																				 																	                                                                             
+CreditReportTradeline: GRID_SATISFACTORY_STRING_XP := ['0','1','N'];
+CreditReportTradeline: GRID_SATISFACTORY_STRING_EQ := ['0','1'];
+CreditReportTradeline: GRID_SATISFACTORY_STRING_TU := ['0','1']; 																				 																	                                                                             
 CreditReportTradeline: GRID_30DPD_STRING_XP := ['2'];
 CreditReportTradeline: GRID_30DPD_STRING_EQ := ['2'];
 CreditReportTradeline: GRID_30DPD_STRING_TU := ['2'];  																				 
@@ -1659,12 +1654,12 @@ CreditReportTradeline: GRID_60DPD_STRING_TU := ['3'];
 CreditReportTradeline: GRID_90DPD_STRING_XP := ['4'];
 CreditReportTradeline: GRID_90DPD_STRING_EQ := ['4'];
 CreditReportTradeline: GRID_90DPD_STRING_TU := ['4'];   																				                           
-CreditReportTradeline: GRID_120_180DPD_STRING_XP := ['567'];
+CreditReportTradeline: GRID_120_180DPD_STRING_XP := ['5','6','7'];
 CreditReportTradeline: GRID_120_180DPD_STRING_EQ := ['5'];
 CreditReportTradeline: GRID_120_180DPD_STRING_TU := ['5'];																		 																				 
-CreditReportTradeline: GRID_DEROG_STRING_XP := ['89Y'];
-CreditReportTradeline: GRID_DEROG_STRING_EQ := ['89Y'];
-CreditReportTradeline: GRID_DEROG_STRING_TU := ['89Y']; 																				 																				 
+CreditReportTradeline: GRID_DEROG_STRING_XP := ['8','9','Y'];
+CreditReportTradeline: GRID_DEROG_STRING_EQ := ['8','9','Y'];
+CreditReportTradeline: GRID_DEROG_STRING_TU := ['8','9','Y']; 																				 																				 
 CreditReportTradeline: STATUS_COLLECTION_XP := ['93'];
 CreditReportTradeline: STATUS_COLLECTION_EQ := [''];
 CreditReportTradeline: STATUS_COLLECTION_TU := ['']; 																				 																				 
@@ -3495,13 +3490,13 @@ CreditReportTradeline: => OldRate90DPD := NOT OldHistoricalWorstRatingCode:Null 
 CreditReportTradeline: => OldRate120180DPD := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_120_180DPD; //G1OldRate120180DPD
 CreditReportTradeline: => OldRateCollection := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_COLLECTION; //G1OldRateCollection
 CreditReportTradeline: => OldRateDerog := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_DEROG; //G1OldRateDerog
-CreditReportTradeline: => GridSatisfactoryEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGridSatisfactory = TRUE; //G1GRID_SATISFACTORY_EVER
-CreditReportTradeline: => Grid30DPDEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGrid30DPD = TRUE; //G1GRID30DPDEVER
-CreditReportTradeline: => Grid60DPDEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGrid60DPD = TRUE; //G1Grid60DPDEver
-CreditReportTradeline: => Grid90DPDEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGrid90DPD = TRUE; //G1Grid90DPDEver
-CreditReportTradeline: => Grid120180Ever := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGrid120180DPD = TRUE; //G1Grid120180DPDEver
-CreditReportTradeline: => GridDEROGEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGridDEROG = TRUE; //G1GridDEROGEver
-CreditReportTradeline: => GridCollectionEver := NOT PaymentHistory84Months:Null AND PaymentHistory84MonthsContainsGridCollection = TRUE; //G1GridCollectionEver
+CreditReportTradeline: => GridSatisfactoryEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_SATISFACTORY_STRING); //G1GRID_SATISFACTORY_EVER
+CreditReportTradeline: => Grid30DPDEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_30DPD_STRING); //G1GRID30DPDEVER
+CreditReportTradeline: => Grid60DPDEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_60DPD_STRING); //G1Grid60DPDEver
+CreditReportTradeline: => Grid90DPDEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_90DPD_STRING); //G1Grid90DPDEver
+CreditReportTradeline: => Grid120180DPDEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_120_180DPD_STRING); //G1Grid120180DPDEver
+CreditReportTradeline: => GridDEROGEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_DEROG_STRING); //G1GridDEROGEver
+CreditReportTradeline: => GridCollectionEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN ['Y']); //G1GridCollectionEver
 CreditReportTradeline: => FrequencyDeferred := NOT PaymentFrequency:Null AND PaymentFrequency IN FREQUENCY_DEFERRED; //G1FrequencyDeferred
 CreditReportTradeline: => FrequencySinglePaymentLoan := NOT PaymentFrequency:Null AND PaymentFrequency IN FREQUENCY_SINGLE_PAYMENT_LOAN; //G1FrequencySinglePaymentLoan
 CreditReportTradeline: => StatusCollection := (NOT StatusCode:Null AND StatusCode IN STATUS_COLLECTION) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_COLLECTION); //G1StatusCollection
@@ -3525,7 +3520,44 @@ CreditReportTradeline: => CIIBankruptcyDischarged := NOT ConsumerInfoIndicator:N
 CreditReportTradeline: => CIIBankruptcyDismissed := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_DISMISSED; //G1CIIBANKRUPTCYDISMISSED
 CreditReportTradeline: => CIIBankruptcyWithdrawn := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_WITHDRAWN; //G1CIIBANKRUPTCYWITHDRAWN
 CreditReportTradeline: => CIIPaidPayingBadDebt := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_PAID_PAYING_BAD_DEBT; //G1CIIPAIDPAYINGBADDEBT
-CreditReportTradeline: => G1CII_DEROG := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_DEROG; //G1CII_DEROG
+CreditReportTradeline: => CIIDEROG := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_DEROG; //G1CII_DEROG
+CreditReportTradeline: => MonthsPaymentPatternStartDate := MONTHSBETWEEN(PaymentPatternStartDate, rCreditReport.DateReported) + 1; //GMOSPaymentPatternStartDate
+CreditReportTradeline: => GridL3_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 3 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING); //G1GridL3_SATISFACTORY
+CreditReportTradeline: => GridL3_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 3 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING); //G1GridL3_30DPD
+CreditReportTradeline: => GridL3_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 3 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING); //G1GridL3_60DPD
+CreditReportTradeline: => GridL3_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 3 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING); //G1GridL3_90DPD
+CreditReportTradeline: => GridL3_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 3 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING); //G1GridL3_120180DPD
+CreditReportTradeline: => GridL3_Collection := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 3 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN ['Y']); //G1GridL3_Collection
+CreditReportTradeline: => GridL6_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 6 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING); //G1GridL6_SATISFACTORY
+CreditReportTradeline: => GridL6_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 6 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING); //G1GridL6_30DPD
+CreditReportTradeline: => GridL6_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 6 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING); //G1GridL6_60DPD
+CreditReportTradeline: => GridL6_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 6 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING); //G1GridL6_90DPD
+CreditReportTradeline: => GridL6_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 6 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING); //G1GridL6_120180DPD
+CreditReportTradeline: => GridL6_Collection := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 6 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN ['Y']); //G1GridL6_Collection
+CreditReportTradeline: => GridL12_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 12 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING); //G1GridL12_SATISFACTORY
+CreditReportTradeline: => GridL12_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 12 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING); //G1GridL12_30DPD
+CreditReportTradeline: => GridL12_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 12 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING); //G1GridL12_60DPD
+CreditReportTradeline: => GridL12_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 12 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING); //G1GridL12_90DPD
+CreditReportTradeline: => GridL12_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 12 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING); //G1GridL12_120180DPD
+CreditReportTradeline: => GridL12_Collection := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 12 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN ['Y']); //G1GridL12_Collection
+CreditReportTradeline: => GridL24_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 24 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING); //G1GridL24_SATISFACTORY
+CreditReportTradeline: => GridL24_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 24 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING); //G1GridL24_30DPD
+CreditReportTradeline: => GridL24_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 24 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING); //G1GridL24_60DPD
+CreditReportTradeline: => GridL24_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 24 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING); //G1GridL24_90DPD
+CreditReportTradeline: => GridL24_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 24 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING); //G1GridL24_120180DPD
+CreditReportTradeline: => GridL24_Collection := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 24 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN ['Y']); //G1GridL24_Collection
+CreditReportTradeline: => GridL36_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 36 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING); //G1GridL36_SATISFACTORY
+CreditReportTradeline: => GridL36_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 36 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING); //G1GridL36_30DPD
+CreditReportTradeline: => GridL36_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 36 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING); //G1GridL36_60DPD
+CreditReportTradeline: => GridL36_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 36 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING); //G1GridL36_90DPD
+CreditReportTradeline: => GridL36_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 36 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING); //G1GridL36_120180DPD
+CreditReportTradeline: => GridL36_Collection := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 36 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN ['Y']); //G1GridL36_Collection
+CreditReportTradeline: => GridL48_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 48 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING); //G1GridL48_SATISFACTORY
+CreditReportTradeline: => GridL48_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 48 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING); //G1GridL48_30DPD
+CreditReportTradeline: => GridL48_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 48 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING); //G1GridL48_60DPD
+CreditReportTradeline: => GridL48_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 48 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING); //G1GridL48_90DPD
+CreditReportTradeline: => GridL48_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 48 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING); //G1GridL48_120180DPD
+CreditReportTradeline: => GridL48_Collection := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 48 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN ['Y']); //G1GridL48_Collection
 
 // Level 2 Globals
 CreditReportTradeline: => Deceased := ECOADeceased OR NCDeceased OR RateDeceased OR StatusDeceased; //G2Deceased
@@ -3561,6 +3593,39 @@ CreditReportTradeline: => AutoLoan := Auto AND NOT AutoLease; //G5AutoLoan
 CreditReportTradeline: => AutoBank := Auto AND KOBBank AND NOT (TypeAutoLease OR NCAutoLease OR TypeLease OR NCLease); //G5AutoBank
 CreditReportTradeline: => AutoFinance := Auto AND NOT AutoBank; //G6AutoFinance
 CreditReportTradeline: => OtherLineOfCredit := AccountTypeC AND NOT MortgageOrHomeEquity; //G4OtherLineOfCredit
+CreditReportTradeline: => OtherIntallment := AllInstallment AND NOT MortgageOrHomeEquity; //G4OtherIntallment
+CreditReportTradeline: => StudentLoan := (KOBStudentLoan OR TypeStudentLoan OR NCStudentLoan OR RateDefaultedStudentLoan) AND NOT (AllRevolving OR MortgageOrHomeEquity OR Auto); //G5StudentLoan
+CreditReportTradeline: => RecreationalItem := (KOBRecreationalItem OR TypeRecreationalItem OR NCRecreationalItem) AND NOT AllRevolving; //G3RecreationalItem
+CreditReportTradeline: => ConsumerFinance := (KOBSalesFinance OR TypeSalesFinance OR NCSalesFinance OR RetailNonCreditCard OR UtilityTrade) AND NOT (MortgageOrHomeEquity OR Auto OR StudentLoan OR AllRevolving OR BankCard); //G6ConsumerFinance
+CreditReportTradeline: => PersonalFinance := (KOBPersonalFinance OR NCPersonalFinance OR TypePersonalFinance) AND (AccountTypeI OR AccountTypeO OR (NOT AccountTypeValid)) AND NOT (MortgageOrHomeEquity OR Auto OR StudentLoan OR ConsumerFinance) AND NOT (TypeSecured OR NCSecured); //G7PersonalFinance
+CreditReportTradeline: => InstallmentEXCLMortgageAutoSTL := (KOBFinance OR KOBBank) AND (KOBInstallment OR TypeInstallment OR AccountTypeI) AND NOT (MortgageOrHomeEquity OR Auto OR StudentLoan OR AllRevolving); //G6InstallmentEXCLMortgageAutoSTL
+CreditReportTradeline: => BankInstallment := KOBBank AND InstallmentEXCLMortgageAutoSTL; //G7BankInstallment
+CreditReportTradeline: => FinanceInstallment := KOBFinance AND InstallmentEXCLMortgageAutoSTL; //G7FinanceInstallment
+CreditReportTradeline: => CreditUnionInstallment := KOBCreditUnion AND InstallmentEXCLMortgageAutoSTL; //G7CreditUnionInstallment
+CreditReportTradeline: => Current120180 := Rate120180DPD OR StatusCurrent120180DPD; //G2Current120180
+CreditReportTradeline: => Current90 := Rate90DPD OR StatusCurrent90DPD; //G2Current90
+CreditReportTradeline: => Current60 := Rate60DPD OR StatusCurrent60DPD; //G2Current60
+CreditReportTradeline: => Current30 := Rate30DPD OR StatusCurrent30DPD; //G2Current30
+CreditReportTradeline: => CurrentSatisfactory := RateSatisfactory OR StatusCurrentSAT; //G2CurrentSatisfactory
+CreditReportTradeline: => PaidPayingBadDebt := RatePaidPayingDebt OR StatusPaidPayingBadDebt OR NCPaidPayingBadDebt OR CIIPaidPayingBadDebt; //G2PaidPayingBadDebt
+CreditReportTradeline: => Foreclosure := RateForeclosure OR StatusForeclosure OR NCForeclosure; //G2Foreclosure
+CreditReportTradeline: => Repo := RateREPO OR StatusREPO OR NCREPO; //G2Repo
+CreditReportTradeline: => Bankruptcy := RateBankruptcy OR NCBankruptcy OR StatusBankruptcy OR CIIBankruptcy; //G2Bankruptcy
+CreditReportTradeline: => Bankruptcy13 := RateBankruptcy13 OR NCBankruptcy13 OR StatusBankruptcy13 OR CIIBankruptcy13; //G2Bankruptcy13
+CreditReportTradeline: => BankruptcyDischarged := NCBankruptcyDischarged OR CIIBankruptcyDischarged; //G2BankruptcyDischarged
+CreditReportTradeline: => BankruptcyDismissed := NCBankruptcyDismissed  OR CIIBankruptcyDismissed; //G2BANKRUPTCYDISMISSED
+CreditReportTradeline: => BankruptcyWithdrawn := NCBankruptcyWithdrawn  OR CIIBankruptcyWithdrawn; //G2BankruptcyWithdrawn
+CreditReportTradeline: => Derogatory := NCDEROG OR ActivityDesignatorDEROG OR RateDEROG OR StatusDerogatory OR CIIDEROG OR NCHighcreditIsChargeoffAmt; //G2Derogatory
+CreditReportTradeline: => MonthsStatusDate := MONTHSBETWEEN(StatusDate, rCreditReport.DateReported) + 1; //GMOSStatusDate
+CreditReportTradeline: => MonthsLastPaymentDate := MONTHSBETWEEN(LastPaymentDate, rCreditReport.DateReported) + 1; //GMOSLastPaymentDate
+CreditReportTradeline: => MonthsDerogatory := IF(Derogatory, IF(MonthsStatusDate >= 0, MonthsStatusDate, IF(MonthsLastPaymentDate >= 0, MonthsLastPaymentDate+ 6, -9999)),-9999); //G3MOSDerogatory
+CreditReportTradeline: => Collection := KOBCollection OR StatusCollection OR TypeCollection OR NCCollection OR RateCollection OR ReturnedCheck OR FamilySupport; //G3Collection
+CreditReportTradeline: => EverDerog := Derogatory OR OldRateDerog OR GridDEROGEver; //G3EverDerog
+CreditReportTradeline: => EverCollection := Collection OR OldRateCollection OR GridCollectionEver; //G3EverCollection
+CreditReportTradeline: => Ever90P := Current120180 OR OldRate120180DPD OR Grid120180DPDEver OR Current90 OR OldRate90DPD OR Grid90DPDEver OR (NinetyDayCounter > 0); //G3Ever90P
+CreditReportTradeline: => Ever60 := Current60 OR OldRate60DPD OR Grid60DPDEver OR (SixtyDayCounter > 0); //G3Ever60
+CreditReportTradeline: => Ever30 := Current30 OR OldRate30DPD OR Grid30DPDEver OR (ThirtyDayCounter > 0); //G3Ever30
+
 
 // Testing/Debug KEL Outputs
 QUERY: CreditReportBankruptcyV1(SearchForTransactionID) <= CreditReportBankruptcy(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
