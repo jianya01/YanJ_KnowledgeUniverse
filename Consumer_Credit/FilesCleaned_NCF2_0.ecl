@@ -136,8 +136,27 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.ConsumerDisputeFlag		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
 		SELF							:= LEFT));
 
+	SHARED NormalizedTradelineHistory := RECORD
+		STRING Transaction_ID;
+		UNSIGNED LexID;
+		STRING Date_Reported;
+		UNSIGNED RecordTypeCounter;
+		UNSIGNED1 RecordCounter;
+		STRING1 RecordValue;
+	END;
+	SHARED NormalizedTradelineHistory NormalizeTradelineHistory(STRING Input, STRING Transaction_ID, UNSIGNED LexID, STRING Date_Reported, UNSIGNED RecordTypeCounter) := FUNCTION
+		NormalizedResult := NORMALIZE(DATASET([{1}], {UNSIGNED1 a}), LENGTH(TRIM(Input)), TRANSFORM(NormalizedTradelineHistory,
+														SELF.Transaction_ID := Transaction_ID;
+														SELF.LexID := LexID;
+														SELF.Date_Reported := Date_Reported;
+														SELF.RecordTypeCounter := RecordTypeCounter;
+														SELF.RecordCounter := COUNTER;
+														SELF.RecordValue := Input[COUNTER]));
+		RETURN NormalizedResult;
+	END;
+	
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	EXPORT TradeLine_Data := PROJECT(Consumer_Credit.Files.TradeLine_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), BOOLEAN AutoLenderMemberName, BOOLEAN TapeSupplierIndicatorBool, STRING2 IndustryCode, STRING BureauCode, STRING TradeKey, STRING KOB, STRING ECOA, STRING PortfolioTypeCode, STRING CreditLimit, STRING ChargeOffAmount, STRING ScheduledPaymentAmount, STRING MonthlyPaymentType, STRING ActualPaymentAmount, STRING ActualPaymentNullInd, STRING StatusCode, STRING AccountConditionCode, STRING DerogCounter, STRING OldHistoricWorstRatingCode, STRING OldHistoricWorstRatingDate, STRING StatusDate, STRING LastPaymentDate, STRING PaymentHistory84Months, STRING ConsumerDisputeFlag, STRING ConsumerInfoIndicator, STRING PaymentFrequency, STRING ActivityDesignatorCode, STRING MortgageID, STRING DeferredPaymentStartDate, STRING DeferredPaymentAmount, STRING BalloonPaymentAmount, STRING BalloonPaymentDueDate, STRING PaymentPatternStartDate},
+	EXPORT TradeLine_Data := PROJECT(Consumer_Credit.Files.TradeLine_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), DATASET(NormalizedTradelineHistory) PaymentHistory84MonthDataset, BOOLEAN AutoLenderMemberName, BOOLEAN TapeSupplierIndicatorBool, STRING2 IndustryCode, STRING BureauCode, STRING TradeKey, STRING KOB, STRING ECOA, STRING PortfolioTypeCode, STRING CreditLimit, STRING ChargeOffAmount, STRING ScheduledPaymentAmount, STRING MonthlyPaymentType, STRING ActualPaymentAmount, STRING ActualPaymentNullInd, STRING StatusCode, STRING AccountConditionCode, STRING DerogCounter, STRING OldHistoricWorstRatingCode, STRING OldHistoricWorstRatingDate, STRING StatusDate, STRING LastPaymentDate, STRING PaymentHistory84Months, STRING ConsumerDisputeFlag, STRING ConsumerInfoIndicator, STRING PaymentFrequency, STRING ActivityDesignatorCode, STRING MortgageID, STRING DeferredPaymentStartDate, STRING DeferredPaymentAmount, STRING BalloonPaymentAmount, STRING BalloonPaymentDueDate, STRING PaymentPatternStartDate},
 		SELF.AutoLenderMemberName		:= REGEXFIND('AUTO|MOTOR|AMERICAN HONDA FINANCE CORP|AUDI FINANCIAL SERVICES|BMW FINANCIAL SERVICES|CHRYSLER CREDIT CORPORATION|INFINITI FINANCIAL SERVICES|LEXUS FINANCIAL SERVICES|MERCEDES-BENZ CREDIT|PORSCHE FINANCIAL SERVICES|SAFCO|SOUTHEAST TOYOTA FINANCE|SUBARU LEASING CORP|VOLKSWAGAN CREDIT|DAIMLER / CHRYLSER ACCEPTANCE CORP|CHRYSLER FINANCIAL COMPANY|GMAC|VOLVO FINANCIAL SERVICES|WFS FINANCIAL|SAFECO IND', STD.Str.ToUpperCase(LEFT.MemberName));
 		SELF.TapeSupplierIndicatorBool	:= LEFT.TapeSupplierIndicator = '*'; // * == TRUE, Blank == FALSE
 		SELF.DateReported				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateReported);
@@ -167,7 +186,8 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.OldHistoricWorstRatingDate	:= IF(LEFT.Transaction_ID[1] = '8', '20100201', '02002010');
 		SELF.StatusDate					:= IF(LEFT.Transaction_ID[1] = '8', '20100201', '20100201');
 		SELF.LastPaymentDate			:= IF(LEFT.Transaction_ID[1] = '8', '02032017', '02032017');
-		SELF.PaymentHistory84Months		:= IF(LEFT.Transaction_ID[1] = '8', '1/2/3/4/5', '1/2/3/4/5');
+		SELF.PaymentHistory84Months		:= IF(LEFT.Transaction_ID[1] = '8', '111234567654321111111111', '77654321111111111111112121111111');
+		SELF.PaymentHistory84MonthDataset := NormalizeTradelineHistory(SELF.PaymentHistory84Months, LEFT.Transaction_ID, LEFT.LexID, LEFT.Date_Reported, LEFT.RecordTypeCounter);
 		SELF.ConsumerDisputeFlag		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
 		SELF.ConsumerInfoIndicator		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
 		SELF.PaymentFrequency			:= IF(LEFT.Transaction_ID[1] = '8', 'B', 'D');
@@ -179,6 +199,8 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.BalloonPaymentDueDate		:= IF(LEFT.Transaction_ID[1] = '8', '02002011', '20110201');
 		SELF.PaymentPatternStartDate	:= IF(LEFT.Transaction_ID[1] = '8', '20110101', '20110101');
 		SELF							:= LEFT));
+	
+	EXPORT Tradeline_History_Data := PROJECT(TradeLine_Data.PaymentHistory84MonthDataset, TRANSFORM(NormalizedTradelineHistory, SELF := LEFT));
 	
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
 	EXPORT TradeLine_Trended_Data := PROJECT((UT.DS_OneRecord + UT.DS_OneRecord), TRANSFORM({STRING Transaction_ID, UNSIGNED LexID, UNSIGNED Date_Reported, UNSIGNED RecordTypeCounter, UNSIGNED1 MonthCounter, UNSIGNED BalanceAmount, UNSIGNED LoanAmountCreditLimit, UNSIGNED ScheduledPayment, UNSIGNED ActualPayment, UNSIGNED LastPaymentDate, UNSIGNED1 ActualPaymentNullInd},
