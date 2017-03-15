@@ -1,9 +1,9 @@
 ﻿// KEL Compiler Options and Configurations
-#OPTION(persist, 2)
+#OPTION(persist, 0)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
  
-// Defining the ERA to allow for ASOF functionality
+ // Defining the ERA to allow for ASOF functionality
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
@@ -87,7 +87,8 @@ CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
 		DATE NinetyDayInquiryHistoryDate,
 		INTEGER NumberOfRevolvingAccounts,
 		INTEGER NumberOfOpenEndedAccounts,
-		INTEGER NumberOfInstallmentAccounts),
+		INTEGER NumberOfInstallmentAccounts,
+		INTEGER LienJudgementSource=NULL('')),
 	MODEL(UID, 
 		TransactionID, 
 		ReferenceNumber,
@@ -104,7 +105,7 @@ CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
 			AmountOwedTotalInstallment, PastDueTotalRevolving, PastDueTotalOpenEnded, PastDueTotalInstallment, NinetyDayInquiryHistoryCount, NinetyDayInquiryHistoryDate, 
 			NumberOfRevolvingAccounts, NumberOfOpenEndedAccounts, NumberOfInstallmentAccounts}, 
 		DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, 
-		ProcessingCompletionStatus, ReportUsage));
+		ProcessingCompletionStatus, ReportUsage,LienJudgementSource));
 
 
 // Credit Report Sub-Section ENTITYs (Bankruptcy, Collection, Employment, Inquiry, Judgement, Lien, Narrative Remarks, Tradeline)
@@ -485,7 +486,8 @@ USE Consumer_Credit.FilesCleaned.ReportRequest_Data(FLAT,
 		AccountNumber = AccountNumber,
 		ProcessingCompletionStatus = ProcessingCompletionStatus,
 		ReportUsage = ReportUsage,
-		ReferenceNumber = ReferenceNumber),
+		ReferenceNumber = ReferenceNumber,
+		LienJudgementSource = Attach2ProcessStatus),
 	PERMITS([v1]));
 
 USE Consumer_Credit.FilesCleaned.Bankruptcy_Data(FLAT,
@@ -3293,6 +3295,7 @@ QUERY: CreditReportJudgementV1(SearchForTransactionID) <= CreditReportJudgement(
 QUERY: CreditReportLienV1(SearchForTransactionID) <= CreditReportLien(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
 QUERY: CreditReportNarrativeRemarksV1(SearchForTransactionID) <= CreditReportNarrativeRemarks(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
 QUERY: CreditReportTradelineV1(SearchForTransactionID) <= CreditReportTradeline(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
+QUERY: CreditReportV1(SearchForTransactionID) <= CreditReport(TransactionID = SearchForTransactionID) USING [v1];
 
 QUERY: CreditReportBankruptcyV2(SearchForTransactionID) <= CreditReportBankruptcy(rCreditReport.TransactionID = SearchForTransactionID) USING [v2];
 QUERY: CreditReportCollectionV2(SearchForTransactionID) <= CreditReportCollection(rCreditReport.TransactionID = SearchForTransactionID) USING [v2];
@@ -3304,5 +3307,5 @@ QUERY: CreditReportNarrativeRemarksV2(SearchForTransactionID) <= CreditReportNar
 QUERY: CreditReportTradelineV2(SearchForTransactionID) <= CreditReportTradeline(rCreditReport.TransactionID = SearchForTransactionID) USING [v2];
    
 // Final KEL Outputs
-SHELL: CreditReportV1 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, StatementLength, ConsumerStatement, LexIDs, ROWS, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies} USING [v1];
+SHELL: CreditReportV1 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, StatementLength, ConsumerStatement, LexIDs, ROWS, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies, LienJudgementSource} USING [v1];
 SHELL: CreditReportV2 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, StatementLength, ConsumerStatement, LexIDs, ROWS, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies} USING [v2];
