@@ -1052,44 +1052,47 @@ USE KELBlackBox.FileCLDPCleaned.FileCDPropertyInsuredClaimPaymentsFlat(FLAT,
 // State Farm CONSTANT Definitions
 ClaimsPropertyRiskClaims: SF_PROP_EXCLUSION_CODE_LIST := ['CONTA', 'FLOOD', 'QUAKE', 'WC'];
 
-// Constants for SF701-SF710, SF806-SF808 (these should be in the NOT included)
-// Constants for SF691-SF700 also used in SF781-SF800  
-// Cconstants for SF711-SF720
+// constants for SF701-SF710, SF806-SF808 (these should be in the NOT included)
+// constants for SF691-SF700 also used in SF781-SF800  
+// constants for SF711-SF720
 ClaimsPropertyRiskClaims: WEATHER_CLAIM_CODE_LIST := ['FREEZ', 'HAIL', 'LIGHT', 'WIND', 'WATER', 'MOVE'];
 ClaimsPropertyRiskClaims: WEATHER_CLAIM_COMB1_CODE_LIST := ['FREEZ', 'HAIL', 'LIGHT', 'WIND'];
 ClaimsPropertyRiskClaims: WEATHER_CLAIM_COMB2_CODE_LIST := ['WATER', 'MOVE'];
 
-// Constants for SF781-SF789, SF806-SF808, SF791-SF800 
+// constants for SF781-SF789, SF806-SF808, SF791-SF800 
 ClaimsPropertyRiskClaims: NON_WEATHER_CLAIM_CODE_LIST := ['CRAFT', 'CREDT', 'DISAP', 'DISSC', 'EXTEN', 'FIRE', 'PHYDA', 'SMOKE', 'THEFT', 'THFSC', 'VMM',  'OTHER', 'LIAB', 'MEDIC', 'SLIP', 'DAMAG', 'DOG'];
 
-// Constants for SF966-SF969
+// constants for SF966-SF969
 ClaimsPropertyRiskClaims: FIRE_SMOKE_CLAIM_CODE_LIST := ['FIRE', 'SMOKE'];
 
-// Constants for SF1056-1079
+// constants for SF1056-1079
 ClaimsPropertyRiskClaims: CRIME_CLAIM_CODE_LIST := ['THEFT', 'THFSC', 'VMM'];
   
-// Constants for SF1146-SF1170
+// constants for SF1146-SF1170
 ClaimsPropertyRiskClaims: LIABILITY_CODE_LIST := ['DOG', 'LIAB', 'SLIP', 'MEDIC', 'DAMAG']; 
 
-// Constants for SF1291-SF1313, SF1411-SF1434, SF1536-SF1549
+// constants for SF1291-SF1313, SF1411-SF1434, SF1536-SF1549
 ClaimsPropertyRiskClaims: COLA_CODE_LIST := ['CRAFT', 'CREDT', 'DAMAG', 'DISAP', 'DISSC', 'DOG', 'EXTEN', 'FIRE', 'FREEZ', 'HAIL', 'LIAB', 'LIGHT', 'MEDIC', 'MOVE', 'MOLD', 'OTHER', 'PHYDA', 'SINK', 'SLIP', 'SMOKE', 'THEFT', 'THFSC', 'VMM', 'WATER', 'WIND'];
 
-// Constants for SF876-SF896, SF898, SF1351-SF1374, SF1471-SF1494; NOT CODE LIST IS USED FOR SF966-SF1170
+// constants for SF876-SF896, SF898, SF1351-SF1374 , SF1471-SF1494; NOT CODE LIST IS USED FOR SF966-SF1170
 ClaimsPropertyRiskClaims: COLB_NOT_HAVE_CODE_LIST := ['EXTEN', 'FREEZ', 'HAIL', 'LIGHT', 'MOVE', 'OTHER', 'PHYDA', 'WATER', 'WIND'];
 ClaimsPropertyRiskClaims: COLB_CODE_LIST := ['CRAFT', 'CREDT', 'DAMAG', 'DISAP', 'DISSC', 'DOG', 'FIRE', 'LIAB', 'MEDIC', 'SLIP', 'SMOKE', 'THEFT', 'THFSC', 'VMM'];
 ClaimsPropertyRiskClaims: COLB_TN_CODE_LIST := ['CRAFT', 'CREDT', 'DAMAG', 'DISAP', 'DISSC', 'DOG', 'FIRE', 'LIAB', 'SLIP', 'SMOKE', 'THEFT', 'THFSC', 'VMM']; // remove MEDIC from COLB_CODE_LIST
 
+ClaimsPropertyRiskClaims: IGNORE_CODE_LIST := ['LAE'];
+
 // Adjusted the ClaimDate to fit the requirement: 
 // Assume CLUE Report date is 01/18/2017, 
 // If 01/18/2016 <= claim_date < 01/18/2017 then this claim falls into the past one year.
-ClaimsPropertyRiskClaims: => DATE19000101 := D'19000101'; 
-ClaimsPropertyRiskClaims: => AdjustedClaimDate := IF(ClaimDate < rClaimsProperty.DateOfOrder, 
-														ADJUSTCALENDAR(ClaimDate, 0, 0, 1),
-														DATE19000101);
-																											
-ClaimsPropertyRiskClaims.Payments: => cClaimCatType := IF(ClaimCatType:Null, '', ClaimCatType);
-ClaimsPropertyRiskClaims.Payments: => cClaimCatAmount := IF(ClaimCatAmount:Null, 0, ClaimCatAmount);
+
+ClaimsPropertyRiskClaims: => AdjustedClaimDate := ADJUSTCALENDAR(ClaimDate, 0, 0, 1);
+
+ClaimsPropertyRiskClaims.Payments: => cClaimCatType := IF( ClaimCatType:Null, '', ClaimCatType);
+ClaimsPropertyRiskClaims.Payments: => ClaimCatAmountTmp := IF( ClaimCatAmount:Null, 0, ClaimCatAmount);
+ClaimsPropertyRiskClaims.Payments: => cClaimCatAmount := IF(cClaimCatType IN ClaimsPropertyRiskClaims.IGNORE_CODE_LIST , 0, ClaimCatAmountTmp);
 ClaimsPropertyRiskClaims: => cAtFaultIndicator := IF(AtFaultIndicator:Null, '', AtFaultIndicator);
+
+ClaimsPropertyRiskClaims: => IsValidClaim := ISVALIDDATE(ClaimDate) AND ISVALIDDATE(rClaimsProperty.DateOfOrder) AND ClaimDate < rClaimsProperty.DateOfOrder AND rClaimsProperty.ProcessingCompletionStatus = 1;  
 
 ClaimsPropertyRiskClaims: => IsSFPropExclusionClaim := EXISTS(Payments(cClaimCatType IN SF_PROP_EXCLUSION_CODE_LIST));
 
@@ -1109,7 +1112,7 @@ ClaimsPropertyRiskClaims: => IsWeatherClaimComb2NonCatNonZero := IsWeatherClaimC
 
 ClaimsPropertyRiskClaims: => IsWeatherClaimCat := EXISTS(Payments(cClaimCatType IN WEATHER_CLAIM_CODE_LIST)) AND (cAtFaultIndicator = 'Y');
 
-ClaimsPropertyRiskClaims: => IsWeatherClaimCatNonZero := EXISTS(Payments(cClaimCatType IN WEATHER_CLAIM_CODE_LIST AND cClaimCatAmount > 0)) AND (cAtFaultIndicator = 'Y');
+ClaimsPropertyRiskClaims: => IsWeatherClaimCatNonZero := EXISTS(Payments(cClaimCatType IN WEATHER_CLAIM_CODE_LIST AND cClaimCatAmount>0)) AND (cAtFaultIndicator = 'Y');
 
 ClaimsPropertyRiskClaims: => IsLiabilityClaimNonZero := EXISTS(Payments(cClaimCatType IN LIABILITY_CODE_LIST AND cClaimCatAmount > 0));
 ClaimsPropertyRiskClaims: => IsLiabilityClaimNonCatNonZero := IsLiabilityClaimNonZero AND (cAtFaultIndicator != 'Y');
@@ -1117,28 +1120,28 @@ ClaimsPropertyRiskClaims: => IsLiabilityClaimNonCatNonZero := IsLiabilityClaimNo
 ClaimsPropertyRiskClaims: => IsNonWeatherClaim := EXISTS(Payments(cClaimCatType IN NON_WEATHER_CLAIM_CODE_LIST));
 ClaimsPropertyRiskClaims: => IsNonWeatherClaimCat := IsNonWeatherClaim AND (cAtFaultIndicator = 'Y');
 
-ClaimsPropertyRiskClaims: => IsNonWeatherClaimNonZero := EXISTS(Payments(cClaimCatType IN NON_WEATHER_CLAIM_CODE_LIST AND cClaimCatAmount > 0));
+ClaimsPropertyRiskClaims: => IsNonWeatherClaimNonZero := EXISTS(Payments(cClaimCatType IN NON_WEATHER_CLAIM_CODE_LIST AND cClaimCatAmount>0));
 ClaimsPropertyRiskClaims: => IsNonWeatherClaimCatNonZero := IsNonWeatherClaimNonZero AND (cAtFaultIndicator = 'Y');
 ClaimsPropertyRiskClaims: => IsNonWeatherClaimNonCatNonZero := IsNonWeatherClaimNonZero AND (cAtFaultIndicator != 'Y');
 
-// IsNotCOLBClaim also used in NonWeather2, Fire/Smoke, Crime, and Liability Attributes
+// IsNotCOLBClaim also used in nonweather2, fire/smoke, crime, and liability attributes
 ClaimsPropertyRiskClaims: => IsColBNotHaveClaim := EXISTS(Payments(cClaimCatType IN COLB_NOT_HAVE_CODE_LIST));
 
 ClaimsPropertyRiskClaims: => IsColBClaim := EXISTS(Payments(cClaimCatType IN COLB_CODE_LIST));
 ClaimsPropertyRiskClaims: => IsColBClaimCat := IsColBClaim AND (cAtFaultIndicator = 'Y');
 ClaimsPropertyRiskClaims: => IsColBClaimNonCat := IsColBClaim AND (cAtFaultIndicator != 'Y');
 
-ClaimsPropertyRiskClaims: => IsColBClaimNonZero := EXISTS(Payments(cClaimCatType IN COLB_CODE_LIST AND cClaimCatAmount > 0));
+ClaimsPropertyRiskClaims: => IsColBClaimNonZero := EXISTS(Payments(cClaimCatType IN COLB_CODE_LIST AND cClaimCatAmount>0));
 ClaimsPropertyRiskClaims: => IsColBClaimCatNonZero := IsColBClaimNonZero AND (cAtFaultIndicator = 'Y');
 ClaimsPropertyRiskClaims: => IsColBClaimNonCatNonZero := IsColBClaimNonZero AND (cAtFaultIndicator != 'Y');
 
 // Special for TN
-ClaimsPropertyRiskClaims: => IsColBClaimNonCatNonZeroTN := EXISTS(Payments(cClaimCatType IN COLB_TN_CODE_LIST AND cClaimCatAmount > 0)) AND (cAtFaultIndicator != 'Y');
+ClaimsPropertyRiskClaims: => IsColBClaimNonCatNonZeroTN := EXISTS(Payments(cClaimCatType IN COLB_TN_CODE_LIST AND cClaimCatAmount>0)) AND (cAtFaultIndicator != 'Y');
 
-ClaimsPropertyRiskClaims: => IsFireSmokeClaimNonZero := EXISTS(Payments(cClaimCatType IN FIRE_SMOKE_CLAIM_CODE_LIST AND cClaimCatAmount > 0));
+ClaimsPropertyRiskClaims: => IsFireSmokeClaimNonZero := EXISTS(Payments(cClaimCatType IN FIRE_SMOKE_CLAIM_CODE_LIST AND cClaimCatAmount>0));
 ClaimsPropertyRiskClaims: => IsFireSmokeClaimNonCatNonZero := IsFireSmokeClaimNonZero AND (cAtFaultIndicator != 'Y');
 
-ClaimsPropertyRiskClaims: => IsCrimeClaimNonZero := EXISTS(Payments(cClaimCatType IN CRIME_CLAIM_CODE_LIST AND cClaimCatAmount > 0));
+ClaimsPropertyRiskClaims: => IsCrimeClaimNonZero := EXISTS(Payments(cClaimCatType IN CRIME_CLAIM_CODE_LIST AND cClaimCatAmount>0));
 ClaimsPropertyRiskClaims: => IsCrimeClaimNonCatNonZero := IsCrimeClaimNonZero AND (cAtFaultIndicator != 'Y');
 																												
 ClaimsPropertyRiskClaims: => IsColAClaimNonZero := EXISTS(Payments(cClaimCatType IN COLA_CODE_LIST AND cClaimCatAmount > 0));											
@@ -1155,162 +1158,232 @@ ClaimsPropertyRiskClaims: => TotalColAClaimAmount := SUM(Payments, TotalColAClai
 ClaimsPropertyRiskClaims.Payments : => TotalColBClaimAmountTmp := IF(cClaimCatType IN ClaimsPropertyRiskClaims.COLB_CODE_LIST, cClaimCatAmount, 0);	
 ClaimsPropertyRiskClaims: => TotalColBClaimAmount := SUM(Payments, TotalColBClaimAmountTmp);
 
-// State Farm Attributes
-ClaimsProperty: => SF691 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF692 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF693 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF694 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF695 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF696 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF697 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF698 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF699 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF700 := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF701 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF702 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF703 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF704 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF705 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF706 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF709 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF710 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF711 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF712 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF713 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF714 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF715 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF716 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF717 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF719 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF720 := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF781 := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF782 := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF783 := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF784 := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF785 := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF787 := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaimNonZero = TRUE OR IsWeatherClaimComb2NonCatNonZero = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF789 := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaimNonZero = TRUE OR IsWeatherClaimComb2NonCatNonZero = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF791 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF792 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF793 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF794 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF795 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF796 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF797 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF798 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF799 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF800 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF806 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimNonCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF807 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimNonCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF808 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimNonCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF809 := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimNonCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF876 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF877 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF878 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF879 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF880 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF886 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF887 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF888 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF889 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF890 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF896 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF898 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF896_TN := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZeroTN = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF897_TN := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZeroTN = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF898_TN := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZeroTN = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF899_TN := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZeroTN = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF966 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF967 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF968 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF969 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF970 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF986 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF987 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF988 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF989 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF990 := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1056 := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1057 := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1058 := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1059 := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1076 := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1077 := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1078 := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1079 := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1146 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1147 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1148 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1149 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1150 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1166 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1167 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1168 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1169 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1170 := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1291 := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1292 := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1293 := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1294 := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1295 := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1301 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1302 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1303 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1304 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1305 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1311 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1312 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1313 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1351 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1352 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1353 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1354 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1355 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1361 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1362 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1363 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1364 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1365 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1371 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1372 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1373 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1374 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1411 := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1412 := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1413 := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1414 := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1421 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1422 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1423 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1424 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1425 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1431 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1434 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1471 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1472 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1473 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1474 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1475 := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1481 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1482 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1483 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1484 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1485 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
-ClaimsProperty: => SF1491 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1492 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1493 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1494 := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >=3000 AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1536 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1537 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1538 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1539 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1546 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1547 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1548 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
-ClaimsProperty: => SF1549 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
-ClaimsProperty: => SF1556 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
-ClaimsProperty: => SF1557 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
-ClaimsProperty: => SF1558 := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCatNonZero = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+//SF691	SF692	SF693	SF694	SF695
+ClaimsProperty: => NumWeatherClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumWeatherClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumWeatherClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumWeatherClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumWeatherClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1 = TRUE OR IsWeatherClaimComb2Cat = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF696	SF697	SF698	SF699	SF700			     
+ClaimsProperty: => NumNZWeatherClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZWeatherClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZWeatherClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZWeatherClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZWeatherClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims ((IsWeatherClaimComb1NonZero = TRUE OR IsWeatherClaimComb2CatNonZero = TRUE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF701	SF702	SF703	SF704	SF705			     
+ClaimsProperty: => NumWeatherCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumWeatherCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumWeatherCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumWeatherCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumWeatherCatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF706	SF709	SF710			     
+ClaimsProperty: => NumNZWeatherCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZWeatherCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZWeatherCatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+	
+//SF711	SF712	SF713	SF714	SF715
+ClaimsProperty: => NumWeatherNonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumWeatherNonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumWeatherNonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumWeatherNonCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumWeatherNonCatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCat = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+		
+//SF716	SF717	SF719	SF720
+ClaimsProperty: => NumNZWeatherNonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZWeatherNonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZWeatherNonCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZWeatherNonCatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsWeatherClaimComb1NonCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF781	SF782	SF783	SF784	SF785		     
+ClaimsProperty: => NumNonWeatherClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNonWeatherClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNonWeatherClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNonWeatherClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNonWeatherClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaim = TRUE OR IsWeatherClaimComb2NonCat = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF787	SF789			     
+ClaimsProperty: => NumNZNonWeatherClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaimNonZero = TRUE OR IsWeatherClaimComb2NonCatNonZero = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZNonWeatherClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims ((IsNonWeatherClaimNonZero = TRUE OR IsWeatherClaimComb2NonCatNonZero = TRUE) AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF791	SF792	SF793	SF794	SF795			     
+ClaimsProperty: => NumNonWeatherCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNonWeatherCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNonWeatherCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNonWeatherCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNonWeatherCatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCat = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF796	SF797	SF798	SF799	SF800			     
+ClaimsProperty: => NumNZNonWeatherCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZNonWeatherCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZNonWeatherCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZNonWeatherCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZNonWeatherCatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF806	SF807	SF808	SF809		     
+ClaimsProperty: => NumNZNonWeatherNonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimNonCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZNonWeatherNonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimNonCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZNonWeatherNonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimNonCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZNonWeatherNonCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsNonWeatherClaimNonCatNonZero = TRUE AND IsWeatherClaimComb1 = FALSE AND IsWeatherClaimComb2Cat = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF876	SF877	SF878	SF879	SF880			     
+ClaimsProperty: => NumNZNonWeather2ClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZNonWeather2ClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZNonWeather2ClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZNonWeather2ClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZNonWeather2ClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF886	SF887	SF888	SF889	SF890			     
+ClaimsProperty: => NumNZNonWeather2CatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZNonWeather2CatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZNonWeather2CatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZNonWeather2CatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZNonWeather2CatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF896	SF898			     
+ClaimsProperty: => NumNZNonWeather2NonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZNonWeather2NonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+
+//SF896_TN	SF897_TN	SF898_TN	SF899_TN			     
+ClaimsProperty: => NumNZNonWeatherNonCatClmWithin1YrTN := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZeroTN = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZNonWeatherNonCatClmWithin2YrTN := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZeroTN = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZNonWeatherNonCatClmWithin3YrTN := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZeroTN = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZNonWeatherNonCatClmWithin4YrTN := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCatNonZeroTN = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF966	SF967	SF968	SF969	SF970			     
+ClaimsProperty: => NumNZFireSmokeClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZFireSmokeClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZFireSmokeClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZFireSmokeClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZFireSmokeClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF986	SF987	SF988	SF989	SF990			     
+ClaimsProperty: => NumNZFireSmokeNonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZFireSmokeNonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZFireSmokeNonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZFireSmokeNonCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZFireSmokeNonCatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsFireSmokeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1056	SF1057	SF1058	SF1059			     
+ClaimsProperty: => NumNZCrimeClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZCrimeClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZCrimeClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZCrimeClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF1076	SF1077	SF1078	SF1079			     
+ClaimsProperty: => NumNZCrimeNonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZCrimeNonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZCrimeNonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZCrimeNonCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsCrimeClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF1146	SF1147	SF1148	SF1149	SF1150			     
+ClaimsProperty: => NumNZLiabilityClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZLiabilityClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZLiabilityClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZLiabilityClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZLiabilityClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1166	SF1167	SF1168	SF1169	SF1170			     
+ClaimsProperty: => NumNZLiabilityNonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZLiabilityNonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZLiabilityNonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZLiabilityNonCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumNZLiabilityNonCatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims ((IsLiabilityClaimNonCatNonZero = TRUE AND IsColBNotHaveClaim = FALSE) AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1291	SF1292	SF1293	SF1294	SF1295			     
+ClaimsProperty: => NumColAGE5000ClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColAGE5000ClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColAGE5000ClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColAGE5000ClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumColAGE5000ClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1301	SF1302	SF1303	SF1304	SF1305			     
+ClaimsProperty: => NumColAGE5000CatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColAGE5000CatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColAGE5000CatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColAGE5000CatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumColAGE5000CatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1311	SF1312	SF1313			     
+ClaimsProperty: => NumColAGE5000NonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColAGE5000NonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColAGE5000NonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+
+//SF1351	SF1352	SF1353	SF1354	SF1355			     
+ClaimsProperty: => NumColBGE5000ClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColBGE5000ClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColBGE5000ClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColBGE5000ClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumColBGE5000ClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1361	SF1362	SF1363	SF1364	SF1365			     
+ClaimsProperty: => NumColBGE5000CatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColBGE5000CatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColBGE5000CatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColBGE5000CatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumColBGE5000CatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1371	SF1372	SF1373	SF1374			                                    
+ClaimsProperty: => NumColBGE5000NonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColBGE5000NonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColBGE5000NonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColBGE5000NonCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 5000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF1411	SF1412	SF1413	SF1414			     
+ClaimsProperty: => NumColAGE3000ClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColAGE3000ClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColAGE3000ClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColAGE3000ClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaim = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF1421	SF1422	SF1423	SF1424	SF1425			     
+ClaimsProperty: => NumColAGE3000CatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColAGE3000CatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColAGE3000CatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColAGE3000CatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumColAGE3000CatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1431	SF1434			     
+ClaimsProperty: => NumColAGE3000NonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColAGE3000NonCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCat = TRUE AND TotalColAClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF1471	SF1472	SF1473	SF1474	SF1475			     
+ClaimsProperty: => NumColBGE3000ClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColBGE3000ClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColBGE3000ClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColBGE3000ClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumColBGE3000ClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaim = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1481	SF1482	SF1483	SF1484	SF1485			     
+ClaimsProperty: => NumColBGE3000CatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColBGE3000CatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColBGE3000CatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColBGE3000CatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+ClaimsProperty: => NumColBGE3000CatClmWithin5Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 5));
+
+//SF1491	SF1492	SF1493	SF1494			     
+ClaimsProperty: => NumColBGE3000NonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumColBGE3000NonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumColBGE3000NonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumColBGE3000NonCatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColBClaimNonCat = TRUE AND IsColBNotHaveClaim = FALSE AND TotalColBClaimAmount >= 3000 AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF1536	SF1537	SF1538	SF1539			     
+ClaimsProperty: => NumNZColAClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZColAClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZColAClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZColAClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF1546	SF1547	SF1548	SF1549			     
+ClaimsProperty: => NumNZColACatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZColACatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZColACatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
+ClaimsProperty: => NumNZColACatClmWithin4Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 4));
+
+//SF1556	SF1557	SF1558			     
+ClaimsProperty: => NumNZColANonCatClmWithin1Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 1));
+ClaimsProperty: => NumNZColANonCatClmWithin2Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 2));
+ClaimsProperty: => NumNZColANonCatClmWithin3Yr := COUNT(ClaimsPropertyRiskClaims (IsColAClaimNonCatNonZero = TRUE AND IsValidClaim = TRUE AND IsSFPropExclusionClaim = FALSE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsProperty.DateOfOrder) < 3));
 
 // Non-FCRA: Claims Discovery
 // Debugging QUERY's
@@ -1327,4 +1400,4 @@ QUERY: CLUEPropertyRiskClaims(SearchForID) <= ClaimsPropertyRiskClaims(rClaimsPr
 QUERY: CLUEPropertyInsuredClaims(SearchForID) <= ClaimsPropertyInsuredClaims(rClaimsProperty = SearchForID) USING [FCRA];
 // Final SHELL
 SHELL: CLUEProperty <= ClaimsProperty{UID, ReportRequestIdRecordCode, Quoteback, ReportCode, ReportType, AccountNumber, AccountSuffix, SpecialBillID, DateOfOrder, DateOfReceipt, DateOfCompletion, ProcessingCompletionStatus, ReportUsage, ReferenceNumber, TimeOfReport, Attach1ProcessStatus, RecordVersion, ReportIdSupplementA} USING [FCRA];
-SHELL: CLUEPropertyStateFarm <= ClaimsProperty{UID, SF691, SF692, SF693, SF694, SF695, SF696, SF697, SF698, SF699, SF700, SF701, SF702, SF703, SF704, SF705, SF706, SF709, SF710, SF711, SF712, SF713, SF714, SF715, SF716, SF717, SF719, SF720, SF781, SF782, SF783, SF784, SF785, SF787, SF789, SF791, SF792, SF793, SF794, SF795, SF796, SF797, SF798, SF799, SF800, SF806, SF807, SF808, SF809, SF876, SF877, SF878, SF879, SF880, SF886, SF887, SF888, SF889, SF890, SF896, SF898, SF896_TN, SF897_TN, SF898_TN, SF899_TN, SF966, SF967, SF968, SF969, SF970, SF986, SF987, SF988, SF989, SF990, SF1056, SF1057, SF1058, SF1059, SF1076, SF1077, SF1078, SF1079, SF1146, SF1147, SF1148, SF1149, SF1150, SF1166, SF1167, SF1168, SF1169, SF1170, SF1291, SF1292, SF1293, SF1294, SF1295, SF1301, SF1302, SF1303, SF1304, SF1305, SF1311, SF1312, SF1313, SF1351, SF1352, SF1353, SF1354, SF1355, SF1361, SF1362, SF1363, SF1364, SF1365, SF1371, SF1372, SF1373, SF1374, SF1411, SF1412, SF1413, SF1414, SF1421, SF1422, SF1423, SF1424, SF1425, SF1431, SF1434, SF1471, SF1472, SF1473, SF1474, SF1475, SF1481, SF1482, SF1483, SF1484, SF1485, SF1491, SF1492, SF1493, SF1494, SF1536, SF1537, SF1538, SF1539, SF1546, SF1547, SF1548, SF1549, SF1556, SF1557, SF1558} USING [FCRA];
+SHELL: CLUEPropertyStateFarm <= ClaimsProperty{UID, NumWeatherClmWithin1Yr, NumWeatherClmWithin2Yr, NumWeatherClmWithin3Yr, NumWeatherClmWithin4Yr, NumWeatherClmWithin5Yr, NumNZWeatherClmWithin1Yr, NumNZWeatherClmWithin2Yr, NumNZWeatherClmWithin3Yr, NumNZWeatherClmWithin4Yr, NumNZWeatherClmWithin5Yr, NumWeatherCatClmWithin1Yr, NumWeatherCatClmWithin2Yr, NumWeatherCatClmWithin3Yr, NumWeatherCatClmWithin4Yr, NumWeatherCatClmWithin5Yr, NumNZWeatherCatClmWithin1Yr, NumNZWeatherCatClmWithin4Yr, NumNZWeatherCatClmWithin5Yr, NumWeatherNonCatClmWithin1Yr, NumWeatherNonCatClmWithin2Yr, NumWeatherNonCatClmWithin3Yr, NumWeatherNonCatClmWithin4Yr, NumWeatherNonCatClmWithin5Yr, NumNZWeatherNonCatClmWithin1Yr, NumNZWeatherNonCatClmWithin2Yr, NumNZWeatherNonCatClmWithin4Yr, NumNZWeatherNonCatClmWithin5Yr, NumNonWeatherClmWithin1Yr, NumNonWeatherClmWithin2Yr, NumNonWeatherClmWithin3Yr, NumNonWeatherClmWithin4Yr, NumNonWeatherClmWithin5Yr, NumNZNonWeatherClmWithin2Yr, NumNZNonWeatherClmWithin4Yr, NumNonWeatherCatClmWithin1Yr, NumNonWeatherCatClmWithin2Yr, NumNonWeatherCatClmWithin3Yr, NumNonWeatherCatClmWithin4Yr, NumNonWeatherCatClmWithin5Yr, NumNZNonWeatherCatClmWithin1Yr, NumNZNonWeatherCatClmWithin2Yr, NumNZNonWeatherCatClmWithin3Yr, NumNZNonWeatherCatClmWithin4Yr, NumNZNonWeatherCatClmWithin5Yr, NumNZNonWeatherNonCatClmWithin1Yr, NumNZNonWeatherNonCatClmWithin2Yr, NumNZNonWeatherNonCatClmWithin3Yr, NumNZNonWeatherNonCatClmWithin4Yr, NumNZNonWeather2ClmWithin1Yr, NumNZNonWeather2ClmWithin2Yr, NumNZNonWeather2ClmWithin3Yr, NumNZNonWeather2ClmWithin4Yr, NumNZNonWeather2ClmWithin5Yr, NumNZNonWeather2CatClmWithin1Yr, NumNZNonWeather2CatClmWithin2Yr, NumNZNonWeather2CatClmWithin3Yr, NumNZNonWeather2CatClmWithin4Yr, NumNZNonWeather2CatClmWithin5Yr, NumNZNonWeather2NonCatClmWithin1Yr, NumNZNonWeather2NonCatClmWithin3Yr, NumNZNonWeatherNonCatClmWithin1YrTN, NumNZNonWeatherNonCatClmWithin2YrTN, NumNZNonWeatherNonCatClmWithin3YrTN, NumNZNonWeatherNonCatClmWithin4YrTN, NumNZFireSmokeClmWithin1Yr, NumNZFireSmokeClmWithin2Yr, NumNZFireSmokeClmWithin3Yr, NumNZFireSmokeClmWithin4Yr, NumNZFireSmokeClmWithin5Yr, NumNZFireSmokeNonCatClmWithin1Yr, NumNZFireSmokeNonCatClmWithin2Yr, NumNZFireSmokeNonCatClmWithin3Yr, NumNZFireSmokeNonCatClmWithin4Yr, NumNZFireSmokeNonCatClmWithin5Yr, NumNZCrimeClmWithin1Yr, NumNZCrimeClmWithin2Yr, NumNZCrimeClmWithin3Yr, NumNZCrimeClmWithin4Yr, NumNZCrimeNonCatClmWithin1Yr, NumNZCrimeNonCatClmWithin2Yr, NumNZCrimeNonCatClmWithin3Yr, NumNZCrimeNonCatClmWithin4Yr, NumNZLiabilityClmWithin1Yr, NumNZLiabilityClmWithin2Yr, NumNZLiabilityClmWithin3Yr, NumNZLiabilityClmWithin4Yr, NumNZLiabilityClmWithin5Yr, NumNZLiabilityNonCatClmWithin1Yr, NumNZLiabilityNonCatClmWithin2Yr, NumNZLiabilityNonCatClmWithin3Yr, NumNZLiabilityNonCatClmWithin4Yr, NumNZLiabilityNonCatClmWithin5Yr, NumColAGE5000ClmWithin1Yr, NumColAGE5000ClmWithin2Yr, NumColAGE5000ClmWithin3Yr, NumColAGE5000ClmWithin4Yr, NumColAGE5000ClmWithin5Yr, NumColAGE5000CatClmWithin1Yr, NumColAGE5000CatClmWithin2Yr, NumColAGE5000CatClmWithin3Yr, NumColAGE5000CatClmWithin4Yr, NumColAGE5000CatClmWithin5Yr, NumColAGE5000NonCatClmWithin1Yr, NumColAGE5000NonCatClmWithin2Yr, NumColAGE5000NonCatClmWithin3Yr, NumColBGE5000ClmWithin1Yr, NumColBGE5000ClmWithin2Yr, NumColBGE5000ClmWithin3Yr, NumColBGE5000ClmWithin4Yr, NumColBGE5000ClmWithin5Yr, NumColBGE5000CatClmWithin1Yr, NumColBGE5000CatClmWithin2Yr, NumColBGE5000CatClmWithin3Yr, NumColBGE5000CatClmWithin4Yr, NumColBGE5000CatClmWithin5Yr, NumColBGE5000NonCatClmWithin1Yr, NumColBGE5000NonCatClmWithin2Yr, NumColBGE5000NonCatClmWithin3Yr, NumColBGE5000NonCatClmWithin4Yr, NumColAGE3000ClmWithin1Yr, NumColAGE3000ClmWithin2Yr, NumColAGE3000ClmWithin3Yr, NumColAGE3000ClmWithin4Yr, NumColAGE3000CatClmWithin1Yr, NumColAGE3000CatClmWithin2Yr, NumColAGE3000CatClmWithin3Yr, NumColAGE3000CatClmWithin4Yr, NumColAGE3000CatClmWithin5Yr, NumColAGE3000NonCatClmWithin1Yr, NumColAGE3000NonCatClmWithin4Yr, NumColBGE3000ClmWithin1Yr, NumColBGE3000ClmWithin2Yr, NumColBGE3000ClmWithin3Yr, NumColBGE3000ClmWithin4Yr, NumColBGE3000ClmWithin5Yr, NumColBGE3000CatClmWithin1Yr, NumColBGE3000CatClmWithin2Yr, NumColBGE3000CatClmWithin3Yr, NumColBGE3000CatClmWithin4Yr, NumColBGE3000CatClmWithin5Yr, NumColBGE3000NonCatClmWithin1Yr, NumColBGE3000NonCatClmWithin2Yr, NumColBGE3000NonCatClmWithin3Yr, NumColBGE3000NonCatClmWithin4Yr, NumNZColAClmWithin1Yr, NumNZColAClmWithin2Yr, NumNZColAClmWithin3Yr, NumNZColAClmWithin4Yr, NumNZColACatClmWithin1Yr, NumNZColACatClmWithin2Yr, NumNZColACatClmWithin3Yr, NumNZColACatClmWithin4Yr, NumNZColANonCatClmWithin1Yr, NumNZColANonCatClmWithin2Yr, NumNZColANonCatClmWithin3Yr} USING [FCRA];

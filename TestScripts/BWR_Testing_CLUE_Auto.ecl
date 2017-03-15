@@ -7,8 +7,10 @@ MaxResults := 250; // The maximum number of records to show in the workunit
 
 TransactionIDs := DATASET([{2951}], {UNSIGNED TransactionID}); // 2 unit recaps  1 inquiry recap
 
-// Main SHELL
+// Main SHELLs (NOTE: You must set #OPTION(persist, 0) in ClaimsAuto.kel before uncommenting these to run all at once, otherwise pick one and run)
 OUTPUT(CHOOSEN(KELGlobal.S_C_L_U_E_Auto.Result(UID = TransactionIDs[1].TransactionID), MaxResults), NAMED('CLUEAuto'));
+
+// OUTPUT(CHOOSEN(KELGlobal.S_C_L_U_E_Auto_State_Farm.Result(UID = TransactionIDs[1].TransactionID), MaxResults), NAMED('CLUEAutoStateFarm'));
 
 /* Debugging Queries - Raw File Results */
 OUTPUT(CHOOSEN(KELBlackBox.FileCLUECleaned.FileCLUEAutoCleaned(RecordIdentifier = TransactionIDs[1].TransactionID), MaxResults), NAMED('RawAuto'));
