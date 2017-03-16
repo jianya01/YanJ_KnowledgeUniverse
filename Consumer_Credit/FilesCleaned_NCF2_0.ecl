@@ -177,6 +177,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.ChargeOffAmount			:= IF(LEFT.Transaction_ID[1] = '8', '1000', '500');
 		SELF.ScheduledPaymentAmount		:= IF(LEFT.Transaction_ID[1] = '8', '100', '50');
 		SELF.MonthlyPaymentType			:= IF(LEFT.Transaction_ID[1] = '8', 'S', '');
+		SELF.AccountPurposeType			:= IF(LEFT.Transaction_ID[1] = '8', 'CR', 'AU');
 		SELF.ActualPaymentAmount		:= IF(LEFT.Transaction_ID[1] = '8', '100', '50');
 		SELF.ActualPaymentNullInd		:= IF(LEFT.Transaction_ID[1] = '8', '0', '0');
 		SELF.StatusCode					:= IF(LEFT.Transaction_ID[1] = '8', 'B', '');
@@ -185,7 +186,10 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.OldHistoricWorstRatingCode	:= IF(LEFT.Transaction_ID[1] = '8', '1', '1');
 		SELF.OldHistoricWorstRatingDate	:= IF(LEFT.Transaction_ID[1] = '8', '20100201', '02002010');
 		SELF.StatusDate					:= IF(LEFT.Transaction_ID[1] = '8', '20100201', '20100201');
-		SELF.LastPaymentDate			:= IF(LEFT.Transaction_ID[1] = '8', '02032017', '02032017');
+		LastPaymentDate					:= IF(LEFT.Transaction_ID[1] = '8', '02032017', '02032017');
+		SELF.LastPaymentDate			:= IF(SELF.BureauCode IN ['XPN', 'EFX'], LastPaymentDate[5..8] + LastPaymentDate[1..2] + LastPaymentDate[3..4], LastPaymentDate[1..4] + LastPaymentDate[5..6] + LastPaymentDate[7..8]);
+		ClosedDate					    := IF(LEFT.Transaction_ID[1] = '8', '02032017', '02032017');
+		SELF.ClosedDate			        := IF(SELF.BureauCode = 'EFX', ClosedDate[5..8] + ClosedDate[1..2] + ClosedDate[3..4], ClosedDate);
 		SELF.PaymentHistory84Months		:= IF(LEFT.Transaction_ID[1] = '8', '111234567654321111111111', '77654321111111111111112121111111');
 		SELF.PaymentHistory84MonthDataset := NormalizeTradelineHistory(SELF.PaymentHistory84Months, LEFT.Transaction_ID, LEFT.LexID, LEFT.Date_Reported, LEFT.RecordTypeCounter);
 		SELF.ConsumerDisputeFlag		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
