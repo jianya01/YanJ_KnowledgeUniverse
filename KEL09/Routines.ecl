@@ -1,9 +1,13 @@
-﻿IMPORT KEL09 AS KEL;
+//IMPORT:KEL09.Routines
+IMPORT KEL09 AS KEL;
 IMPORT STD;
 IMPORT * FROM KEL09.Null;
+
 EXPORT Routines := MODULE
+
 //============================================================================================
 //      Annotations
+
     EXPORT BuildRecord(din, fieldList, parm) := FUNCTIONMACRO
         // Build a partial record definition based on the given dataset and the given list of fields
         // parm=NOQUAL means don't put the dataset name as a qualifier to the field names
@@ -34,6 +38,7 @@ EXPORT Routines := MODULE
           RETURN '';
       #END
     ENDMACRO;
+
     EXPORT BuildClear(din, groups, fieldin) := FUNCTIONMACRO
     // build assignments using the __CLEAN macro to clear un-needed flags
       LoadXml('<xml/>');
@@ -60,6 +65,7 @@ EXPORT Routines := MODULE
     //#ERROR(%'newFields'%)
     RETURN %'newFields'%;
     ENDMACRO;
+
     EXPORT BuildJoin(din, groups, fieldin, lastcon) := FUNCTIONMACRO
       // Build a join condition for the group
       // all members of groups, ANDed; if fieldin not blank, it ANDed; if the result not blank, add lastcon
@@ -73,7 +79,11 @@ EXPORT Routines := MODULE
                 #IF(%'newFields'% != '')
                   #APPEND(newFields, ' AND ');
                 #END
-                #APPEND(newFields, '__EEQP(LEFT.'+%'@label'%+',RIGHT.'+%'@label'%+')')
+                #IF(__ISNULLABLE(din.%@label%))
+                  #APPEND(newFields, '__EEQP(LEFT.'+%'@label'%+',RIGHT.'+%'@label'%+')')
+                #ELSE
+                  #APPEND(newFields, 'LEFT.'+%'@label'%+'=RIGHT.'+%'@label'%)
+                #END
               #END
             #END
           #END
@@ -90,6 +100,7 @@ EXPORT Routines := MODULE
     //#ERROR(%'newFields'%)
     RETURN %'newFields'%;
     ENDMACRO;
+
     EXPORT BuildSort(din, groups, fieldin, oncard, up) := FUNCTIONMACRO
     // Build the 'value' part of a sort command
       LoadXml('<xml/>');
@@ -125,6 +136,7 @@ EXPORT Routines := MODULE
     //#ERROR(%'outStr'%)
     RETURN(%'outStr'%);
     ENDMACRO;
+
     EXPORT BuildBreak(din, groups) := FUNCTIONMACRO
     // build a test for a change in one of the keys in 'groups' - return the string 'FALSE' if no groups
       LoadXml('<xml/>');
@@ -135,9 +147,13 @@ EXPORT Routines := MODULE
             #FOR(field)
               #IF(REGEXFIND(','+%'@label'%+',', ','+groups+',',NOCASE))
                 #IF(%'newFields'% != '')
-                  #APPEND(newFields, ' AND ');
+                  #APPEND(newFields, ' OR ');
                 #END
-                #APPEND(newFields, 'NOT __EEQP(LEFT.'+%'@label'%+',RIGHT.'+%'@label'%+')')
+                #IF(__ISNULLABLE(din.%@label%))
+                  #APPEND(newFields, 'NOT __EEQP(LEFT.'+%'@label'%+',RIGHT.'+%'@label'%+')')
+                #ELSE
+                  #APPEND(newFields, 'LEFT.'+%'@label'%+'<>RIGHT.'+%'@label'%)
+                #END
               #END
             #END
           #END
@@ -148,6 +164,7 @@ EXPORT Routines := MODULE
     //#ERROR(%'newFields'%)
     RETURN %'newFields'%;
     ENDMACRO;
+
   EXPORT KELcardinalityTable(din, groups, fieldin, fieldout, weighted) := FUNCTIONMACRO
   // build shared cardinality table -- note that the contents of .f have been partly cleared
     LOCAL __c1 := KEL.Routines.BuildClear(din, groups, fieldin);
@@ -165,6 +182,7 @@ EXPORT Routines := MODULE
                           MERGE);
     RETURN __ctab;
     ENDMACRO;
+
   EXPORT KELmodeTable(din, groups, fieldin, weighted) := FUNCTIONMACRO
   // insert mode annotation
     LOCAL __ntab := din (__NN(fieldin));                                        // no NULLs
@@ -187,6 +205,7 @@ EXPORT Routines := MODULE
     LOCAL __itab := IF (groups = '', __itab1, __itab2b);
     RETURN __itab;
   ENDMACRO;
+
   EXPORT KELrankOrdinal(din, groups, fieldin, fieldout, up) := FUNCTIONMACRO
       // we're not offering this one in KEL for now - too expensive and the sequence is too arbitrary
     // insert ordinal rank annotation [a,b,b,c -> 1,2,3,4]
@@ -202,10 +221,12 @@ EXPORT Routines := MODULE
                                                           IF(#EXPAND(__b1), __CN(1), __CN(__T(LEFT.fieldout)+1)));
                                   SELF := RIGHT));
   ENDMACRO;
+
   EXPORT KELrankTableRaw(din, groups, fieldin, up, standard, modified, fractional, dense, weighted) := FUNCTIONMACRO
   // generate standard [a,b,b,c -> 1,2,2,4], modified [a,b,b,c -> 1,3,3,4], fractional [a,b,b,c -> 1,2.5,2.5,4]
   //      and/or dense [a,b,b,c -> 1,2,2,3] rank annotations
   // bonus: __count is cardinality, but no entry for NULL
+
     LOCAL __ntab := din (__NN(fieldin));                                        // no NULLs
     LOCAL __ctab := KEL.Routines.KELcardinalityTable(__ntab, groups, fieldin, __count, weighted);
     LOCAL __m1 := KEL.Routines.BuildRecord(din, groups, '');
@@ -222,6 +243,7 @@ EXPORT Routines := MODULE
                                                SELF := RIGHT));
     RETURN __ro;
   ENDMACRO;
+
   EXPORT KELrankTable(din, groups, fieldin, up, standard, modified, fractional, dense, weighted) := FUNCTIONMACRO
     LOCAL __rtab := KEL.Routines.KELrankTableRaw(din, groups, fieldin, up, standard, modified, fractional, dense, weighted);
     LOCAL __m1 := KEL.Routines.BuildRecord(din, groups, '');
@@ -231,6 +253,7 @@ EXPORT Routines := MODULE
                                                        SELF := LEFT));
     RETURN __ro;
   ENDMACRO;
+
   EXPORT KELbucketTableRaw(din, groups, fieldin, up, weighted) := FUNCTIONMACRO
     LOCAL __rtab := KEL.Routines.KELrankTableRaw(din, groups, fieldin, up, __stdrank, __modrank, __frarank, __denrank, weighted);
     LOCAL __m2 := KEL.Routines.BuildRecord(__rtab, groups, fieldin);
@@ -252,9 +275,11 @@ EXPORT Routines := MODULE
                          LEFT OUTER, LOOKUP);
     #END
   ENDMACRO;
+
   EXPORT INTEGER KELbucketCalc(REAL observ, INTEGER bins, INTEGER pop) := FUNCTION
     RETURN (TRUNCATE((observ-1) / (pop/bins))) + 1;
   END;
+
   EXPORT KELbucketTable(din, groups, fieldin, up, buckets1, fieldout1, buckets2=0, fieldout2='', buckets3=0, fieldout3='', weighted=false) := FUNCTIONMACRO
       // build support table { group, group, ... fieldin, bin1 [, bin2, [bin3]] }
     LOCAL __btab := KEL.Routines.KELbucketTableRaw(din, groups, fieldin, up, weighted);
@@ -285,52 +310,69 @@ EXPORT Routines := MODULE
                         SELF := LEFT));
     RETURN __result;
   ENDMACRO;
+
+
 //============================================================================================
 //      Date Related
+
 // many are KEL wrapper functions for equivalents in ECL module STD.DATE
+
   EXPORT INTEGER Year (KEL.typ.kdate pdate) := FUNCTION
         RETURN STD.DATE.Year(pdate);
         END;
+
   EXPORT INTEGER Month (KEL.typ.kdate pdate) := FUNCTION
         RETURN STD.DATE.Month(pdate);
         END;
+
   EXPORT INTEGER Day (KEL.typ.kdate pdate) := FUNCTION
         RETURN STD.DATE.Day(pdate);
         END;
+
   EXPORT KEL.typ.kdate DateFromParts (INTEGER2 yyyy, UNSIGNED1 mm, UNSIGNED1 dd) := FUNCTION
         RETURN STD.DATE.DateFromParts(yyyy, mm, dd);
         END;
+
   // this works on a year number
   EXPORT BOOLEAN IsLeapYear (INTEGER pdate) := FUNCTION
         RETURN STD.DATE.IsLeapYear(pdate);
         END;
+
   // this works on a DATE while STD.DATE.IsLeapYear works on a year number
   EXPORT BOOLEAN IsDateLeapYear (KEL.typ.kdate pdate) := FUNCTION
         RETURN STD.DATE.IsDateLeapYear(pdate);
         END;
+
   EXPORT INTEGER DayOfYear (KEL.typ.kdate pdate) := FUNCTION
         RETURN STD.DATE.DayOfYear(pdate);
         END;
+
   EXPORT INTEGER YearsBetween (KEL.typ.kdate pdate1, KEL.typ.kdate pdate2) := FUNCTION
         RETURN STD.DATE.YearsBetween(pdate1, pdate2);
         END;
+
   EXPORT INTEGER MonthsBetween (KEL.typ.kdate pdate1, KEL.typ.kdate pdate2) := FUNCTION
         RETURN STD.DATE.MonthsBetween(pdate1, pdate2);
         END;
+
   EXPORT INTEGER DaysBetween (KEL.typ.kdate pdate1, KEL.typ.kdate pdate2) := FUNCTION
         RETURN STD.DATE.DaysBetween(pdate1, pdate2);
         END;
+
   EXPORT INTEGER FromGregorianDate (KEL.typ.kdate pdate) := FUNCTION
       // convert yyyymmdd date to Rata Die (day count with 1/1/1 as day number 1)
     RETURN STD.DATE.FromGregorianDate(pdate);
     END;
+
   EXPORT KEL.typ.kdate ToGregorianDate (INTEGER pdate) := FUNCTION
       // convert Rata Die (day count with 1/1/1 as day number 1) date to yyyymmdd
     RETURN STD.DATE.ToGregorianDate(pdate);
     END;
+
   EXPORT INTEGER Today () := FUNCTION
     RETURN STD.DATE.Today();
     END;
+
   EXPORT FromStringToDate(pstr, format) := FUNCTIONMACRO
       // format is per IEEE Std 1003.1 for the strptime() function
       LOCAL KEL.typ.kdate __result:= KEL.Routines.StringToDateHelper(__T(pstr), __T(format));
@@ -342,6 +384,7 @@ EXPORT Routines := MODULE
   EXPORT KEL.typ.kdate StringToDateHelper(KEL.typ.str pstr, KEL.typ.str format) := FUNCTION
       RETURN STD.DATE.FromStringToDate(pstr, format);
       END;
+
     // TODO - this currently doesn't work - the compiler wants all inputs and outputs of a
     // function to be nullable or non-nullable (all the same) but is not able to boost
     // a set of strings literal to nullable -- so it takes the all-non-nullable template
@@ -354,14 +397,17 @@ EXPORT Routines := MODULE
       LOCAL KEL.typ.nkdate __rval := IF(__NL(pstr) OR __result = 0 OR NOT KEL.Routines.IsValidDate(__result), __N(KEL.typ.kdate), __CN(__result));
       RETURN __rval;
       ENDMACRO;
+
     EXPORT DateToString(KEL.typ.kdate pdate, STRING format) := FUNCTION
       // format is per IEEE Std 1003.1 for the strftime() function
       RETURN STD.DATE.DateToString(pdate, format);
       END;
+
     EXPORT DayOfWeek(KEL.typ.kdate pdate) := FUNCTION
       // compute US-convention weekday number [1..7] where 1 is Sunday and 7 is Saturday
       RETURN STD.DATE.DayOfWeek(pdate);
       END;
+
     EXPORT WeekNumber(KEL.typ.kdate pdate) := FUNCTION
         // compute ISO 8601 week numbers
         // (zero means the date is in the last week of the preceeding year;
@@ -369,45 +415,58 @@ EXPORT Routines := MODULE
         RETURN (STD.DATE.DayOfYear(pdate) - DayOfWeek(pdate) + 10) DIV 7;
         // example Friday 26 September 2008 is in week 39
       END;
+
   EXPORT KEL.typ.kdate AdjustCalendar(KEL.typ.kdate date,
                             INTEGER year_delta = 0,
                             INTEGER month_delta = 0,
                             INTEGER day_delta = 0) := FUNCTION
       RETURN STD.DATE.AdjustCalendar(date, year_delta, month_delta, day_delta);
       END;
+
   EXPORT BOOLEAN IsJulianLeapYear (INTEGER pdate) := FUNCTION
       RETURN STD.DATE.IsJulianLeapYear(pdate);
       END;
+
   EXPORT BOOLEAN IsValidDate3 (KEL.typ.kdate pdate, INTEGER yearlow, INTEGER yearhigh) := FUNCTION
     RETURN STD.DATE.IsValidDate(pdate, yearlow, yearhigh);
     END;
+
   EXPORT BOOLEAN IsValidDate (KEL.typ.kdate pdate) := FUNCTION
     RETURN STD.DATE.IsValidDate(pdate);
     END;
+
   EXPORT STRING ConvertDateFormat (STRING pdate, STRING iform, STRING oform) := FUNCTION
       RETURN STD.DATE.ConvertDateFormat(pdate, iform, oform);
       END;
+
   EXPORT STRING ConvertDateFormatMultiple (STRING pdate, SET OF STRING iform, STRING oform) := FUNCTION
       RETURN STD.DATE.ConvertDateFormatMultiple(pdate, iform, oform);
       END;
+
   EXPORT INTEGER DaysSince1900(INTEGER pyear, INTEGER pmonth, INTEGER pday) := FUNCTION
       RETURN STD.DATE.DaysSince1900(pyear, pmonth, pday);
       END;
+
   EXPORT INTEGER ToDaysSince1900(KEL.typ.kdate pdate) := FUNCTION
       RETURN STD.DATE.ToDaysSince1900(pdate);
       END;
+
   EXPORT KEL.typ.kdate FromDaysSince1900(INTEGER pdays) := FUNCTION
       RETURN STD.DATE.FromDaysSince1900(pdays);
       END;
+
   EXPORT KEL.typ.kdate DatesForMonthStart(KEL.Typ.kdate pdays) := FUNCTION
       RETURN STD.DATE.DatesForMonth(pdays).startDate;
       END;
+
   EXPORT KEL.typ.kdate DatesForMonthEnd(KEL.Typ.kdate pdays) := FUNCTION
       RETURN STD.DATE.DatesForMonth(pdays).endDate;
       END;
+
   EXPORT KEL.typ.kdate DatesForWeekStart(KEL.Typ.kdate pdays) := FUNCTION
       RETURN STD.DATE.DatesForWeek(pdays).startDate;
       END;
+
   EXPORT KEL.typ.kdate DatesForWeekEnd(KEL.Typ.kdate pdays) := FUNCTION
       RETURN STD.DATE.DatesForWeek(pdays).endDate;
       END;
@@ -417,47 +476,60 @@ EXPORT Routines := MODULE
       LOCAL KEL.typ.nkdate __rval := IF(__NN(pdate) AND KEL.Routines.IsValidDate(__result), __CN(__result), __N(Kel.typ.kdate));
       RETURN __rval;
       ENDMACRO;
+
   EXPORT IntegerFromDate(pdate) := FUNCTIONMACRO
       RETURN pdate;
       ENDMACRO;
+
   EXPORT NIntegerFromNDate(pdate) := FUNCTIONMACRO
       RETURN __CAST(KEL.typ.int, pdate);
       ENDMACRO;
+
 //============================================================================================
 //      Helper Functions for FromFlat macro handling DATEs
+
   EXPORT KEL.typ.nkdate DateFromField(KEL.typ.kdate pdate) := FUNCTION
     KEL.typ.nkdate rval := IF(IsValidDate(pdate), __CN(pdate), __N(Kel.typ.kdate));
     RETURN rval;
   END;
+
   EXPORT DateFromField2(pdate, prule) := FUNCTIONMACRO
     KEL.typ.kdate tdate := (KEL.typ.kdate)prule(pdate);
     LOCAL KEL.typ.nkdate __rval := IF(KEL.Routines.IsValidDate(tdate), __CN(tdate), __N(Kel.typ.kdate));
     RETURN __rval;
   ENDMACRO;
+
 //============================================================================================
 //      Helper Functions for ECL syntax
+
   EXPORT SubStr2(STRING pstr, istart, iend) := FUNCTION
         RETURN pstr[istart..iend];
         END;
+
   EXPORT SubStr1(STRING pstr, istart) := FUNCTION
         RETURN pstr[istart..];
         END;
+
   // varients on TRIM keywords
   EXPORT TrimAll(STRING pstr) := FUNCTION
         RETURN TRIM(pstr, ALL);
         END;
+
   EXPORT TrimBoth(STRING pstr) := FUNCTION
         RETURN TRIM(pstr, LEFT, RIGHT);
         END;
+
   EXPORT TrimLeft(STRING pstr) := FUNCTION
         RETURN TRIM(pstr, LEFT);
         END;
+
 //  clipping functions
   EXPORT BoundsFold(pvalue, plow, phigh) := FUNCTION
         RETURN IF(pvalue < plow,
                   plow,
                   IF(pvalue > phigh, phigh, pvalue));
           END;
+
   EXPORT BoundsClip(pvalue, plow, phigh) := FUNCTIONMACRO
         RETURN IF( __NL(pvalue) OR
                   (__NN(plow)  AND __T(pvalue) < __T(plow)) OR
@@ -465,10 +537,13 @@ EXPORT Routines := MODULE
                   __N(TYPEOF(__T(pvalue))),
                   pvalue);
         ENDMACRO;
+
 //  string operations (added in #1159)
+
   EXPORT KEL.Typ.bool EndsWith(STRING psource, STRING psuffix) := FUNCTION
         RETURN STD.Str.EndsWith( psource, psuffix );
         END; 
+
   EXPORT KEL.Typ.bool StartsWith(STRING psource, STRING pprefix) := FUNCTION
         RETURN STD.Str.StartsWith( psource, pprefix );
         END;
@@ -476,14 +551,17 @@ EXPORT Routines := MODULE
   EXPORT KEL.Typ.bool Contains(STRING psource, STRING ptarget) := FUNCTION
         RETURN STD.Str.Find( psource, ptarget);
         END;                
+
   EXPORT ToUpperCase(STRING psource) := FUNCTION
         RETURN STD.Str.ToUpperCase( psource );
         END;
+
   // [harder than expected to find pairs of COUNT and GET with matching semantics]
   EXPORT INTEGER CountWords(STRING psource, STRING pseparator=' ') := 
           if ( pseparator = ' ',
              STD.Str.CountWords( psource, pseparator ),
              STD.Str.FindCount( psource, pseparator ) + 1);
+
   import lib_stringlib;
   sp(string s,integer1 n,string1 sep) := if( stringlib.stringfind(s,sep,n)=0, length(s)+1, stringlib.stringfind(s,sep,n) );
   export string word(string s,integer1 n,string1 sep=' ') := 
@@ -492,22 +570,32 @@ EXPORT Routines := MODULE
                // copied from the SALT33 ut.mod library
               if (n = 1, s[1..sp(s,1,sep)-1],
                    s[sp(s,n-1,sep)+1..sp(s,n,sep)-1]) );
+
 //============================================================================================
 //      Helper Functions for scalar MIN/MAX on nullable values
+
   EXPORT MinN(v1, v2) := FUNCTIONMACRO
         LOCAL __v1 := v1;
         LOCAL __v2 := v2;
-        RETURN MAP(__NL(__v1) => __v2,
-                   __NL(__v2) => __v1,
-                   __T(__v1) < __T(__v2) => __v1,
-                   __v2);
-        ENDMACRO;
+        LOCAL __v1Null := __NL(__v1);
+        LOCAL __v2Null := __NL(__v2);
+        LOCAL __v1Value := __T(__v1);
+        LOCAL __v2Value := __T(__v2);
+        LOCAL __flag := __v1Null AND __v2NULL;
+        LOCAL __value := MAP(__v1Null => __v2Value, __v2Null => __v1Value, __v1Value < __v2Value => __v1Value, __v2Value); 
+        RETURN __BN(__value, __flag);
+  ENDMACRO;
+
   EXPORT MaxN(v1, v2) := FUNCTIONMACRO
         LOCAL __v1 := v1;
         LOCAL __v2 := v2;
-        RETURN MAP(__NL(__v1) => __v2,
-                   __NL(__v2) => __v1,
-                   __T(__v1) > __T(__v2) => __v1,
-                   __v2);
-        ENDMACRO;
+        LOCAL __v1Null := __NL(__v1);
+        LOCAL __v2Null := __NL(__v2);
+        LOCAL __v1Value := __T(__v1);
+        LOCAL __v2Value := __T(__v2);
+        LOCAL __flag := __v1Null AND __v2NULL;
+        LOCAL __value := MAP(__v1Null => __v2Value, __v2Null => __v1Value, __v1Value > __v2Value => __v1Value, __v2Value); 
+        RETURN __BN(__value, __flag);
+  ENDMACRO;
+
 END;

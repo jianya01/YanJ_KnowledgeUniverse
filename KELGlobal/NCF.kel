@@ -1,15 +1,15 @@
 ﻿// KEL Compiler Options and Configurations
-#OPTION(persist, 2)
+#OPTION(persist, 0)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
- 
+  
 // Defining the ERA to allow for ASOF functionality
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
-
+ 
 // Defining the PERMITS to allow for NCF v1 and v2 to utilize the same ENTITY/Attribute definitions, but different USE statements
 PERMITS v1, v2;
-
+ 
 // Defined to support the Person/CreditReport ASSOCIATIONS
 Person := ENTITY(FLAT(UID=LexID));
 
@@ -781,7 +781,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.ReportRequest_Data(FLAT,
 		ReportUsage = ReportUsage,
 		ReferenceNumber = ReferenceNumber),
 	PERMITS([v2]));
-
+ 
 USE Consumer_Credit.FilesCleaned_NCF2_0.Bankruptcy_Data(FLAT,
 	CreditReportBankruptcy(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
@@ -3303,6 +3303,7 @@ CreditReportBankruptcy: => NC_DISPUTE_STATUS_PENDING := MAP(BureauCode = XP => N
                                          BureauCode = TU => NC_DISPUTE_STATUS_PENDING_TU,BLANK_SET);																																		 																	 																			 																		 
 
 //Global Attributes
+
 CreditReportBankruptcy: => PRDischargedBKP := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISCHARGED_BKP; //GPRDischargedBKP
 CreditReportBankruptcy: => PRDismissedBKP := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISMISSED_BKP; //GPRDismissedBKP
 CreditReportBankruptcy: => PRBankruptcy13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_BANKRUPTCY_13; //GPRBankruptcy13
@@ -3522,7 +3523,7 @@ CreditReportTradeline: => CIIBankruptcyDismissed := NOT ConsumerInfoIndicator:Nu
 CreditReportTradeline: => CIIBankruptcyWithdrawn := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_WITHDRAWN; //G1CIIBANKRUPTCYWITHDRAWN
 CreditReportTradeline: => CIIPaidPayingBadDebt := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_PAID_PAYING_BAD_DEBT; //G1CIIPAIDPAYINGBADDEBT
 CreditReportTradeline: => CIIDEROG := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_DEROG; //G1CII_DEROG
-CreditReportTradeline: => MonthsPaymentPatternStartDate := MONTHSBETWEEN(PaymentPatternStartDate, rCreditReport.DateReported); //GMOSPaymentPatternStartDate
+CreditReportTradeline: => MonthsPaymentPatternStartDate := ABS(MONTHSBETWEEN(PaymentPatternStartDate, rCreditReport.DateReported)); //GMOSPaymentPatternStartDate
 CreditReportTradeline: => GridL3_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 3 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING); //G1GridL3_SATISFACTORY
 CreditReportTradeline: => GridL3_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 3 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING); //G1GridL3_30DPD
 CreditReportTradeline: => GridL3_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 3 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING); //G1GridL3_60DPD
@@ -3561,6 +3562,7 @@ CreditReportTradeline: => GridL48_120180DPD := EXISTS(PaymentHistory84MonthsSM) 
 CreditReportTradeline: => GridL48_Collection := EXISTS(PaymentHistory84MonthsSM) AND (MonthsPaymentPatternStartDate <= 48 AND MonthsPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (MonthsPaymentPatternStartDate - 1))).PaymentCode IN ['Y']); //G1GridL48_Collection
 
 // Level 2 Globals
+
 CreditReportTradeline: => Deceased := ECOADeceased OR NCDeceased OR RateDeceased OR StatusDeceased; //G2Deceased
 CreditReportTradeline: => FamilySupport := TypeFamilySupport OR NCFamilySupport; //G2FamilySupport
 CreditReportTradeline: => CommercialAccount := TypeCommercialAccount OR NCCommercialAccount; //G2CommercialAccount
@@ -3617,8 +3619,8 @@ CreditReportTradeline: => BankruptcyDischarged := NCBankruptcyDischarged OR CIIB
 CreditReportTradeline: => BankruptcyDismissed := NCBankruptcyDismissed  OR CIIBankruptcyDismissed; //G2BANKRUPTCYDISMISSED
 CreditReportTradeline: => BankruptcyWithdrawn := NCBankruptcyWithdrawn  OR CIIBankruptcyWithdrawn; //G2BankruptcyWithdrawn
 CreditReportTradeline: => Derogatory := NCDEROG OR ActivityDesignatorDEROG OR RateDEROG OR StatusDerogatory OR CIIDEROG OR NCHighcreditIsChargeoffAmt; //G2Derogatory
-CreditReportTradeline: => MonthsStatusDate := MONTHSBETWEEN(StatusDate, rCreditReport.DateReported); //GMOSStatusDate
-CreditReportTradeline: => MonthsLastPaymentDate := MONTHSBETWEEN(LastPaymentDate, rCreditReport.DateReported); //GMOSLastPaymentDate
+CreditReportTradeline: => MonthsStatusDate := ABS(MONTHSBETWEEN(StatusDate, rCreditReport.DateReported)); //GMOSStatusDate
+CreditReportTradeline: => MonthsLastPaymentDate := ABS(MONTHSBETWEEN(LastPaymentDate, rCreditReport.DateReported)); //GMOSLastPaymentDate
 CreditReportTradeline: => MonthsDerogatory := IF(Derogatory, IF(MonthsStatusDate >= 0, MonthsStatusDate, IF(MonthsLastPaymentDate >= 0, MonthsLastPaymentDate+ 6, -9999)),-9999); //G3MOSDerogatory
 CreditReportTradeline: => Collection := KOBCollection OR StatusCollection OR TypeCollection OR NCCollection OR RateCollection OR ReturnedCheck OR FamilySupport; //G3Collection
 CreditReportTradeline: => EverDerog := Derogatory OR OldRateDerog OR GridDEROGEver; //G3EverDerog
@@ -3626,7 +3628,7 @@ CreditReportTradeline: => EverCollection := Collection OR OldRateCollection OR G
 CreditReportTradeline: => Ever90P := Current120180 OR OldRate120180DPD OR Grid120180DPDEver OR Current90 OR OldRate90DPD OR Grid90DPDEver OR (NinetyDayCounter > 0); //G3Ever90P
 CreditReportTradeline: => Ever60 := Current60 OR OldRate60DPD OR Grid60DPDEver OR (SixtyDayCounter > 0); //G3Ever60
 CreditReportTradeline: => Ever30 := Current30 OR OldRate30DPD OR Grid30DPDEver OR (ThirtyDayCounter > 0); //G3Ever30
-CreditReportTradeline: => MonthsDateReported := MONTHSBETWEEN(DateReported, rCreditReport.DateReported); //GMOSDateReported
+CreditReportTradeline: => MonthsDateReported := ABS(MONTHSBETWEEN(DateReported, rCreditReport.DateReported)); //GMOSDateReported
 CreditReportTradeline: => Satisfactory_3M := (CurrentSatisfactory AND MonthsDateReported >= 0 AND MonthsDateReported <= 3) OR GridL3_Satisfactory; //G3_Satisfactoryin3M
 CreditReportTradeline: => DaysPastDue30_3M := (Current30 AND MonthsDateReported >= 0 AND MonthsDateReported <= 3) OR GridL3_30DPD; //G3_30DPDin3M
 CreditReportTradeline: => DaysPastDue60_3M := (Current60 AND MonthsDateReported >= 0 AND MonthsDateReported <= 3) OR GridL3_60DPD; //G3_60DPDin3M
@@ -3672,11 +3674,11 @@ CreditReportTradeline: => WorstRating48M := IF(Collection AND MonthsDerogatory >
 CreditReportTradeline: => RecoveredAccount := EverDerog AND NOT Derogatory; //G4RecoveredAccount
 CreditReportTradeline: => CurrentImprovedAccount := NOT EverDerog AND ((Ever90P AND (Current60 OR Current30 OR CurrentSatisfactory)) OR (Ever60  AND (Current30 OR CurrentSatisfactory)) OR (Ever30 AND CurrentSatisfactory)); //G4CurrentImprovedAccount
 CreditReportTradeline: => RevivedAccount := CurrentSatisfactory AND (EverDerog OR Ever90P OR Ever60 OR Ever30); //G4RevivedAccount
-CreditReportTradeline: => MonthsClosedDate := MONTHSBETWEEN(ClosedDate, rCreditReport.DateReported); //GMOSClosedDate
+CreditReportTradeline: => MonthsClosedDate := ABS(MONTHSBETWEEN(ClosedDate, rCreditReport.DateReported)); //GMOSClosedDate
 CreditReportTradeline: => Closed := Deceased OR ECOAClosed OR NCClosed OR (NCClosedIfZeroBalance AND NOT (AccountBalance > 0)) OR ActivityDesignatorClosed OR RateClosed OR StatusClosed OR (AccountTypeI AND NOT (AccountBalance > 0)) OR (AccountTypeM AND NOT (AccountBalance > 0)) OR (NOT ClosedDate:Null AND MonthsClosedDate >=0) OR Derogatory; //G3Closed
-//_auditGroupCount = G4HomeEquity + G5Mortgage + G5AutoBank + G6AutoFinance + G4OtherLineOfCredit + G5StudentLoan + G2RetailCreditCard + G3RetailNonCreditCard + G2BankCard + G6ConsumerFinance + G7PersonalFinance;
 
 // p02 Trade Globals
+
 CreditReportTradeline: =>  CreditLimitOrHighCredit := IF(CreditLimit > 0, CreditLimit, IF(HighestCreditAmount > 0, HighestCreditAmount, -9999)); //GCreditLimitORHighCredit
 CreditReportTradeline: =>  CalculatedChargeOffAmount := IF(ChargeOffAmount > 0, ChargeOffAmount, IF(NCHighcreditIsChargeoffAmt, HighestCreditAmount, -9999)); //GChargeOffAmount
 CreditReportTradeline: =>  CollectionAmount := IF(Collection, IF(CalculatedChargeOffAmount > 0, CalculatedChargeOffAmount, IF(KOBCollection OR TypeCollection OR ReturnedCheck OR FamilySupport, IF(ThirtyDayCounter = 0 AND SixtyDayCounter = 0 AND NinetyDayCounter = 0, HighestCreditAmount, MAX(AccountBalance, AmountPastDue)),AccountBalance)), -9999); //GCollectionAmount
@@ -3787,280 +3789,278 @@ CreditReportTradeline: =>  ActualPaymentNullInd23 := ONLY(Trended(MonthCounter =
 CreditReportTradeline: =>  ActualPaymentNullInd24 := ONLY(Trended(MonthCounter = 25), ActualPaymentNullInd);
 
 //Trended Attributes
-CreditReportTradeline.Trended: => GTDMOSLastPaymentM := MONTHSBETWEEN(LastPayment, CreditReportTradeline.rCreditReport.DateReported);
-CreditReportTradeline.Trended: => GTDavailableM := NOT ((BalanceAmount <= 0) AND (LoanAmountCreditLimit <= 0) AND (ScheduledPayment <= 0) AND LastPayment:Null AND (ActualPayment <= 0) AND (ActualPaymentNullInd = 1));
-// CreditReportTradeline.Trended: => GTDNewInfoM := IF(MonthCounter <= 24, GTDavailableM AND NOT (BalanceAmount = ONLY(CreditReportTradeline.Trended(MonthCounter + 1 = CreditReportTradeline.Trended.MonthCounter), BalanceAmount)), GTDavailableM);
-CreditReportTradeline.Trended: => GTDutilizationM := IF(LoanAmountCreditLimit > 0, MIN(ROUND(MAX(BalanceAmount, 0) * 10000 / LoanAmountCreditLimit)/100, 999.99), 0);
-CreditReportTradeline: => GTDNMavailable24 := Trended(GTDavailableM = TRUE):Count;//SUM(Trended, Trended.GTDavailableM);
-// CreditReportTradeline.Trended: => GTDoverPaymentM := MAX(ActualPayment - ONLY(CreditReportTradeline.Trended(MonthCounter =  CreditReportTradeline.Trended.MonthCounter + 1), ScheduledPayment), 0);
+CreditReportTradeline.Trended: => MonthsLastPaymentM := ABS(MONTHSBETWEEN(LastPayment, CreditReportTradeline.rCreditReport.DateReported)); //GTDMOSLastPaymentM
+CreditReportTradeline.Trended: => AvailableM := NOT ((BalanceAmount <= 0) AND (LoanAmountCreditLimit <= 0) AND (ScheduledPayment <= 0) AND LastPayment:Null AND (ActualPayment <= 0) AND (ActualPaymentNullInd = 1)); //AvailableM
+CreditReportTradeline.Trended: => UtilizationM := IF(LoanAmountCreditLimit > 0, MIN(ROUND((MAX(BalanceAmount, 0) * 10000)/LoanAmountCreditLimit)/100, 999.99), 0); //GTDutilizationM
+CreditReportTradeline: => AvailableMonths24 := Trended(AvailableM = TRUE):Count; //GTDNMavailable24
 
-CreditReportTradeline: =>  GTDoverPayment0 := MAX(ActualPayment0,0) - MAX(ScheduledPayment1,0);
-CreditReportTradeline: =>  GTDoverPayment1 := MAX(ActualPayment1,0) - MAX(ScheduledPayment2,0);
-CreditReportTradeline: =>  GTDoverPayment2 := MAX(ActualPayment2,0) - MAX(ScheduledPayment3,0);
-CreditReportTradeline: =>  GTDoverPayment3 := MAX(ActualPayment3,0) - MAX(ScheduledPayment4,0);
-CreditReportTradeline: =>  GTDoverPayment4 := MAX(ActualPayment4,0) - MAX(ScheduledPayment5,0);
-CreditReportTradeline: =>  GTDoverPayment5 := MAX(ActualPayment5,0) - MAX(ScheduledPayment6,0);
-CreditReportTradeline: =>  GTDoverPayment6 := MAX(ActualPayment6,0) - MAX(ScheduledPayment7,0);
-CreditReportTradeline: =>  GTDoverPayment7 := MAX(ActualPayment7,0) - MAX(ScheduledPayment8,0);
-CreditReportTradeline: =>  GTDoverPayment8 := MAX(ActualPayment8,0) - MAX(ScheduledPayment9,0);
-CreditReportTradeline: =>  GTDoverPayment9 := MAX(ActualPayment9,0) - MAX(ScheduledPayment10,0);
-CreditReportTradeline: =>  GTDoverPayment10 := MAX(ActualPayment10,0) - MAX(ScheduledPayment11,0);
-CreditReportTradeline: =>  GTDoverPayment11 := MAX(ActualPayment11,0) - MAX(ScheduledPayment12,0);
-CreditReportTradeline: =>  GTDoverPayment12 := MAX(ActualPayment12,0) - MAX(ScheduledPayment13,0);
-CreditReportTradeline: =>  GTDoverPayment13 := MAX(ActualPayment13,0) - MAX(ScheduledPayment14,0);
-CreditReportTradeline: =>  GTDoverPayment14 := MAX(ActualPayment14,0) - MAX(ScheduledPayment15,0);
-CreditReportTradeline: =>  GTDoverPayment15 := MAX(ActualPayment15,0) - MAX(ScheduledPayment16,0);
-CreditReportTradeline: =>  GTDoverPayment16 := MAX(ActualPayment16,0) - MAX(ScheduledPayment17,0);
-CreditReportTradeline: =>  GTDoverPayment17 := MAX(ActualPayment17,0) - MAX(ScheduledPayment18,0);
-CreditReportTradeline: =>  GTDoverPayment18 := MAX(ActualPayment18,0) - MAX(ScheduledPayment19,0);
-CreditReportTradeline: =>  GTDoverPayment19 := MAX(ActualPayment19,0) - MAX(ScheduledPayment20,0);
-CreditReportTradeline: =>  GTDoverPayment20 := MAX(ActualPayment20,0) - MAX(ScheduledPayment21,0);
-CreditReportTradeline: =>  GTDoverPayment21 := MAX(ActualPayment21,0) - MAX(ScheduledPayment22,0);
-CreditReportTradeline: =>  GTDoverPayment22 := MAX(ActualPayment22,0) - MAX(ScheduledPayment23,0);
-CreditReportTradeline: =>  GTDoverPayment23 := MAX(ActualPayment23,0) - MAX(ScheduledPayment24,0);
+CreditReportTradeline: =>  OverPayment0 := MAX(ActualPayment0,0) - MAX(ScheduledPayment1,0);
+CreditReportTradeline: =>  OverPayment1 := MAX(ActualPayment1,0) - MAX(ScheduledPayment2,0);
+CreditReportTradeline: =>  OverPayment2 := MAX(ActualPayment2,0) - MAX(ScheduledPayment3,0);
+CreditReportTradeline: =>  OverPayment3 := MAX(ActualPayment3,0) - MAX(ScheduledPayment4,0);
+CreditReportTradeline: =>  OverPayment4 := MAX(ActualPayment4,0) - MAX(ScheduledPayment5,0);
+CreditReportTradeline: =>  OverPayment5 := MAX(ActualPayment5,0) - MAX(ScheduledPayment6,0);
+CreditReportTradeline: =>  OverPayment6 := MAX(ActualPayment6,0) - MAX(ScheduledPayment7,0);
+CreditReportTradeline: =>  OverPayment7 := MAX(ActualPayment7,0) - MAX(ScheduledPayment8,0);
+CreditReportTradeline: =>  OverPayment8 := MAX(ActualPayment8,0) - MAX(ScheduledPayment9,0);
+CreditReportTradeline: =>  OverPayment9 := MAX(ActualPayment9,0) - MAX(ScheduledPayment10,0);
+CreditReportTradeline: =>  OverPayment10 := MAX(ActualPayment10,0) - MAX(ScheduledPayment11,0);
+CreditReportTradeline: =>  OverPayment11 := MAX(ActualPayment11,0) - MAX(ScheduledPayment12,0);
+CreditReportTradeline: =>  OverPayment12 := MAX(ActualPayment12,0) - MAX(ScheduledPayment13,0);
+CreditReportTradeline: =>  OverPayment13 := MAX(ActualPayment13,0) - MAX(ScheduledPayment14,0);
+CreditReportTradeline: =>  OverPayment14 := MAX(ActualPayment14,0) - MAX(ScheduledPayment15,0);
+CreditReportTradeline: =>  OverPayment15 := MAX(ActualPayment15,0) - MAX(ScheduledPayment16,0);
+CreditReportTradeline: =>  OverPayment16 := MAX(ActualPayment16,0) - MAX(ScheduledPayment17,0);
+CreditReportTradeline: =>  OverPayment17 := MAX(ActualPayment17,0) - MAX(ScheduledPayment18,0);
+CreditReportTradeline: =>  OverPayment18 := MAX(ActualPayment18,0) - MAX(ScheduledPayment19,0);
+CreditReportTradeline: =>  OverPayment19 := MAX(ActualPayment19,0) - MAX(ScheduledPayment20,0);
+CreditReportTradeline: =>  OverPayment20 := MAX(ActualPayment20,0) - MAX(ScheduledPayment21,0);
+CreditReportTradeline: =>  OverPayment21 := MAX(ActualPayment21,0) - MAX(ScheduledPayment22,0);
+CreditReportTradeline: =>  OverPayment22 := MAX(ActualPayment22,0) - MAX(ScheduledPayment23,0);
+CreditReportTradeline: =>  OverPayment23 := MAX(ActualPayment23,0) - MAX(ScheduledPayment24,0);
 
-CreditReportTradeline: =>  GTDoverBalance0 := MAX(ActualPayment0,0) - MAX(BalanceAmount1,0);
-CreditReportTradeline: =>  GTDoverBalance1 := MAX(ActualPayment1,0) - MAX(BalanceAmount2,0);
-CreditReportTradeline: =>  GTDoverBalance2 := MAX(ActualPayment2,0) - MAX(BalanceAmount3,0);
-CreditReportTradeline: =>  GTDoverBalance3 := MAX(ActualPayment3,0) - MAX(BalanceAmount4,0);
-CreditReportTradeline: =>  GTDoverBalance4 := MAX(ActualPayment4,0) - MAX(BalanceAmount5,0);
-CreditReportTradeline: =>  GTDoverBalance5 := MAX(ActualPayment5,0) - MAX(BalanceAmount6,0);
-CreditReportTradeline: =>  GTDoverBalance6 := MAX(ActualPayment6,0) - MAX(BalanceAmount7,0);
-CreditReportTradeline: =>  GTDoverBalance7 := MAX(ActualPayment7,0) - MAX(BalanceAmount8,0);
-CreditReportTradeline: =>  GTDoverBalance8 := MAX(ActualPayment8,0) - MAX(BalanceAmount9,0);
-CreditReportTradeline: =>  GTDoverBalance9 := MAX(ActualPayment9,0) - MAX(BalanceAmount10,0);
-CreditReportTradeline: =>  GTDoverBalance10 := MAX(ActualPayment10,0) - MAX(BalanceAmount11,0);
-CreditReportTradeline: =>  GTDoverBalance11 := MAX(ActualPayment11,0) - MAX(BalanceAmount12,0);
-CreditReportTradeline: =>  GTDoverBalance12 := MAX(ActualPayment12,0) - MAX(BalanceAmount13,0);
-CreditReportTradeline: =>  GTDoverBalance13 := MAX(ActualPayment13,0) - MAX(BalanceAmount14,0);
-CreditReportTradeline: =>  GTDoverBalance14 := MAX(ActualPayment14,0) - MAX(BalanceAmount15,0);
-CreditReportTradeline: =>  GTDoverBalance15 := MAX(ActualPayment15,0) - MAX(BalanceAmount16,0);
-CreditReportTradeline: =>  GTDoverBalance16 := MAX(ActualPayment16,0) - MAX(BalanceAmount17,0);
-CreditReportTradeline: =>  GTDoverBalance17 := MAX(ActualPayment17,0) - MAX(BalanceAmount18,0);
-CreditReportTradeline: =>  GTDoverBalance18 := MAX(ActualPayment18,0) - MAX(BalanceAmount19,0);
-CreditReportTradeline: =>  GTDoverBalance19 := MAX(ActualPayment19,0) - MAX(BalanceAmount20,0);
-CreditReportTradeline: =>  GTDoverBalance20 := MAX(ActualPayment20,0) - MAX(BalanceAmount21,0);
-CreditReportTradeline: =>  GTDoverBalance21 := MAX(ActualPayment21,0) - MAX(BalanceAmount22,0);
-CreditReportTradeline: =>  GTDoverBalance22 := MAX(ActualPayment22,0) - MAX(BalanceAmount23,0);
-CreditReportTradeline: =>  GTDoverBalance23 := MAX(ActualPayment23,0) - MAX(BalanceAmount24,0);
+CreditReportTradeline: =>  OverBalance0 := MAX(ActualPayment0,0) - MAX(BalanceAmount1,0);
+CreditReportTradeline: =>  OverBalance1 := MAX(ActualPayment1,0) - MAX(BalanceAmount2,0);
+CreditReportTradeline: =>  OverBalance2 := MAX(ActualPayment2,0) - MAX(BalanceAmount3,0);
+CreditReportTradeline: =>  OverBalance3 := MAX(ActualPayment3,0) - MAX(BalanceAmount4,0);
+CreditReportTradeline: =>  OverBalance4 := MAX(ActualPayment4,0) - MAX(BalanceAmount5,0);
+CreditReportTradeline: =>  OverBalance5 := MAX(ActualPayment5,0) - MAX(BalanceAmount6,0);
+CreditReportTradeline: =>  OverBalance6 := MAX(ActualPayment6,0) - MAX(BalanceAmount7,0);
+CreditReportTradeline: =>  OverBalance7 := MAX(ActualPayment7,0) - MAX(BalanceAmount8,0);
+CreditReportTradeline: =>  OverBalance8 := MAX(ActualPayment8,0) - MAX(BalanceAmount9,0);
+CreditReportTradeline: =>  OverBalance9 := MAX(ActualPayment9,0) - MAX(BalanceAmount10,0);
+CreditReportTradeline: =>  OverBalance10 := MAX(ActualPayment10,0) - MAX(BalanceAmount11,0);
+CreditReportTradeline: =>  OverBalance11 := MAX(ActualPayment11,0) - MAX(BalanceAmount12,0);
+CreditReportTradeline: =>  OverBalance12 := MAX(ActualPayment12,0) - MAX(BalanceAmount13,0);
+CreditReportTradeline: =>  OverBalance13 := MAX(ActualPayment13,0) - MAX(BalanceAmount14,0);
+CreditReportTradeline: =>  OverBalance14 := MAX(ActualPayment14,0) - MAX(BalanceAmount15,0);
+CreditReportTradeline: =>  OverBalance15 := MAX(ActualPayment15,0) - MAX(BalanceAmount16,0);
+CreditReportTradeline: =>  OverBalance16 := MAX(ActualPayment16,0) - MAX(BalanceAmount17,0);
+CreditReportTradeline: =>  OverBalance17 := MAX(ActualPayment17,0) - MAX(BalanceAmount18,0);
+CreditReportTradeline: =>  OverBalance18 := MAX(ActualPayment18,0) - MAX(BalanceAmount19,0);
+CreditReportTradeline: =>  OverBalance19 := MAX(ActualPayment19,0) - MAX(BalanceAmount20,0);
+CreditReportTradeline: =>  OverBalance20 := MAX(ActualPayment20,0) - MAX(BalanceAmount21,0);
+CreditReportTradeline: =>  OverBalance21 := MAX(ActualPayment21,0) - MAX(BalanceAmount22,0);
+CreditReportTradeline: =>  OverBalance22 := MAX(ActualPayment22,0) - MAX(BalanceAmount23,0);
+CreditReportTradeline: =>  OverBalance23 := MAX(ActualPayment23,0) - MAX(BalanceAmount24,0);
 
-CreditReportTradeline: =>  GTDincrBalance0 := MAX(BalanceAmount0,0) - MAX(BalanceAmount1,0);
-CreditReportTradeline: =>  GTDincrBalance1 := MAX(BalanceAmount1,0) - MAX(BalanceAmount2,0);
-CreditReportTradeline: =>  GTDincrBalance2 := MAX(BalanceAmount2,0) - MAX(BalanceAmount3,0);
-CreditReportTradeline: =>  GTDincrBalance3 := MAX(BalanceAmount3,0) - MAX(BalanceAmount4,0);
-CreditReportTradeline: =>  GTDincrBalance4 := MAX(BalanceAmount4,0) - MAX(BalanceAmount5,0);
-CreditReportTradeline: =>  GTDincrBalance5 := MAX(BalanceAmount5,0) - MAX(BalanceAmount6,0);
-CreditReportTradeline: =>  GTDincrBalance6 := MAX(BalanceAmount6,0) - MAX(BalanceAmount7,0);
-CreditReportTradeline: =>  GTDincrBalance7 := MAX(BalanceAmount7,0) - MAX(BalanceAmount8,0);
-CreditReportTradeline: =>  GTDincrBalance8 := MAX(BalanceAmount8,0) - MAX(BalanceAmount9,0);
-CreditReportTradeline: =>  GTDincrBalance9 := MAX(BalanceAmount9,0) - MAX(BalanceAmount10,0);
-CreditReportTradeline: =>  GTDincrBalance10 := MAX(BalanceAmount10,0) - MAX(BalanceAmount11,0);
-CreditReportTradeline: =>  GTDincrBalance11 := MAX(BalanceAmount11,0) - MAX(BalanceAmount12,0);
-CreditReportTradeline: =>  GTDincrBalance12 := MAX(BalanceAmount12,0) - MAX(BalanceAmount13,0);
-CreditReportTradeline: =>  GTDincrBalance13 := MAX(BalanceAmount13,0) - MAX(BalanceAmount14,0);
-CreditReportTradeline: =>  GTDincrBalance14 := MAX(BalanceAmount14,0) - MAX(BalanceAmount15,0);
-CreditReportTradeline: =>  GTDincrBalance15 := MAX(BalanceAmount15,0) - MAX(BalanceAmount16,0);
-CreditReportTradeline: =>  GTDincrBalance16 := MAX(BalanceAmount16,0) - MAX(BalanceAmount17,0);
-CreditReportTradeline: =>  GTDincrBalance17 := MAX(BalanceAmount17,0) - MAX(BalanceAmount18,0);
-CreditReportTradeline: =>  GTDincrBalance18 := MAX(BalanceAmount18,0) - MAX(BalanceAmount19,0);
-CreditReportTradeline: =>  GTDincrBalance19 := MAX(BalanceAmount19,0) - MAX(BalanceAmount20,0);
-CreditReportTradeline: =>  GTDincrBalance20 := MAX(BalanceAmount20,0) - MAX(BalanceAmount21,0);
-CreditReportTradeline: =>  GTDincrBalance21 := MAX(BalanceAmount21,0) - MAX(BalanceAmount22,0);
-CreditReportTradeline: =>  GTDincrBalance22 := MAX(BalanceAmount22,0) - MAX(BalanceAmount23,0);
-CreditReportTradeline: =>  GTDincrBalance23 := MAX(BalanceAmount23,0) - MAX(BalanceAmount24,0);
+CreditReportTradeline: =>  IncrBalance0 := MAX(BalanceAmount0,0) - MAX(BalanceAmount1,0);
+CreditReportTradeline: =>  IncrBalance1 := MAX(BalanceAmount1,0) - MAX(BalanceAmount2,0);
+CreditReportTradeline: =>  IncrBalance2 := MAX(BalanceAmount2,0) - MAX(BalanceAmount3,0);
+CreditReportTradeline: =>  IncrBalance3 := MAX(BalanceAmount3,0) - MAX(BalanceAmount4,0);
+CreditReportTradeline: =>  IncrBalance4 := MAX(BalanceAmount4,0) - MAX(BalanceAmount5,0);
+CreditReportTradeline: =>  IncrBalance5 := MAX(BalanceAmount5,0) - MAX(BalanceAmount6,0);
+CreditReportTradeline: =>  IncrBalance6 := MAX(BalanceAmount6,0) - MAX(BalanceAmount7,0);
+CreditReportTradeline: =>  IncrBalance7 := MAX(BalanceAmount7,0) - MAX(BalanceAmount8,0);
+CreditReportTradeline: =>  IncrBalance8 := MAX(BalanceAmount8,0) - MAX(BalanceAmount9,0);
+CreditReportTradeline: =>  IncrBalance9 := MAX(BalanceAmount9,0) - MAX(BalanceAmount10,0);
+CreditReportTradeline: =>  IncrBalance10 := MAX(BalanceAmount10,0) - MAX(BalanceAmount11,0);
+CreditReportTradeline: =>  IncrBalance11 := MAX(BalanceAmount11,0) - MAX(BalanceAmount12,0);
+CreditReportTradeline: =>  IncrBalance12 := MAX(BalanceAmount12,0) - MAX(BalanceAmount13,0);
+CreditReportTradeline: =>  IncrBalance13 := MAX(BalanceAmount13,0) - MAX(BalanceAmount14,0);
+CreditReportTradeline: =>  IncrBalance14 := MAX(BalanceAmount14,0) - MAX(BalanceAmount15,0);
+CreditReportTradeline: =>  IncrBalance15 := MAX(BalanceAmount15,0) - MAX(BalanceAmount16,0);
+CreditReportTradeline: =>  IncrBalance16 := MAX(BalanceAmount16,0) - MAX(BalanceAmount17,0);
+CreditReportTradeline: =>  IncrBalance17 := MAX(BalanceAmount17,0) - MAX(BalanceAmount18,0);
+CreditReportTradeline: =>  IncrBalance18 := MAX(BalanceAmount18,0) - MAX(BalanceAmount19,0);
+CreditReportTradeline: =>  IncrBalance19 := MAX(BalanceAmount19,0) - MAX(BalanceAmount20,0);
+CreditReportTradeline: =>  IncrBalance20 := MAX(BalanceAmount20,0) - MAX(BalanceAmount21,0);
+CreditReportTradeline: =>  IncrBalance21 := MAX(BalanceAmount21,0) - MAX(BalanceAmount22,0);
+CreditReportTradeline: =>  IncrBalance22 := MAX(BalanceAmount22,0) - MAX(BalanceAmount23,0);
+CreditReportTradeline: =>  IncrBalance23 := MAX(BalanceAmount23,0) - MAX(BalanceAmount24,0);
 
-CreditReportTradeline: =>  GTDPercentBalanceChange0 := IF(BalanceAmount1 > 0, ROUND(GTDincrBalance0 * 10000 / BalanceAmount1)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange1 := IF(BalanceAmount2 > 0, ROUND(GTDincrBalance1 * 10000 / BalanceAmount2)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange2 := IF(BalanceAmount3 > 0, ROUND(GTDincrBalance2 * 10000 / BalanceAmount3)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange3 := IF(BalanceAmount4 > 0, ROUND(GTDincrBalance3 * 10000 / BalanceAmount4)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange4 := IF(BalanceAmount5 > 0, ROUND(GTDincrBalance4 * 10000 / BalanceAmount5)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange5 := IF(BalanceAmount6 > 0, ROUND(GTDincrBalance5 * 10000 / BalanceAmount6)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange6 := IF(BalanceAmount7 > 0, ROUND(GTDincrBalance6 * 10000 / BalanceAmount7)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange7 := IF(BalanceAmount8 > 0, ROUND(GTDincrBalance7 * 10000 / BalanceAmount8)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange8 := IF(BalanceAmount9 > 0, ROUND(GTDincrBalance8 * 10000 / BalanceAmount9)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange9 := IF(BalanceAmount10 > 0, ROUND(GTDincrBalance9 * 10000 / BalanceAmount10)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange10 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance10 * 10000 / BalanceAmount11)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange11 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance11 * 10000 / BalanceAmount12)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange12 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance12 * 10000 / BalanceAmount13)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange13 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance13 * 10000 / BalanceAmount14)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange14 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance14 * 10000 / BalanceAmount15)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange15 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance15 * 10000 / BalanceAmount16)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange16 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance16 * 10000 / BalanceAmount17)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange17 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance17 * 10000 / BalanceAmount18)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange18 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance18 * 10000 / BalanceAmount19)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange19 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance19 * 10000 / BalanceAmount20)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange20 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance20 * 10000 / BalanceAmount21)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange21 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance21 * 10000 / BalanceAmount22)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange22 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance22 * 10000 / BalanceAmount23)/100, 0);
-CreditReportTradeline: =>  GTDPercentBalanceChange23 := IF(BalanceAmount11 > 0, ROUND(GTDincrBalance23 * 10000 / BalanceAmount24)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange0 := IF(BalanceAmount1 > 0, ROUND(IncrBalance0 * 10000 / BalanceAmount1)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange1 := IF(BalanceAmount2 > 0, ROUND(IncrBalance1 * 10000 / BalanceAmount2)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange2 := IF(BalanceAmount3 > 0, ROUND(IncrBalance2 * 10000 / BalanceAmount3)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange3 := IF(BalanceAmount4 > 0, ROUND(IncrBalance3 * 10000 / BalanceAmount4)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange4 := IF(BalanceAmount5 > 0, ROUND(IncrBalance4 * 10000 / BalanceAmount5)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange5 := IF(BalanceAmount6 > 0, ROUND(IncrBalance5 * 10000 / BalanceAmount6)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange6 := IF(BalanceAmount7 > 0, ROUND(IncrBalance6 * 10000 / BalanceAmount7)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange7 := IF(BalanceAmount8 > 0, ROUND(IncrBalance7 * 10000 / BalanceAmount8)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange8 := IF(BalanceAmount9 > 0, ROUND(IncrBalance8 * 10000 / BalanceAmount9)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange9 := IF(BalanceAmount10 > 0, ROUND(IncrBalance9 * 10000 / BalanceAmount10)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange10 := IF(BalanceAmount11 > 0, ROUND(IncrBalance10 * 10000 / BalanceAmount11)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange11 := IF(BalanceAmount11 > 0, ROUND(IncrBalance11 * 10000 / BalanceAmount12)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange12 := IF(BalanceAmount11 > 0, ROUND(IncrBalance12 * 10000 / BalanceAmount13)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange13 := IF(BalanceAmount11 > 0, ROUND(IncrBalance13 * 10000 / BalanceAmount14)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange14 := IF(BalanceAmount11 > 0, ROUND(IncrBalance14 * 10000 / BalanceAmount15)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange15 := IF(BalanceAmount11 > 0, ROUND(IncrBalance15 * 10000 / BalanceAmount16)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange16 := IF(BalanceAmount11 > 0, ROUND(IncrBalance16 * 10000 / BalanceAmount17)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange17 := IF(BalanceAmount11 > 0, ROUND(IncrBalance17 * 10000 / BalanceAmount18)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange18 := IF(BalanceAmount11 > 0, ROUND(IncrBalance18 * 10000 / BalanceAmount19)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange19 := IF(BalanceAmount11 > 0, ROUND(IncrBalance19 * 10000 / BalanceAmount20)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange20 := IF(BalanceAmount11 > 0, ROUND(IncrBalance20 * 10000 / BalanceAmount21)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange21 := IF(BalanceAmount11 > 0, ROUND(IncrBalance21 * 10000 / BalanceAmount22)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange22 := IF(BalanceAmount11 > 0, ROUND(IncrBalance22 * 10000 / BalanceAmount23)/100, 0);
+CreditReportTradeline: =>  PercentBalanceChange23 := IF(BalanceAmount11 > 0, ROUND(IncrBalance23 * 10000 / BalanceAmount24)/100, 0);
 
-CreditReportTradeline: =>  GTDRatioAP2SP0 := IF(ScheduledPayment1 > 0 AND ActualPaymentNullInd0 = 0, MIN(ROUND(MAX(ActualPayment0,0) * 10000 / ScheduledPayment1)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP1 := IF(ScheduledPayment2 > 0 AND ActualPaymentNullInd1 = 0, MIN(ROUND(MAX(ActualPayment1,0) * 10000 / ScheduledPayment2)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP2 := IF(ScheduledPayment3 > 0 AND ActualPaymentNullInd2 = 0, MIN(ROUND(MAX(ActualPayment2,0) * 10000 / ScheduledPayment3)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP3 := IF(ScheduledPayment4 > 0 AND ActualPaymentNullInd3 = 0, MIN(ROUND(MAX(ActualPayment3,0) * 10000 / ScheduledPayment4)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP4 := IF(ScheduledPayment5 > 0 AND ActualPaymentNullInd4 = 0, MIN(ROUND(MAX(ActualPayment4,0) * 10000 / ScheduledPayment5)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP5 := IF(ScheduledPayment6 > 0 AND ActualPaymentNullInd5 = 0, MIN(ROUND(MAX(ActualPayment5,0) * 10000 / ScheduledPayment6)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP6 := IF(ScheduledPayment7 > 0 AND ActualPaymentNullInd6 = 0, MIN(ROUND(MAX(ActualPayment6,0) * 10000 / ScheduledPayment7)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP7 := IF(ScheduledPayment8 > 0 AND ActualPaymentNullInd7 = 0, MIN(ROUND(MAX(ActualPayment7,0) * 10000 / ScheduledPayment8)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP8 := IF(ScheduledPayment9 > 0 AND ActualPaymentNullInd8 = 0, MIN(ROUND(MAX(ActualPayment8,0) * 10000 / ScheduledPayment9)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP9 := IF(ScheduledPayment10 > 0 AND ActualPaymentNullInd9 = 0, MIN(ROUND(MAX(ActualPayment9,0) * 10000 / ScheduledPayment10)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP10 := IF(ScheduledPayment11 > 0 AND ActualPaymentNullInd10 = 0, MIN(ROUND(MAX(ActualPayment10,0) * 10000 / ScheduledPayment11)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP11 := IF(ScheduledPayment12 > 0 AND ActualPaymentNullInd11 = 0, MIN(ROUND(MAX(ActualPayment11,0) * 10000 / ScheduledPayment12)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP12 := IF(ScheduledPayment13 > 0 AND ActualPaymentNullInd12 = 0, MIN(ROUND(MAX(ActualPayment12,0) * 10000 / ScheduledPayment13)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP13 := IF(ScheduledPayment14 > 0 AND ActualPaymentNullInd13 = 0, MIN(ROUND(MAX(ActualPayment13,0) * 10000 / ScheduledPayment14)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP14 := IF(ScheduledPayment15 > 0 AND ActualPaymentNullInd14 = 0, MIN(ROUND(MAX(ActualPayment14,0) * 10000 / ScheduledPayment15)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP15 := IF(ScheduledPayment16 > 0 AND ActualPaymentNullInd15 = 0, MIN(ROUND(MAX(ActualPayment15,0) * 10000 / ScheduledPayment16)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP16 := IF(ScheduledPayment17 > 0 AND ActualPaymentNullInd16 = 0, MIN(ROUND(MAX(ActualPayment16,0) * 10000 / ScheduledPayment17)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP17 := IF(ScheduledPayment18 > 0 AND ActualPaymentNullInd17 = 0, MIN(ROUND(MAX(ActualPayment17,0) * 10000 / ScheduledPayment18)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP18 := IF(ScheduledPayment19 > 0 AND ActualPaymentNullInd18 = 0, MIN(ROUND(MAX(ActualPayment18,0) * 10000 / ScheduledPayment19)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP19 := IF(ScheduledPayment20 > 0 AND ActualPaymentNullInd19 = 0, MIN(ROUND(MAX(ActualPayment19,0) * 10000 / ScheduledPayment20)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP20 := IF(ScheduledPayment21 > 0 AND ActualPaymentNullInd20 = 0, MIN(ROUND(MAX(ActualPayment20,0) * 10000 / ScheduledPayment21)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP21 := IF(ScheduledPayment22 > 0 AND ActualPaymentNullInd21 = 0, MIN(ROUND(MAX(ActualPayment21,0) * 10000 / ScheduledPayment22)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP22 := IF(ScheduledPayment23 > 0 AND ActualPaymentNullInd22 = 0, MIN(ROUND(MAX(ActualPayment22,0) * 10000 / ScheduledPayment23)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2SP23 := IF(ScheduledPayment24 > 0 AND ActualPaymentNullInd23 = 0, MIN(ROUND(MAX(ActualPayment23,0) * 10000 / ScheduledPayment24)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP0 := IF(ScheduledPayment1 > 0 AND ActualPaymentNullInd0 = 0, MIN(ROUND(MAX(ActualPayment0,0) * 10000 / ScheduledPayment1)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP1 := IF(ScheduledPayment2 > 0 AND ActualPaymentNullInd1 = 0, MIN(ROUND(MAX(ActualPayment1,0) * 10000 / ScheduledPayment2)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP2 := IF(ScheduledPayment3 > 0 AND ActualPaymentNullInd2 = 0, MIN(ROUND(MAX(ActualPayment2,0) * 10000 / ScheduledPayment3)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP3 := IF(ScheduledPayment4 > 0 AND ActualPaymentNullInd3 = 0, MIN(ROUND(MAX(ActualPayment3,0) * 10000 / ScheduledPayment4)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP4 := IF(ScheduledPayment5 > 0 AND ActualPaymentNullInd4 = 0, MIN(ROUND(MAX(ActualPayment4,0) * 10000 / ScheduledPayment5)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP5 := IF(ScheduledPayment6 > 0 AND ActualPaymentNullInd5 = 0, MIN(ROUND(MAX(ActualPayment5,0) * 10000 / ScheduledPayment6)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP6 := IF(ScheduledPayment7 > 0 AND ActualPaymentNullInd6 = 0, MIN(ROUND(MAX(ActualPayment6,0) * 10000 / ScheduledPayment7)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP7 := IF(ScheduledPayment8 > 0 AND ActualPaymentNullInd7 = 0, MIN(ROUND(MAX(ActualPayment7,0) * 10000 / ScheduledPayment8)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP8 := IF(ScheduledPayment9 > 0 AND ActualPaymentNullInd8 = 0, MIN(ROUND(MAX(ActualPayment8,0) * 10000 / ScheduledPayment9)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP9 := IF(ScheduledPayment10 > 0 AND ActualPaymentNullInd9 = 0, MIN(ROUND(MAX(ActualPayment9,0) * 10000 / ScheduledPayment10)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP10 := IF(ScheduledPayment11 > 0 AND ActualPaymentNullInd10 = 0, MIN(ROUND(MAX(ActualPayment10,0) * 10000 / ScheduledPayment11)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP11 := IF(ScheduledPayment12 > 0 AND ActualPaymentNullInd11 = 0, MIN(ROUND(MAX(ActualPayment11,0) * 10000 / ScheduledPayment12)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP12 := IF(ScheduledPayment13 > 0 AND ActualPaymentNullInd12 = 0, MIN(ROUND(MAX(ActualPayment12,0) * 10000 / ScheduledPayment13)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP13 := IF(ScheduledPayment14 > 0 AND ActualPaymentNullInd13 = 0, MIN(ROUND(MAX(ActualPayment13,0) * 10000 / ScheduledPayment14)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP14 := IF(ScheduledPayment15 > 0 AND ActualPaymentNullInd14 = 0, MIN(ROUND(MAX(ActualPayment14,0) * 10000 / ScheduledPayment15)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP15 := IF(ScheduledPayment16 > 0 AND ActualPaymentNullInd15 = 0, MIN(ROUND(MAX(ActualPayment15,0) * 10000 / ScheduledPayment16)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP16 := IF(ScheduledPayment17 > 0 AND ActualPaymentNullInd16 = 0, MIN(ROUND(MAX(ActualPayment16,0) * 10000 / ScheduledPayment17)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP17 := IF(ScheduledPayment18 > 0 AND ActualPaymentNullInd17 = 0, MIN(ROUND(MAX(ActualPayment17,0) * 10000 / ScheduledPayment18)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP18 := IF(ScheduledPayment19 > 0 AND ActualPaymentNullInd18 = 0, MIN(ROUND(MAX(ActualPayment18,0) * 10000 / ScheduledPayment19)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP19 := IF(ScheduledPayment20 > 0 AND ActualPaymentNullInd19 = 0, MIN(ROUND(MAX(ActualPayment19,0) * 10000 / ScheduledPayment20)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP20 := IF(ScheduledPayment21 > 0 AND ActualPaymentNullInd20 = 0, MIN(ROUND(MAX(ActualPayment20,0) * 10000 / ScheduledPayment21)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP21 := IF(ScheduledPayment22 > 0 AND ActualPaymentNullInd21 = 0, MIN(ROUND(MAX(ActualPayment21,0) * 10000 / ScheduledPayment22)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP22 := IF(ScheduledPayment23 > 0 AND ActualPaymentNullInd22 = 0, MIN(ROUND(MAX(ActualPayment22,0) * 10000 / ScheduledPayment23)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP23 := IF(ScheduledPayment24 > 0 AND ActualPaymentNullInd23 = 0, MIN(ROUND(MAX(ActualPayment23,0) * 10000 / ScheduledPayment24)/100, 999.99), -9999);
 
-CreditReportTradeline: =>  GTDRatioAP2Balance0 := IF(BalanceAmount1 > 0 AND ActualPaymentNullInd0 = 0, MIN(ROUND(MAX(ActualPayment0,0) * 10000 / BalanceAmount1)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance1 := IF(BalanceAmount2 > 0 AND ActualPaymentNullInd1 = 0, MIN(ROUND(MAX(ActualPayment1,0) * 10000 / BalanceAmount2)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance2 := IF(BalanceAmount3 > 0 AND ActualPaymentNullInd2 = 0, MIN(ROUND(MAX(ActualPayment2,0) * 10000 / BalanceAmount3)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance3 := IF(BalanceAmount4 > 0 AND ActualPaymentNullInd3 = 0, MIN(ROUND(MAX(ActualPayment3,0) * 10000 / BalanceAmount4)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance4 := IF(BalanceAmount5 > 0 AND ActualPaymentNullInd4 = 0, MIN(ROUND(MAX(ActualPayment4,0) * 10000 / BalanceAmount5)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance5 := IF(BalanceAmount6 > 0 AND ActualPaymentNullInd5 = 0, MIN(ROUND(MAX(ActualPayment5,0) * 10000 / BalanceAmount6)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance6 := IF(BalanceAmount7 > 0 AND ActualPaymentNullInd6 = 0, MIN(ROUND(MAX(ActualPayment6,0) * 10000 / BalanceAmount7)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance7 := IF(BalanceAmount8 > 0 AND ActualPaymentNullInd7 = 0, MIN(ROUND(MAX(ActualPayment7,0) * 10000 / BalanceAmount8)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance8 := IF(BalanceAmount9 > 0 AND ActualPaymentNullInd8 = 0, MIN(ROUND(MAX(ActualPayment8,0) * 10000 / BalanceAmount9)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance9 := IF(BalanceAmount10 > 0 AND ActualPaymentNullInd9 = 0, MIN(ROUND(MAX(ActualPayment9,0) * 10000 / BalanceAmount10)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance10 := IF(BalanceAmount11 > 0 AND ActualPaymentNullInd10 = 0, MIN(ROUND(MAX(ActualPayment10,0) * 10000 / BalanceAmount11)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance11 := IF(BalanceAmount12 > 0 AND ActualPaymentNullInd11 = 0, MIN(ROUND(MAX(ActualPayment11,0) * 10000 / BalanceAmount12)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance12 := IF(BalanceAmount13 > 0 AND ActualPaymentNullInd12 = 0, MIN(ROUND(MAX(ActualPayment12,0) * 10000 / BalanceAmount13)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance13 := IF(BalanceAmount14 > 0 AND ActualPaymentNullInd13 = 0, MIN(ROUND(MAX(ActualPayment13,0) * 10000 / BalanceAmount14)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance14 := IF(BalanceAmount15 > 0 AND ActualPaymentNullInd14 = 0, MIN(ROUND(MAX(ActualPayment14,0) * 10000 / BalanceAmount15)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance15 := IF(BalanceAmount16 > 0 AND ActualPaymentNullInd15 = 0, MIN(ROUND(MAX(ActualPayment15,0) * 10000 / BalanceAmount16)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance16 := IF(BalanceAmount17 > 0 AND ActualPaymentNullInd16 = 0, MIN(ROUND(MAX(ActualPayment16,0) * 10000 / BalanceAmount17)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance17 := IF(BalanceAmount18 > 0 AND ActualPaymentNullInd17 = 0, MIN(ROUND(MAX(ActualPayment17,0) * 10000 / BalanceAmount18)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance18 := IF(BalanceAmount19 > 0 AND ActualPaymentNullInd18 = 0, MIN(ROUND(MAX(ActualPayment18,0) * 10000 / BalanceAmount19)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance19 := IF(BalanceAmount20 > 0 AND ActualPaymentNullInd19 = 0, MIN(ROUND(MAX(ActualPayment19,0) * 10000 / BalanceAmount20)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance20 := IF(BalanceAmount21 > 0 AND ActualPaymentNullInd20 = 0, MIN(ROUND(MAX(ActualPayment20,0) * 10000 / BalanceAmount21)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance21 := IF(BalanceAmount22 > 0 AND ActualPaymentNullInd21 = 0, MIN(ROUND(MAX(ActualPayment21,0) * 10000 / BalanceAmount22)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance22 := IF(BalanceAmount23 > 0 AND ActualPaymentNullInd22 = 0, MIN(ROUND(MAX(ActualPayment22,0) * 10000 / BalanceAmount23)/100, 999.99), -9999);
-CreditReportTradeline: =>  GTDRatioAP2Balance23 := IF(BalanceAmount24 > 0 AND ActualPaymentNullInd23 = 0, MIN(ROUND(MAX(ActualPayment23,0) * 10000 / BalanceAmount24)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance0 := IF(BalanceAmount1 > 0 AND ActualPaymentNullInd0 = 0, MIN(ROUND(MAX(ActualPayment0,0) * 10000 / BalanceAmount1)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance1 := IF(BalanceAmount2 > 0 AND ActualPaymentNullInd1 = 0, MIN(ROUND(MAX(ActualPayment1,0) * 10000 / BalanceAmount2)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance2 := IF(BalanceAmount3 > 0 AND ActualPaymentNullInd2 = 0, MIN(ROUND(MAX(ActualPayment2,0) * 10000 / BalanceAmount3)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance3 := IF(BalanceAmount4 > 0 AND ActualPaymentNullInd3 = 0, MIN(ROUND(MAX(ActualPayment3,0) * 10000 / BalanceAmount4)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance4 := IF(BalanceAmount5 > 0 AND ActualPaymentNullInd4 = 0, MIN(ROUND(MAX(ActualPayment4,0) * 10000 / BalanceAmount5)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance5 := IF(BalanceAmount6 > 0 AND ActualPaymentNullInd5 = 0, MIN(ROUND(MAX(ActualPayment5,0) * 10000 / BalanceAmount6)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance6 := IF(BalanceAmount7 > 0 AND ActualPaymentNullInd6 = 0, MIN(ROUND(MAX(ActualPayment6,0) * 10000 / BalanceAmount7)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance7 := IF(BalanceAmount8 > 0 AND ActualPaymentNullInd7 = 0, MIN(ROUND(MAX(ActualPayment7,0) * 10000 / BalanceAmount8)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance8 := IF(BalanceAmount9 > 0 AND ActualPaymentNullInd8 = 0, MIN(ROUND(MAX(ActualPayment8,0) * 10000 / BalanceAmount9)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance9 := IF(BalanceAmount10 > 0 AND ActualPaymentNullInd9 = 0, MIN(ROUND(MAX(ActualPayment9,0) * 10000 / BalanceAmount10)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance10 := IF(BalanceAmount11 > 0 AND ActualPaymentNullInd10 = 0, MIN(ROUND(MAX(ActualPayment10,0) * 10000 / BalanceAmount11)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance11 := IF(BalanceAmount12 > 0 AND ActualPaymentNullInd11 = 0, MIN(ROUND(MAX(ActualPayment11,0) * 10000 / BalanceAmount12)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance12 := IF(BalanceAmount13 > 0 AND ActualPaymentNullInd12 = 0, MIN(ROUND(MAX(ActualPayment12,0) * 10000 / BalanceAmount13)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance13 := IF(BalanceAmount14 > 0 AND ActualPaymentNullInd13 = 0, MIN(ROUND(MAX(ActualPayment13,0) * 10000 / BalanceAmount14)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance14 := IF(BalanceAmount15 > 0 AND ActualPaymentNullInd14 = 0, MIN(ROUND(MAX(ActualPayment14,0) * 10000 / BalanceAmount15)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance15 := IF(BalanceAmount16 > 0 AND ActualPaymentNullInd15 = 0, MIN(ROUND(MAX(ActualPayment15,0) * 10000 / BalanceAmount16)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance16 := IF(BalanceAmount17 > 0 AND ActualPaymentNullInd16 = 0, MIN(ROUND(MAX(ActualPayment16,0) * 10000 / BalanceAmount17)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance17 := IF(BalanceAmount18 > 0 AND ActualPaymentNullInd17 = 0, MIN(ROUND(MAX(ActualPayment17,0) * 10000 / BalanceAmount18)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance18 := IF(BalanceAmount19 > 0 AND ActualPaymentNullInd18 = 0, MIN(ROUND(MAX(ActualPayment18,0) * 10000 / BalanceAmount19)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance19 := IF(BalanceAmount20 > 0 AND ActualPaymentNullInd19 = 0, MIN(ROUND(MAX(ActualPayment19,0) * 10000 / BalanceAmount20)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance20 := IF(BalanceAmount21 > 0 AND ActualPaymentNullInd20 = 0, MIN(ROUND(MAX(ActualPayment20,0) * 10000 / BalanceAmount21)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance21 := IF(BalanceAmount22 > 0 AND ActualPaymentNullInd21 = 0, MIN(ROUND(MAX(ActualPayment21,0) * 10000 / BalanceAmount22)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance22 := IF(BalanceAmount23 > 0 AND ActualPaymentNullInd22 = 0, MIN(ROUND(MAX(ActualPayment22,0) * 10000 / BalanceAmount23)/100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance23 := IF(BalanceAmount24 > 0 AND ActualPaymentNullInd23 = 0, MIN(ROUND(MAX(ActualPayment23,0) * 10000 / BalanceAmount24)/100, 999.99), -9999);
 
 
-CreditReportTradeline.Trended: => GTDNBalanceGM := IF(BalanceAmount > 0, 1, 0);
-CreditReportTradeline: => GTDNBalanceG0_6 := GTDNBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum;
-CreditReportTradeline: => GTDNBalanceG0_12 := GTDNBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum;
-CreditReportTradeline: => GTDNBalanceG0_18 := GTDNBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum;
-CreditReportTradeline: => GTDNBalanceG0_24 := GTDNBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum;
+CreditReportTradeline.Trended: => NBalanceGM := IF(BalanceAmount > 0, 1, 0); //GTDNBalanceGM
+CreditReportTradeline: => NBalanceG0_6 := NBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum; //GTDNBalanceG0_6
+CreditReportTradeline: => NBalanceG0_12 := NBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum; //GTDNBalanceG0_12
+CreditReportTradeline: => NBalanceG0_18 := NBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum; //GTDNBalanceG0_18
+CreditReportTradeline: => NBalanceG0_24 := NBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum; //GTDNBalanceG0_24
 
-CreditReportTradeline.Trended: => GTDNActualPaymentGM := IF(ActualPayment > 0, 1, 0);
-CreditReportTradeline: => GTDNActualPaymentG0_6 := GTDNActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum;
-CreditReportTradeline: => GTDNActualPaymentG0_12 := GTDNActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum;
-CreditReportTradeline: => GTDNActualPaymentG0_18 := GTDNActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum;
-CreditReportTradeline: => GTDNActualPaymentG0_24 := GTDNActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum;
+CreditReportTradeline.Trended: => NActualPaymentGM := IF(ActualPayment > 0, 1, 0); //GTDNActualPaymentGM
+CreditReportTradeline: => NActualPaymentG0_6 := NActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum; //GTDNActualPaymentG0_6
+CreditReportTradeline: => NActualPaymentG0_12 := NActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum; //GTDNActualPaymentG0_12
+CreditReportTradeline: => NActualPaymentG0_18 := NActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum; //GTDNActualPaymentG0_18
+CreditReportTradeline: => NActualPaymentG0_24 := NActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum; //GTDNActualPaymentG0_24
 
-CreditReportTradeline.Trended: => GTDNLastPayment6M := IF((GTDMOSLastPaymentM >= 0 AND GTDMOSLastPaymentM <= 6), 1, 0);
-CreditReportTradeline: => GTDNLastPayment6 := GTDNLastPayment6M$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0);
-CreditReportTradeline.Trended: => GTDNLastPayment12M := IF((GTDMOSLastPaymentM >= 0 AND GTDMOSLastPaymentM <= 12), 1, 0);
-CreditReportTradeline: => GTDNLastPayment12 := GTDNLastPayment12M$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0);
-CreditReportTradeline.Trended: => GTDNLastPayment18M := IF((GTDMOSLastPaymentM >= 0 AND GTDMOSLastPaymentM <= 18), 1, 0);
-CreditReportTradeline: => GTDNLastPayment18 := GTDNLastPayment12M$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0);
-CreditReportTradeline.Trended: => GTDNLastPayment24M := IF((GTDMOSLastPaymentM >= 0 AND GTDMOSLastPaymentM <= 24), 1, 0);
-CreditReportTradeline: => GTDNLastPayment24 := GTDNLastPayment12M$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0);
+CreditReportTradeline.Trended: => NLastPayment6M := IF((MonthsLastPaymentM >= 0 AND MonthsLastPaymentM <= 6), 1, 0); //GTDNLastPayment6M
+CreditReportTradeline: => NLastPayment6 := NLastPayment6M$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0); //GTDNLastPayment6
+CreditReportTradeline.Trended: => NLastPayment12M := IF((MonthsLastPaymentM >= 0 AND MonthsLastPaymentM <= 12), 1, 0); //GTDNLastPayment12M
+CreditReportTradeline: => NLastPayment12 := NLastPayment12M$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0); //GTDNLastPayment12
+CreditReportTradeline.Trended: => NLastPayment18M := IF((MonthsLastPaymentM >= 0 AND MonthsLastPaymentM <= 18), 1, 0); //GTDNLastPayment18M
+CreditReportTradeline: => NLastPayment18 := NLastPayment18M$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0); //GTDNLastPayment18
+CreditReportTradeline.Trended: => NLastPayment24M := IF((MonthsLastPaymentM >= 0 AND MonthsLastPaymentM <= 24), 1, 0); //GTDNLastPayment24M
+CreditReportTradeline: => NLastPayment24 := NLastPayment24M$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0); //GTDNLastPayment24
 
-CreditReportTradeline.Trended: => GTDSumActualPaymentM := MAX(ActualPayment, 0);
-CreditReportTradeline: => GTDSumActualPayment6 := GTDSumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum;
-CreditReportTradeline: => GTDSumActualPayment12 := GTDSumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum;
-CreditReportTradeline: => GTDSumActualPayment18 := GTDSumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum;
-CreditReportTradeline: => GTDSumActualPayment24 := GTDSumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum;
+CreditReportTradeline.Trended: => SumActualPaymentM := MAX(ActualPayment, 0); //GTDSumActualPaymentM
+CreditReportTradeline: => SumActualPayment6 := SumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum; //GTDSumActualPayment6
+CreditReportTradeline: => SumActualPayment12 := SumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum; //GTDSumActualPayment12
+CreditReportTradeline: => SumActualPayment18 := SumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum; //GTDSumActualPayment18
+CreditReportTradeline: => SumActualPayment24 := SumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum; //GTDSumActualPayment24
 
-CreditReportTradeline: => GTDNCarryBalance6 := IF(GTDoverBalance0 < 0, 1, 0) + IF(GTDoverBalance1 < 0, 1, 0) + IF(GTDoverBalance2 < 0, 1, 0) + IF(GTDoverBalance3 < 0, 1, 0) + IF(GTDoverBalance4 < 0, 1, 0) + IF(GTDoverBalance5 < 0, 1, 0) + IF(GTDoverBalance6 < 0, 1, 0);
-CreditReportTradeline: => GTDNOverPayment6 := IF(GTDoverPayment0 > 0, 1, 0) + IF(GTDoverPayment1 > 0, 1, 0) + IF(GTDoverPayment2 > 0, 1, 0) + IF(GTDoverPayment3 > 0, 1, 0) + IF(GTDoverPayment4 > 0, 1, 0) + IF(GTDoverPayment5 > 0, 1, 0) + IF(GTDoverPayment6 > 0, 1, 0);
-CreditReportTradeline: => GTDNPastDue6 := IF(GTDoverPayment0 < 0, 1, 0) + IF(GTDoverPayment1 < 0, 1, 0) + IF(GTDoverPayment2 < 0, 1, 0) + IF(GTDoverPayment3 < 0, 1, 0) + IF(GTDoverPayment4 < 0, 1, 0) + IF(GTDoverPayment5 < 0, 1, 0) + IF(GTDoverPayment6 < 0, 1, 0);
-CreditReportTradeline: => GTDNincrBalance6 := IF(GTDincrBalance0 > 0, 1, 0) + IF(GTDincrBalance1 > 0, 1, 0) + IF(GTDincrBalance2 > 0, 1, 0) + IF(GTDincrBalance3 > 0, 1, 0) + IF(GTDincrBalance4 > 0, 1, 0) + IF(GTDincrBalance5 > 0, 1, 0) + IF(GTDincrBalance6 > 0, 1, 0);
+CreditReportTradeline: => NCarryBalance6 := IF(OverBalance0 < 0, 1, 0) + IF(OverBalance1 < 0, 1, 0) + IF(OverBalance2 < 0, 1, 0) + IF(OverBalance3 < 0, 1, 0) + IF(OverBalance4 < 0, 1, 0) + IF(OverBalance5 < 0, 1, 0) + IF(OverBalance6 < 0, 1, 0); //GTDNCarryBalance6
+CreditReportTradeline: => NOverPayment6 := IF(OverPayment0 > 0, 1, 0) + IF(OverPayment1 > 0, 1, 0) + IF(OverPayment2 > 0, 1, 0) + IF(OverPayment3 > 0, 1, 0) + IF(OverPayment4 > 0, 1, 0) + IF(OverPayment5 > 0, 1, 0) + IF(OverPayment6 > 0, 1, 0); //GTDNOverPayment6
+CreditReportTradeline: => NPastDue6 := IF(OverPayment0 < 0, 1, 0) + IF(OverPayment1 < 0, 1, 0) + IF(OverPayment2 < 0, 1, 0) + IF(OverPayment3 < 0, 1, 0) + IF(OverPayment4 < 0, 1, 0) + IF(OverPayment5 < 0, 1, 0) + IF(OverPayment6 < 0, 1, 0); //GTDNPastDue6
+CreditReportTradeline: => NIncrBalance6 := IF(IncrBalance0 > 0, 1, 0) + IF(IncrBalance1 > 0, 1, 0) + IF(IncrBalance2 > 0, 1, 0) + IF(IncrBalance3 > 0, 1, 0) + IF(IncrBalance4 > 0, 1, 0) + IF(IncrBalance5 > 0, 1, 0) + IF(IncrBalance6 > 0, 1, 0); //GTDNincrBalance6
 
-CreditReportTradeline: => GTDNCarryBalance12 := IF(GTDoverBalance0 < 0, 1, 0) + IF(GTDoverBalance1 < 0, 1, 0) + IF(GTDoverBalance2 < 0, 1, 0) + IF(GTDoverBalance3 < 0, 1, 0) + IF(GTDoverBalance4 < 0, 1, 0) + IF(GTDoverBalance5 < 0, 1, 0) + IF(GTDoverBalance6 < 0, 1, 0) + IF(GTDoverBalance7 < 0, 1, 0) + IF(GTDoverBalance8 < 0, 1, 0) + IF(GTDoverBalance9 < 0, 1, 0) + IF(GTDoverBalance10 < 0, 1, 0) + IF(GTDoverBalance11 < 0, 1, 0) + IF(GTDoverBalance12 < 0, 1, 0);
-CreditReportTradeline: => GTDNOverPayment12 := IF(GTDoverPayment0 > 0, 1, 0) + IF(GTDoverPayment1 > 0, 1, 0) + IF(GTDoverPayment2 > 0, 1, 0) + IF(GTDoverPayment3 > 0, 1, 0) + IF(GTDoverPayment4 > 0, 1, 0) + IF(GTDoverPayment5 > 0, 1, 0) + IF(GTDoverPayment6 > 0, 1, 0) + IF(GTDoverPayment7 > 0, 1, 0) + IF(GTDoverPayment8 > 0, 1, 0) + IF(GTDoverPayment9 > 0, 1, 0) + IF(GTDoverPayment10 > 0, 1, 0) + IF(GTDoverPayment11 > 0, 1, 0) + IF(GTDoverPayment12 > 0, 1, 0);
-CreditReportTradeline: => GTDNPastDue12 := IF(GTDoverPayment0 < 0, 1, 0) + IF(GTDoverPayment1 < 0, 1, 0) + IF(GTDoverPayment2 < 0, 1, 0) + IF(GTDoverPayment3 < 0, 1, 0) + IF(GTDoverPayment4 < 0, 1, 0) + IF(GTDoverPayment5 < 0, 1, 0) + IF(GTDoverPayment6 < 0, 1, 0) + IF(GTDoverPayment7 < 0, 1, 0) + IF(GTDoverPayment8 < 0, 1, 0) + IF(GTDoverPayment9 < 0, 1, 0) + IF(GTDoverPayment10 < 0, 1, 0) + IF(GTDoverPayment11 < 0, 1, 0) + IF(GTDoverPayment12 < 0, 1, 0);
-CreditReportTradeline: => GTDNincrBalance12 := IF(GTDincrBalance0 > 0, 1, 0) + IF(GTDincrBalance1 > 0, 1, 0) + IF(GTDincrBalance2 > 0, 1, 0) + IF(GTDincrBalance3 > 0, 1, 0) + IF(GTDincrBalance4 > 0, 1, 0) + IF(GTDincrBalance5 > 0, 1, 0) + IF(GTDincrBalance6 > 0, 1, 0) + IF(GTDincrBalance7 > 0, 1, 0) + IF(GTDincrBalance8 > 0, 1, 0) + IF(GTDincrBalance9 > 0, 1, 0) + IF(GTDincrBalance10 > 0, 1, 0) + IF(GTDincrBalance11 > 0, 1, 0) + IF(GTDincrBalance12 > 0, 1, 0);
+CreditReportTradeline: => NCarryBalance12 := IF(OverBalance0 < 0, 1, 0) + IF(OverBalance1 < 0, 1, 0) + IF(OverBalance2 < 0, 1, 0) + IF(OverBalance3 < 0, 1, 0) + IF(OverBalance4 < 0, 1, 0) + IF(OverBalance5 < 0, 1, 0) + IF(OverBalance6 < 0, 1, 0) + IF(OverBalance7 < 0, 1, 0) + IF(OverBalance8 < 0, 1, 0) + IF(OverBalance9 < 0, 1, 0) + IF(OverBalance10 < 0, 1, 0) + IF(OverBalance11 < 0, 1, 0) + IF(OverBalance12 < 0, 1, 0); //GTDNCarryBalance12
+CreditReportTradeline: => NOverPayment12 := IF(OverPayment0 > 0, 1, 0) + IF(OverPayment1 > 0, 1, 0) + IF(OverPayment2 > 0, 1, 0) + IF(OverPayment3 > 0, 1, 0) + IF(OverPayment4 > 0, 1, 0) + IF(OverPayment5 > 0, 1, 0) + IF(OverPayment6 > 0, 1, 0) + IF(OverPayment7 > 0, 1, 0) + IF(OverPayment8 > 0, 1, 0) + IF(OverPayment9 > 0, 1, 0) + IF(OverPayment10 > 0, 1, 0) + IF(OverPayment11 > 0, 1, 0) + IF(OverPayment12 > 0, 1, 0); //GTDNOverPayment12
+CreditReportTradeline: => NPastDue12 := IF(OverPayment0 < 0, 1, 0) + IF(OverPayment1 < 0, 1, 0) + IF(OverPayment2 < 0, 1, 0) + IF(OverPayment3 < 0, 1, 0) + IF(OverPayment4 < 0, 1, 0) + IF(OverPayment5 < 0, 1, 0) + IF(OverPayment6 < 0, 1, 0) + IF(OverPayment7 < 0, 1, 0) + IF(OverPayment8 < 0, 1, 0) + IF(OverPayment9 < 0, 1, 0) + IF(OverPayment10 < 0, 1, 0) + IF(OverPayment11 < 0, 1, 0) + IF(OverPayment12 < 0, 1, 0); //GTDNPastDue12
+CreditReportTradeline: => NIncrBalance12 := IF(IncrBalance0 > 0, 1, 0) + IF(IncrBalance1 > 0, 1, 0) + IF(IncrBalance2 > 0, 1, 0) + IF(IncrBalance3 > 0, 1, 0) + IF(IncrBalance4 > 0, 1, 0) + IF(IncrBalance5 > 0, 1, 0) + IF(IncrBalance6 > 0, 1, 0) + IF(IncrBalance7 > 0, 1, 0) + IF(IncrBalance8 > 0, 1, 0) + IF(IncrBalance9 > 0, 1, 0) + IF(IncrBalance10 > 0, 1, 0) + IF(IncrBalance11 > 0, 1, 0) + IF(IncrBalance12 > 0, 1, 0); //GTDNincrBalance12
 
-CreditReportTradeline: => GTDNCarryBalance18 := IF(GTDoverBalance0 < 0, 1, 0) + IF(GTDoverBalance1 < 0, 1, 0) + IF(GTDoverBalance2 < 0, 1, 0) + IF(GTDoverBalance3 < 0, 1, 0) + IF(GTDoverBalance4 < 0, 1, 0) + IF(GTDoverBalance5 < 0, 1, 0) + IF(GTDoverBalance6 < 0, 1, 0) + IF(GTDoverBalance7 < 0, 1, 0) + IF(GTDoverBalance8 < 0, 1, 0) + IF(GTDoverBalance9 < 0, 1, 0) + IF(GTDoverBalance10 < 0, 1, 0) + IF(GTDoverBalance11 < 0, 1, 0) + IF(GTDoverBalance12 < 0, 1, 0) + IF(GTDoverBalance13 < 0, 1, 0) + IF(GTDoverBalance14 < 0, 1, 0) + IF(GTDoverBalance15 < 0, 1, 0) + IF(GTDoverBalance16 < 0, 1, 0) + IF(GTDoverBalance17 < 0, 1, 0) + IF(GTDoverBalance18 < 0, 1, 0);
-CreditReportTradeline: => GTDNOverPayment18 := IF(GTDoverPayment0 > 0, 1, 0) + IF(GTDoverPayment1 > 0, 1, 0) + IF(GTDoverPayment2 > 0, 1, 0) + IF(GTDoverPayment3 > 0, 1, 0) + IF(GTDoverPayment4 > 0, 1, 0) + IF(GTDoverPayment5 > 0, 1, 0) + IF(GTDoverPayment6 > 0, 1, 0) + IF(GTDoverPayment7 > 0, 1, 0) + IF(GTDoverPayment8 > 0, 1, 0) + IF(GTDoverPayment9 > 0, 1, 0) + IF(GTDoverPayment10 > 0, 1, 0) + IF(GTDoverPayment11 > 0, 1, 0) + IF(GTDoverPayment12 > 0, 1, 0) + IF(GTDoverPayment13 > 0, 1, 0) + IF(GTDoverPayment14 > 0, 1, 0) + IF(GTDoverPayment15 > 0, 1, 0) + IF(GTDoverPayment16 > 0, 1, 0) + IF(GTDoverPayment17 > 0, 1, 0) + IF(GTDoverPayment18 > 0, 1, 0);
-CreditReportTradeline: => GTDNPastDue18 := IF(GTDoverPayment0 < 0, 1, 0) + IF(GTDoverPayment1 < 0, 1, 0) + IF(GTDoverPayment2 < 0, 1, 0) + IF(GTDoverPayment3 < 0, 1, 0) + IF(GTDoverPayment4 < 0, 1, 0) + IF(GTDoverPayment5 < 0, 1, 0) + IF(GTDoverPayment6 < 0, 1, 0) + IF(GTDoverPayment7 < 0, 1, 0) + IF(GTDoverPayment8 < 0, 1, 0) + IF(GTDoverPayment9 < 0, 1, 0) + IF(GTDoverPayment10 < 0, 1, 0) + IF(GTDoverPayment11 < 0, 1, 0) + IF(GTDoverPayment12 < 0, 1, 0) + IF(GTDoverPayment13 < 0, 1, 0) + IF(GTDoverPayment14 < 0, 1, 0) + IF(GTDoverPayment15 < 0, 1, 0) + IF(GTDoverPayment16 < 0, 1, 0) + IF(GTDoverPayment17 < 0, 1, 0) + IF(GTDoverPayment18 < 0, 1, 0);
-CreditReportTradeline: => GTDNincrBalance18 := IF(GTDincrBalance0 > 0, 1, 0) + IF(GTDincrBalance1 > 0, 1, 0) + IF(GTDincrBalance2 > 0, 1, 0) + IF(GTDincrBalance3 > 0, 1, 0) + IF(GTDincrBalance4 > 0, 1, 0) + IF(GTDincrBalance5 > 0, 1, 0) + IF(GTDincrBalance6 > 0, 1, 0) + IF(GTDincrBalance7 > 0, 1, 0) + IF(GTDincrBalance8 > 0, 1, 0) + IF(GTDincrBalance9 > 0, 1, 0) + IF(GTDincrBalance10 > 0, 1, 0) + IF(GTDincrBalance11 > 0, 1, 0) + IF(GTDincrBalance12 > 0, 1, 0) + IF(GTDincrBalance13 > 0, 1, 0) + IF(GTDincrBalance14 > 0, 1, 0) + IF(GTDincrBalance15 > 0, 1, 0) + IF(GTDincrBalance16 > 0, 1, 0) + IF(GTDincrBalance17 > 0, 1, 0) + IF(GTDincrBalance18 > 0, 1, 0);
+CreditReportTradeline: => NCarryBalance18 := IF(OverBalance0 < 0, 1, 0) + IF(OverBalance1 < 0, 1, 0) + IF(OverBalance2 < 0, 1, 0) + IF(OverBalance3 < 0, 1, 0) + IF(OverBalance4 < 0, 1, 0) + IF(OverBalance5 < 0, 1, 0) + IF(OverBalance6 < 0, 1, 0) + IF(OverBalance7 < 0, 1, 0) + IF(OverBalance8 < 0, 1, 0) + IF(OverBalance9 < 0, 1, 0) + IF(OverBalance10 < 0, 1, 0) + IF(OverBalance11 < 0, 1, 0) + IF(OverBalance12 < 0, 1, 0) + IF(OverBalance13 < 0, 1, 0) + IF(OverBalance14 < 0, 1, 0) + IF(OverBalance15 < 0, 1, 0) + IF(OverBalance16 < 0, 1, 0) + IF(OverBalance17 < 0, 1, 0) + IF(OverBalance18 < 0, 1, 0); //GTDNCarryBalance18
+CreditReportTradeline: => NOverPayment18 := IF(OverPayment0 > 0, 1, 0) + IF(OverPayment1 > 0, 1, 0) + IF(OverPayment2 > 0, 1, 0) + IF(OverPayment3 > 0, 1, 0) + IF(OverPayment4 > 0, 1, 0) + IF(OverPayment5 > 0, 1, 0) + IF(OverPayment6 > 0, 1, 0) + IF(OverPayment7 > 0, 1, 0) + IF(OverPayment8 > 0, 1, 0) + IF(OverPayment9 > 0, 1, 0) + IF(OverPayment10 > 0, 1, 0) + IF(OverPayment11 > 0, 1, 0) + IF(OverPayment12 > 0, 1, 0) + IF(OverPayment13 > 0, 1, 0) + IF(OverPayment14 > 0, 1, 0) + IF(OverPayment15 > 0, 1, 0) + IF(OverPayment16 > 0, 1, 0) + IF(OverPayment17 > 0, 1, 0) + IF(OverPayment18 > 0, 1, 0); //GTDNOverPayment18
+CreditReportTradeline: => NPastDue18 := IF(OverPayment0 < 0, 1, 0) + IF(OverPayment1 < 0, 1, 0) + IF(OverPayment2 < 0, 1, 0) + IF(OverPayment3 < 0, 1, 0) + IF(OverPayment4 < 0, 1, 0) + IF(OverPayment5 < 0, 1, 0) + IF(OverPayment6 < 0, 1, 0) + IF(OverPayment7 < 0, 1, 0) + IF(OverPayment8 < 0, 1, 0) + IF(OverPayment9 < 0, 1, 0) + IF(OverPayment10 < 0, 1, 0) + IF(OverPayment11 < 0, 1, 0) + IF(OverPayment12 < 0, 1, 0) + IF(OverPayment13 < 0, 1, 0) + IF(OverPayment14 < 0, 1, 0) + IF(OverPayment15 < 0, 1, 0) + IF(OverPayment16 < 0, 1, 0) + IF(OverPayment17 < 0, 1, 0) + IF(OverPayment18 < 0, 1, 0); //GTDNPastDue18
+CreditReportTradeline: => NIncrBalance18 := IF(IncrBalance0 > 0, 1, 0) + IF(IncrBalance1 > 0, 1, 0) + IF(IncrBalance2 > 0, 1, 0) + IF(IncrBalance3 > 0, 1, 0) + IF(IncrBalance4 > 0, 1, 0) + IF(IncrBalance5 > 0, 1, 0) + IF(IncrBalance6 > 0, 1, 0) + IF(IncrBalance7 > 0, 1, 0) + IF(IncrBalance8 > 0, 1, 0) + IF(IncrBalance9 > 0, 1, 0) + IF(IncrBalance10 > 0, 1, 0) + IF(IncrBalance11 > 0, 1, 0) + IF(IncrBalance12 > 0, 1, 0) + IF(IncrBalance13 > 0, 1, 0) + IF(IncrBalance14 > 0, 1, 0) + IF(IncrBalance15 > 0, 1, 0) + IF(IncrBalance16 > 0, 1, 0) + IF(IncrBalance17 > 0, 1, 0) + IF(IncrBalance18 > 0, 1, 0); //GTDNincrBalanc18
 
-CreditReportTradeline: => GTDNCarryBalance24 := IF(GTDoverBalance0 < 0, 1, 0) + IF(GTDoverBalance1 < 0, 1, 0) + IF(GTDoverBalance2 < 0, 1, 0) + IF(GTDoverBalance3 < 0, 1, 0) + IF(GTDoverBalance4 < 0, 1, 0) + IF(GTDoverBalance5 < 0, 1, 0) + IF(GTDoverBalance6 < 0, 1, 0) + IF(GTDoverBalance7 < 0, 1, 0) + IF(GTDoverBalance8 < 0, 1, 0) + IF(GTDoverBalance9 < 0, 1, 0) + IF(GTDoverBalance10 < 0, 1, 0) + IF(GTDoverBalance11 < 0, 1, 0) + IF(GTDoverBalance12 < 0, 1, 0) + IF(GTDoverBalance13 < 0, 1, 0) + IF(GTDoverBalance14 < 0, 1, 0) + IF(GTDoverBalance15 < 0, 1, 0) + IF(GTDoverBalance16 < 0, 1, 0) + IF(GTDoverBalance17 < 0, 1, 0) + IF(GTDoverBalance18 < 0, 1, 0) + IF(GTDoverBalance19 < 0, 1, 0) + IF(GTDoverBalance20 < 0, 1, 0) + IF(GTDoverBalance21 < 0, 1, 0) + IF(GTDoverBalance22 < 0, 1, 0) + IF(GTDoverBalance23 < 0, 1, 0);
-CreditReportTradeline: => GTDNOverPayment24 := IF(GTDoverPayment0 > 0, 1, 0) + IF(GTDoverPayment1 > 0, 1, 0) + IF(GTDoverPayment2 > 0, 1, 0) + IF(GTDoverPayment3 > 0, 1, 0) + IF(GTDoverPayment4 > 0, 1, 0) + IF(GTDoverPayment5 > 0, 1, 0) + IF(GTDoverPayment6 > 0, 1, 0) + IF(GTDoverPayment7 > 0, 1, 0) + IF(GTDoverPayment8 > 0, 1, 0) + IF(GTDoverPayment9 > 0, 1, 0) + IF(GTDoverPayment10 > 0, 1, 0) + IF(GTDoverPayment11 > 0, 1, 0) + IF(GTDoverPayment12 > 0, 1, 0) + IF(GTDoverPayment13 > 0, 1, 0) + IF(GTDoverPayment14 > 0, 1, 0) + IF(GTDoverPayment15 > 0, 1, 0) + IF(GTDoverPayment16 > 0, 1, 0) + IF(GTDoverPayment17 > 0, 1, 0) + IF(GTDoverPayment18 > 0, 1, 0) + IF(GTDoverPayment19 > 0, 1, 0) + IF(GTDoverPayment20 > 0, 1, 0) + IF(GTDoverPayment21 > 0, 1, 0) + IF(GTDoverPayment22 > 0, 1, 0) + IF(GTDoverPayment23 > 0, 1, 0);
-CreditReportTradeline: => GTDNPastDue24 := IF(GTDoverPayment0 < 0, 1, 0) + IF(GTDoverPayment1 < 0, 1, 0) + IF(GTDoverPayment2 < 0, 1, 0) + IF(GTDoverPayment3 < 0, 1, 0) + IF(GTDoverPayment4 < 0, 1, 0) + IF(GTDoverPayment5 < 0, 1, 0) + IF(GTDoverPayment6 < 0, 1, 0) + IF(GTDoverPayment7 < 0, 1, 0) + IF(GTDoverPayment8 < 0, 1, 0) + IF(GTDoverPayment9 < 0, 1, 0) + IF(GTDoverPayment10 < 0, 1, 0) + IF(GTDoverPayment11 < 0, 1, 0) + IF(GTDoverPayment12 < 0, 1, 0) + IF(GTDoverPayment13 < 0, 1, 0) + IF(GTDoverPayment14 < 0, 1, 0) + IF(GTDoverPayment15 < 0, 1, 0) + IF(GTDoverPayment16 < 0, 1, 0) + IF(GTDoverPayment17 < 0, 1, 0) + IF(GTDoverPayment18 < 0, 1, 0) + IF(GTDoverPayment19 < 0, 1, 0) + IF(GTDoverPayment20 < 0, 1, 0) + IF(GTDoverPayment21 < 0, 1, 0) + IF(GTDoverPayment22 < 0, 1, 0) + IF(GTDoverPayment23 < 0, 1, 0);
-CreditReportTradeline: => GTDNincrBalance24 := IF(GTDincrBalance0 > 0, 1, 0) + IF(GTDincrBalance1 > 0, 1, 0) + IF(GTDincrBalance2 > 0, 1, 0) + IF(GTDincrBalance3 > 0, 1, 0) + IF(GTDincrBalance4 > 0, 1, 0) + IF(GTDincrBalance5 > 0, 1, 0) + IF(GTDincrBalance6 > 0, 1, 0) + IF(GTDincrBalance7 > 0, 1, 0) + IF(GTDincrBalance8 > 0, 1, 0) + IF(GTDincrBalance9 > 0, 1, 0) + IF(GTDincrBalance10 > 0, 1, 0) + IF(GTDincrBalance11 > 0, 1, 0) + IF(GTDincrBalance12 > 0, 1, 0) + IF(GTDincrBalance13 > 0, 1, 0) + IF(GTDincrBalance14 > 0, 1, 0) + IF(GTDincrBalance15 > 0, 1, 0) + IF(GTDincrBalance16 > 0, 1, 0) + IF(GTDincrBalance17 > 0, 1, 0) + IF(GTDincrBalance18 > 0, 1, 0) + IF(GTDincrBalance19 > 0, 1, 0) + IF(GTDincrBalance20 > 0, 1, 0) + IF(GTDincrBalance21 > 0, 1, 0) + IF(GTDincrBalance22 > 0, 1, 0) + IF(GTDincrBalance23 > 0, 1, 0);
+CreditReportTradeline: => NCarryBalance24 := IF(OverBalance0 < 0, 1, 0) + IF(OverBalance1 < 0, 1, 0) + IF(OverBalance2 < 0, 1, 0) + IF(OverBalance3 < 0, 1, 0) + IF(OverBalance4 < 0, 1, 0) + IF(OverBalance5 < 0, 1, 0) + IF(OverBalance6 < 0, 1, 0) + IF(OverBalance7 < 0, 1, 0) + IF(OverBalance8 < 0, 1, 0) + IF(OverBalance9 < 0, 1, 0) + IF(OverBalance10 < 0, 1, 0) + IF(OverBalance11 < 0, 1, 0) + IF(OverBalance12 < 0, 1, 0) + IF(OverBalance13 < 0, 1, 0) + IF(OverBalance14 < 0, 1, 0) + IF(OverBalance15 < 0, 1, 0) + IF(OverBalance16 < 0, 1, 0) + IF(OverBalance17 < 0, 1, 0) + IF(OverBalance18 < 0, 1, 0) + IF(OverBalance19 < 0, 1, 0) + IF(OverBalance20 < 0, 1, 0) + IF(OverBalance21 < 0, 1, 0) + IF(OverBalance22 < 0, 1, 0) + IF(OverBalance23 < 0, 1, 0); ////GTDNCarryBalance24
+CreditReportTradeline: => NOverPayment24 := IF(OverPayment0 > 0, 1, 0) + IF(OverPayment1 > 0, 1, 0) + IF(OverPayment2 > 0, 1, 0) + IF(OverPayment3 > 0, 1, 0) + IF(OverPayment4 > 0, 1, 0) + IF(OverPayment5 > 0, 1, 0) + IF(OverPayment6 > 0, 1, 0) + IF(OverPayment7 > 0, 1, 0) + IF(OverPayment8 > 0, 1, 0) + IF(OverPayment9 > 0, 1, 0) + IF(OverPayment10 > 0, 1, 0) + IF(OverPayment11 > 0, 1, 0) + IF(OverPayment12 > 0, 1, 0) + IF(OverPayment13 > 0, 1, 0) + IF(OverPayment14 > 0, 1, 0) + IF(OverPayment15 > 0, 1, 0) + IF(OverPayment16 > 0, 1, 0) + IF(OverPayment17 > 0, 1, 0) + IF(OverPayment18 > 0, 1, 0) + IF(OverPayment19 > 0, 1, 0) + IF(OverPayment20 > 0, 1, 0) + IF(OverPayment21 > 0, 1, 0) + IF(OverPayment22 > 0, 1, 0) + IF(OverPayment23 > 0, 1, 0); //GTDNOverPayment24
+CreditReportTradeline: => NPastDue24 := IF(OverPayment0 < 0, 1, 0) + IF(OverPayment1 < 0, 1, 0) + IF(OverPayment2 < 0, 1, 0) + IF(OverPayment3 < 0, 1, 0) + IF(OverPayment4 < 0, 1, 0) + IF(OverPayment5 < 0, 1, 0) + IF(OverPayment6 < 0, 1, 0) + IF(OverPayment7 < 0, 1, 0) + IF(OverPayment8 < 0, 1, 0) + IF(OverPayment9 < 0, 1, 0) + IF(OverPayment10 < 0, 1, 0) + IF(OverPayment11 < 0, 1, 0) + IF(OverPayment12 < 0, 1, 0) + IF(OverPayment13 < 0, 1, 0) + IF(OverPayment14 < 0, 1, 0) + IF(OverPayment15 < 0, 1, 0) + IF(OverPayment16 < 0, 1, 0) + IF(OverPayment17 < 0, 1, 0) + IF(OverPayment18 < 0, 1, 0) + IF(OverPayment19 < 0, 1, 0) + IF(OverPayment20 < 0, 1, 0) + IF(OverPayment21 < 0, 1, 0) + IF(OverPayment22 < 0, 1, 0) + IF(OverPayment23 < 0, 1, 0); //GTDNPastDue24
+CreditReportTradeline: => NIncrBalance24 := IF(IncrBalance0 > 0, 1, 0) + IF(IncrBalance1 > 0, 1, 0) + IF(IncrBalance2 > 0, 1, 0) + IF(IncrBalance3 > 0, 1, 0) + IF(IncrBalance4 > 0, 1, 0) + IF(IncrBalance5 > 0, 1, 0) + IF(IncrBalance6 > 0, 1, 0) + IF(IncrBalance7 > 0, 1, 0) + IF(IncrBalance8 > 0, 1, 0) + IF(IncrBalance9 > 0, 1, 0) + IF(IncrBalance10 > 0, 1, 0) + IF(IncrBalance11 > 0, 1, 0) + IF(IncrBalance12 > 0, 1, 0) + IF(IncrBalance13 > 0, 1, 0) + IF(IncrBalance14 > 0, 1, 0) + IF(IncrBalance15 > 0, 1, 0) + IF(IncrBalance16 > 0, 1, 0) + IF(IncrBalance17 > 0, 1, 0) + IF(IncrBalance18 > 0, 1, 0) + IF(IncrBalance19 > 0, 1, 0) + IF(IncrBalance20 > 0, 1, 0) + IF(IncrBalance21 > 0, 1, 0) + IF(IncrBalance22 > 0, 1, 0) + IF(IncrBalance23 > 0, 1, 0); //GTDNincrBalance24
 
-CreditReportTradeline: => GTDmaxBalance24 := Trended.BalanceAmount$Max;
-CreditReportTradeline: => GTDmaxLoanCreditLimit24 := Trended.LoanAmountCreditLimit$Max;
-CreditReportTradeline: => GTDmaxScheduledPayment24 := Trended.ScheduledPayment$Max;
-CreditReportTradeline: => GTDmaxActualPayment24 := Trended.ActualPayment$Max;
-CreditReportTradeline: => GTDmaxOverPayment24 := MAX(GTDoverPayment0, GTDoverPayment1, GTDoverPayment2, GTDoverPayment3, GTDoverPayment4, GTDoverPayment5, GTDoverPayment6, GTDoverPayment7, GTDoverPayment8, GTDoverPayment9, GTDoverPayment10, GTDoverPayment11, GTDoverPayment12, GTDoverPayment13, GTDoverPayment14, GTDoverPayment15, GTDoverPayment16, GTDoverPayment17, GTDoverPayment18, GTDoverPayment19, GTDoverPayment20, GTDoverPayment21, GTDoverPayment22, GTDoverPayment23);
-CreditReportTradeline: => GTDmaxOverBalance24 := MAX(GTDoverBalance0, GTDoverBalance1, GTDoverBalance2, GTDoverBalance3, GTDoverBalance4, GTDoverBalance5, GTDoverBalance6, GTDoverBalance7, GTDoverBalance8, GTDoverBalance9, GTDoverBalance10, GTDoverBalance11, GTDoverBalance12, GTDoverBalance13, GTDoverBalance14, GTDoverBalance15, GTDoverBalance16, GTDoverBalance17, GTDoverBalance18, GTDoverBalance19, GTDoverBalance20, GTDoverBalance21, GTDoverBalance22, GTDoverBalance23);
-CreditReportTradeline: => GTDmaxIncrBalance24 := MAX(GTDincrBalance0, GTDincrBalance1, GTDincrBalance2, GTDincrBalance3, GTDincrBalance4, GTDincrBalance5, GTDincrBalance6, GTDincrBalance7, GTDincrBalance8, GTDincrBalance9, GTDincrBalance10, GTDincrBalance11, GTDincrBalance12, GTDincrBalance13, GTDincrBalance14, GTDincrBalance15, GTDincrBalance16, GTDincrBalance17, GTDincrBalance18, GTDincrBalance19, GTDincrBalance20, GTDincrBalance21, GTDincrBalance22, GTDincrBalance23);
+CreditReportTradeline: => MaxBalance24 := Trended.BalanceAmount$Max; //GTDmaxBalance24
+CreditReportTradeline: => MaxLoanCreditLimit24 := Trended.LoanAmountCreditLimit$Max; //GTDmaxLoanCreditLimit24
+CreditReportTradeline: => MaxScheduledPayment24 := Trended.ScheduledPayment$Max; //GTDmaxScheduledPayment24
+CreditReportTradeline: => MaxActualPayment24 := Trended.ActualPayment$Max; //GTDmaxActualPayment24
+CreditReportTradeline: => MaxOverPayment24 := MAX(OverPayment0, OverPayment1, OverPayment2, OverPayment3, OverPayment4, OverPayment5, OverPayment6, OverPayment7, OverPayment8, OverPayment9, OverPayment10, OverPayment11, OverPayment12, OverPayment13, OverPayment14, OverPayment15, OverPayment16, OverPayment17, OverPayment18, OverPayment19, OverPayment20, OverPayment21, OverPayment22, OverPayment23); //GTDmaxOverPayment24
+CreditReportTradeline: => MaxOverBalance24 := MAX(OverBalance0, OverBalance1, OverBalance2, OverBalance3, OverBalance4, OverBalance5, OverBalance6, OverBalance7, OverBalance8, OverBalance9, OverBalance10, OverBalance11, OverBalance12, OverBalance13, OverBalance14, OverBalance15, OverBalance16, OverBalance17, OverBalance18, OverBalance19, OverBalance20, OverBalance21, OverBalance22, OverBalance23); //GTDmaxOverBalance24
+CreditReportTradeline: => MaxIncrBalance24 := MAX(IncrBalance0, IncrBalance1, IncrBalance2, IncrBalance3, IncrBalance4, IncrBalance5, IncrBalance6, IncrBalance7, IncrBalance8, IncrBalance9, IncrBalance10, IncrBalance11, IncrBalance12, IncrBalance13, IncrBalance14, IncrBalance15, IncrBalance16, IncrBalance17, IncrBalance18, IncrBalance19, IncrBalance20, IncrBalance21, IncrBalance22, IncrBalance23); //GTDmaxIncrBalance24
 
-CreditReportTradeline: => GTDminBalance24 := Trended.BalanceAmount$Min;
-CreditReportTradeline: => GTDminLoanCreditLimit24 := Trended.LoanAmountCreditLimit$Min;
-CreditReportTradeline: => GTDminScheduledPayment24 := Trended.ScheduledPayment$Min;
-CreditReportTradeline: => GTDminActualPayment24 := Trended.ActualPayment$Min;
-CreditReportTradeline: => GTDminOverPayment24 := MIN(GTDoverPayment0, GTDoverPayment1, GTDoverPayment2, GTDoverPayment3, GTDoverPayment4, GTDoverPayment5, GTDoverPayment6, GTDoverPayment7, GTDoverPayment8, GTDoverPayment9, GTDoverPayment10, GTDoverPayment11, GTDoverPayment12, GTDoverPayment13, GTDoverPayment14, GTDoverPayment15, GTDoverPayment16, GTDoverPayment17, GTDoverPayment18, GTDoverPayment19, GTDoverPayment20, GTDoverPayment21, GTDoverPayment22, GTDoverPayment23);
-CreditReportTradeline: => GTDminOverBalance24 := MIN(GTDoverBalance0, GTDoverBalance1, GTDoverBalance2, GTDoverBalance3, GTDoverBalance4, GTDoverBalance5, GTDoverBalance6, GTDoverBalance7, GTDoverBalance8, GTDoverBalance9, GTDoverBalance10, GTDoverBalance11, GTDoverBalance12, GTDoverBalance13, GTDoverBalance14, GTDoverBalance15, GTDoverBalance16, GTDoverBalance17, GTDoverBalance18, GTDoverBalance19, GTDoverBalance20, GTDoverBalance21, GTDoverBalance22, GTDoverBalance23);
-CreditReportTradeline: => GTDminIncrBalance24 := MIN(GTDincrBalance0, GTDincrBalance1, GTDincrBalance2, GTDincrBalance3, GTDincrBalance4, GTDincrBalance5, GTDincrBalance6, GTDincrBalance7, GTDincrBalance8, GTDincrBalance9, GTDincrBalance10, GTDincrBalance11, GTDincrBalance12, GTDincrBalance13, GTDincrBalance14, GTDincrBalance15, GTDincrBalance16, GTDincrBalance17, GTDincrBalance18, GTDincrBalance19, GTDincrBalance20, GTDincrBalance21, GTDincrBalance22, GTDincrBalance23);
+CreditReportTradeline: => MinBalance24 := Trended.BalanceAmount$Min; //GTDminBalance24
+CreditReportTradeline: => MinLoanCreditLimit24 := Trended.LoanAmountCreditLimit$Min; //GTDminLoanCreditLimit24
+CreditReportTradeline: => MinScheduledPayment24 := Trended.ScheduledPayment$Min; //GTDminScheduledPayment24
+CreditReportTradeline: => MinActualPayment24 := Trended.ActualPayment$Min; //GTDminActualPayment24
+CreditReportTradeline: => MinOverPayment24 := MIN(OverPayment0, OverPayment1, OverPayment2, OverPayment3, OverPayment4, OverPayment5, OverPayment6, OverPayment7, OverPayment8, OverPayment9, OverPayment10, OverPayment11, OverPayment12, OverPayment13, OverPayment14, OverPayment15, OverPayment16, OverPayment17, OverPayment18, OverPayment19, OverPayment20, OverPayment21, OverPayment22, OverPayment23); //GTDminOverPayment24
+CreditReportTradeline: => MinOverBalance24 := MIN(OverBalance0, OverBalance1, OverBalance2, OverBalance3, OverBalance4, OverBalance5, OverBalance6, OverBalance7, OverBalance8, OverBalance9, OverBalance10, OverBalance11, OverBalance12, OverBalance13, OverBalance14, OverBalance15, OverBalance16, OverBalance17, OverBalance18, OverBalance19, OverBalance20, OverBalance21, OverBalance22, OverBalance23); //GTDminOverBalance24
+CreditReportTradeline: => MinIncrBalance24 := MIN(IncrBalance0, IncrBalance1, IncrBalance2, IncrBalance3, IncrBalance4, IncrBalance5, IncrBalance6, IncrBalance7, IncrBalance8, IncrBalance9, IncrBalance10, IncrBalance11, IncrBalance12, IncrBalance13, IncrBalance14, IncrBalance15, IncrBalance16, IncrBalance17, IncrBalance18, IncrBalance19, IncrBalance20, IncrBalance21, IncrBalance22, IncrBalance23); //GTDminIncrBalance24
 
-CreditReportTradeline: => GTDRangeBalance24 := MAX(GTDmaxBalance24,0) - MAX(GTDminBalance24,0);
-CreditReportTradeline: => GTDRangeLoanCreditLimit24 := MAX(GTDmaxLoanCreditLimit24,0) - MAX(GTDminLoanCreditLimit24,0);
-CreditReportTradeline: => GTDRangeScheduledPayment24 := MAX(GTDmaxScheduledPayment24,0) - MAX(GTDminScheduledPayment24,0);
-CreditReportTradeline: => GTDRangeActualPayment24 := MAX(GTDmaxActualPayment24,0) - MAX(GTDminActualPayment24,0);
+CreditReportTradeline: => RangeBalance24 := MAX(MaxBalance24,0) - MAX(MinBalance24,0); //GTDRangeBalance24
+CreditReportTradeline: => RangeLoanCreditLimit24 := MAX(MaxLoanCreditLimit24,0) - MAX(MinLoanCreditLimit24,0); //GTDRangeLoanCreditLimit24
+CreditReportTradeline: => RangeScheduledPayment24 := MAX(MaxScheduledPayment24,0) - MAX(MinScheduledPayment24,0); //GTDRangeScheduledPayment24
+CreditReportTradeline: => RangeActualPayment24 := MAX(MaxActualPayment24,0) - MAX(MinActualPayment24,0); //GTDRangeActualPayment24
 
-CreditReportTradeline: => GTDmaxUtilization24 := Trended.GTDutilizationM$Max;
-CreditReportTradeline: => GTDmaxPercentBalanceChange24 := MAX(GTDPercentBalanceChange0, GTDPercentBalanceChange1, GTDPercentBalanceChange2, GTDPercentBalanceChange3, GTDPercentBalanceChange4, GTDPercentBalanceChange5, GTDPercentBalanceChange6, GTDPercentBalanceChange7, GTDPercentBalanceChange8, GTDPercentBalanceChange9, GTDPercentBalanceChange10, GTDPercentBalanceChange11, GTDPercentBalanceChange12, GTDPercentBalanceChange13, GTDPercentBalanceChange14, GTDPercentBalanceChange15, GTDPercentBalanceChange16, GTDPercentBalanceChange17, GTDPercentBalanceChange18, GTDPercentBalanceChange19, GTDPercentBalanceChange20, GTDPercentBalanceChange21, GTDPercentBalanceChange22, GTDPercentBalanceChange23);
+CreditReportTradeline: => MaxUtilization24 := Trended.UtilizationM$Max; //GTDmaxUtilization24
+CreditReportTradeline: => MaxPercentBalanceChange24 := MAX(PercentBalanceChange0, PercentBalanceChange1, PercentBalanceChange2, PercentBalanceChange3, PercentBalanceChange4, PercentBalanceChange5, PercentBalanceChange6, PercentBalanceChange7, PercentBalanceChange8, PercentBalanceChange9, PercentBalanceChange10, PercentBalanceChange11, PercentBalanceChange12, PercentBalanceChange13, PercentBalanceChange14, PercentBalanceChange15, PercentBalanceChange16, PercentBalanceChange17, PercentBalanceChange18, PercentBalanceChange19, PercentBalanceChange20, PercentBalanceChange21, PercentBalanceChange22, PercentBalanceChange23); //GTDmaxPercentBalanceChange24
 
-CreditReportTradeline: => GTDmeanBalance6 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 7), BalanceAmount);
-CreditReportTradeline: => GTDmeanBalance12 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 13), BalanceAmount);
-CreditReportTradeline: => GTDmeanBalance18 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 19), BalanceAmount);
-CreditReportTradeline: => GTDmeanBalance24 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 25), BalanceAmount);
+CreditReportTradeline: => MeanBalance6 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 7), BalanceAmount); //GTDmeanBalance6
+CreditReportTradeline: => MeanBalance12 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 13), BalanceAmount); //GTDmeanBalance12
+CreditReportTradeline: => MeanBalance18 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 19), BalanceAmount); //GTDmeanBalance18
+CreditReportTradeline: => MeanBalance24 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 25), BalanceAmount); //GTDmeanBalance24
 
-CreditReportTradeline: => GTDstdBalance12 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 13), BalanceAmount);
-CreditReportTradeline: => GTDstdBalance18 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 19), BalanceAmount);
-CreditReportTradeline: => GTDstdBalance24 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 25), BalanceAmount);
-CreditReportTradeline: => GTDmeanUtilization6 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 7), GTDutilizationM);
-CreditReportTradeline: => GTDmeanUtilization12 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 13), GTDutilizationM);
-CreditReportTradeline: => GTDmeanUtilization18 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 19), GTDutilizationM);
-CreditReportTradeline: => GTDmeanUtilization24 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 25), GTDutilizationM);
-CreditReportTradeline: => GTDstdUtilization24 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 25), GTDutilizationM);
+CreditReportTradeline: => StdBalance12 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 13), BalanceAmount); //GTDstdBalance12
+CreditReportTradeline: => StdBalance18 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 19), BalanceAmount); //GTDstdBalance18
+CreditReportTradeline: => StdBalance24 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 25), BalanceAmount); //GTDstdBalance24
+CreditReportTradeline: => MeanUtilization6 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 7), UtilizationM); //GTDmeanUtilization6
+CreditReportTradeline: => MeanUtilization12 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 13), UtilizationM); //GTDmeanUtilization12
+CreditReportTradeline: => MeanUtilization18 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 19), UtilizationM); //GTDmeanUtilization18
+CreditReportTradeline: => MeanUtilization24 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 25), UtilizationM); //GTDmeanUtilization24
+CreditReportTradeline: => StdUtilization24 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 25), UtilizationM); //GTDstdUtilization24
+ 
+CreditReportTradeline: => SlopeBalance24 := (25 * SUM(Trended, (25 - MonthCounter)*MAX(BalanceAmount, 0)) - SUM(Trended, 25 - MonthCounter) * SUM(Trended, MAX(BalanceAmount, 0)))/(25 * SUM(Trended,(25 - MonthCounter)*(25 - MonthCounter)) - SUM(Trended, 25 - MonthCounter) * SUM(Trended, 25 - MonthCounter)); //GTDslopeBalance24
+CreditReportTradeline: => SlopeBalance18 := (19 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), (19 - MonthCounter)*MAX(BalanceAmount, 0)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), 19 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), MAX(BalanceAmount, 0)))/(25 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19),(19 - MonthCounter)*(19 - MonthCounter)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), 19 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), 19 - MonthCounter)); //GTDslopeBalance18
+CreditReportTradeline: => SlopeBalance12 := (13 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), (13 - MonthCounter)*MAX(BalanceAmount, 0)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), 13 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), MAX(BalanceAmount, 0)))/(25 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13),(13 - MonthCounter)*(13 - MonthCounter)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), 13 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), 13 - MonthCounter)); //GTDslopeBalance12
+CreditReportTradeline: => SlopeBalance6 := (7 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), (7 - MonthCounter)*MAX(BalanceAmount, 0)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), 7 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), MAX(BalanceAmount, 0)))/(25 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7),(7 - MonthCounter)*(7 - MonthCounter)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), 7 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), 7 - MonthCounter)); //GTDslopeBalance6
 
-CreditReportTradeline: => GTDslopeBalance24 := (25 * SUM(Trended, (25 - MonthCounter)*MAX(BalanceAmount, 0)) - SUM(Trended, 25 - MonthCounter) * SUM(Trended, MAX(BalanceAmount, 0)))/(25 * SUM(Trended,(25 - MonthCounter)*(25 - MonthCounter)) - SUM(Trended, 25 - MonthCounter) * SUM(Trended, 25 - MonthCounter));
-CreditReportTradeline: => GTDslopeBalance18 := (19 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), (19 - MonthCounter)*MAX(BalanceAmount, 0)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), 19 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), MAX(BalanceAmount, 0)))/(25 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19),(19 - MonthCounter)*(19 - MonthCounter)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), 19 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), 19 - MonthCounter));
-CreditReportTradeline: => GTDslopeBalance12 := (13 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), (13 - MonthCounter)*MAX(BalanceAmount, 0)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), 13 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), MAX(BalanceAmount, 0)))/(25 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13),(13 - MonthCounter)*(13 - MonthCounter)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), 13 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), 13 - MonthCounter));
-CreditReportTradeline: => GTDslopeBalance6 := (7 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), (7 - MonthCounter)*MAX(BalanceAmount, 0)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), 7 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), MAX(BalanceAmount, 0)))/(25 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7),(7 - MonthCounter)*(7 - MonthCounter)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), 7 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), 7 - MonthCounter));
+CreditReportTradeline.Trended: => RatingM := IF((CreditReportTradeline.MonthsPaymentPatternStartDate <= 24 AND CreditReportTradeline.MonthsPaymentPatternStartDate > 0) AND (MonthCounter >= CreditReportTradeline.MonthsPaymentPatternStartDate AND MonthCounter <= 24) AND MonthCounter <= LENGTH(TRIMALL(CreditReportTradeline.PaymentHistory84Months)), SUBSTR(CreditReportTradeline.PaymentHistory84Months, MonthCounter, 1),IF(NOT CreditReportTradeline.CurrentRateCode:Null AND (CreditReportTradeline.MonthsDateReported <= 24 AND CreditReportTradeline.MonthsDateReported >= 0) AND MonthCounter = CreditReportTradeline.MonthsDateReported + 1, SUBSTR(CreditReportTradeline.CurrentRateCode, 1, 1), '-')); //GTDRatingM
 
-CreditReportTradeline.Trended: => GTDRatingM := IF(CreditReportTradeline(MonthsPaymentPatternStartDate <= 24 AND MonthsPaymentPatternStartDate > 0) AND (MonthCounter >= CreditReportTradeline.MonthsPaymentPatternStartDate AND MonthCounter <= 24) AND MonthCounter <= LENGTH(TRIMALL(CreditReportTradeline.PaymentHistory84Months)), SUBSTR(CreditReportTradeline.PaymentHistory84Months, MonthCounter, 1),IF(CreditReportTradeline(NOT CurrentRateCode:Null AND (MonthsDateReported <= 24 AND MonthsDateReported >= 0)) AND MonthCounter = CreditReportTradeline.MonthsDateReported + 1, SUBSTR(CreditReportTradeline.CurrentRateCode, 1, 1), '-'));
+CreditReportTradeline: => Max30PBalance24 := MAX(MAX(Trended((RatingM IN GRID_30DPD) OR (RatingM IN GRID_60DPD) OR (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax30PBalance24
+CreditReportTradeline: => Max60PBalance24 := MAX(MAX(Trended((RatingM IN GRID_60DPD) OR (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax60PBalance24
+CreditReportTradeline: => Max90PBalance24 := MAX(MAX(Trended((RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax90PBalance24
+CreditReportTradeline: => Max120PBalance24 := MAX(MAX(Trended((RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax120PBalance24
+CreditReportTradeline: => MaxDerogBalance24 := MAX(MAX(Trended(RatingM IN GRID_DEROG), BalanceAmount), -9999); //GTDMaxDerogBalance24
 
-CreditReportTradeline: => GTDmax30PBalance24 := MAX(MAX(Trended((GTDRatingM IN GRID_30DPD) OR (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax60PBalance24 := MAX(MAX(Trended((GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax90PBalance24 := MAX(MAX(Trended((GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax120PBalance24 := MAX(MAX(Trended((GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmaxDerogBalance24 := MAX(MAX(Trended(GTDRatingM IN GRID_DEROG), BalanceAmount), -9999);
+CreditReportTradeline: => Max30PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (RatingM IN GRID_30DPD) OR (RatingM IN GRID_60DPD) OR (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax30PBalance18
+CreditReportTradeline: => Max60PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (RatingM IN GRID_60DPD) OR (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax60PBalance18
+CreditReportTradeline: => Max90PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax90PBalance18
+CreditReportTradeline: => Max120PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax120PBalance18
+CreditReportTradeline: => MaxDerogBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND RatingM IN GRID_DEROG), BalanceAmount), -9999); //GTDMaxDerogBalance18
 
-CreditReportTradeline: => GTDmax30PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (GTDRatingM IN GRID_30DPD) OR (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax60PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax90PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax120PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmaxDerogBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND GTDRatingM IN GRID_DEROG), BalanceAmount), -9999);
+CreditReportTradeline: => Max30PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (RatingM IN GRID_30DPD) OR (RatingM IN GRID_60DPD) OR (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax30PBalance12
+CreditReportTradeline: => Max60PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (RatingM IN GRID_60DPD) OR (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax60PBalance12
+CreditReportTradeline: => Max90PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax90PBalance12
+CreditReportTradeline: => Max120PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax120PBalance12
+CreditReportTradeline: => MaxDerogBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND RatingM IN GRID_DEROG), BalanceAmount), -9999); //GTDMaxDerogBalance12
 
-CreditReportTradeline: => GTDmax30PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (GTDRatingM IN GRID_30DPD) OR (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax60PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax90PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax120PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmaxDerogBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND GTDRatingM IN GRID_DEROG), BalanceAmount), -9999);
-
-CreditReportTradeline: => GTDmax30PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_30DPD) OR (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax60PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax90PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmax120PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
-CreditReportTradeline: => GTDmaxDerogBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND GTDRatingM IN GRID_DEROG), BalanceAmount), -9999);
-
+CreditReportTradeline: => Max30PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (RatingM IN GRID_30DPD) OR (RatingM IN GRID_60DPD) OR (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax30PBalance6
+CreditReportTradeline: => Max60PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (RatingM IN GRID_60DPD) OR (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax60PBalance6
+CreditReportTradeline: => Max90PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (RatingM IN GRID_90DPD) OR (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax90PBalance6
+CreditReportTradeline: => Max120PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (RatingM IN GRID_120_180DPD) OR (RatingM IN GRID_DEROG)), BalanceAmount), -9999); //GTDMax120PBalance6
+CreditReportTradeline: => MaxDerogBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND RatingM IN GRID_DEROG), BalanceAmount), -9999); //GTDMaxDerogBalance6
+ 
 
 // Testing/Debug KEL Outputs
 QUERY: CreditReportBankruptcyV1(SearchForTransactionID) <= CreditReportBankruptcy(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
