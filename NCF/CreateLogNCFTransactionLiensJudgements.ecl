@@ -4,7 +4,7 @@
 		
 		Input_LienJudgement_File := Files.TransactionLogLiensJudgements;
 		Vault_LienJudgement_File := Files.Lien_JudgementsData;
-		Vault_LienJudgement_File_Name := 'thor::base::ncf::Prod::Liens_JudgementsData';
+		Vault_LienJudgement_File_Name := '~thor::base::ncf::Prod::Liens_JudgementsData';
 		File_Date := std.date.today();
 		Source_IP := '10.194.64.250';
 		Source_Path := '/data/orbitprod/Vault/NCF/LienJudgement/process/'+File_Date+'/transaction_log_lien_judgment.txt';
@@ -12,7 +12,7 @@
 		
 		SprayFile  := FileServices.SprayVariable(Source_IP ,Source_Path,,
 																							'' ,, '' ,
-																							Destination_Group,Vault_LienJudgement_File_Name); 
+																							Destination_Group,Vault_LienJudgement_File_Name,,,,true,,true); 
 		
 		Max_Rid := MAX(Vault_LienJudgement_File,Vault_Rid);
 		
