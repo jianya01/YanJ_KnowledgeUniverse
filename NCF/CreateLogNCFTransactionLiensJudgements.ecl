@@ -25,8 +25,11 @@
 	Failurebody     := 'LiensJudgementsData  Build Failed for ' + (STRING)std.date.today() + '\n' +
 										 'The Workunit is ' + WORKUNIT + '\n'+
 										 'ErrorMessage is ' + FAILMESSAGE + '\n\n';		
-										 
 	
+	
+															
+																					
+																					
 	CreateFile := SEQUENTIAL(NCF.FileUtil.FN_OutputAndPromoteFile(TransactionLogEditsArchive_Out, Files.base_prefix, 'Liens_JudgementsData', WORKUNIT[2..9] + WORKUNIT[11..16]),
 													 Fileservices.Sendemail(NCF.EmailAddresses.NCF_EmailAddresses, Successsubject, Successbody))
 												 : FAILURE(Fileservices.Sendemail(NCF.EmailAddresses.NCF_EmailAddresses, Failuresubject, Failurebody));
