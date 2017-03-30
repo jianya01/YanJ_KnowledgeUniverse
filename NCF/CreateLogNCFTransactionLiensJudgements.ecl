@@ -1,11 +1,11 @@
 ﻿ IMPORT NCF_Layout,STD,Vault;
  
- EXPORT CreateLogNCFTransactionLiensJudgements := FUNCTION
+ EXPORT CreateLogNCFTransactionLiensJudgements(STRING Input_File_Date ='') := FUNCTION
 		
 		Input_LienJudgement_File := Files.TransactionLogLiensJudgements;
 		Vault_LienJudgement_File := Files.Lien_JudgementsData;
-		Vault_LienJudgement_File_Name := '~thor::base::ncf::Prod::Liens_JudgementsData';
-		File_Date := std.date.today();
+		Vault_LienJudgement_File_Name := Files.TransactionLogLiensJudgements_File;
+		File_Date := IF(Input_File_Date ='',(STRING)std.date.today(),Input_File_Date);
 		Source_IP := '10.194.64.250';
 		Source_Path := '/data/orbitprod/Vault/NCF/LienJudgement/process/'+File_Date+'/transaction_log_lien_judgment.txt';
 		Destination_Group := 'analyt_thor400_90_b';
@@ -38,7 +38,8 @@
 										 'The Workunit is ' + WORKUNIT + '\n'+
 										 'ErrorMessage is ' + FAILMESSAGE + '\n\n';		
 	
-	CreateFile := SEQUENTIAL(SprayFile, NCF.FileUtil.FN_OutputAndPromoteFile(TransactionLogEditsArchive_Out, Files.base_prefix, 'Liens_JudgementsData', WORKUNIT[2..9] + WORKUNIT[11..16]),
+	CreateFile := SEQUENTIAL(SprayFile, 
+													 NCF.FileUtil.FN_OutputAndPromoteFile(TransactionLogEditsArchive_Out, Files.base_prefix, 'Liens_JudgementsData', WORKUNIT[2..9] + WORKUNIT[11..16]),
 													 Fileservices.Sendemail(NCF.EmailAddresses.NCF_EmailAddresses, Successsubject, Successbody))
 												 : FAILURE(Fileservices.Sendemail(NCF.EmailAddresses.NCF_EmailAddresses, Failuresubject, Failurebody));
 									
