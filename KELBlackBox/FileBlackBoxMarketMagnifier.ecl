@@ -962,7 +962,7 @@ LayoutMarketMagnifier := RECORD
   string10 alternate_addr_numerics;
  END;
 
-fileName := KELBlackBox.FileBlackBoxLocation + 'out::marketmagnifier::092016::final';
+fileName := KELBlackBox.FileBlackBoxLocation + 'analyt_thor400_90_dev::unmatchedmarketmagnifier';
 EXPORT FileBlackBoxMarketMagnifier := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
-	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
+	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__),
 	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));
