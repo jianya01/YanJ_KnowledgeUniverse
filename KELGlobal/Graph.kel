@@ -165,13 +165,6 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		Vacation{NumberOfCurrentVacationMonths, MaxVacationMonths, VacationPeriodsCount, VacationBeginDate, VacationEndDate},
 		ACA{InstitutionTypeCode, InstitutionTypeExpanded, InstitutionName}));
 
-// Due to a current issue with KEL the ACA information needs to be broken out into its own ENTITY and then joined back to the Address using some Address Logical Properties.  This should be fixed with the 0.8.2 build sometime in the next couple months.
-ACAInfo := ENTITY(FLAT(Address parent=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
-		STRING InstitutionTypeCode=NULL(), 
-		STRING InstitutionTypeExpanded=NULL(), 
-		STRING InstitutionName=NULL(), 
-		INTEGER RecordCountHelper=NULL()));
-
 Aircraft := ENTITY(FLAT(UID(NNumber),
 		STRING NNumber,
 		STRING SerialNumber,
@@ -272,19 +265,7 @@ USE ACA.Key_ACA_Addr_RID(FLAT, // This file doesn't contain Dates First/Last See
 		TypeCode = addr_type,
 		InstitutionTypeCode = inst_type,
 		InstitutionTypeExpanded = inst_type_exp,
-		InstitutionName = institution),
-	ACAInfo( // Supporting the ACAInfo Address Entity until KEL 0.8.2 arrives and then this can be removed
-		PrimaryRange = prim_range,
-		Predirectional = predir,
-		PrimaryName = prim_name,
-		Suffix = addr_suffix,
-		Postdirectional = postdir,
-		SecondaryRange = sec_range,
-		ZIP5 = z5,
-		InstitutionTypeCode = inst_type,
-		InstitutionTypeExpanded = inst_type_exp,
-		InstitutionName = institution,
-		RecordCountHelper = UniqueID));
+		InstitutionName = institution));
 
 USE BankruptcyV3.Key_BankruptcyV3_Main_Full(FLAT,
 	Bankruptcy(TMSID = TMSID,
@@ -639,8 +620,7 @@ Watercraft: => DaysOld := ABS(DAYSBETWEEN(WatercraftKey:DateFirstSeen, CURRENTDA
 
 
 Address: => ACAHit := IF(EXISTS(ACA), 'Y', 'N');
-Address: => ACAWithCounts := ACAInfo{parent, InstitutionName, InstitutionTypeCode, InstitutionTypeExpanded, Frequency := COUNT(GROUP)};
-Address: => TopACA := ONLY(TOPN(ACAWithCounts, 1, -Frequency));
+Address: => TopACA := ONLY(TOPN(ACA, 1, -InstitutionName:Weight));
 Address: => ACAInstitutionName := TopACA.InstitutionName;
 Address: => ACAInstitutionTypeCode := TopACA.InstitutionTypeCode;
 Address: => ACAInstitutionTypeExpanded := TopACA.InstitutionTypeExpanded;
