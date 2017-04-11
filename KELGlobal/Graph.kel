@@ -24,6 +24,16 @@ Person := ENTITY(FLAT(UID=LexID,
 		ReportedDatesOfBirth{DateOfBirth},
 		ReportedDatesOfDeath{DateOfDeath}));
  
+Phone := ENTITY(FLAT(UID(Phone10),
+		STRING Phone10,
+		STRING AreaCode,
+		STRING Phone7,
+		STRING Type,
+		BOOLEAN IsActive),
+	MODEL(UID,
+		Phone10, AreaCode, Phone7,
+		Types{Type},
+		IsActive));
 
 Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		STRING TMSID=NULL('Garbage12345'),
@@ -201,6 +211,8 @@ Watercraft := ENTITY(FLAT(UID(WatercraftKey),
 PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange))); // Connects a Person to an Address
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID), STRING NameType));
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
+PersonPhone := ASSOCIATION(FLAT(Person Subject, Phone PhoneNumber=UID(Phone10)));
+AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber=UID(Phone10), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange))); 
 
 // Define a first degree and second degree associations
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
@@ -230,7 +242,69 @@ USE IDL_Header.header_ins(FLAT,
 		LastName = lname,
 		NameSuffix = sname,
 		DateOfBirth = dob,
-		Gender = gender));					
+		Gender = gender),
+	Phone(
+		Phone10 = phone,
+		DateFirstSeen = dt_first_seen,
+		DateLastSeen = dt_last_seen));					
+
+USE Gong.GongNuestarHistory(FLAT,
+	Person(UID=did,
+		DateFirstSeen = dt_first_seen,
+		DateLastSeen = dt_last_seen,
+		Title = name_prefix,
+		FirstName = name_first,
+		MiddleName = name_middle,
+		LastName = name_last,
+		NameSuffix = name_suffix),
+	Phone(
+		Phone10 = phone10,
+		AreaCode = prior_area_code,
+		DateFirstSeen = dt_first_seen,
+		DateLastSeen = dt_last_seen),
+	Address(
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		UnitDesignation = unit_desig,
+		SecondaryRange = sec_range,
+		PostalCity = p_city_name,
+		VanityCity = v_city_name,
+		State = st,
+		ZIP5 = z5,
+		ZIP4 = z4,
+		CarrierRouteNumber = cart,
+		CarrierRouteSortationAtZIP = cr_sort_sz,
+		LineOfTravel = lot,
+		LineOfTravelOrder = lot_order,
+		DeliveryPointBarcode = dpbc,
+		DeliveryPointBarcodeCheckDigit = chk_digit,
+		TypeCode = rec_type,
+		County = county_code,
+		Latitude = geo_lat,
+		Longitude = geo_long,
+		MetropolitanStatisticalArea = msa,
+		GeoBlock = geo_blk,
+		GeoMatch = geo_match,
+		ACECleanerErrorCode = err_stat),
+	PersonPhone(
+		DateFirstSeen = dt_first_seen, 
+		DateLastSeen = dt_last_seen, 
+		Subject = did,
+		Phone10 = phone10),
+	AddressPhone(
+		DateFirstSeen = dt_first_seen, 
+		DateLastSeen = dt_last_seen, 
+		Phone10 = phone10,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		SecondaryRange = sec_range,
+		ZIP5 = z5));
 
 USE Header.File_Did_Death_Master_ssa(FLAT, 
 	Person(UID=did,
@@ -605,6 +679,9 @@ IMPORT MaritalStatus FROM KELBlackBox.MaritalStatus;
 IMPORT MarketMagnifier FROM KELBlackBox.MarketMagnifier;
 IMPORT RiskView FROM KELBlackBox.RiskView;
 
+// Global Constant Definitions
+
+Phone: REPEATING_NUMBERS := ['1111111111', '2222222222', '3333333333', '4444444444', '5555555555', '6666666666', '7777777777', '8888888888', '9999999999', '0000000000']; 
 
 
 // Global Attribute Definitions
@@ -630,6 +707,8 @@ Person: => WatercraftCount24 := COUNT(WatercraftOwner.WCraft(DaysOld <= 2*365){W
 Person: => WatercraftCount60 := COUNT(WatercraftOwner.WCraft(DaysOld <= 5*365){WatercraftKey});
 
 Watercraft: => DaysOld := ABS(DAYSBETWEEN(WatercraftKey:DateFirstSeen, CURRENTDATE())); 
+
+Phone: => IsValid := Phone10 != 0 AND LENGTH(TRIMALL(Phone10)) = 10 AND NOT STARTSWITH(Phone10, '555') AND NOT SUBSTR(Phone10, 4, 10) IN ['0000000', '1234567'] AND SUBSTR(Phone10, 7, 10) != '9999' AND NOT Phone10 IN REPEATING_NUMBERS;
 
 
 Address: => ACAHit := IF(EXISTS(ACA), 'Y', 'N');
@@ -919,6 +998,10 @@ QUERY: PersonWatercraftCount <= Person(WatercraftCount != 0){UID, WatercraftCoun
 QUERY: WatercraftLocation <= Address(EXISTS(WatercraftAddress.WCraft)){UID, WatercraftAddress.WCraft.WatercraftKey, PrimaryRange, PrimaryName, ZIP4} ;
 ///////////////////////////////////  End of Watercraft Queries  //////////////////////////////////
 
+
+QUERY: PhoneDump <= Phone;
+QUERY: PersonPhoneDump <= PersonPhone;
+QUERY: AddressPhoneDump <= AddressPhone;
  
 //Bankruptcy Based Queries
 QUERY: Bankruptcy(SearchForTMSID) <= Bankruptcy(TMSID = SearchForTMSID); 
