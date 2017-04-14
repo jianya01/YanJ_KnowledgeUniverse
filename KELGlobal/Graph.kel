@@ -8,16 +8,19 @@ ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
 // Global Person Entity Definition
-Person := ENTITY(FLAT(UID=LexID, 
+Person := ENTITY(FLAT(UID=LexID,
+		STRING Title=NULL(),
 		STRING FirstName=NULL(),
 		STRING MiddleName=NULL(),  
 		STRING LastName=NULL(),
+		STRING NameSuffix=NULL(),
 		DATE DateOfBirth,
 		DATE DateOfDeath,
+		STRING Gender,
 		INTEGER FelonyCount=NULL(-1)), //NULL??
 	MODEL(UID, 
-		FelonyCount,
-		FullName{FirstName, MiddleName, LastName}, 
+		FelonyCount, Gender,
+		FullName{Title, FirstName, MiddleName, LastName, NameSuffix}, 
 		ReportedDatesOfBirth{DateOfBirth},
 		ReportedDatesOfDeath{DateOfDeath}));
  
@@ -165,13 +168,6 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		Vacation{NumberOfCurrentVacationMonths, MaxVacationMonths, VacationPeriodsCount, VacationBeginDate, VacationEndDate},
 		ACA{InstitutionTypeCode, InstitutionTypeExpanded, InstitutionName}));
 
-// Due to a current issue with KEL the ACA information needs to be broken out into its own ENTITY and then joined back to the Address using some Address Logical Properties.  This should be fixed with the 0.8.2 build sometime in the next couple months.
-ACAInfo := ENTITY(FLAT(Address parent=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
-		STRING InstitutionTypeCode=NULL(), 
-		STRING InstitutionTypeExpanded=NULL(), 
-		STRING InstitutionName=NULL(), 
-		INTEGER RecordCountHelper=NULL()));
-
 Aircraft := ENTITY(FLAT(UID(NNumber),
 		STRING NNumber,
 		STRING SerialNumber,
@@ -228,16 +224,20 @@ USE IDL_Header.header_ins(FLAT,
 	Person(UID=did,
 		DateFirstSeen = dt_first_seen, // Contains information for ASOF
 		DateLastSeen = dt_last_seen, // Contains information for ASOF
+		Title = title,
 		FirstName = fname,
 		MiddleName = mname,
 		LastName = lname,
-		DateOfBirth = dob));					
+		NameSuffix = sname,
+		DateOfBirth = dob,
+		Gender = gender));					
 
 USE Header.File_Did_Death_Master_ssa(FLAT, 
 	Person(UID=did,
 		FirstName = fname,
 		MiddleName = mname,
 		LastName = lname,
+		NameSuffix = name_suffix,
 		DateOfBirth = dob8,
 		DateOfDeath = dod8));	
 
@@ -272,19 +272,7 @@ USE ACA.Key_ACA_Addr_RID(FLAT, // This file doesn't contain Dates First/Last See
 		TypeCode = addr_type,
 		InstitutionTypeCode = inst_type,
 		InstitutionTypeExpanded = inst_type_exp,
-		InstitutionName = institution),
-	ACAInfo( // Supporting the ACAInfo Address Entity until KEL 0.8.2 arrives and then this can be removed
-		PrimaryRange = prim_range,
-		Predirectional = predir,
-		PrimaryName = prim_name,
-		Suffix = addr_suffix,
-		Postdirectional = postdir,
-		SecondaryRange = sec_range,
-		ZIP5 = z5,
-		InstitutionTypeCode = inst_type,
-		InstitutionTypeExpanded = inst_type_exp,
-		InstitutionName = institution,
-		RecordCountHelper = UniqueID));
+		InstitutionName = institution));
 
 USE BankruptcyV3.Key_BankruptcyV3_Main_Full(FLAT,
 	Bankruptcy(TMSID = TMSID,
@@ -467,9 +455,11 @@ USE FAA.aircraft_did_reg(FLAT,
 		DateFirstSeen = date_first_seen,
 		DateLastSeen = date_last_seen,
 		UID = did_out,
+		Title = title,
 		FirstName = fname,
 		MiddleName = mname,   
-		LastName = lname));
+		LastName = lname,
+		NameSuffix = name_suffix));
 
 USE Watercraft.File_Base_Search_Prod(FLAT,
 	Watercraft(
@@ -527,9 +517,13 @@ USE Watercraft.File_Base_Search_Prod(FLAT,
 		DateFirstSeen = date_first_seen,		//This is for ASOF functionality
 		DateLastSeen = date_last_seen,		 //This is for ASOF functionality
 		UID = did,
+		Title = title,
 		FirstName = fname,
 		MiddleName = mname,  
-		LastName = lname));
+		LastName = lname,
+		NameSuffix = name_suffix,
+		Gender = gender,
+		DateOfBirth = dob));
 
 // Maps the Relatives V3 index to the FirstDegreeAssociations
 USE Relationship.key_relatives_v3(FLAT,
@@ -639,8 +633,7 @@ Watercraft: => DaysOld := ABS(DAYSBETWEEN(WatercraftKey:DateFirstSeen, CURRENTDA
 
 
 Address: => ACAHit := IF(EXISTS(ACA), 'Y', 'N');
-Address: => ACAWithCounts := ACAInfo{parent, InstitutionName, InstitutionTypeCode, InstitutionTypeExpanded, Frequency := COUNT(GROUP)};
-Address: => TopACA := ONLY(TOPN(ACAWithCounts, 1, -Frequency));
+Address: => TopACA := ONLY(TOPN(ACA, 1, -InstitutionName:Weight, InstitutionName));
 Address: => ACAInstitutionName := TopACA.InstitutionName;
 Address: => ACAInstitutionTypeCode := TopACA.InstitutionTypeCode;
 Address: => ACAInstitutionTypeExpanded := TopACA.InstitutionTypeExpanded;

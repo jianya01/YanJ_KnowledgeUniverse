@@ -964,5 +964,5 @@ LayoutMarketMagnifier := RECORD
 
 fileName := KELBlackBox.FileBlackBoxLocation + 'out::marketmagnifier::092016::final';
 EXPORT FileBlackBoxMarketMagnifier := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
-	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
+	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__),
 	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));
