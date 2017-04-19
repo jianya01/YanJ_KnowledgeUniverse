@@ -103,4 +103,4 @@
   string110 claimnumber;
  END;
  
-EXPORT Flags := DATASET('~' + 'thor::base::healthcare::sprayed::test::brazil_ii-mbs_dummy_id-unimed_fulldata-d20160524-flags_med_fix', FlagLayout, THOR); ;
+EXPORT Flags := DATASET('~' + 'thor::base::healthcare::sprayed::test::brazil_ii-mbs_dummy_id-unimed_fulldata-d20160524-flags_med_fix', FlagLayout, THOR);
