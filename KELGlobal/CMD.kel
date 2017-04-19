@@ -1,0 +1,514 @@
+﻿// KEL Compiler Options and Configurations
+#OPTION(persist, 2) //Change 0 to 2 for persisting. 0 is only for debugging
+#OPTION(persistexpire, 30)
+#OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
+
+// Defining the ERA to allow for ASOF functionality
+ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
+ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
+
+Patient := ENTITY(FLAT(UID = PatientKey,
+		INTEGER PatientNumber,
+		STRING FirstName,
+		STRING MiddleName,
+		STRING LastName,
+		DATE DateOfBirth,
+		STRING Gender,
+		DATE DateOfDeath,
+		DATE LastUpdateDate,
+		INTEGER UserDefinitionCounter,
+		STRING UserDefinition),
+	MODEL(UID,
+		PatientNumber, FirstName, MiddleName, LastName,	DateOfBirth, Gender, DateOfDeath, LastUpdateDate,
+		UserDefinitions{UserDefinitionCounter, UserDefinition}));
+		
+MedicalProvider := ENTITY(FLAT(UID = ProviderKey,
+		INTEGER NationalProviderIdentifier,
+		INTEGER DrugEnforcementAdministrationNumber,
+		STRING Taxanomy,
+		STRING TaxID,
+		STRING TaxIDSuffix,
+		INTEGER ProviderNumber,
+		STRING ProviderNumberSuffix,
+		INTEGER NumberQualifier,
+		INTEGER NetworkCode,
+		STRING FirstName,
+		STRING LastName,
+		INTEGER SpecialtyCode1,
+		INTEGER SpecialtyCode2,
+		STRING Type,
+		INTEGER WatchCode,
+		DATE LastUpdateDate,
+		STRING CompanyID,
+		INTEGER UserDefinitionCounter,
+		STRING UserDefinition), 
+	MODEL(UID,
+		NationalProviderIdentifier, DrugEnforcementAdministrationNumber, Taxanomy, TaxID, TaxIDSuffix, ProviderNumber, ProviderNumberSuffix, NumberQualifier, NetworkCode,
+		FirstName, LastName, SpecialtyCode1, SpecialtyCode2, Type, WatchCode, LastUpdateDate, CompanyID,
+		UserDefinitions{UserDefinitionCounter, UserDefinition}));
+		
+ProviderFacility := ENTITY(FLAT(UID = ProviderKey,
+		INTEGER NationalProviderIdentifier,
+		INTEGER DrugEnforcementAdministrationNumber,
+		STRING Taxanomy,
+		STRING TaxID,
+		STRING TaxIDSuffix,
+		INTEGER ProviderNumber,
+		STRING ProviderNumberSuffix,
+		INTEGER NumberQualifier,
+		INTEGER NetworkCode,
+		STRING FacilityName,
+		INTEGER FacilityNumber,
+		INTEGER SpecialtyCode1,
+		INTEGER SpecialtyCode2,
+		STRING Type,
+		INTEGER WatchCode,
+		DATE LastUpdateDate,
+		STRING CompanyID,
+		INTEGER UserDefinitionCounter,
+		STRING UserDefinition), 
+	MODEL(UID,
+		NationalProviderIdentifier, DrugEnforcementAdministrationNumber, Taxanomy, TaxID, TaxIDSuffix, ProviderNumber, ProviderNumberSuffix, NumberQualifier, NetworkCode,
+		FacilityName, FacilityNumber, SpecialtyCode1, SpecialtyCode2, Type, WatchCode, LastUpdateDate, CompanyID,
+		UserDefinitions{UserDefinitionCounter, UserDefinition}));
+
+Address := ENTITY(FLAT(UID(Address1, Address2, ZipCode),
+		STRING Address1,
+		STRING Address2,
+		STRING City,
+		STRING State,
+		INTEGER ZipCode,
+		STRING County,
+		STRING Country,
+		STRING Region),
+	MODEL(UID,
+		Address1, Address2, City, State, ZipCode, County, Country, Region));
+
+PolicyHolder := ENTITY(FLAT(UID = MemberKey,
+		INTEGER InsuranceIDNumber,
+		DATE EffectiveDate,
+		DATE ExpirationDate,
+		STRING CoverageType,
+		STRING Status),
+	MODEL(UID,
+		InsuranceIDNumber, EffectiveDate, ExpirationDate, CoverageType, Status));
+
+Policy := ENTITY(FLAT(UID = PolicyNumber,
+		INTEGER GroupNumber,
+		INTEGER DivisionNumber),
+	MODEL(UID,
+		GroupNumber, DivisionNumber));
+
+SocialSecurityNumber := ENTITY(FLAT(UID = SSN), 
+	MODEL(UID));
+
+Claim := ENTITY(FLAT(UID(ClaimNumber),
+		STRING ClaimNumber,
+		INTEGER LineNumber,
+		STRING Status,
+		STRING Type,
+		STRING TransactionType,
+		INTEGER AdjustmentCode,
+		INTEGER AdjustmentNumber,
+		STRING DateTimeStamp,
+		STRING LineOfBusiness,
+		STRING TypeOfPlan,
+		DATE ProcessedDate,
+		DATE ReceivedDate,
+		DATE AccidentDate,
+		STRING AccidentType,
+		INTEGER OutlierCode,
+		INTEGER ICDVersion,
+		STRING MaxOutOfPocketMetIndividualInd,
+		STRING MaxOutOfPocketMetFamilyInd,
+		STRING DeductibleMetIndividualInd,
+		STRING DeductibleMetFamilyInd,
+		STRING AgreementID,
+		INTEGER CheckNumber,
+		DATE CheckDate,
+		STRING PaymentType,
+		STRING ReimbursementMethodType, 	//DRGSource
+		STRING ReimbursementMethodVersion, //DRGVersion
+		STRING DiagnosisRelatedGroupReimbursementCode,		//DIAG_REL_GROUP
+		STRING DiagnosisRelatedGroupReimbursementCode2,
+		REAL DiagnosisRelatedGroupPricing,
+		STRING PayeeCode,
+		STRING PriceIndicator,
+		REAL ChargeAmount,
+		REAL ReasonableAndCustomaryAmount,
+		REAL DeductibeAmount,
+		REAL PaidAmount,
+		REAL CopayAmount,
+		REAL CoordinationOfBenefitsAmount,
+		REAL CoinsuranceAmount,
+		INTEGER UserDefinitionCounter,
+		STRING UserDefinition),
+	MODEL(UID,
+		ClaimNumber, LineOfBusiness, TypeOfPlan, ProcessedDate, ReceivedDate, AccidentDate, AccidentType, OutlierCode, ICDVersion, MaxOutOfPocketMetIndividualInd, MaxOutOfPocketMetFamilyInd,
+		DeductibleMetIndividualInd, DeductibleMetFamilyInd,
+		LineItem{LineNumber, Status, Type, TransactionType, AdjustmentCode, AdjustmentNumber, DateTimeStamp},
+		Payment{AgreementID, CheckNumber, CheckDate, PaymentType, ReimbursementMethodType, ReimbursementMethodVersion, DiagnosisRelatedGroupReimbursementCode,
+			DiagnosisRelatedGroupReimbursementCode2, DiagnosisRelatedGroupPricing, PayeeCode, PriceIndicator, ChargeAmount, ReasonableAndCustomaryAmount, DeductibeAmount, PaidAmount,
+			CopayAmount, CoordinationOfBenefitsAmount, CoinsuranceAmount},
+		UserDefinitions{UserDefinitionCounter, UserDefinition}));
+
+Service := ENTITY(FLAT(UID(ClaimNumber, ClaimLineItem),
+		INTEGER ClaimNumber,
+		INTEGER ClaimLineItem,
+		STRING BenefitPlan,
+		DATE StartDate,
+		DATE EndDate,
+		DATE AdmittanceDate,
+		DATE DischargeDate,
+		INTEGER PlaceOfService,
+		STRING ServiceType,
+		INTEGER UnitsOfServiceType,
+		INTEGER UnitsOfService,
+		INTEGER UnitsOfServiceAllowed,
+		INTEGER RevenueCode,
+		INTEGER RejectionReasonCounter,
+		STRING RejectionReason,
+		STRING PrincipalDiagnosisCode,
+		STRING AdmissionDiagnosisCode,
+		STRING VisitReasonDiagnosisCode,
+		INTEGER DiagnosisCodeCounter,
+		STRING DiagnosisCode,
+		STRING CPTOrHCPCSProcedureCode,
+		INTEGER CPTOrHCPCSProcedureCodeModifierCounter,
+		STRING CPTOrHCPCSProcedureCodeModifier,
+		STRING PrincipalProcedureCode,
+		INTEGER ICDProcedureCodeCounter,
+		STRING ICDProcedureCode,
+		INTEGER DrugCounter,
+		STRING NationalDrugCode,
+		STRING NationalDrugCodeQuantity,
+		STRING NationalDrugCodeUnits),
+	MODEL(UID,
+		ClaimNumber, ClaimLineItem, BenefitPlan, StartDate, EndDate, AdmittanceDate, DischargeDate, PlaceOfService, ServiceType, UnitsOfServiceType, UnitsOfService,
+		UnitsOfServiceAllowed, RevenueCode,
+		RejectionReasons{RejectionReasonCounter, RejectionReason},
+		Diagnosis{PrincipalDiagnosisCode, AdmissionDiagnosisCode, VisitReasonDiagnosisCode, DiagnosisCodeCounter, DiagnosisCode},
+		Procedure{CPTOrHCPCSProcedureCode, CPTOrHCPCSProcedureCodeModifierCounter, CPTOrHCPCSProcedureCodeModifier, PrincipalProcedureCode, ICDProcedureCodeCounter,
+			ICDProcedureCode},
+		Drugs{DrugCounter, NationalDrugCode, NationalDrugCodeQuantity, NationalDrugCodeUnits}));
+
+Flag := ENTITY(FLAT(UID(FlagID),
+		STRING FlagID,
+		INTEGER NumberOfFlagsInGroup,
+		STRING Description,
+		STRING LineRecoverable,
+		REAL AggregrateValue,
+		REAL AggregateComponent,
+		STRING ProcedureCodeMins,
+		INTEGER NoteCounter,
+		STRING Note),
+	MODEL(UID,
+		FlagID, NumberOfFlagsInGroup, Description, LineRecoverable, AggregrateValue, AggregateComponent, ProcedureCodeMins,
+		Miscellaneous{NoteCounter, Note}));
+
+PatientSSN := ASSOCIATION(FLAT(Patient Subject, SocialSecurityNumber Ssn));
+PolicyHolderSSN := ASSOCIATION(FLAT(PolicyHolder Subject, SocialSecurityNumber Ssn));
+PatientPolicyHolderRelation := ASSOCIATION(FLAT(Patient First, PolicyHolder Second, INTEGER SequenceNumber, INTEGER RelationCode));
+PatientPolicy := ASSOCIATION(FLAT(Patient Subject, Policy Insurance));
+PolicyHolderPolicy := ASSOCIATION(FLAT(PolicyHolder Insured, Policy Insurance));
+PatientService := ASSOCIATION(FLAT(Patient Subject, Service ServicePerformed=UID(ClaimNumber, ClaimLineItem), STRING PatientStatus, STRING AuthorizationCode));
+PatientClaim := ASSOCIATION(FLAT(Patient Subject, Claim MedicalClaim=UID(ClaimNumber), STRING PatientAccountNumber));
+ClaimFlag := ASSOCIATION(FLAT(Claim MedicalClaim=UID(ClaimNumber), Flag Flag=UID(FlagID)));
+ProviderFacilityService := ASSOCIATION(FLAT(ProviderFacility Facility, Service ServicePerformed=UID(ClaimNumber, ClaimLineItem), INTEGER BillType));
+// MedicalProviderService := ASSOCIATION(FLAT(MedicalProvider Professional, Service ServicePerformed=UID(ClaimNumber, ClaimLineItem), INTEGER BillType)); // Not needed for BillType
+PolicyHolderClaim := ASSOCIATION(FLAT(PolicyHolder Insured, Claim MedicalClaim=UID(ClaimNumber)));
+ProviderFacilityAddress := ASSOCIATION(FLAT(ProviderFacility Facility, Address Location=UID(Address1, Address2, ZipCode)));
+MedicalProviderAddress := ASSOCIATION(FLAT(MedicalProvider Professional, Address Location=UID(Address1, Address2, ZipCode)));
+PatientAddress := ASSOCIATION(FLAT(Patient Subject, Address Location=UID(Address1, Address2, ZipCode)));
+ProviderFacilityClaim := ASSOCIATION(FLAT(ProviderFacility Facility, Claim MedicalClaim=UID(ClaimNumber), INTEGER BillingProvider, INTEGER ReferringProvider, INTEGER FacilityNPI, STRING InNetwork, STRING MedicareParticipation));
+MedicalProviderClaim := ASSOCIATION(FLAT(MedicalProvider Professional, Claim MedicalClaim=UID(ClaimNumber), INTEGER BillingProvider, INTEGER ReferringProvider, INTEGER FacilityNPI, STRING InNetwork, STRING MedicareParticipation));
+ProviderFacilityPatient := ASSOCIATION(FLAT(ProviderFacility Facility, Patient Subject, INTEGER MedicalRecordNumber));
+MedicalProviderPatient := ASSOCIATION(FLAT(MedicalProvider Professional, Patient Subject, INTEGER MedicalRecordNumber));
+
+
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Patient(FLAT,
+	Patient(
+		UID = PATIENT_KEY,
+		PatientNumber = PATIENT_NUM,
+		FirstName = PATIENT_FIRST_NAME,
+		MiddleName = PATIENT_MID_INIT,
+		LastName = PATIENT_LAST_NAME,
+		DateOfBirth = PATIENT_BIRTH_DT,
+		Gender = PATIENT_GENDER,
+		DateOfDeath = PATIENT_DOD,
+		LastUpdateDate = PATIENT_LATEST_UPDATE_DATE),
+	PolicyHolder(
+		UID = PRIMARY_MEMBER_KEY,
+		InsuranceIDNumber = PRIMARY_INS_NUM,
+		EffectiveDate = INSURED_ELIG_EFF_DT,
+		ExpirationDate = INSURED_ELIG_EXP_DT,
+		CoverageType = INSURED_ELIG_COV_TYPE,
+		Status = INSURED_ELIG_STATUS),
+	Policy(
+		UID = PRIMARY_INS_POLICY_NUMBER,
+		GroupNumber = PRIMARY_INS_GROUP_NUM,
+		DivisionNumber = PRIMARY_INS_DIVISION_NUM),
+	SocialSecurityNumber(
+		UID = PATIENT_SSN),
+	Address(
+		Address1 = PATIENT_ADDRESS_1,
+		Address2 = PATIENT_ADDRESS_2,
+		City = PATIENT_CITY_NAME,
+		State = PATIENT_STATE_NAME,
+		ZipCode = PATIENT_ZIP_CD,
+		County = PATIENT_COUNTY,
+		Country = PATIENT_COUNTRY),
+	PatientAddress(
+		Subject = PATIENT_KEY,
+		Address1 = PATIENT_ADDRESS_1,
+		Address2 = PATIENT_ADDRESS_2,
+		ZipCode = PATIENT_ZIP_CD),
+	PatientSSN(
+		Subject = PATIENT_KEY,
+		Ssn = PATIENT_SSN),
+	PolicyHolderSSN(
+		Subject = PRIMARY_MEMBER_KEY,
+		Ssn = PRIMARY_INS_SSN),
+	PatientPolicyHolderRelation(
+		First = PATIENT_KEY,
+		Second = PRIMARY_MEMBER_KEY,
+		SequenceNumber = PATIENT_SEQ_NBR,
+		RelationCode = PATIENT_RELATION),
+	PatientPolicy(
+		Subject = PATIENT_KEY,
+		Insurance = PRIMARY_INS_POLICY_NUMBER),
+	PolicyHolderPolicy(
+		Insured = PRIMARY_MEMBER_KEY,
+		Insurance = PRIMARY_INS_POLICY_NUMBER));
+
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Patient(FLAT,
+	SocialSecurityNumber(
+		UID = PRIMARY_INS_SSN));
+
+USE Brazil_HealthCare_FWA_Analytics_Layouts.FileCMDCleaned.PatientUserDefinition(FLAT,
+	Patient(
+		UID = PatientKey,
+		UserDefinitionCounter = DefinitionCounter,
+		UserDefinition = UserDefinition));
+		
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Provider(FLAT,
+	ProviderFacility(FILTER(PROVIDER_TYPE = 'F'),
+		UID = PROVIDER_KEY,
+		NationalProviderIdentifier = PROVIDER_NPI,
+		DrugEnforcementAdministrationNumber = PROVIDER_DEA,
+		Taxanomy = PROVIDER_TAXONOMY,
+		TaxID = PROVIDER_TAX_ID,
+		TaxIDSuffix = PROVIDER_TAX_ID_SUFFIX,
+		ProviderNumber = PROVIDER_NUM,
+		ProviderNumberSuffix = PROVIDER_NUM_SUFFIX,
+		NumberQualifier = PROVIDER_NUM_QUALIFIER,
+		NetworkCode = NETWORK_CODE,
+		FacilityName = PROVIDER_FACILITY_NAME,
+		FacilityNumber = PROVIDER_FACILITY_NUM,
+		SpecialtyCode1 = PROV_SPECIALTY_CD_1,
+		SpecialtyCode2 = PROV_SPECIALTY_CD_2,
+		Type = PROVIDER_TYPE,
+		WatchCode = WATCH_CD,
+		LastUpdateDate = PROVIDER_LATEST_UPDATE_DATE),
+	MedicalProvider(FILTER(PROVIDER_TYPE = 'P'),
+		UID = PROVIDER_KEY,
+		NationalProviderIdentifier = PROVIDER_NPI,
+		DrugEnforcementAdministrationNumber = PROVIDER_DEA,
+		Taxanomy = PROVIDER_TAXONOMY,
+		TaxID = PROVIDER_TAX_ID,
+		TaxIDSuffix = PROVIDER_TAX_ID_SUFFIX,
+		ProviderNumber = PROVIDER_NUM,
+		ProviderNumberSuffix = PROVIDER_NUM_SUFFIX,
+		NumberQualifier = PROVIDER_NUM_QUALIFIER,
+		NetworkCode = NETWORK_CODE,
+		FirstName = PROVIDER_FIRST_NAME,
+		LastName = PROVIDER_LAST_NAME,
+		SpecialtyCode1 = PROV_SPECIALTY_CD_1,
+		SpecialtyCode2 = PROV_SPECIALTY_CD_2,
+		Type = PROVIDER_TYPE,
+		WatchCode = WATCH_CD,
+		LastUpdateDate = PROVIDER_LATEST_UPDATE_DATE),
+	Address(
+		Address1 = PROVIDER_ADDRESS_1,
+		Address2 = PROVIDER_ADDRESS_2,
+		City = PROVIDER_CITY,
+		State = PROVIDER_STATE,
+		ZipCode = PROVIDER_ZIP_CD,
+		County = PROVIDER_COUNTY,
+		Country = PROVIDER_COUNTRY,
+		Region = PROVIDER_REGION),
+	ProviderFacilityAddress(FILTER(PROVIDER_TYPE = 'F'),
+		Facility = PROVIDER_KEY,
+		Address1 = PROVIDER_ADDRESS_1,
+		Address2 = PROVIDER_ADDRESS_2,
+		ZipCode = PROVIDER_ZIP_CD),
+	MedicalProviderAddress(FILTER(PROVIDER_TYPE = 'P'),
+		Professional = PROVIDER_KEY,
+		Address1 = PROVIDER_ADDRESS_1,
+		Address2 = PROVIDER_ADDRESS_2,
+		ZipCode = PROVIDER_ZIP_CD));
+
+USE Brazil_HealthCare_FWA_Analytics_Layouts.FileCMDCleaned.ProviderUserDefinition(FLAT,
+	ProviderFacility(FILTER(ProviderType = 'F'),
+		UID = ProviderKey,
+		UserDefinitionCounter = DefinitionCounter,
+		UserDefinition = UserDefinition),
+	MedicalProvider(FILTER(ProviderType = 'P'),
+		UID = ProviderKey,
+		UserDefinitionCounter = DefinitionCounter,
+		UserDefinition = UserDefinition));
+
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Medical(FLAT,
+	Claim(
+		ClaimNumber = CLAIM_NUM,
+		LineNumber = CLAIM_LINE_NUM,
+		Status = CLAIM_STATUS,
+		Type = CLAIM_TYPE,
+		TransactionType = TRANSACTION_TYPE,
+		AdjustmentCode = ADJUSTMENT_CD,
+		AdjustmentNumber = ADJUSTMENT_NUM,
+		DateTimeStamp = DT_TM_STAMP,
+		LineOfBusiness = LINE_OF_BUSINESS,
+		TypeOfPlan = TYPE_OF_PLAN,
+		ProcessedDate = PROCESSED_DT,
+		ReceivedDate = RECEIVED_DT,
+		AccidentDate = ACCIDENT_DT,
+		AccidentType = ACCIDENT_TYPE,
+		OutlierCode = OUTLIER_CD,
+		ICDVersion = ICD_VERSION,
+		MaxOutOfPocketMetIndividualInd = MAX_POCKET_OUT_MET_INDV,
+		MaxOutOfPocketMetFamilyInd = MAX_POCKET_OUT_MET_FAMILY,
+		DeductibleMetIndividualInd = DEDUCTIBLE_MET_INDV,
+		DeductibleMetFamilyInd = DEDUCTIBLE_MET_FAMILY,
+		AgreementID = AGREEMENT_ID,
+		CheckNumber = CHECK_NUM,
+		CheckDate = CHECK_DT,
+		PaymentType = PAYMENT_TYPE,
+		ReimbursementMethodType = DRG_SOURCE, 	//DRGSource
+		ReimbursementMethodVersion = DRG_VERSION, //DRGVersion
+		DiagnosisRelatedGroupReimbursementCode = DIAG_REL_GROUP,		//DIAG_REL_GROUP
+		DiagnosisRelatedGroupReimbursementCode2 = DIAG_REL_GROUP_2,
+		DiagnosisRelatedGroupPricing = DRG_PRICING,
+		PayeeCode = PAYEE_CODE,
+		PriceIndicator = PRICE_IND,
+		ChargeAmount = CHARGE_AMT,
+		ReasonableAndCustomaryAmount = RC_AMT,
+		DeductibeAmount = DEDUCT_AMT,
+		PaidAmount = PAID_AMT,
+		CopayAmount = COPAY_AMT,
+		CoordinationOfBenefitsAmount = COB_AMT,
+		CoinsuranceAmount = CO_INS_AMT),
+	Service(
+		ClaimNumber = CLAIM_NUM,
+		ClaimLineItem = CLAIM_LINE_NUM,
+		BenefitPlan = BENEFIT_PLAN,
+		StartDate = SERVICE_FROM_DT,
+		EndDate = SERVICE_TO_DT,
+		AdmittanceDate = ADMIT_DT,
+		DischargeDate = DISCH_DT,
+		PlaceOfService = PLACE_OF_SERVICE,
+		ServiceType = TYPE_OF_SERVICE,
+		UnitsOfServiceType = UNIT_OF_SERV_TYPE,
+		UnitsOfService = UNITS_OF_SERVICE,
+		UnitsOfServiceAllowed = UNITS_OF_SERVICE_ALLOWED,
+		RevenueCode = REVENUE_CD,
+		PrincipalDiagnosisCode = PRN_DIAG_CD,
+		AdmissionDiagnosisCode = ADM_DIAG_CD,
+		VisitReasonDiagnosisCode = VISIT_REASN_DIAG_CD,
+		CPTOrHCPCSProcedureCode = CPT_HCPCS_PROC_CD,
+		PrincipalProcedureCode = PRN_ICD_CD),
+	PatientService(
+		ClaimNumber = CLAIM_NUM,
+		ClaimLineItem = CLAIM_LINE_NUM,
+		Subject = PATIENT_KEY,
+		PatientStatus = PATIENT_STATUS,
+		AuthorizationCode = AUTH_CODE),
+	PatientClaim(
+		Subject = PATIENT_KEY,
+		ClaimNumber = CLAIM_NUM,
+		PatientAccountNumber = PATIENT_ACCT_NUM),
+	ProviderFacilityService(
+		Facility = PROVIDER_KEY,
+		ClaimNumber = CLAIM_NUM,
+		ClaimLineItem = CLAIM_LINE_NUM,
+		BillType = TYPE_OF_BILL),
+	PolicyHolderClaim(
+		ClaimNumber = CLAIM_NUM,
+		Insured = PRIMARY_INSURED_KEY),
+	ProviderFacilityClaim(FILTER(TRIMALL(RENDERING_PROVIDER_KEY) != ''),
+		Facility = RENDERING_PROVIDER_KEY,
+		ClaimNumber = CLAIM_NUM,
+		BillingProvider = BILLING_PROVIDER_KEY,
+		ReferringProvider = REFERRING_PROVIDER_KEY,
+		FacilityNPI = FACILITY_NPI,
+		InNetwork = NETWORK_IND,
+		MedicareParticipation = PROV_MEDICARE_PAR_IND),
+	MedicalProviderClaim(FILTER(TRIMALL(PCP_PROVIDER_KEY) != ''),
+		Professional = PCP_PROVIDER_KEY,
+		ClaimNumber = CLAIM_NUM,
+		BillingProvider = BILLING_PROVIDER_KEY,
+		ReferringProvider = REFERRING_PROVIDER_KEY,
+		FacilityNPI = FACILITY_NPI,
+		InNetwork = NETWORK_IND,
+		MedicareParticipation = PROV_MEDICARE_PAR_IND),
+	ProviderFacilityPatient(FILTER(TRIMALL(RENDERING_PROVIDER_KEY) != ''),
+		Facility = RENDERING_PROVIDER_KEY,
+		Subject = PATIENT_KEY,
+		MedicalRecordNumber = MED_REC_NUM),
+	MedicalProviderPatient(FILTER(TRIMALL(PCP_PROVIDER_KEY) != ''),
+		Professional = PCP_PROVIDER_KEY,
+		Subject = PATIENT_KEY,
+		MedicalRecordNumber = MED_REC_NUM));
+
+USE Brazil_HealthCare_FWA_Analytics_Layouts.FileCMDCleaned.ClaimUserDefinition(FLAT,
+	Claim(
+		ClaimNumber = ClaimKey,
+		UserDefinitionCounter = DefinitionCounter,
+		UserDefinition = UserDefinition),
+	Service(
+		ClaimNumber = ClaimKey,
+		ClaimLineItem = ClaimLineNumber,
+		RejectionReasonCounter = RejectionReasonCounter,
+		RejectionReason = RejectionReason,
+		DiagnosisCodeCounter = DiagnosisCodeCounter,
+		DiagnosisCode = DiagnosisCode,
+		CPTOrHCPCSProcedureCodeModifierCounter = ProcedureCodeModifierCounter,
+		CPTOrHCPCSProcedureCodeModifier = ProcedureCodeModifier,
+		ICDProcedureCodeCounter = ProcedureCodeCounter,
+		ICDProcedureCode = ProcedureCode,
+		DrugCounter = DrugCounter,
+		NationalDrugCode = NationalDrugCode,
+		NationalDrugCodeQuantity = NationalDrugCodeQuantity,
+		NationalDrugCodeUnits = NationalDrugCodeUnits));
+
+USE Brazil_HealthCare_FWA_Analytics_Layouts.FileCMDCleaned.TabledFlags(FLAT,
+	Flag(
+		FlagID = flag_id,
+		NumberOfFlagsInGroup = number_flags_in_group,
+		Description = flag_description,
+		LineRecoverable = line_recoverable,
+		AggregrateValue = flag_aggregate_value,
+		AggregateComponent = flag_aggregate_component,
+		ProcedureCodeMins = flag_proc_cd_mins));
+		
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Flags(FLAT,
+	ClaimFlag(
+		FlagID = flag_id,
+		ClaimNumber = claim_num));
+		
+USE Brazil_HealthCare_FWA_Analytics_Layouts.FileCMDCleaned.FlagNotes(FLAT,		
+	Flag(
+		FlagID = FlagKey,
+		NoteCounter = MiscCounter,
+		Note = Misc));
+
+QUERY: PatientDump <= Patient;
+QUERY: ProviderFacilityDump <= ProviderFacility;
+QUERY: MedicalProviderDump <= MedicalProvider;
+QUERY: ClaimDump <= Claim;
+QUERY: ServiceDump <= Service;
+QUERY: FlagDump <= Flag;
+QUERY: AddressDump <= Address;
+QUERY: PolicyDump <= Policy;
+QUERY: PolicyHolderDump <= PolicyHolder;
+QUERY: SSNDump <= SocialSecurityNumber;
