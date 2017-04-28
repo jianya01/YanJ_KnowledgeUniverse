@@ -23,7 +23,16 @@ Person := ENTITY(FLAT(UID=LexID,
 		FullName{Title, FirstName, MiddleName, LastName, NameSuffix}, 
 		ReportedDatesOfBirth{DateOfBirth},
 		ReportedDatesOfDeath{DateOfDeath}));
- 
+		
+SocialSecurityNumber := ENTITY(FLAT(UID=SSN, 
+    STRING SSN,
+    DATE OfficialFirstSeen,
+    DATE OfficialLastSeen,
+    DATE DateOfDeath,
+    STRING IssueState=NULL('')),  
+  MODEL(UID, SSN,
+    OfficialFirstSeen,  OfficialLastSeen, IssueState,
+    DatesOfDeath{DateOfDeath}));
 
 Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		STRING TMSID=NULL('Garbage12345'),
@@ -202,6 +211,11 @@ PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRa
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID), STRING NameType));
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
 
+PersonSSN := ASSOCIATION(FLAT(Person Subject, SocialSecurityNumber SecurityNo, BOOLEAN LegacySSN));
+SSNAddress := ASSOCIATION(FLAT(SocialSecurityNumber SecurityNo, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+SSNBankruptcy := ASSOCIATION(FLAT(SocialSecurityNumber SecurityNo, Bankruptcy Bankrupt=UID(TMSID)));
+SSNCriminalOffense := ASSOCIATION(FLAT(SocialSecurityNumber SecurityNo, CriminalOffense Offense=UID(offender_key)));
+
 // Define a first degree and second degree associations
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
 SecondDegreeAssociations := ASSOCIATION(FLAT(Person FirstDegreeAssociation=LexID, Person SecondDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
@@ -241,6 +255,67 @@ USE Header.File_Did_Death_Master_ssa(FLAT,
 		DateOfBirth = dob8,
 		DateOfDeath = dod8));	
 
+USE Risk_Indicators.Key_SSN_Table_v4_filtered_FCRA(FLAT,
+  SocialSecurityNumber(UID=ssn,
+    DateLastSeen = FORMAT('YYYYMM01')Combo.header_last_seen,    // Contains information for ASOF
+    DateFirstSeen = FORMAT('YYYYMM01')Combo.header_first_seen,  // Contains information for ASOF 
+    OfficialFirstSeen = FORMAT('YYYYMM01')official_first_seen,
+    OfficialLastSeen = FORMAT('YYYYMM01')official_last_seen,
+    IssueState = issue_state));
+		
+USE doxie.Key_FCRA_legacy_ssn(FLAT,  // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
+  SocialSecurityNumber(
+    UID=ssn),
+	PersonSSN(
+    Subject = did,
+    SecurityNo = ssn,
+		LegacySSN = TRUE));	
+		
+USE header_quick.Key_Did_FCRA(FLAT,
+  SocialSecurityNumber(UID=ssn,
+    DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,     // Contains information for ASOF
+    DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,   // Contains information for ASOF
+    IssueState = st),
+	SSNAddress(
+    DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,   // Contains information for ASOF
+    DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen, // Contains information for ASOF
+    SecurityNo = ssn,
+    PrimaryRange = prim_range,
+    Predirectional = predir,
+    PrimaryName = prim_name,
+    Suffix = suffix,
+    Postdirectional = postdir,
+    ZIP5 = zip,
+    SecondaryRange = sec_range));			
+
+		
+USE Death_Master.Key_ssn_ssa(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below it has dod8(Date of death) and dob8(dateof birth) can we use as datefirtseen and datelastseen
+  SocialSecurityNumber(UID=ssn,
+    DateOfDeath = dod8));	
+
+	
+USE doxie.Key_FCRA_Header(FLAT,
+  SSNAddress(
+    DateLastSeen = dt_last_seen,   // Contains information for ASOF
+    DateFirstSeen = dt_first_seen, // Contains information for ASOF
+    SecurityNo = ssn,
+	  PrimaryRange = prim_range,
+	  Predirectional = predir,
+    PrimaryName = prim_name,
+    Suffix = suffix,
+    Postdirectional = postdir,
+    ZIP5 = zip,
+    SecondaryRange = sec_range),
+	SocialSecurityNumber(UID=ssn,
+    DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,    // Contains information for ASOF
+    DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,  // Contains information for ASOF 
+    DateOfDeath = dod,
+    IssueState = st));
+
+USE Risk_Indicators.Key_ADL_Risk_Table_v4_Filtered(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
+  Person(
+	  UID=did));		// this file does not have a ssn field to have a Socialsecuritynumberentity 
+		
 USE doxie_files.Key_Offenders_Risk(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
 	CriminalOffense(
 		OffenderKey = offender_key,
@@ -962,3 +1037,16 @@ QUERY: AddressShellInputParmaters(_PrimaryRange, _Predirectional, _PrimaryName, 
 		ADVONumberOfVacationMonths, ADVOMaxVacationMonths, ADVOVacationPeriodsCount,
 		// ACA
 		ACAHit, ACAInstitutionName, ACAInstitutionTypeCode, ACAInstitutionTypeExpanded};
+
+ // SocialSecurityNumber: => Deceased := IF(EXISTS(DatesOfDeath), 'True', 'False')  ; 
+		
+QUERY: ALLSSNData <= SocialSecurityNumber;
+
+QUERY: SSNData(SearchForThisUID) <= SocialSecurityNumber(UID = SearchForThisUID);
+
+QUERY: PersonSSNTest <= PersonSSN;
+QUERY: SSNAddressTest <= SSNAddress;
+ 
+ 
+ 
+
