@@ -28,6 +28,6 @@ LayoutOffense := RECORD
 blankDataset := dataset([], LayoutOffense);
 
 fileName := '~thor_data400::key::corrections_offenders_risk::20160929::bocashell_did';
-EXPORT Key_Corrections_Offenders := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
+EXPORT Key_BocaShell_Crim2 := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	INDEX(blankDataset, {did}, {blankDataset}, fileName),
 	INDEX(blankDataset, {did}, {blankDataset}, fileName) (KEYED((UNSIGNED8)DID IN _Control.LexIDFilterSet)));
