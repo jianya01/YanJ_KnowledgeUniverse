@@ -10,8 +10,8 @@ Transaction := DATASET([{'8815915R3562404', 189543897881}], {STRING TransactionI
 NCFVersion := 1; // Run NCF Version 1
 //NCFVersion := 2; // Run NCF Version 2
 
-IncludeDebugQueries := true; // Only OUTPUT the top level CreditReport
-// IncludeDebugQueries := false; // OUTPUT all CreditReport* ENTITY results
+// IncludeDebugQueries := true; // Only OUTPUT the top level CreditReport
+IncludeDebugQueries := false; // OUTPUT all CreditReport* ENTITY results
 
 #if(NCFVersion = 1)
 	OUTPUT(KELCodeLocation.S_Credit_Report_V1.Result(Transaction_I_D_ = Transaction[1].TransactionID), NAMED('CreditReport'));

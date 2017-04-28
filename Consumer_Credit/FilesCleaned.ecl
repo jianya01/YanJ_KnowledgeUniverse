@@ -1,4 +1,4 @@
-IMPORT Consumer_Credit, Consumer_Credit_Layout, STD;
+﻿IMPORT Consumer_Credit, Consumer_Credit_Layout, STD;
 
 EXPORT FilesCleaned := MODULE
 	SHARED FilterDate := 99999999; // If you want to run faster for quick iterative development set this to a recent date. Otherwise 99999999 runs everything.

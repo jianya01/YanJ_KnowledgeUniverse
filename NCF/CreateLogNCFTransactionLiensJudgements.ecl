@@ -1,6 +1,6 @@
 ﻿ IMPORT NCF_Layout,STD,Vault;
  
- EXPORT CreateLogNCFTransactionLiensJudgements(STRING Input_File_Date ='') := FUNCTION
+  EXPORT CreateLogNCFTransactionLiensJudgements(STRING Input_File_Date ='') := FUNCTION
 		
 		Input_LienJudgement_File := Files.TransactionLogLiensJudgements;
 		Vault_LienJudgement_File := Files.Lien_JudgementsData;

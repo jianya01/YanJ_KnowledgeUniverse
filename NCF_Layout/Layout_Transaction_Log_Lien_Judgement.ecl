@@ -3,7 +3,7 @@
 	EXPORT t_Transaction_Log_Lien_JudgementRecord_csv := RECORD
   STRING20 Transaction_ID {xpath('transaction_id')};
 	STRING filler1;
-	STRING Date_Loaded; // need to change this to Date Added
+	STRING Date_Loaded; 
 	STRING filler2;
 	STRING20 Lex_ID {xpath('lex_id')};
 	STRING filler3;

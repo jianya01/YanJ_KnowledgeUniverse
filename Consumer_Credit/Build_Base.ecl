@@ -14,8 +14,10 @@ EXPORT Build_Base(STRING8 InputStartDate = '', STRING8 InputEndDate = '', STRING
 
 		Max_Load_Date := ut.JultoYYYYMMDD('20' + (STRING)MAX(Files.ReportRequest_Data, JulianDate));
 		DayGap := ut.DaysSince1900(Start_Date[1..4], Start_Date[5..6], Start_Date[7..8]) - ut.DaysSince1900(Max_Load_Date[1..4], Max_Load_Date[5..6], Max_Load_Date[7..8]); 
+
+		NCF_Master_Archive := DATASET('~thor::ncf::laj::master_archive_sample_report_final', Consumer_Credit_Layout.Layout_EditsArchive, THOR);
 		
-		DS_BASE_MST_ARCHIVE_REPORT := PROJECT(Files.NCF_Master_Archive(JulianDate BETWEEN Start_Julian_Date AND End_Julian_Date),
+		DS_BASE_MST_ARCHIVE_REPORT := PROJECT(NCF_Master_Archive,/*Files.NCF_Master_Archive(JulianDate BETWEEN Start_Julian_Date AND End_Julian_Date),*/
 																	TRANSFORM(Layout_EditsArchive_Append, 
 																	SELF.OriginalRefNo := (UNSIGNED6) ConvertRefNo(LEFT.JulianDate, LEFT.RemainingRefNo, LEFT.ReportSource),	
 																	SELF := LEFT, 
@@ -46,7 +48,7 @@ EXPORT Build_Base(STRING8 InputStartDate = '', STRING8 InputEndDate = '', STRING
 																																					0),																																					 
 																			 SELF := RIGHT), LOCAL);														 
 																	 
-		DuplicateReports := DEDUP(SORT(DISTRIBUTE(DS_BASE_MST_ARCHIVE_REPORT_ITER(Edits[7..10] = 'NR52' AND Edits[15..16] = 'GM' AND STD.Str.Find(Edits, 'DUPLICATE REPORT', 1) > 0), HASH32(OriginalRefNo)), 
+		DuplicateReports := DEDUP(SORT(DISTRIBUTE(DS_BASE_MST_ARCHIVE_REPORT_ITER(Edits[7..10] = 'NR52' AND Edits[15..16] = 'GM' AND STD.Str.Find(Edits, 'DUPLICATE REPORT', 1) > 0),HASH32(OriginalRefNo)), 
 																	 OriginalRefNo, LOCAL), OriginalRefNo, LOCAL);	
 																	 
 		Exclude_Duplicate_Reports := JOIN(DS_BASE_MST_ARCHIVE_REPORT_ITER, DuplicateReports,
@@ -59,6 +61,8 @@ EXPORT Build_Base(STRING8 InputStartDate = '', STRING8 InputEndDate = '', STRING
 
 		InValidStatus_Reports := DEDUP(SORT(DISTRIBUTE(Exclude_Duplicate_Reports(Edits[7..10] = 'RI51' AND Edits[143] NOT IN ['C', 'U']), HASH32(OriginalRefNo)), 
 																	 OriginalRefNo, ReportTypeCounter, LOCAL), OriginalRefNo, ReportTypeCounter, LOCAL);
+																	 
+																 
 
 		Exclude_InValidStatus_Reports := JOIN(Exclude_Duplicate_Reports, InValidStatus_Reports,
 																		 LEFT.OriginalRefNo = RIGHT.OriginalRefNo AND
@@ -66,9 +70,13 @@ EXPORT Build_Base(STRING8 InputStartDate = '', STRING8 InputEndDate = '', STRING
 																		 TRANSFORM(Layout_EditsArchive_Append,
 																		 SELF := LEFT), LEFT ONLY, LOCAL);
 
-		TransactionLog := Files.NCF_Transaction_Log ((UNSIGNED2)reference_number[1..5] BETWEEN Start_Julian_Date AND End_Julian_Date AND
-																								 Customer_Number NOT IN Constants.Test_Customers) : INDEPENDENT;
-											
+		NCF_Transaction_Log := DATASET('~thor::ncf::laj::sample_transaction_logs_final', Consumer_Credit_Layout.LayoutTransactionLogs.transaction_log, THOR);
+
+		// TransactionLog := Files.NCF_Transaction_Log ((UNSIGNED2)reference_number[1..5] BETWEEN Start_Julian_Date AND End_Julian_Date AND
+																								 // Customer_Number NOT IN Constants.Test_Customers) : INDEPENDENT;
+
+		TransactionLog := NCF_Transaction_Log;
+
 		TransactionLogDupeRef := TABLE(DISTRIBUTE(TransactionLog, HASH32(reference_number)), {reference_number, CountRef := COUNT(GROUP)}, reference_number, LOCAL)(CountRef > 1) : INDEPENDENT;
 														 
 		TransactionLog_ExcludeDupe := JOIN(TransactionLog, TransactionLogDupeRef,
@@ -85,7 +93,8 @@ EXPORT Build_Base(STRING8 InputStartDate = '', STRING8 InputEndDate = '', STRING
 											 SELF.Date_Reported := RIGHT.date_added[1..4] + RIGHT.date_added[6..7] + RIGHT.date_added[9..10],
 											 SELF := LEFT), HASH) : INDEPENDENT;
 										 
-		WeeklyData := WeeklyTotalData(LexID != 0);										 
+		WeeklyData := WeeklyTotalData;//(LexID != 0);
+		//WeeklyData := Exclude_InValidStatus_Reports;
 										 
     CompleteData := Files.Report_Data + WeeklyData;										 
 		
@@ -121,12 +130,25 @@ EXPORT Build_Base(STRING8 InputStartDate = '', STRING8 InputEndDate = '', STRING
 												 'The workunit is ' + WORKUNIT + '\n\n' +
 												 'ErrorMessage is ' + FAILMESSAGE + '\n\n';												 
 												 
-    BuildFiles := SEQUENTIAL(FileUtil.FN_OutputAndPromoteFile(CompleteData, Files.base_prefix, 'report', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-														 Build_Records(WeeklyData),
-														 Build_AuditLog(AuditLog_Data, Start_Julian_Date, End_Julian_Date),
-														 Fileservices.Sendemail(EmailAddresses.ConsumerCredit_EmailAddresses, SuccessSubject, SuccessBody))
-														 :FAILURE(Fileservices.Sendemail(EmailAddresses.ConsumerCredit_EmailAddresses, FailureSubject, FailureBody));													
+    // BuildFiles := SEQUENTIAL(FileUtil.FN_OutputAndPromoteFile(CompleteData, Files.base_prefix, 'report', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+														 // Build_Records(WeeklyData),
+														 // Build_AuditLog(AuditLog_Data, Start_Julian_Date, End_Julian_Date),
+														 // Fileservices.Sendemail(EmailAddresses.ConsumerCredit_EmailAddresses, SuccessSubject, SuccessBody))
+														 // :FAILURE(Fileservices.Sendemail(EmailAddresses.ConsumerCredit_EmailAddresses, FailureSubject, FailureBody));													
 												 
-		RETURN IF(Skip_Validation = 'N' AND DayGap != 1, ValidationEmail, BuildFiles);
+		// RETURN IF(Skip_Validation = 'N' AND DayGap != 1, ValidationEmail, BuildFiles);
+		
+		  Return Build_Records(WeeklyData);
+		 
+		 //RETURN Consumer_Credit.Build_Records(WeeklyData);
+		
+		// Return DS_BASE_MST_ARCHIVE_REPORT_ITER;
+		
+		//Return DuplicateReports;
+		
+	//Return	Exclude_InValidStatus_Reports;
+	
+	 // Return DS_BASE_MST_ARCHIVE_REPORT_DIST;
+	
 
 END;
