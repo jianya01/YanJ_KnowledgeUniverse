@@ -66,6 +66,17 @@ Phone := ENTITY(FLAT(UID,
 		Carrier{CarrierCode, CarrierName}, //Making it into a Sub-Model to account for the portability of the phone number
 		Notes{NoteCounter, Note}));
 
+/* Just a placeholder until the final ENTITY is coded */
+DriversLicense := ENTITY(FLAT(UID(DLNumber, DLState),
+		STRING DLNumber,
+		STRING DLState),
+	MODEL(UID,
+		DLNumber, DLState));
+
+/* Just a placeholder until the final ENTITY is coded */
+SocialSecurityNumber := ENTITY(FLAT(UID = SSN), 
+	MODEL(UID));
+
 Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		STRING TMSID=NULL('Garbage12345'),
 		STRING Source=NULL(),
@@ -209,6 +220,26 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		Vacation{NumberOfCurrentVacationMonths, MaxVacationMonths, VacationPeriodsCount, VacationBeginDate, VacationEndDate},
 		ACA{InstitutionTypeCode, InstitutionTypeExpanded, InstitutionName}));
 
+Inquiry := ENTITY(FLAT(UID(TransactionID),
+		STRING TransactionID,
+		DATE DateOfInquiry,
+		STRING TimeOfInquiry,
+		STRING Source,
+		STRING SequenceNumber,
+		STRING Method,
+		INTEGER ProductCode,
+		STRING FunctionDescription,
+		INTEGER GLBPurpose,
+		INTEGER DPPAPurpose,
+		INTEGER FCRAPurpose,
+		STRING SubMarket,
+		STRING Vertical,
+		STRING Use,
+		STRING Industry),
+	MODEL(UID,
+		TransactionID, DateOfInquiry, TimeOfInquiry, Source, SequenceNumber, Method, ProductCode, FunctionDescription, GLBPurpose, DPPAPurpose, FCRAPurpose, SubMarket, Vertical,
+		Use, Industry));
+
 Aircraft := ENTITY(FLAT(UID(NNumber),
 		STRING NNumber,
 		STRING SerialNumber,
@@ -244,6 +275,12 @@ PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMS
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
 PersonPhone := ASSOCIATION(FLAT(Person Subject, Phone PhoneNumber, INTEGER ConfidenceScore, INTEGER PersonScore, INTEGER NameScore, INTEGER BestNameMatchFlag, INTEGER LatestPhoneOwnerFlag, INTEGER ActivePhoneFlag));
 AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), INTEGER BestAddressMatchFlag)); 
+
+PersonInquiry := ASSOCIATION(FLAT(Person Subject, Inquiry Inquiry=UID(TransactionID)));
+AddressInquiry := ASSOCIATION(FLAT(Inquiry Inquiry=UID(TransactionID), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+SSNInquiry := ASSOCIATION(FLAT(SocialSecurityNumber SSN, Inquiry Inquiry=UID(TransactionID)));
+PhoneInquiry := ASSOCIATION(FLAT(Phone PhoneNumber, Inquiry Inquiry=UID(TransactionID)));
+DriversLicenseInquiry := ASSOCIATION(FLAT(DriversLicense LicenseInformation=UID(DLNumber, DLState), Inquiry Inquiry=UID(TransactionID)));
 
 // Define a first degree and second degree associations
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
@@ -444,12 +481,118 @@ USE Phoneplus_v2.File_Phoneplus_Base(FLAT,						//Contains information about Hou
 		ZIP5 = zip5,
 		BestAddressMatchFlag = append_best_addr_match_flag));
 
+USE Inquiry_AccLogs.FileInquiryBaseSourceCleaned.FileInquiryCleaned(FLAT,
+	Inquiry(
+		TransactionID = search_info__transaction_id,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		DateOfInquiry = dateofinquiry,
+		TimeOfInquiry = timeofinquiry,
+		SequenceNumber = search_info__sequence_number,
+		Method = search_info__method,
+		ProductCode = search_info__product_code,
+		FunctionDescription = search_info__function_description,
+		GLBPurpose = permissions__glb_purpose,
+		DPPAPurpose = permissions__dppa_purpose,
+		FCRAPurpose = permissions__fcra_purpose,
+		SubMarket = bus_intel__sub_market,
+		Vertical = bus_intel__vertical,
+		Use = bus_intel__use,
+		Industry = bus_intel__industry),
+	Person(UID = person_q__appended_adl,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		FirstName = person_q__fname,
+		MiddleName = person_q__mname,
+		LastName = person_q__lname,
+		NameSuffix = person_q__name_suffix,
+		DateOfBirth = person_q__dob),
+	Address(
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		PrimaryRange = person_q__prim_range,
+		Predirectional = person_q__predir,
+		PrimaryName = person_q__prim_name,
+		Suffix = person_q__addr_suffix,
+		Postdirectional = person_q__postdir,
+		UnitDesignation = person_q__unit_desig,
+		SecondaryRange = person_q__sec_range,
+		VanityCity = person_q__v_city_name,
+		State = person_q__st,
+		ZIP5 = person_q__zip5,
+		ZIP4 = person_q__zip4,
+		TypeCode = person_q__addr_rec_type,
+		County = person_q__fips_county,
+		Latitude = person_q__geo_lat,
+		Longitude = person_q__geo_long,
+		GeoBlock = person_q__geo_blk,
+		GeoMatch = person_q__geo_match,
+		ACECleanerErrorCode = person_q__err_stat),
+	Phone(
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		UID = person_q__personal_phone,
+		Phone10 = person_q__personal_phone),
+	DriversLicense(
+		DLNumber = person_q__dl,
+		DLState = person_q__dl_st,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	SocialSecurityNumber(
+		UID = person_q__appended_ssn,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	PersonInquiry(
+		Subject = person_q__appended_adl,
+		TransactionID = search_info__transaction_id,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	AddressInquiry(
+		TransactionID = search_info__transaction_id,
+		PrimaryRange = person_q__prim_range,
+		Predirectional = person_q__predir,
+		PrimaryName = person_q__prim_name,
+		Suffix = person_q__addr_suffix,
+		Postdirectional = person_q__postdir,
+		SecondaryRange = person_q__sec_range,
+		ZIP5 = person_q__zip5,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	SSNInquiry(
+		TransactionID = search_info__transaction_id,
+		SSN = person_q__appended_ssn,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	PhoneInquiry(
+		TransactionID = search_info__transaction_id,
+		PhoneNumber = person_q__personal_phone,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	DriversLicenseInquiry(
+		TransactionID = search_info__transaction_id,
+		DLNumber = person_q__dl,
+		DLState = person_q__dl_st,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry));
+		
+USE Inquiry_AccLogs.FileInquiryBaseSourceCleaned.FileInquiryCleaned(FLAT,
+	Phone(
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		UID = person_q__work_phone,
+		Phone10 = person_q__work_phone),
+	PhoneInquiry(
+		TransactionID = search_info__transaction_id,
+		PhoneNumber = person_q__work_phone,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry));
+
 USE Header.File_Did_Death_Master_ssa(FLAT, 
 	Person(UID=did,
-		FirstName = fname,
-		MiddleName = mname,
-		LastName = lname,
-		NameSuffix = name_suffix,
+		FirstName = person_q__fname,
+		MiddleName = person_q__mname,
+		LastName = person_q__lname,
+		NameSuffix = person_q__name_suffix,
 		DateOfBirth = dob8,
 		DateOfDeath = dod8));	
 
