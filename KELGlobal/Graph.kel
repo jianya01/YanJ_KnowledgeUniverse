@@ -26,14 +26,15 @@ Person := ENTITY(FLAT(UID=LexID,
 		ReportedDatesOfDeath{DateOfDeath}));
 		
 SocialSecurityNumber := ENTITY(FLAT(UID=SSN, 
-    STRING SSN,
-    DATE OfficialFirstSeen,
-    DATE OfficialLastSeen,
-    DATE DateOfDeath,
-    STRING IssueState=NULL('')),  
-  MODEL(UID, SSN,
-    OfficialFirstSeen,  OfficialLastSeen, IssueState,
-    DatesOfDeath{DateOfDeath}));
+		STRING SSN,
+		DATE OfficialFirstSeen,
+		DATE OfficialLastSeen,
+		DATE DateOfDeath,
+		STRING IssueState=NULL('')),  
+	MODEL(UID,
+		SSN, OfficialFirstSeen, OfficialLastSeen, IssueState,
+		DatesOfDeath{DateOfDeath}));
+		
 Phone := ENTITY(FLAT(UID,
 		STRING Phone10,
 		INTEGER AreaCode,
@@ -254,10 +255,11 @@ PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(
 PersonPhone := ASSOCIATION(FLAT(Person Subject, Phone PhoneNumber, INTEGER ConfidenceScore, INTEGER PersonScore, INTEGER NameScore, INTEGER BestNameMatchFlag, INTEGER LatestPhoneOwnerFlag, INTEGER ActivePhoneFlag));
 AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), INTEGER BestAddressMatchFlag)); 
 
-PersonSSN := ASSOCIATION(FLAT(Person Subject, SocialSecurityNumber SecurityNo, BOOLEAN LegacySSN));
-SSNAddress := ASSOCIATION(FLAT(SocialSecurityNumber SecurityNo, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
-SSNBankruptcy := ASSOCIATION(FLAT(SocialSecurityNumber SecurityNo, Bankruptcy Bankrupt=UID(TMSID)));
-SSNCriminalOffense := ASSOCIATION(FLAT(SocialSecurityNumber SecurityNo, CriminalOffense Offense=UID(offender_key)));
+PersonSSN := ASSOCIATION(FLAT(Person Subject, SocialSecurityNumber Social, BOOLEAN LegacySSN));
+SSNAddress := ASSOCIATION(FLAT(SocialSecurityNumber Social, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+SSNBankruptcy := ASSOCIATION(FLAT(SocialSecurityNumber Social, Bankruptcy Bankrupt=UID(TMSID)));
+SSNCriminalOffense := ASSOCIATION(FLAT(SocialSecurityNumber Social, CriminalOffense Offense=UID(offender_key)));
+PhoneSSN := ASSOCIATION(FLAT(Phone PhoneNumber, SocialSecurityNumber Social));
 
 // Define a first degree and second degree associations
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
@@ -291,6 +293,31 @@ USE IDL_Header.header_ins(FLAT,
 	Phone(
 		UID = phone,
 		Phone10 = phone,
+		DateFirstSeen = dt_first_seen,
+		DateLastSeen = dt_last_seen),
+	SocialSecurityNumber(UID = ssn,
+		DateLastSeen = dt_last_seen,    // Contains information for ASOF
+		DateFirstSeen = dt_first_seen,  // Contains information for ASOF 
+		IssueState = st),
+	PersonSSN(
+		Subject = did,
+		Social = ssn,
+		DateLastSeen = dt_last_seen,    // Contains information for ASOF
+		DateFirstSeen = dt_first_seen),
+	SSNAddress(
+		DateLastSeen = dt_last_seen,   // Contains information for ASOF
+		DateFirstSeen = dt_first_seen, // Contains information for ASOF
+		Social = ssn,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range),
+	PhoneSSN(
+		PhoneNumber = phone,
+		Social = ssn,
 		DateFirstSeen = dt_first_seen,
 		DateLastSeen = dt_last_seen));					
 
@@ -465,68 +492,229 @@ USE Header.File_Did_Death_Master_ssa(FLAT,
 		LastName = lname,
 		NameSuffix = name_suffix,
 		DateOfBirth = dob8,
-		DateOfDeath = dod8));	
+		DateOfDeath = dod8),
+	SocialSecurityNumber(
+		UID = ssn,
+		DateOfDeath = dod8,
+		IssueState = state),
+	PersonSSN(
+		Subject = did,
+		Social = ssn));	
 
 USE Risk_Indicators.Key_SSN_Table_v4_filtered_FCRA(FLAT,
-  SocialSecurityNumber(UID=ssn,
-    DateLastSeen = FORMAT('YYYYMM01')Combo.header_last_seen,    // Contains information for ASOF
-    DateFirstSeen = FORMAT('YYYYMM01')Combo.header_first_seen,  // Contains information for ASOF 
-    OfficialFirstSeen = FORMAT('YYYYMM01')official_first_seen,
-    OfficialLastSeen = FORMAT('YYYYMM01')official_last_seen,
-    IssueState = issue_state));
+	SocialSecurityNumber(UID=ssn,
+		DateLastSeen = FORMAT('YYYYMM01')Combo.header_last_seen,    // Contains information for ASOF
+		DateFirstSeen = FORMAT('YYYYMM01')Combo.header_first_seen,  // Contains information for ASOF 
+		OfficialFirstSeen = FORMAT('YYYYMM01')official_first_seen,
+		OfficialLastSeen = FORMAT('YYYYMM01')official_last_seen,
+		IssueState = issue_state));
 		
 USE doxie.Key_FCRA_legacy_ssn(FLAT,  // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
-  SocialSecurityNumber(
-    UID=ssn),
+	SocialSecurityNumber(UID=ssn),
 	PersonSSN(
-    Subject = did,
-    SecurityNo = ssn,
-		LegacySSN = TRUE));	
+		Subject = did,
+		Social = ssn,
+		LegacySSN = TRUE),
+	Person(
+		UID=did));	
 		
 USE header_quick.Key_Did_FCRA(FLAT,
-  SocialSecurityNumber(UID=ssn,
-    DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,     // Contains information for ASOF
-    DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,   // Contains information for ASOF
-    IssueState = st),
+	SocialSecurityNumber(UID=ssn,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,     // Contains information for ASOF
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,   // Contains information for ASOF
+		IssueState = st),
 	SSNAddress(
-    DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,   // Contains information for ASOF
-    DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen, // Contains information for ASOF
-    SecurityNo = ssn,
-    PrimaryRange = prim_range,
-    Predirectional = predir,
-    PrimaryName = prim_name,
-    Suffix = suffix,
-    Postdirectional = postdir,
-    ZIP5 = zip,
-    SecondaryRange = sec_range));			
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,   // Contains information for ASOF
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen, // Contains information for ASOF
+		Social = ssn,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range),
+	Person(
+		UID=did,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen, // Contains information for ASOF
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,   // Contains information for ASOF
+		Title = title,
+		FirstName = fname,
+		MiddleName = mname,
+		LastName = lname,
+		NameSuffix = name_suffix,
+		DateOfBirth = dob),
+	PersonSSN(
+		Subject = did,
+		Social = ssn,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	Address(
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		UnitDesignation = unit_desig,
+		SecondaryRange = sec_range,
+		State = st,
+		ZIP5 = zip,
+		ZIP4 = zip4,
+		County = county,
+		GeoBlock = geo_blk,
+		ADVODateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,    // Contains information for ASOF
+		ADVODateLastSeen = FORMAT('YYYYMM01')dt_last_seen,      // Contains information for ASOF 
+		ADVODateVendorFirstReported = FORMAT('YYYYMM01')dt_vendor_first_reported,
+		ADVODateVendorLastReported = FORMAT('YYYYMM01')dt_vendor_last_reported,
+		RecordTypeCode = rec_type),
+	Phone(
+		Phone10 = phone,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	PhoneSSN(
+		PhoneNumber = phone,
+		Social = ssn,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	PersonAddress(
+		Subject = did,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	PersonPhone(
+		Subject = did,
+		PhoneNumber = phone,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	AddressPhone(
+		PhoneNumber = phone,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen));			
 
 		
 USE Death_Master.Key_ssn_ssa(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below it has dod8(Date of death) and dob8(dateof birth) can we use as datefirtseen and datelastseen
-  SocialSecurityNumber(UID=ssn,
-    DateOfDeath = dod8));	
+	SocialSecurityNumber(UID=ssn,
+		DateOfDeath = dod8,
+		IssueState = state),
+	Person(
+		UID=did,
+		FirstName = fname,
+		MiddleName = mname,
+		LastName = lname,
+		NameSuffix = name_suffix,
+		DateOfBirth = dob8,
+		DateOfDeath = dod8),
+	PersonSSN(
+		Subject = did,
+		Social = ssn));	
 
 	
 USE doxie.Key_FCRA_Header(FLAT,
-  SSNAddress(
-    DateLastSeen = dt_last_seen,   // Contains information for ASOF
-    DateFirstSeen = dt_first_seen, // Contains information for ASOF
-    SecurityNo = ssn,
-	  PrimaryRange = prim_range,
-	  Predirectional = predir,
-    PrimaryName = prim_name,
-    Suffix = suffix,
-    Postdirectional = postdir,
-    ZIP5 = zip,
-    SecondaryRange = sec_range),
-	SocialSecurityNumber(UID=ssn,
-    DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,    // Contains information for ASOF
-    DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,  // Contains information for ASOF 
-    DateOfDeath = dod,
-    IssueState = st));
+	SSNAddress(
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,   // Contains information for ASOF
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen, // Contains information for ASOF
+		Social = ssn,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range),
+	SocialSecurityNumber(
+		UID=ssn,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,    // Contains information for ASOF
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,  // Contains information for ASOF 
+		DateOfDeath = dod,
+		IssueState = st),
+	Person(
+		UID=did,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen, // Contains information for ASOF
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen,   // Contains information for ASOF
+		Title = title,
+		FirstName = fname,
+		MiddleName = mname,
+		LastName = lname,
+		NameSuffix = name_suffix,
+		DateOfBirth = dob,
+		DateOfDeath = dod),
+	Address(
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		UnitDesignation = unit_desig,
+		SecondaryRange = sec_range,
+		State = st,
+		ZIP5 = zip,
+		ZIP4 = zip4,
+		County = county,
+		GeoBlock = geo_blk,
+		ADVODateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,    // Contains information for ASOF
+		ADVODateLastSeen = FORMAT('YYYYMM01')dt_last_seen,      // Contains information for ASOF 
+		ADVODateVendorFirstReported = FORMAT('YYYYMM01')dt_vendor_first_reported,
+		ADVODateVendorLastReported = FORMAT('YYYYMM01')dt_vendor_last_reported,
+		RecordTypeCode = rec_type),
+	Phone(
+		Phone10 = phone,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	PhoneSSN(
+		PhoneNumber = phone,
+		Social = ssn,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	PersonSSN(
+		Subject = did,
+		Social = ssn,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	PersonAddress(
+		Subject = did,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	PersonPhone(
+		Subject = did,
+		PhoneNumber = phone,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen),
+	AddressPhone(
+		PhoneNumber = phone,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range,
+		DateFirstSeen = FORMAT('YYYYMM01')dt_first_seen,
+		DateLastSeen = FORMAT('YYYYMM01')dt_last_seen));
 
 USE Risk_Indicators.Key_ADL_Risk_Table_v4_Filtered(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
-  Person(
-	  UID=did));		// this file does not have a ssn field to have a Socialsecuritynumberentity 
+	Person(
+		UID = did,
+		DateOfBirth = combo.reported_dob));		// this file does not have a ssn field to have a Socialsecuritynumberentity 
 		
 USE doxie_files.Key_Offenders_Risk(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
 	CriminalOffense(
@@ -534,7 +722,23 @@ USE doxie_files.Key_Offenders_Risk(FLAT, // This file doesn't contain Dates Firs
 		OffenseScore = offense_score,
 		Level = criminal_offender_level,
 		CaseNumber = case_num),
-	PersonOffenses(Offender=sdid));
+	PersonOffenses(
+		Offender=sdid),
+	SocialSecurityNumber(
+		UID=ssn,
+		IssueState = st),
+	PersonSSN(
+		Subject = did,
+		Social = ssn),
+	SSNAddress(
+		Social = ssn,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip5,
+		SecondaryRange = sec_range));
 
 USE doxie_files.Key_BocaShell_Crim2(FLAT,
 	Person(
@@ -611,7 +815,47 @@ USE BankruptcyV3.Key_BankruptcyV3_Search_Full(FLAT,
 		DateFirstSeen = date_first_seen,
 		DateLastSeen = date_last_seen,
 		FilingType = filing_type,
-		Disposition = disposition));  
+		Disposition = disposition),
+	PersonSSN(
+		Subject = did,
+		Social = ssn,	
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen),
+	SocialSecurityNumber(
+		UID=ssn,
+		IssueState = st,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen),
+	PhoneSSN(
+		PhoneNumber = phone,
+		Social = ssn,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen),
+	SSNBankruptcy(
+		Social = ssn,
+		Bankrupt = tmsid),
+	SSNAddress(
+		Social = ssn,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen),
+	PersonAddress(
+		Subject = did,
+		PrimaryRange = prim_range,
+		Predirectional = predir,
+		PrimaryName = prim_name,
+		Suffix = addr_suffix,
+		Postdirectional = postdir,
+		ZIP5 = zip,
+		SecondaryRange = sec_range,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen));  
 
  
 // Maps the ADVO index to the Address Entity
@@ -810,7 +1054,12 @@ USE Watercraft.File_Base_Search_Prod(FLAT,
 		LastName = lname,
 		NameSuffix = name_suffix,
 		Gender = gender,
-		DateOfBirth = dob));
+		DateOfBirth = dob),
+	SocialSecurityNumber(
+		UID=ssn,
+		IssueState = st,
+		DateFirstSeen = date_first_seen,
+		DateLastSeen = date_last_seen));
 
 // Maps the Relatives V3 index to the FirstDegreeAssociations
 USE Relationship.key_relatives_v3(FLAT,
@@ -826,7 +1075,7 @@ USE Relationship.key_relatives_v3(FLAT,
 		Generation = generation,
 		RelationshipDateFirstSeen = rel_dt_first_seen,
 		RelationshipDateLastSeen = rel_dt_last_seen));
-
+	
 
 // Maps the Boca Shell BlackBox Attributes to the Person Entity
 USE KELBlackBox.FileBlackBoxBocaShell(FLAT,
@@ -918,6 +1167,10 @@ Person: => WatercraftCount06 := COUNT(WatercraftOwner.WCraft(DaysOld <= 180){Wat
 Person: => WatercraftCount12 := COUNT(WatercraftOwner.WCraft(DaysOld <= 365){WatercraftKey});
 Person: => WatercraftCount24 := COUNT(WatercraftOwner.WCraft(DaysOld <= 2*365){WatercraftKey});
 Person: => WatercraftCount60 := COUNT(WatercraftOwner.WCraft(DaysOld <= 5*365){WatercraftKey});
+
+Person: => SSNCount := COUNT(PersonSSN.Social); // (Ssns_per_adl)ECL attribute name
+
+SocialSecurityNumber: => AddressCount := COUNT(SSNAddress.Location); //	(Addrs_per_ssn)	ECL attribute name
 
 Watercraft: => DaysOld := ABS(DAYSBETWEEN(WatercraftKey:DateFirstSeen, CURRENTDATE())); 
 
@@ -1260,15 +1513,18 @@ QUERY: AddressShellInputParmaters(_PrimaryRange, _Predirectional, _PrimaryName, 
 		// ACA
 		ACAHit, ACAInstitutionName, ACAInstitutionTypeCode, ACAInstitutionTypeExpanded};
 
- // SocialSecurityNumber: => Deceased := IF(EXISTS(DatesOfDeath), 'True', 'False')  ; 
 		
 QUERY: ALLSSNData <= SocialSecurityNumber;
 
+// QUERY: SSNData(SearchForThisUID) <= SocialSecurityNumber(UID = SearchForThisUID){AddressCount};
 QUERY: SSNData(SearchForThisUID) <= SocialSecurityNumber(UID = SearchForThisUID);
 
 QUERY: PersonSSNTest <= PersonSSN;
 QUERY: SSNAddressTest <= SSNAddress;
- 
- 
+
+QUERY: PhoneSSNDump <= PhoneSSN;
+QUERY: SSNBankruptcyDump <= SSNBankruptcy; 
+
+QUERY: PersonData(SearchForLexID) <= Person(UID = SearchForLexID){SSNCount};
  
 
