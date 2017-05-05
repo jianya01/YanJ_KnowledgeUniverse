@@ -5,18 +5,17 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	// SHARED FilterDate := 20160101; // If you want to run faster for quick iterative development set this to a recent date. Otherwise 99999999 runs everything.
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	EXPORT Bankruptcy_Data := PROJECT(Consumer_Credit.Files.Bankruptcy_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode, STRING ECOA, STRING StatusDate, STRING ConsumerDisputeFlag},
+	EXPORT Bankruptcy_Data := PROJECT(Consumer_Credit.Files.Bankruptcy_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode, STRING StatusCode, STRING ConsumerDisputeFlag},
 		SELF.DateFiled					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateFiled);
 		SELF.SatisfiedDischargeDate		:= Consumer_Credit.Utilities.CleanDate(LEFT.SatisfiedDischargeDate);
 		// These are all new 2.0 fields, need to re-map these once we have the finalized EDITs layout
 		SELF.BureauCode					:= IF(LEFT.Transaction_ID[1] = '8', 'XPN', 'EFX');
-		SELF.ECOA						:= IF(LEFT.Transaction_ID[1] = '8', 'I', 'J');
-		SELF.StatusDate					:= IF(LEFT.Transaction_ID[1] = '8', '20160608', '02012017');
+		SELF.StatusCode					:= IF(LEFT.Transaction_ID[1] = '8', '11', '13');
 		SELF.ConsumerDisputeFlag		:= IF(LEFT.Transaction_ID[1] = '8', 'Y', '');
 		SELF							:= LEFT));
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	EXPORT Collection_Data := PROJECT(Consumer_Credit.Files.Collection_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), BOOLEAN MedicalClientName, BOOLEAN MedicalCollectionClientName, STRING2 IndustryCode, STRING BureauCode, STRING KOB, STRING OriginalCreditorName, STRING AccountNumber, STRING PastDueAmount, STRING ClassificationCode, STRING ConsumerDisputeFlag, STRING AccountTypeCode, STRING ConsumerInfoIndicator, STRING Date1stDelinquency},
+	EXPORT Collection_Data := PROJECT(Consumer_Credit.Files.Collection_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), BOOLEAN MedicalClientName, BOOLEAN MedicalCollectionClientName, STRING2 IndustryCode, STRING BureauCode, STRING KOB, STRING AccountNumber, STRING PastDueAmount, STRING ClassificationCode, STRING ConsumerDisputeFlag, STRING AccountPurposeCode, STRING ConsumerInfoIndicator, STRING DateOfFirstDelinquency, STRING CODateReported, STRING LastPaymentDate},
 		SELF.MedicalClientName				:= STD.Str.Find(STD.Str.ToUpperCase(LEFT.ClientNameOrNumber), 'MEDICAL PAYMENT', 1) > 0;
 		SELF.MedicalCollectionClientName	:= REGEXFIND('AMBU|ANATOM|ANESTH|ARTHRIT|ASTHMA|BREAST|CHIRO|CLINIC|CARDIAC|CARDIOL|DDS|DENTA|DERMA|DIAGNOST|DOCTOR|DR |DR\\.|DRS|EMERG|GASTRO|GYNEC|HEALTH|HOSP|HLTH|IMAGING|LAB|MAXILLOF|MD |MEDIC|MEDSTAR|MEMORI|MERCY|NEURO|OB/GY|OBGYN|OBSTET|OPTHALM|OPTOM|ORAL|ORTHO|OSTEO|OTOLARYN|PATHO|PEDIAT|PHARM|PHY|RADI| ST |ST\\.|SURG|SAINT|UROLOG', STD.Str.ToUpperCase(LEFT.ClientNameOrNumber));
 		SELF.DateReported					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateReported);
@@ -28,14 +27,15 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		// These are all new 2.0 fields, need to re-map these once we have the finalized EDITs layout
 		SELF.BureauCode						:= IF(LEFT.Transaction_ID[1] = '8', 'XPN', 'EFX');
 		SELF.KOB							:= IF(LEFT.Transaction_ID[1] = '8', '45', '45');
-		SELF.OriginalCreditorName			:= IF(LEFT.Transaction_ID[1] = '8', 'Someone', 'Random');
 		SELF.AccountNumber					:= IF(LEFT.Transaction_ID[1] = '8', 'A1224', 'B45');
 		SELF.PastDueAmount					:= IF(LEFT.Transaction_ID[1] = '8', '10', '0');
 		SELF.ClassificationCode				:= IF(LEFT.Transaction_ID[1] = '8', 'A4', 'ZA');
 		SELF.ConsumerDisputeFlag			:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
-		SELF.AccountTypeCode				:= IF(LEFT.Transaction_ID[1] = '8', 'DB', 'CO');
+		SELF.AccountPurposeCode				:= IF(LEFT.Transaction_ID[1] = '8', 'DB', 'CO');
 		SELF.ConsumerInfoIndicator			:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
-		SELF.Date1stDelinquency				:= IF(LEFT.Transaction_ID[1] = '8', '', '05151999');
+		SELF.DateOfFirstDelinquency			:= IF(LEFT.Transaction_ID[1] = '8', '', '19990515');
+		SELF.LastPaymentDate				:= (STRING)LEFT.DateOfLastActivity;
+		SELF.CODateReported					:= LEFT.DateReported;
 		SELF								:= LEFT));
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
@@ -55,7 +55,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.Version								:= IF(LEFT.Transaction_ID[1] = '8', '7X', '6');
 		SELF.PaymentHistoryType						:= IF(LEFT.Transaction_ID[1] = '8', '8', '4');
 		SELF.FileSinceDate							:= IF(LEFT.Transaction_ID[1] = '8', '', '20010101');
-		SELF.BirthDate								:= IF(LEFT.Transaction_ID[1] = '8', '06001987', '06081987');
+		SELF.BirthDate								:= IF(LEFT.Transaction_ID[1] = '8', '19870600', '19870608');
 		SELF.DeathDate								:= IF(LEFT.Transaction_ID[1] = '8', '', '');
 		SELF.ConsumerStatementOnFile				:= IF(LEFT.Transaction_ID[1] = '8', '1', '1');
 		SELF.ContentType							:= IF(LEFT.Transaction_ID[1] = '8', 'CS', '');
@@ -71,7 +71,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
 	EXPORT InquiryHistory_Data := PROJECT(Consumer_Credit.Files.InquiryHistory_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING2 IndustryID, STRING5 IndustryIDFull, STRING BureauCode, STRING KOB, STRING Amount, STRING IQType, STRING Abbreviation, STRING Terms},
-		SELF.DateOfInquiry				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateOfInquiry);
+		SELF.DateOfInquiry				:= LEFT.DateOfInquiry; // Don't want to do any cleaning or DD append process for Inquiries - it's either a valid date, or it's not.
 		SELF.IndustryID					:= STD.Str.ToUpperCase(LEFT.InquirerID[4..5]);
 		SELF.IndustryIDFull				:= STD.Str.ToUpperCase(LEFT.InquirerID[1..5]);
 		// These are all new 2.0 fields, need to re-map these once we have the finalized EDITs layout
@@ -84,14 +84,13 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF							:= LEFT));
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	EXPORT Judgement_Data := PROJECT(Consumer_Credit.Files.Judgement_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode, STRING ECOA, STRING StatusDate, STRING ConsumerDisputeFlag},
+	EXPORT Judgement_Data := PROJECT(Consumer_Credit.Files.Judgement_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode, STRING ConsumerDisputeFlag, STRING JudgmentType},
 		SELF.DateFiled					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateFiled);
 		SELF.DateSatisfied				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateSatisfied);
 		SELF.DateVerified				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateVerified); // Not well populated
 		// These are all new 2.0 fields, need to re-map these once we have the finalized EDITs layout
 		SELF.BureauCode					:= IF(LEFT.Transaction_ID[1] = '8', 'XPN', 'EFX');
-		SELF.ECOA						:= IF(LEFT.Transaction_ID[1] = '8', 'I', 'J');
-		SELF.StatusDate					:= IF(LEFT.Transaction_ID[1] = '8', '20140101', '');
+		SELF.JudgmentType				:= IF(LEFT.Transaction_ID[1] = '8', '11', '12');
 		SELF.ConsumerDisputeFlag		:= IF(LEFT.Transaction_ID[1] = '8', 'Y', '');
 		SELF							:= LEFT));
 
@@ -125,14 +124,12 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF							:= LEFT));
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	EXPORT TaxLien_Data := PROJECT(Consumer_Credit.Files.TaxLien_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode, STRING ECOA, STRING StatusDate, STRING ConsumerDisputeFlag},
+	EXPORT TaxLien_Data := PROJECT(Consumer_Credit.Files.TaxLien_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode, STRING ConsumerDisputeFlag},
 		SELF.DateFiled					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateFiled);
 		SELF.DateReleased				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateReleased);
 		SELF.DateVerified				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateVerified); // Not well populated
 		// These are all new 2.0 fields, need to re-map these once we have the finalized EDITs layout
 		SELF.BureauCode					:= IF(LEFT.Transaction_ID[1] = '8', 'XPN', 'EFX');
-		SELF.ECOA						:= IF(LEFT.Transaction_ID[1] = '8', 'I', 'J');
-		SELF.StatusDate					:= IF(LEFT.Transaction_ID[1] = '8', '0', '');
 		SELF.ConsumerDisputeFlag		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
 		SELF							:= LEFT));
 
@@ -156,7 +153,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	END;
 	
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	EXPORT TradeLine_Data := PROJECT(Consumer_Credit.Files.TradeLine_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), DATASET(NormalizedTradelineHistory) PaymentHistory84MonthDataset, BOOLEAN AutoLenderMemberName, BOOLEAN TapeSupplierIndicatorBool, STRING2 IndustryCode, STRING BureauCode, STRING TradeKey, STRING KOB, STRING ECOA, STRING PortfolioTypeCode, STRING ClosedDate, STRING CreditLimit, STRING ChargeOffAmount, STRING ScheduledPaymentAmount, STRING MonthlyPaymentType, STRING AccountPurposeType, STRING ActualPaymentAmount, STRING ActualPaymentNullInd, STRING StatusCode, STRING AccountConditionCode, STRING DerogCounter, STRING OldHistoricWorstRatingCode, STRING OldHistoricWorstRatingDate, STRING StatusDate, STRING LastPaymentDate, STRING PaymentHistory84Months, STRING ConsumerDisputeFlag, STRING ConsumerInfoIndicator, STRING PaymentFrequency, STRING ActivityDesignatorCode, STRING MortgageID, STRING DeferredPaymentStartDate, STRING DeferredPaymentAmount, STRING BalloonPaymentAmount, STRING BalloonPaymentDueDate, STRING PaymentPatternStartDate},
+	EXPORT TradeLine_Data := PROJECT(Consumer_Credit.Files.TradeLine_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), DATASET(NormalizedTradelineHistory) PaymentHistory84MonthDataset, BOOLEAN AutoLenderMemberName, BOOLEAN TapeSupplierIndicatorBool, STRING2 IndustryCode, STRING BureauCode, STRING TradeKey, STRING KOB, STRING ECOA, STRING PortfolioTypeCode, STRING ClosedDate, STRING CreditLimit, STRING ChargeOffAmount, STRING ScheduledPaymentAmount, STRING MonthlyPaymentType, STRING AccountPurposeType, STRING ActualPaymentAmount, BOOLEAN ActualPaymentNullInd, STRING StatusCode, STRING AccountConditionCode, STRING DerogCounter, STRING OldHistoricWorstRatingCode, STRING OldHistoricWorstRatingDate, STRING StatusDate, STRING LastPaymentDate, STRING PaymentHistory48Months, STRING AdditionalPaymentHistory, STRING PaymentHistory84Months, STRING ConsumerDisputeFlag, STRING ConsumerInfoIndicator, STRING PaymentFrequency, STRING ActivityDesignatorCode, STRING MortgageID, STRING DeferredPaymentStartDate, STRING DeferredPaymentAmount, STRING BalloonPaymentAmount, STRING BalloonPaymentDueDate, STRING PaymentPatternStartDate, STRING TRDateReported},
 		SELF.AutoLenderMemberName		:= REGEXFIND('AUTO|MOTOR|AMERICAN HONDA FINANCE CORP|AUDI FINANCIAL SERVICES|BMW FINANCIAL SERVICES|CHRYSLER CREDIT CORPORATION|INFINITI FINANCIAL SERVICES|LEXUS FINANCIAL SERVICES|MERCEDES-BENZ CREDIT|PORSCHE FINANCIAL SERVICES|SAFCO|SOUTHEAST TOYOTA FINANCE|SUBARU LEASING CORP|VOLKSWAGAN CREDIT|DAIMLER / CHRYLSER ACCEPTANCE CORP|CHRYSLER FINANCIAL COMPANY|GMAC|VOLVO FINANCIAL SERVICES|WFS FINANCIAL|SAFECO IND', STD.Str.ToUpperCase(LEFT.MemberName));
 		SELF.TapeSupplierIndicatorBool	:= LEFT.TapeSupplierIndicator = '*'; // * == TRUE, Blank == FALSE
 		SELF.DateReported				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateReported);
@@ -179,18 +176,20 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.MonthlyPaymentType			:= IF(LEFT.Transaction_ID[1] = '8', 'S', '');
 		SELF.AccountPurposeType			:= IF(LEFT.Transaction_ID[1] = '8', 'CR', 'AU');
 		SELF.ActualPaymentAmount		:= IF(LEFT.Transaction_ID[1] = '8', '100', '50');
-		SELF.ActualPaymentNullInd		:= IF(LEFT.Transaction_ID[1] = '8', '0', '0');
+		SELF.ActualPaymentNullInd		:= (BOOLEAN)(INTEGER)IF(LEFT.Transaction_ID[1] = '8', '0', '0');
 		SELF.StatusCode					:= IF(LEFT.Transaction_ID[1] = '8', 'B', '');
 		SELF.AccountConditionCode		:= IF(LEFT.Transaction_ID[1] = '8', 'C', '');
 		SELF.DerogCounter				:= IF(LEFT.Transaction_ID[1] = '8', '1', '');
 		SELF.OldHistoricWorstRatingCode	:= IF(LEFT.Transaction_ID[1] = '8', '1', '1');
-		SELF.OldHistoricWorstRatingDate	:= IF(LEFT.Transaction_ID[1] = '8', '20100201', '02002010');
+		SELF.OldHistoricWorstRatingDate	:= IF(LEFT.Transaction_ID[1] = '8', '20100201', '20100201');
 		SELF.StatusDate					:= IF(LEFT.Transaction_ID[1] = '8', '20100201', '20100201');
 		LastPaymentDate					:= IF(LEFT.Transaction_ID[1] = '8', '02032017', '02032017');
 		SELF.LastPaymentDate			:= IF(SELF.BureauCode IN ['XPN', 'EFX'], LastPaymentDate[5..8] + LastPaymentDate[1..2] + LastPaymentDate[3..4], LastPaymentDate[1..4] + LastPaymentDate[5..6] + LastPaymentDate[7..8]);
-		ClosedDate					:= IF(LEFT.Transaction_ID[1] = '8', '02032017', '02032017');
-		SELF.ClosedDate			:= IF(SELF.BureauCode = 'EFX', ClosedDate[5..8] + ClosedDate[1..2] + ClosedDate[3..4], ClosedDate);
-		SELF.PaymentHistory84Months		:= IF(LEFT.Transaction_ID[1] = '8', '111234567654321111111111', '77654321111111111111112121111111');
+		ClosedDate						:= IF(LEFT.Transaction_ID[1] = '8', '02032017', '02032017');
+		SELF.ClosedDate					:= IF(SELF.BureauCode = 'EFX', ClosedDate[5..8] + ClosedDate[1..2] + ClosedDate[3..4], ClosedDate);
+		SELF.PaymentHistory48Months		:= IF(LEFT.Transaction_ID[1] = '8', '111234567654321111111111', '77654321111111111111112121111111');
+		SELF.AdditionalPaymentHistory	:= '';
+		SELF.PaymentHistory84Months		:= TRIM(SELF.PaymentHistory48Months) + TRIM(SELF.AdditionalPaymentHistory);
 		SELF.PaymentHistory84MonthDataset := NormalizeTradelineHistory(SELF.PaymentHistory84Months, LEFT.Transaction_ID, LEFT.LexID, LEFT.Date_Reported, LEFT.RecordTypeCounter);
 		SELF.ConsumerDisputeFlag		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
 		SELF.ConsumerInfoIndicator		:= IF(LEFT.Transaction_ID[1] = '8', 'N', '');
@@ -200,14 +199,15 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.DeferredPaymentStartDate	:= IF(LEFT.Transaction_ID[1] = '8', '0', '20110101');
 		SELF.DeferredPaymentAmount		:= IF(LEFT.Transaction_ID[1] = '8', '0', '400');
 		SELF.BalloonPaymentAmount		:= IF(LEFT.Transaction_ID[1] = '8', '500', '500');
-		SELF.BalloonPaymentDueDate		:= IF(LEFT.Transaction_ID[1] = '8', '02002011', '20110201');
+		SELF.BalloonPaymentDueDate		:= IF(LEFT.Transaction_ID[1] = '8', '20110201', '20110201');
 		SELF.PaymentPatternStartDate	:= IF(LEFT.Transaction_ID[1] = '8', '20110101', '20110101');
+		SELF.TRDateReported				:= LEFT.DateReported;
 		SELF							:= LEFT));
 	
 	EXPORT Tradeline_History_Data := PROJECT(TradeLine_Data.PaymentHistory84MonthDataset, TRANSFORM(NormalizedTradelineHistory, SELF := LEFT));
 	
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	EXPORT TradeLine_Trended_Data := PROJECT((UT.DS_OneRecord + UT.DS_OneRecord), TRANSFORM({STRING Transaction_ID, UNSIGNED LexID, UNSIGNED Date_Reported, UNSIGNED RecordTypeCounter, UNSIGNED1 MonthCounter, UNSIGNED BalanceAmount, UNSIGNED LoanAmountCreditLimit, UNSIGNED ScheduledPayment, UNSIGNED ActualPayment, UNSIGNED LastPaymentDate, UNSIGNED1 ActualPaymentNullInd},
+	EXPORT TradeLine_Trended_Data := PROJECT((UT.DS_OneRecord + UT.DS_OneRecord), TRANSFORM({STRING Transaction_ID, UNSIGNED LexID, UNSIGNED Date_Reported, UNSIGNED RecordTypeCounter, UNSIGNED1 MonthCounter, STRING6 TrendedDataDate, UNSIGNED BalanceAmount, UNSIGNED LoanAmountCreditLimit, UNSIGNED ScheduledPayment, UNSIGNED ActualPayment, UNSIGNED LastPaymentDate, BOOLEAN TDActualPaymentNullInd},
 		SELF.Transaction_ID				:= CASE(COUNTER,
 											1 => '8778015R13971833',
 											2 => '0F19ADA9C0X3382',
@@ -216,6 +216,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.Date_Reported				:= 20170201;
 		SELF.RecordTypeCounter			:= 1;
 		SELF.MonthCounter				:= COUNTER;
+		SELF.TrendedDataDate			:= '201702';
 		SELF.BalanceAmount				:= CASE(COUNTER,
 											1 => 12345,
 											2 => 222,
@@ -236,6 +237,6 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 											1 => 20170202,
 											2 => 20170201,
 												 0);
-		SELF.ActualPaymentNullInd		:= 0;
+		SELF.TDActualPaymentNullInd		:= (BOOLEAN)(INTEGER)0;
 		SELF							:= LEFT));
 END;
