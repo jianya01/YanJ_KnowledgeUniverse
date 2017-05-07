@@ -5,6 +5,7 @@ EXPORT Files := MODULE
 //	EXPORT IsProd := regexfind('dev', Constants.Region_Name, nocase);
 	EXPORT prefix := '~';
 	EXPORT base_prefix := prefix + 'thor::base::consumercredit';
+	EXPORT base_ncf_prefix := prefix + 'thor::base::ncf';
 	
 //	EXPORT IsInProd := regexfind('prod', Constants.Region_Name, nocase);
 	EXPORT Inprefix := '~';
@@ -44,5 +45,11 @@ EXPORT Files := MODULE
 	EXPORT NarrativeA_Data := DATASET(base_prefix + '::prod::narrativea', Consumer_Credit_Layout.Layout_Report.Layout_NarrativeARecord, THOR, OPT);
 	
 	EXPORT Person_Data := DATASET(base_prefix + '::prod::person', Consumer_Credit_Layout.Layout_Report.Layout_PersonRecord, THOR, OPT);
+
+	EXPORT TransactionLogLiensJudgements  := DATASET(base_prefix + '::laj::transaction_log_lien_judgment', Consumer_Credit_Layout.Layout_Transaction_Log_Lien_Judgement.t_Transaction_Log_Lien_JudgementRecord_csv, CSV(heading(0), SEPARATOR('|'), TERMINATOR('\n')));
+	
+	EXPORT TransactionLogLiensJudgements_File  :='~thor::base::ncf::laj::Liens_JudgementsData';
+	
+	EXPORT Lien_JudgementsData := DATASET(base_prefix + '::Prod::Liens_JudgementsData', Consumer_Credit_Layout.Layout_Log_NCF_Transaction_Log_Liens_Judgements, THOR,OPT);
 	
 END;
