@@ -46,10 +46,10 @@ EXPORT Files := MODULE
 	
 	EXPORT Person_Data := DATASET(base_prefix + '::prod::person', Consumer_Credit_Layout.Layout_Report.Layout_PersonRecord, THOR, OPT);
 
-	EXPORT TransactionLogLiensJudgements  := DATASET(base_prefix + '::laj::transaction_log_lien_judgment', Consumer_Credit_Layout.Layout_Transaction_Log_Lien_Judgement.t_Transaction_Log_Lien_JudgementRecord_csv, CSV(heading(0), SEPARATOR('|'), TERMINATOR('\n')));
+	EXPORT TransactionLogLiensJudgements  := DATASET(base_ncf_prefix + '::laj::transaction_log_lien_judgment', Consumer_Credit_Layout.Layout_Transaction_Log_Lien_Judgement.t_Transaction_Log_Lien_JudgementRecord_csv, CSV(heading(0), SEPARATOR('|'), TERMINATOR('\n')));
 	
 	EXPORT TransactionLogLiensJudgements_File  :='~thor::base::ncf::laj::Liens_JudgementsData';
 	
-	EXPORT Lien_JudgementsData := DATASET(base_prefix + '::Prod::Liens_JudgementsData', Consumer_Credit_Layout.Layout_Log_NCF_Transaction_Log_Liens_Judgements, THOR,OPT);
+	EXPORT Lien_JudgementsData := DATASET(base_ncf_prefix + '::Prod::Liens_JudgementsData', Consumer_Credit_Layout.Layout_Log_NCF_Transaction_Log_Liens_Judgements, THOR,OPT);
 	
 END;
