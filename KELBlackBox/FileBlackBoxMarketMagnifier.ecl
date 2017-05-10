@@ -1,4 +1,4 @@
-﻿IMPORT _Control, KELBlackBox;
+﻿IMPORT _Control, KELBlackBox, STD;
 
 LayoutMarketMagnifier := RECORD
   unsigned8 file_seq;
@@ -964,5 +964,5 @@ LayoutMarketMagnifier := RECORD
 
 fileName := KELBlackBox.FileBlackBoxLocation + 'out::marketmagnifier::092016::final';
 EXPORT FileBlackBoxMarketMagnifier := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
-	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__),
-	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));
+	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) ((UNSIGNED8)LexID > 0 AND NOT STD.Date.IsValidDate(STD.Date.FromStringToDate(dt_last_seen[1..6] + '01', '%Y%m%d'))),
+	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet AND NOT STD.Date.IsValidDate(STD.Date.FromStringToDate(dt_last_seen[1..6] + '01', '%Y%m%d')))); 
