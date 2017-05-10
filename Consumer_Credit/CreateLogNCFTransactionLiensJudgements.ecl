@@ -1,4 +1,4 @@
-﻿ IMPORT NCF_Layout,STD,Vault;
+﻿ IMPORT Consumer_Credit_Layout,STD,Vault;
  
  EXPORT CreateLogNCFTransactionLiensJudgements(STRING Input_File_Date ='') := FUNCTION
 		
@@ -11,12 +11,12 @@
 		Destination_Group := 'analyt_thor400_90_b';
 		
 		SprayFile  := FileServices.SprayVariable(Source_IP ,Source_Path,,
-																							'' ,, '' ,
-																							Destination_Group,Vault_LienJudgement_File_Name,,,,true,,true); 
+																						 '' ,, '' ,
+																						 Destination_Group,Vault_LienJudgement_File_Name,,,,true,,true):PERSIST(Files.TransactionLogLiensJudgements_File + 'Spray_Temp' + File_Date,EXPIRE(15));
 		
 		Max_Rid := MAX(Vault_LienJudgement_File,Vault_Rid);
 		
-	  TransactionLogEditsArchive := PROJECT(Input_LienJudgement_File, TRANSFORM(NCF_Layout.Layout_Log_NCF_Transaction_Log_Liens_Judgements,
+	  TransactionLogEditsArchive := PROJECT(Input_LienJudgement_File, TRANSFORM(Consumer_Credit_Layout.Layout_Log_NCF_Transaction_Log_Liens_Judgements,
        SELF.LexID :=(UNSIGNED) LEFT.Lex_ID;
        SELF.TransactionID := LEFT.Transaction_ID;
        SELF.Date_Last_Seen := LEFT.Date_Loaded; 
@@ -40,16 +40,10 @@
 										 
 	
 	CreateFile := SEQUENTIAL(SprayFile, 
-													 NCF.FileUtil.FN_OutputAndPromoteFile(TransactionLogEditsArchive_Out, Files.base_prefix, 'Liens_JudgementsData', WORKUNIT[2..9] + WORKUNIT[11..16]),
-													 Fileservices.Sendemail(NCF.EmailAddresses.NCF_EmailAddresses, Successsubject, Successbody))
-												 : FAILURE(Fileservices.Sendemail(NCF.EmailAddresses.NCF_EmailAddresses, Failuresubject, Failurebody));
+													 Consumer_Credit.FileUtil.FN_OutputAndPromoteFile(TransactionLogEditsArchive_Out, Files.base_ncf_prefix, 'Liens_JudgementsData', WORKUNIT[2..9] + WORKUNIT[11..16]),
+													 Fileservices.Sendemail(Consumer_Credit.EmailAddresses.NCF_EmailAddresses, Successsubject, Successbody))
+												 : FAILURE(Fileservices.Sendemail(Consumer_Credit.EmailAddresses.NCF_EmailAddresses, Failuresubject, Failurebody));
 									
 	RETURN CreateFile;			
 
 END;
-
-
-
-
-
-
