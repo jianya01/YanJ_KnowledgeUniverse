@@ -104,4 +104,4 @@ END;
 fileName := '~thor_data400::base::watercraft_search';
 EXPORT File_Base_Search_Prod := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutWCSearch, THOR),
-	DATASET(fileName, LayoutWCSearch, THOR)((UNSIGNED8)did IN _Control.LexIDFilterSet));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutWCSearch, THOR), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

@@ -30,4 +30,4 @@ blankDataset := dataset([], LayoutOffense);
 fileName := '~thor_data400::key::corrections_offenders_risk::20160929::bocashell_did';
 EXPORT Key_BocaShell_Crim2 := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	INDEX(blankDataset, {did}, {blankDataset}, fileName),
-	INDEX(blankDataset, {did}, {blankDataset}, fileName) (KEYED((UNSIGNED8)DID IN _Control.LexIDFilterSet)));
+	JOIN(DISTRIBUTE(INDEX(blankDataset, {did}, {blankDataset}, fileName), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

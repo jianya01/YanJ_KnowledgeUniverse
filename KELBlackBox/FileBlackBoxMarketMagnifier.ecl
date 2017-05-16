@@ -965,4 +965,4 @@ LayoutMarketMagnifier := RECORD
 fileName := KELBlackBox.FileBlackBoxLocation + 'out::marketmagnifier::092016::final';
 EXPORT FileBlackBoxMarketMagnifier := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) ((UNSIGNED8)LexID > 0 AND STD.Date.IsValidDate(STD.Date.FromStringToDate(dt_last_seen[1..6] + '01', '%Y%m%d'))),
-	DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet AND STD.Date.IsValidDate(STD.Date.FromStringToDate(dt_last_seen[1..6] + '01', '%Y%m%d')))); 
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutMarketMagnifier, THOR, __COMPRESSED__) ((UNSIGNED8)LexID > 0 AND STD.Date.IsValidDate(STD.Date.FromStringToDate(dt_last_seen[1..6] + '01', '%Y%m%d'))), HASH64((UNSIGNED8)LexID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.LexID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

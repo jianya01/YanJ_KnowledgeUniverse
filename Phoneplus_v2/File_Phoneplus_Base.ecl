@@ -144,4 +144,4 @@ LayoutPhoneBase := RECORD
 fileName := '~analyt_thor400_90_dev::thor_data400::base::phonesplusv2_20170406';
 EXPORT File_Phoneplus_Base := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutPhoneBase, THOR),
-	DATASET(fileName, LayoutPhoneBase, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutPhoneBase, THOR), HASH64(DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

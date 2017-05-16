@@ -27,4 +27,4 @@ END;
 fileName := '~thor::base::did_death_master_ssa_20160709';
 EXPORT File_Did_Death_Master_ssa := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutDeathMaster, THOR),
-	DATASET(fileName, LayoutDeathMaster, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutDeathMaster, THOR), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

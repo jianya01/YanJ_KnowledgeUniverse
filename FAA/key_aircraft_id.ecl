@@ -96,4 +96,4 @@ blankDataset := dataset([], LayoutAircraft);
 fileName := '~thor_data400::key::faa::20161109::aircraft_id';
 EXPORT Key_Aircraft_ID := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	INDEX(blankDataset, {aircraft_id}, {blankDataset}, fileName),
-	INDEX(blankDataset, {aircraft_id}, {blankDataset}, fileName) ((UNSIGNED8)did_out IN _Control.LexIDFilterSet));
+	JOIN(DISTRIBUTE(INDEX(blankDataset, {aircraft_id}, {blankDataset}, fileName), HASH64((UNSIGNED8)DID_Out)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID_Out = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

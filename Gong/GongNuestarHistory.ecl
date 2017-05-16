@@ -103,6 +103,5 @@ EXPORT GongNuestarHistory := MODULE
 	fileName := '~analyt_thor400_90_dev::thor::gong::neustar::history::20170406';
 	EXPORT FileGongNuestarHistory := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 		DATASET(fileName, LayoutGongHistory, THOR),
-		DATASET(fileName, LayoutGongHistory, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));
-	
+		JOIN(DISTRIBUTE(DATASET(fileName, LayoutGongHistory, THOR), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));
 END;
