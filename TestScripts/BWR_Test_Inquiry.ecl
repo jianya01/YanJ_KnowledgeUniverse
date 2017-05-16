@@ -4,16 +4,16 @@ IMPORT KELGlobal, Inquiry_AccLogs, _Control;
 
 OUTPUT(Inquiry_AccLogs.File_FCRA_Inquiry_BaseSource(search_info.transaction_id IN _Control.TransactionIDFilterSet), NAMED('RawInquiryFile'));
 OUTPUT(KELGlobal.Q_Inquiry_Dump.Res0, NAMED('InquiryDump'));
-// OUTPUT(KELGlobal.Q_Limited_Person_Dump.Res0, NAMED('LimitedPersonDump'));
-// OUTPUT(KELGlobal.Q_Limited_Address_Dump.Res0, NAMED('LimitedAddressDump'));
-// OUTPUT(KELGlobal.Q_Limited_Phone_Dump.Res0, NAMED('LimitedPhoneDump'));
-// OUTPUT(KELGlobal.Q_Limited_Drivers_License_Dump.Res0, NAMED('LimitedDriversLicenseDump'));
-// OUTPUT(KELGlobal.Q_Limited_Social_Security_Number_Dump.Res0, NAMED('LimitedSocialSecurityNumberDump'));
-// OUTPUT(KELGlobal.Q_Person_Inquiry_Dump.Res0, NAMED('PersonInquiryDump'));
-// OUTPUT(KELGlobal.Q_Address_Inquiry_Dump.Res0, NAMED('AddressInquiryDump'));
-// OUTPUT(KELGlobal.Q_S_S_N_Inquiry_Dump.Res0, NAMED('SSNInquiryDump'));
-// OUTPUT(KELGlobal.Q_Phone_Inquiry_Dump.Res0, NAMED('PhoneInquiryDump'));
-// OUTPUT(KELGlobal.Q_Drivers_License_Inquiry_Dump.Res0, NAMED('DriversLicenseInquiryDump'));
+OUTPUT(KELGlobal.Q_Limited_Person_Dump.Res0, NAMED('LimitedPersonDump'));
+OUTPUT(KELGlobal.Q_Limited_Address_Dump.Res0, NAMED('LimitedAddressDump'));
+OUTPUT(KELGlobal.Q_Limited_Phone_Dump.Res0, NAMED('LimitedPhoneDump'));
+OUTPUT(KELGlobal.Q_Limited_Drivers_License_Dump.Res0, NAMED('LimitedDriversLicenseDump'));
+OUTPUT(KELGlobal.Q_Limited_Social_Security_Number_Dump.Res0, NAMED('LimitedSocialSecurityNumberDump'));
+OUTPUT(KELGlobal.Q_Person_Inquiry_Dump.Res0, NAMED('PersonInquiryDump'));
+OUTPUT(KELGlobal.Q_Address_Inquiry_Dump.Res0, NAMED('AddressInquiryDump'));
+OUTPUT(KELGlobal.Q_S_S_N_Inquiry_Dump.Res0, NAMED('SSNInquiryDump'));
+OUTPUT(KELGlobal.Q_Phone_Inquiry_Dump.Res0, NAMED('PhoneInquiryDump'));
+OUTPUT(KELGlobal.Q_Drivers_License_Inquiry_Dump.Res0, NAMED('DriversLicenseInquiryDump'));
 
 
 

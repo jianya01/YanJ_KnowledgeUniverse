@@ -74,8 +74,10 @@ DriversLicense := ENTITY(FLAT(UID(DLNumber, DLState),
 		DLNumber, DLState));
 
 /* Just a placeholder until the final ENTITY is coded */
-SocialSecurityNumber := ENTITY(FLAT(UID = SSN), 
-	MODEL(UID));
+SocialSecurityNumber := ENTITY(FLAT(UID,
+		STRING SSN), 
+	MODEL(UID,
+		SSN));
 
 Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		STRING TMSID=NULL('Garbage12345'),
@@ -507,7 +509,7 @@ USE Inquiry_AccLogs.FileInquiryBaseSourceCleaned.FileInquiryCleaned(FLAT,
 		LastName = person_q.lname,
 		NameSuffix = person_q.name_suffix,
 		DateOfBirth = person_q.dob),
-	Address(
+	Address(FILTER(person_q.prim_range <> '' OR person_q.predir <> '' OR person_q.prim_name <> '' OR person_q.addr_suffix <> '' OR person_q.postdir <> '' OR person_q.sec_range <> '' OR person_q.zip5 <> ''),
 		DateFirstSeen = dateofinquiry, 
 		DateLastSeen = dateofinquiry,
 		PrimaryRange = person_q.prim_range,
@@ -533,21 +535,22 @@ USE Inquiry_AccLogs.FileInquiryBaseSourceCleaned.FileInquiryCleaned(FLAT,
 		DateLastSeen = dateofinquiry,
 		UID = person_q.personal_phone,
 		Phone10 = person_q.personal_phone),
-	DriversLicense(
+	DriversLicense(FILTER(person_q.dl <> '' OR person_q.dl_st <> ''),
 		DLNumber = person_q.dl,
 		DLState = person_q.dl_st,
 		DateFirstSeen = dateofinquiry, 
 		DateLastSeen = dateofinquiry),
 	SocialSecurityNumber(
 		UID = person_q.appended_ssn,
+		SSN = person_q.appended_ssn,
 		DateFirstSeen = dateofinquiry, 
 		DateLastSeen = dateofinquiry),
-	PersonInquiry(
+	PersonInquiry(FILTER(person_q.appended_adl <> 0),
 		Subject = person_q.appended_adl,
 		TransactionID = search_info.transaction_id,
 		DateFirstSeen = dateofinquiry, 
 		DateLastSeen = dateofinquiry),
-	AddressInquiry(
+	AddressInquiry(FILTER(person_q.prim_range <> '' OR person_q.predir <> '' OR person_q.prim_name <> '' OR person_q.addr_suffix <> '' OR person_q.postdir <> '' OR person_q.sec_range <> '' OR person_q.zip5 <> ''),
 		TransactionID = search_info.transaction_id,
 		PrimaryRange = person_q.prim_range,
 		Predirectional = person_q.predir,
@@ -558,17 +561,17 @@ USE Inquiry_AccLogs.FileInquiryBaseSourceCleaned.FileInquiryCleaned(FLAT,
 		ZIP5 = person_q.zip5,
 		DateFirstSeen = dateofinquiry, 
 		DateLastSeen = dateofinquiry),
-	SSNInquiry(
+	SSNInquiry(FILTER(person_q.appended_ssn <> ''),
 		TransactionID = search_info.transaction_id,
 		SSN = person_q.appended_ssn,
 		DateFirstSeen = dateofinquiry, 
 		DateLastSeen = dateofinquiry),
-	PhoneInquiry(
+	PhoneInquiry(FILTER(person_q.personal_phone <> ''),
 		TransactionID = search_info.transaction_id,
 		PhoneNumber = person_q.personal_phone,
 		DateFirstSeen = dateofinquiry, 
 		DateLastSeen = dateofinquiry),
-	DriversLicenseInquiry(
+	DriversLicenseInquiry(FILTER(person_q.dl <> '' OR person_q.dl_st <> ''),
 		TransactionID = search_info.transaction_id,
 		DLNumber = person_q.dl,
 		DLState = person_q.dl_st,
@@ -576,12 +579,12 @@ USE Inquiry_AccLogs.FileInquiryBaseSourceCleaned.FileInquiryCleaned(FLAT,
 		DateLastSeen = dateofinquiry));
 		
 USE Inquiry_AccLogs.FileInquiryBaseSourceCleaned.FileInquiryCleaned(FLAT,
-	Phone(
+	Phone(FILTER(person_q.work_phone <> ''),
 		DateFirstSeen = dateofinquiry, 
 		DateLastSeen = dateofinquiry,
 		UID = person_q.work_phone,
 		Phone10 = person_q.work_phone),
-	PhoneInquiry(
+	PhoneInquiry(FILTER(person_q.work_phone <> ''),
 		TransactionID = search_info.transaction_id,
 		PhoneNumber = person_q.work_phone,
 		DateFirstSeen = dateofinquiry, 
@@ -1287,16 +1290,16 @@ QUERY: AddressDumpLimited <= Address;//(AddressPhone.PhoneNumber IN [3306347304,
 
 
 QUERY: InquiryDump <= Inquiry;
-QUERY: LimitedPersonDump <= Person(PersonInquiry.Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
-QUERY: LimitedAddressDump <= Address(AddressInquiry.Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
-QUERY: LimitedPhoneDump <= Phone(PhoneInquiry.Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
-QUERY: LimitedDriversLicenseDump <= DriversLicense(DriversLicenseInquiry.Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
-QUERY: LimitedSocialSecurityNumberDump <= SocialSecurityNumber(SSNInquiry.Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
-QUERY: PersonInquiryDump <= PersonInquiry(Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
-QUERY: AddressInquiryDump <= AddressInquiry(Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
-QUERY: SSNInquiryDump <= SSNInquiry(Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
-QUERY: PhoneInquiryDump <= PhoneInquiry(Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
-QUERY: DriversLicenseInquiryDump <= DriversLicenseInquiry(Inquiry.TransactionID IN ['61619680', '478826333B278608', '61707460']);
+QUERY: LimitedPersonDump <= Person(PersonInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: LimitedAddressDump <= Address(AddressInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: LimitedPhoneDump <= Phone(PhoneInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: LimitedDriversLicenseDump <= DriversLicense(DriversLicenseInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: LimitedSocialSecurityNumberDump <= SocialSecurityNumber(SSNInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: PersonInquiryDump <= PersonInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: AddressInquiryDump <= AddressInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: SSNInquiryDump <= SSNInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: PhoneInquiryDump <= PhoneInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: DriversLicenseInquiryDump <= DriversLicenseInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
 
  
 //Bankruptcy Based Queries
