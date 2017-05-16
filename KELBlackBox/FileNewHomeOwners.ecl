@@ -1,4 +1,4 @@
-﻿IMPORT _Control, KELBlackBox;
+﻿IMPORT _Control, KELBlackBox, STD;
 
 LayoutNewHomeOwner := RECORD
   unsigned6 lexid;
@@ -103,5 +103,5 @@ LayoutNewHomeOwner := RECORD
 
 fileName := KELBlackBox.FileBlackBoxLocation + 'out::marketmagnifier::nho::20161216::final';
 EXPORT FileNewHomeOwners := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
-	DATASET(fileName, LayoutNewHomeOwner, THOR, __COMPRESSED__),
-	DATASET(fileName, LayoutNewHomeOwner, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));
+	DATASET(fileName, LayoutNewHomeOwner, THOR, __COMPRESSED__) ((UNSIGNED8)LexID > 0 AND STD.Date.IsValidDate(STD.Date.FromStringToDate(date_first_seen[1..6] + '01', '%Y%m%d'))),
+	DATASET(fileName, LayoutNewHomeOwner, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet AND STD.Date.IsValidDate(STD.Date.FromStringToDate(date_first_seen[1..6] + '01', '%Y%m%d')))); 
