@@ -60,4 +60,4 @@ END;
 fileName := '~thor::base::insuranceheader::idl_policy_header';
 EXPORT header_ins := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutPolicyHeader, THOR),
-	DATASET(fileName, LayoutPolicyHeader, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutPolicyHeader, THOR), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

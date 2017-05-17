@@ -94,4 +94,4 @@ LayoutAircraft := RECORD
 fileName := '~thor_data400::base::faa_aircraft_reg';
 EXPORT aircraft_did_reg := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutAircraft, THOR),
-	DATASET(fileName, LayoutAircraft, THOR) ((UNSIGNED8)did_out IN _Control.LexIDFilterSet));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutAircraft, THOR), HASH64((UNSIGNED8)DID_Out)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID_Out = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

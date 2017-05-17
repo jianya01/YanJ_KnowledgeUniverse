@@ -128,4 +128,4 @@ blankDataset := dataset([], LayoutOffenses);
 fileName := '~thor_data400::key::corrections_offenders_risk::did_public_qa';
 EXPORT Key_Offenders_Risk := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	INDEX(blankDataset, {unsigned6 sdid := (integer)did}, {blankDataset}, fileName),
-	INDEX(blankDataset, {unsigned6 sdid := (integer)did}, {blankDataset}, fileName) (KEYED((UNSIGNED8)sDID IN _Control.LexIDFilterSet)));
+	JOIN(DISTRIBUTE(INDEX(blankDataset, {unsigned6 sdid := (integer)did}, {blankDataset}, fileName), HASH64((UNSIGNED8)SDID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.SDID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));
