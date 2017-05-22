@@ -66,6 +66,19 @@ Phone := ENTITY(FLAT(UID,
 		Carrier{CarrierCode, CarrierName}, //Making it into a Sub-Model to account for the portability of the phone number
 		Notes{NoteCounter, Note}));
 
+/* Just a placeholder until the final ENTITY is coded */
+DriversLicense := ENTITY(FLAT(UID(DLNumber, DLState),
+		STRING DLNumber,
+		STRING DLState),
+	MODEL(UID,
+		DLNumber, DLState));
+
+/* Just a placeholder until the final ENTITY is coded */
+SocialSecurityNumber := ENTITY(FLAT(UID,
+		STRING SSN), 
+	MODEL(UID,
+		SSN));
+
 Bankruptcy := ENTITY(FLAT(UID(TMSID),
 		STRING TMSID=NULL('Garbage12345'),
 		STRING Source=NULL(),
@@ -209,6 +222,26 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		Vacation{NumberOfCurrentVacationMonths, MaxVacationMonths, VacationPeriodsCount, VacationBeginDate, VacationEndDate},
 		ACA{InstitutionTypeCode, InstitutionTypeExpanded, InstitutionName}));
 
+Inquiry := ENTITY(FLAT(UID(TransactionID),
+		STRING TransactionID,
+		DATE DateOfInquiry,
+		STRING TimeOfInquiry,
+		STRING Source,
+		STRING SequenceNumber,
+		STRING Method,
+		INTEGER ProductCode,
+		STRING FunctionDescription,
+		INTEGER GLBPurpose,
+		INTEGER DPPAPurpose,
+		INTEGER FCRAPurpose,
+		STRING SubMarket,
+		STRING Vertical,
+		STRING Use,
+		STRING Industry),
+	MODEL(UID,
+		TransactionID, DateOfInquiry, TimeOfInquiry, Source, SequenceNumber, Method, ProductCode, FunctionDescription, GLBPurpose, DPPAPurpose, FCRAPurpose, SubMarket, Vertical,
+		Use, Industry));
+
 Aircraft := ENTITY(FLAT(UID(NNumber),
 		STRING NNumber,
 		STRING SerialNumber,
@@ -244,6 +277,12 @@ PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMS
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
 PersonPhone := ASSOCIATION(FLAT(Person Subject, Phone PhoneNumber, INTEGER ConfidenceScore, INTEGER PersonScore, INTEGER NameScore, INTEGER BestNameMatchFlag, INTEGER LatestPhoneOwnerFlag, INTEGER ActivePhoneFlag));
 AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), INTEGER BestAddressMatchFlag)); 
+
+PersonInquiry := ASSOCIATION(FLAT(Person Subject, Inquiry Inquiry=UID(TransactionID)));
+AddressInquiry := ASSOCIATION(FLAT(Inquiry Inquiry=UID(TransactionID), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+SSNInquiry := ASSOCIATION(FLAT(SocialSecurityNumber SSN, Inquiry Inquiry=UID(TransactionID)));
+PhoneInquiry := ASSOCIATION(FLAT(Phone PhoneNumber, Inquiry Inquiry=UID(TransactionID)));
+DriversLicenseInquiry := ASSOCIATION(FLAT(DriversLicense LicenseInformation=UID(DLNumber, DLState), Inquiry Inquiry=UID(TransactionID)));
 
 // Define a first degree and second degree associations
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
@@ -443,6 +482,113 @@ USE Phoneplus_v2.File_Phoneplus_Base(FLAT,						//Contains information about Hou
 		SecondaryRange = sec_range,
 		ZIP5 = zip5,
 		BestAddressMatchFlag = append_best_addr_match_flag));
+
+USE Inquiry_AccLogs.FileInquiryBaseSourceCleaned.FileInquiryCleaned(FLAT,
+	Inquiry(
+		TransactionID = search_info.transaction_id,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		DateOfInquiry = dateofinquiry,
+		TimeOfInquiry = timeofinquiry,
+		SequenceNumber = search_info.sequence_number,
+		Method = search_info.method,
+		ProductCode = search_info.product_code,
+		FunctionDescription = search_info.function_description,
+		GLBPurpose = permissions.glb_purpose,
+		DPPAPurpose = permissions.dppa_purpose,
+		FCRAPurpose = permissions.fcra_purpose,
+		SubMarket = bus_intel.sub_market,
+		Vertical = bus_intel.vertical,
+		Use = bus_intel.use,
+		Industry = bus_intel.industry),
+	Person(UID = person_q.appended_adl,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		FirstName = person_q.fname,
+		MiddleName = person_q.mname,
+		LastName = person_q.lname,
+		NameSuffix = person_q.name_suffix,
+		DateOfBirth = person_q.dob),
+	Address(FILTER(person_q.prim_range <> '' OR person_q.predir <> '' OR person_q.prim_name <> '' OR person_q.addr_suffix <> '' OR person_q.postdir <> '' OR person_q.sec_range <> '' OR person_q.zip5 <> ''),
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		PrimaryRange = person_q.prim_range,
+		Predirectional = person_q.predir,
+		PrimaryName = person_q.prim_name,
+		Suffix = person_q.addr_suffix,
+		Postdirectional = person_q.postdir,
+		UnitDesignation = person_q.unit_desig,
+		SecondaryRange = person_q.sec_range,
+		VanityCity = person_q.v_city_name,
+		State = person_q.st,
+		ZIP5 = person_q.zip5,
+		ZIP4 = person_q.zip4,
+		TypeCode = person_q.addr_rec_type,
+		County = person_q.fips_county,
+		Latitude = person_q.geo_lat,
+		Longitude = person_q.geo_long,
+		GeoBlock = person_q.geo_blk,
+		GeoMatch = person_q.geo_match,
+		ACECleanerErrorCode = person_q.err_stat),
+	Phone(
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		UID = person_q.personal_phone,
+		Phone10 = person_q.personal_phone),
+	DriversLicense(FILTER(person_q.dl <> '' OR person_q.dl_st <> ''),
+		DLNumber = person_q.dl,
+		DLState = person_q.dl_st,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	SocialSecurityNumber(
+		UID = person_q.appended_ssn,
+		SSN = person_q.appended_ssn,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	PersonInquiry(FILTER(person_q.appended_adl <> 0),
+		Subject = person_q.appended_adl,
+		TransactionID = search_info.transaction_id,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	AddressInquiry(FILTER(person_q.prim_range <> '' OR person_q.predir <> '' OR person_q.prim_name <> '' OR person_q.addr_suffix <> '' OR person_q.postdir <> '' OR person_q.sec_range <> '' OR person_q.zip5 <> ''),
+		TransactionID = search_info.transaction_id,
+		PrimaryRange = person_q.prim_range,
+		Predirectional = person_q.predir,
+		PrimaryName = person_q.prim_name,
+		Suffix = person_q.addr_suffix,
+		Postdirectional = person_q.postdir,
+		SecondaryRange = person_q.sec_range,
+		ZIP5 = person_q.zip5,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	SSNInquiry(FILTER(person_q.appended_ssn <> ''),
+		TransactionID = search_info.transaction_id,
+		SSN = person_q.appended_ssn,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	PhoneInquiry(FILTER(person_q.personal_phone <> ''),
+		TransactionID = search_info.transaction_id,
+		PhoneNumber = person_q.personal_phone,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry),
+	DriversLicenseInquiry(FILTER(person_q.dl <> '' OR person_q.dl_st <> ''),
+		TransactionID = search_info.transaction_id,
+		DLNumber = person_q.dl,
+		DLState = person_q.dl_st,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry));
+		
+USE Inquiry_AccLogs.FileInquiryBaseSourceCleaned.FileInquiryCleaned(FLAT,
+	Phone(FILTER(person_q.work_phone <> ''),
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry,
+		UID = person_q.work_phone,
+		Phone10 = person_q.work_phone),
+	PhoneInquiry(FILTER(person_q.work_phone <> ''),
+		TransactionID = search_info.transaction_id,
+		PhoneNumber = person_q.work_phone,
+		DateFirstSeen = dateofinquiry, 
+		DateLastSeen = dateofinquiry));
 
 USE Header.File_Did_Death_Master_ssa(FLAT, 
 	Person(UID=did,
@@ -1158,6 +1304,20 @@ QUERY: PhoneDump <= Phone;
 QUERY: PersonPhoneDump <= PersonPhone;
 QUERY: AddressPhoneDump <= AddressPhone;
 QUERY: AddressDumpLimited <= Address;//(AddressPhone.PhoneNumber IN [3306347304, 6148714046, 2397311646, 9783324492, 3304972391, 6142610152, 3309286887, 3862185308, 6067804643, 5675254901, 9783374492, 6064623342, 3308540326, 8502106580, 9786633400]);
+
+
+QUERY: InquiryDump <= Inquiry;
+QUERY: LimitedPersonDump <= Person(PersonInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: LimitedAddressDump <= Address(AddressInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: LimitedPhoneDump <= Phone(PhoneInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: LimitedDriversLicenseDump <= DriversLicense(DriversLicenseInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: LimitedSocialSecurityNumberDump <= SocialSecurityNumber(SSNInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: PersonInquiryDump <= PersonInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: AddressInquiryDump <= AddressInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: SSNInquiryDump <= SSNInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: PhoneInquiryDump <= PhoneInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+QUERY: DriversLicenseInquiryDump <= DriversLicenseInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+
  
 //Bankruptcy Based Queries
 QUERY: Bankruptcy(SearchForTMSID) <= Bankruptcy(TMSID = SearchForTMSID); 
