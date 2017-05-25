@@ -1,6 +1,7 @@
 ﻿EXPORT Layout_Prefix_Vault := RECORD
-	UNSIGNED4 vault_date_first_seen;
-	UNSIGNED4 vault_date_last_seen;
-	STRING1 vault_active_flag;
-	UNSIGNED8 vault_rid;
+	unsigned8 vault_rid;
+  unsigned4 vault_date_first_seen;
+  unsigned4 vault_date_last_seen;
+	UNSIGNED1 vault_record_status;
+	Integer vault_UID_Hash;
 END;
