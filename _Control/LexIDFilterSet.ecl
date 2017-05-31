@@ -1,2 +1,3 @@
-﻿EXPORT LexIDFilterSet := []; // Include every single LexID in the base files (Full File Runs)
-// EXPORT LexIDFilterSet := [3815228, 14026833]; // Filter the base files to only keep the records which have a LexID in this set (Filtered File Runs)
+﻿EXPORT LexIDFilterSet := DATASET([], {UNSIGNED8 LexID}); // Include every single LexID in the base files (Full File Runs)
+// EXPORT LexIDFilterSet := DATASET('~bpahl::suspect_addr::filterLexIDs', {UNSIGNED8 LexID}, THOR, __COMPRESSED__); // Grab a set of LexID's from a file
+// EXPORT LexIDFilterSet := DATASET([3815228, 14026833], {UNSIGNED8 LexID}); // Filter the base files to only keep the records which have a LexID in this set (Filtered File Runs)

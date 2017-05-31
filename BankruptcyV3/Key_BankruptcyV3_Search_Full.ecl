@@ -128,4 +128,4 @@ END;
 fileName := '~thor::base::bankruptcy::search_v3';
 EXPORT Key_BankruptcyV3_Search_Full := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutBankruptcySearch, THOR),
-	DATASET(fileName, LayoutBankruptcySearch, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutBankruptcySearch, THOR), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));
