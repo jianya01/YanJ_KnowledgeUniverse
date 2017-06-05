@@ -470,6 +470,7 @@ EXPORT FileCLUECleaned := MODULE
 		UNSIGNED8 RecordIdentifier;
 		UNSIGNED8 ClaimIDRecordCounter;
 		UNSIGNED8 PaymentRecordCounter;
+		STRING5 SectionIdentifier;
 		string3 unitnumber{xpath('UnitNumber')};
 		string3 groupsequencenumber{xpath('GroupSequenceNumber')};
 		string4 recordcode{xpath('RecordCode')};
@@ -495,6 +496,7 @@ EXPORT FileCLUECleaned := MODULE
 	SHARED autot_claimsetclueautov2report := RECORD
 		UNSIGNED8 RecordIdentifier;
 		UNSIGNED8 ClaimIDRecordCounter;
+		STRING5 SectionIdentifier;
 		autot_claiminforecordreport claiminfo{xpath('ClaimInfo')};
 		autot_policyrecordreport policy{xpath('Policy')};
 		autot_personrecordreport policyholder{xpath('PolicyHolder')};
@@ -562,9 +564,10 @@ EXPORT FileCLUECleaned := MODULE
 		SELF := le;
 	END;
 	
-	autot_claimsetclueautov2report cleanClaimHistorySection(RECORDOF(KELBlackBox.FileCLUEAuto.claimhistorysubjectsection.claimset) le, UNSIGNED8 recIdentifier, UNSIGNED8 cntr) := TRANSFORM
+	autot_claimsetclueautov2report cleanClaimHistorySection(RECORDOF(KELBlackBox.FileCLUEAuto.claimhistorysubjectsection.claimset) le, UNSIGNED8 recIdentifier, UNSIGNED8 cntr, STRING5 secIdentifier) := TRANSFORM
 		SELF.RecordIdentifier := recIdentifier;
 		SELF.ClaimIDRecordCounter := cntr;
+		SELF.SectionIdentifier :=  secIdentifier;
 		SELF.claiminfo.claimdate := CleanDate(iESP2Date(le.claiminfo.claimdate.Year, le.claiminfo.claimdate.Month, le.claiminfo.claimdate.Day));
 		SELF.claiminfo.firstclaimpaymentdate := CleanDate(iESP2Date(le.claiminfo.firstclaimpaymentdate.Year, le.claiminfo.firstclaimpaymentdate.Month, le.claiminfo.firstclaimpaymentdate.Day));
 		SELF.claiminfo.latestclaimpaymentdate := CleanDate(iESP2Date(le.claiminfo.latestclaimpaymentdate.Year, le.claiminfo.latestclaimpaymentdate.Month, le.claiminfo.latestclaimpaymentdate.Day));
@@ -590,7 +593,7 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.driverslicense.dataassodatev := CleanDate(iESP2Date(le.driverslicense.dataassodatev.Year, le.driverslicense.dataassodatev.Month, le.driverslicense.dataassodatev.Day));
 		SELF.driverslicense.type := le.driverslicense._type;
 		SELF.vehicle.type := le.vehicle._type;
-		SELF.Payments := PROJECT(le.Payments, TRANSFORM(autot_claimpaymentrecordreport, SELF.RecordIdentifier := recIdentifier; SELF.ClaimIDRecordCounter := cntr; SELF.PaymentRecordCounter := COUNTER; SELF := LEFT));
+		SELF.Payments := PROJECT(le.Payments, TRANSFORM(autot_claimpaymentrecordreport, SELF.RecordIdentifier := recIdentifier; SELF.ClaimIDRecordCounter := cntr; SELF.PaymentRecordCounter := COUNTER; SELF.SectionIdentifier := secIdentifier; SELF := LEFT));
 		
 		SELF := le;
 	END;
@@ -605,7 +608,7 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.recapprocessingsection.unitrecap := PROJECT(le.recapprocessingsection.unitrecap, cleanRecapProcessingSection(LEFT, le.RecID, COUNTER));
 		SELF.recapprocessingsection.inquiryrecap.RecordIdentifier := le.RecID;
 		SELF.recapprocessingsection.inquiryrecap.RecapRecordCounter := 1;
-		SELF.claimhistorysubjectsection.claimset := PROJECT(le.claimhistorysubjectsection.claimset, cleanClaimHistorySection(LEFT, le.RecID, COUNTER));
+		SELF.claimhistorysubjectsection.claimset := PROJECT(le.claimhistorysubjectsection.claimset, cleanClaimHistorySection(LEFT, le.RecID, COUNTER, le.claimhistorysubjectsection.reportsectionheader.sectionidentifier));
 		SELF.groupsearchidsection.groupcurrentaddress.datefirstseen := CleanDate(iESP2Date(le.groupsearchidsection.groupcurrentaddress.datefirstseen.Year, le.groupsearchidsection.groupcurrentaddress.datefirstseen.Month, le.groupsearchidsection.groupcurrentaddress.datefirstseen.Day));
 		SELF.groupsearchidsection.groupcurrentaddress.datelastseen := CleanDate(iESP2Date(le.groupsearchidsection.groupcurrentaddress.datelastseen.Year, le.groupsearchidsection.groupcurrentaddress.datelastseen.Month, le.groupsearchidsection.groupcurrentaddress.datelastseen.Day));
 		SELF.groupsearchidsection.groupcurrentaddress.dataassodate := CleanDate(iESP2Date(le.groupsearchidsection.groupcurrentaddress.dataassodate.Year, le.groupsearchidsection.groupcurrentaddress.dataassodate.Month, le.groupsearchidsection.groupcurrentaddress.dataassodate.Day));
@@ -632,7 +635,7 @@ EXPORT FileCLUECleaned := MODULE
 	EXPORT FileCLUEAutoClaim := NORMALIZE(FileCLUEAutoCleaned, LEFT.claimhistorysubjectsection.claimset, TRANSFORM(autot_claimsetclueautov2report, SELF := RIGHT));
 	EXPORT FileCLUEAutoPayments := NORMALIZE(FileCLUEAutoClaim, LEFT.Payments, TRANSFORM(autot_claimpaymentrecordreport, SELF := RIGHT));
   
-	EXPORT FileCLUEAutoPaymentsFlat := NORMALIZE(FileCLUEAutoPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+	EXPORT FileCLUEAutoPaymentsFlat := NORMALIZE(FileCLUEAutoPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING5 SectionIdentifier, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
               SELF.ClaimCatType := CASE(COUNTER,
                      1 => LEFT.ClaimCat1Type,
                      2 => LEFT.ClaimCat2Type,
@@ -1019,6 +1022,7 @@ EXPORT FileCLUECleaned := MODULE
 		UNSIGNED8 RecordIdentifier;
 		UNSIGNED8 ClaimIDRecordCounter;
 		UNSIGNED8 PaymentRecordCounter;
+		STRING5 SectionIdentifier;
 		string3 unitnumber{xpath('UnitNumber')};
 		string3 groupsequencenumber{xpath('GroupSequenceNumber')};
 		string4 recordcode{xpath('RecordCode')};
@@ -1044,6 +1048,7 @@ EXPORT FileCLUECleaned := MODULE
 	SHARED propertyt_claimsetcluepropertyreport := RECORD
 		UNSIGNED8 RecordIdentifier;
 		UNSIGNED8 ClaimIDRecordCounter;
+		STRING5 SectionIdentifier;
 		propertyt_claiminforecordreport claiminfo{xpath('ClaimInfo')};
 		DATASET(propertyt_claimpaymentrecordreport) payments{xpath('Payments/ClaimPayment'), maxcount(6)};
 		propertyt_policyrecordreport policy{xpath('Policy')};
@@ -1089,9 +1094,10 @@ EXPORT FileCLUECleaned := MODULE
 		SELF := le;
 	END;
 	
-	propertyt_claimsetcluepropertyreport cleanClaimSetProperty(RECORDOF(KELBlackBox.FileCLUEProperty.claimhistoryrisksection.claimset) le, UNSIGNED8 recIdentifier, UNSIGNED8 cntr) := TRANSFORM
+	propertyt_claimsetcluepropertyreport cleanClaimSetProperty(RECORDOF(KELBlackBox.FileCLUEProperty.claimhistoryrisksection.claimset) le, UNSIGNED8 recIdentifier, UNSIGNED8 cntr, STRING5 secIdentifier) := TRANSFORM
 		SELF.RecordIdentifier := recIdentifier;
 		SELF.ClaimIDRecordCounter := cntr;
+		SELF.SectionIdentifier := secIdentifier;
 		SELF.claiminfo.claimdate := CleanDate(iESP2Date(le.claiminfo.claimdate.Year, le.claiminfo.claimdate.Month, le.claiminfo.claimdate.Day));
 		SELF.claiminfo.firstclaimpaymentdate := CleanDate(iESP2Date(le.claiminfo.firstclaimpaymentdate.Year, le.claiminfo.firstclaimpaymentdate.Month, le.claiminfo.firstclaimpaymentdate.Day));
 		SELF.claiminfo.latestclaimpaymentdate := CleanDate(iESP2Date(le.claiminfo.latestclaimpaymentdate.Year, le.claiminfo.latestclaimpaymentdate.Month, le.claiminfo.latestclaimpaymentdate.Day));
@@ -1122,7 +1128,7 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.address.datelastseen := CleanDate(iESP2Date(le.address.datelastseen.Year, le.address.datelastseen.Month, le.address.datelastseen.Day));
 		SELF.address.dataassodate := CleanDate(iESP2Date(le.address.dataassodate.Year, le.address.dataassodate.Month, le.address.dataassodate.Day));
 		SELF.telephone.dataassociationdate := CleanDate(iESP2Date(le.telephone.dataassociationdate.Year, le.telephone.dataassociationdate.Month, le.telephone.dataassociationdate.Day));
-		SELF.Payments := PROJECT(le.Payments, TRANSFORM(propertyt_claimpaymentrecordreport, SELF.RecordIdentifier := recIdentifier; SELF.ClaimIDRecordCounter := cntr; SELF.PaymentRecordCounter := COUNTER; SELF := LEFT));
+		SELF.Payments := PROJECT(le.Payments, TRANSFORM(propertyt_claimpaymentrecordreport, SELF.RecordIdentifier := recIdentifier; SELF.ClaimIDRecordCounter := cntr; SELF.PaymentRecordCounter := COUNTER; SELF.SectionIdentifier := secIdentifier; SELF := LEFT));
 		
 		SELF := le;
 	END;
@@ -1153,8 +1159,8 @@ EXPORT FileCLUECleaned := MODULE
 		SELF.searchinformationsection.formeraddress.datefirstseen := CleanDate(iESP2Date(le.searchinformationsection.formeraddress.datefirstseen.Year, le.searchinformationsection.formeraddress.datefirstseen.Month, le.searchinformationsection.formeraddress.datefirstseen.Day));
 		SELF.searchinformationsection.formeraddress.datelastseen := CleanDate(iESP2Date(le.searchinformationsection.formeraddress.datelastseen.Year, le.searchinformationsection.formeraddress.datelastseen.Month, le.searchinformationsection.formeraddress.datelastseen.Day));
 		SELF.searchinformationsection.formeraddress.dataassodate := CleanDate(iESP2Date(le.searchinformationsection.formeraddress.dataassodate.Year, le.searchinformationsection.formeraddress.dataassodate.Month, le.searchinformationsection.formeraddress.dataassodate.Day));
-		SELF.claimhistoryrisksection.claimset := PROJECT(le.claimhistoryrisksection.claimset, cleanClaimSetProperty(LEFT, le.RecID, COUNTER));
-		SELF.claimhistoryinsuredsection.claimsets := PROJECT(le.claimhistoryinsuredsection.claimsets, cleanClaimSetProperty(LEFT, le.RecID, COUNTER));
+		SELF.claimhistoryrisksection.claimset := PROJECT(le.claimhistoryrisksection.claimset, cleanClaimSetProperty(LEFT, le.RecID, COUNTER, le.claimhistoryrisksection.reportsectionheader.sectionidentifier));
+		SELF.claimhistoryinsuredsection.claimsets := PROJECT(le.claimhistoryinsuredsection.claimsets, cleanClaimSetProperty(LEFT, le.RecID, COUNTER, le.claimhistoryinsuredsection.reportsectionheader.sectionidentifier));
 		
 		SELF := le;
 	END;
@@ -1168,7 +1174,7 @@ EXPORT FileCLUECleaned := MODULE
 	EXPORT FileCLUEPropertyRiskClaim := NORMALIZE(FileCLUEPropertyCleaned, LEFT.claimhistoryrisksection.claimset, TRANSFORM(propertyt_claimsetcluepropertyreport, SELF := RIGHT));
 	EXPORT FileCLUEPropertyRiskClaimPayments := NORMALIZE(FileCLUEPropertyRiskClaim, LEFT.Payments, TRANSFORM(propertyt_claimpaymentrecordreport, SELF := RIGHT));
 	
-  EXPORT FileCLUEPropertyRiskClaimPaymentsFlat := NORMALIZE(FileCLUEPropertyRiskClaimPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+  EXPORT FileCLUEPropertyRiskClaimPaymentsFlat := NORMALIZE(FileCLUEPropertyRiskClaimPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING5 SectionIdentifier, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
               SELF.ClaimCatType := CASE(COUNTER,
                      1 => LEFT.ClaimCat1Type,
                      2 => LEFT.ClaimCat2Type,
@@ -1193,7 +1199,7 @@ EXPORT FileCLUECleaned := MODULE
 	EXPORT FileCLUEPropertyInsuredClaim := NORMALIZE(FileCLUEPropertyCleaned, LEFT.claimhistoryinsuredsection.claimsets, TRANSFORM(propertyt_claimsetcluepropertyreport, SELF := RIGHT));
 	EXPORT FileCLUEPropertyInsuredClaimPayments := NORMALIZE(FileCLUEPropertyInsuredClaim, LEFT.Payments, TRANSFORM(propertyt_claimpaymentrecordreport, SELF := RIGHT));
   
-	EXPORT FileCLUEPropertyInsuredClaimPaymentsFlat := NORMALIZE(FileCLUEPropertyInsuredClaimPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+	EXPORT FileCLUEPropertyInsuredClaimPaymentsFlat := NORMALIZE(FileCLUEPropertyInsuredClaimPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING5 SectionIdentifier, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
               SELF.ClaimCatType := CASE(COUNTER,
                      1 => LEFT.ClaimCat1Type,
                      2 => LEFT.ClaimCat2Type,
