@@ -7,11 +7,11 @@ EXPORT Strata_Automation(pVaultFile, pCurrent_Date, pYesterday, pBaseSuffix, pSt
 	InputDate := (STRING8)pCurrent_Date;
 	
 	Strata_Log := DATASET([{InputDate[1..4] + '-' + InputDate[5..6] + '-' + InputDate[7..8],
-													COUNT(pVaultFile),
-													COUNT(pVaultFile(Vault_Active_Flag = 'Y')),
-													COUNT(pVaultFile(Vault_Active_Flag = 'N' AND vault_date_last_seen = pYesterday)), 
-													COUNT(pVaultFile(Vault_Active_Flag = 'Y' AND vault_date_first_seen = pCurrent_Date AND vault_date_last_seen = pCurrent_Date)),
-													COUNT(pVaultFile(Vault_Active_Flag = 'Y' AND vault_date_first_seen <> pCurrent_Date AND vault_date_last_seen = pCurrent_Date))}],
+						/*totalcount*/  COUNT(pVaultFile),
+						/*currentbuild*/COUNT(pVaultFile(Vault_Active_Flag = 'Y')),
+						/*expired*/			COUNT(pVaultFile(Vault_Active_Flag = 'N' AND vault_date_last_seen = pYesterday)), 
+						/*new*/					COUNT(pVaultFile(Vault_Active_Flag = 'Y' AND vault_date_first_seen = pCurrent_Date AND vault_date_last_seen = pCurrent_Date)),
+						/*updated*/			COUNT(pVaultFile(Vault_Active_Flag = 'Y' AND vault_date_first_seen <> pCurrent_Date AND vault_date_last_seen = pCurrent_Date))}],
 													Vault_Layout.Layout_Strata_Automation);
 													
   tStrataStats := CHOOSEN(Strata_Log, 1);
