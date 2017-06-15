@@ -65,4 +65,3 @@
     RETURN (__v.f & __flag) != 0;
   ENDMACRO;
 END;
-
