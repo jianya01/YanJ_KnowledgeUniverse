@@ -1,4 +1,4 @@
-﻿EXPORT Typ := MODULE
+﻿EXPORT Typ := MODULE 
   // This definition must match the one in Kel.Null.  The definition must
   // be duplicated in order to avoid circular references between Kel.Typ
   // and Kel.Null.
@@ -65,4 +65,3 @@
     RETURN (__v.f & __flag) != 0;
   ENDMACRO;
 END;
-

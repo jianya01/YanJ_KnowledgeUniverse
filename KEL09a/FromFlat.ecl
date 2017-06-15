@@ -1,4 +1,4 @@
-﻿EXPORT FromFlat := MODULE
+﻿EXPORT FromFlat := MODULE 
 
     EXPORT BuildMapping(from, to, source, dest, nullval, frule) := FUNCTIONMACRO
         LOADXML('<xml/>');
