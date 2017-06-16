@@ -13,7 +13,7 @@ EXPORT BuildAutomation(pModule,
 																										self.vault_record_status := left.__Tpe ;
 																										self:=left;));
 	
-	pEmailSourceTrim := TRIM(pEmailSource, LEFT, RIGHT);
+	pEmailSourceinTrim := TRIM(pEmailSource, LEFT, RIGHT);
   Successsubject  := 'The ' + pEmailSourceinTrim + ' build Completed for : ' + (STRING8)STD.Date.Today();
 	Successbody     := 'The ' + pEmailSourceinTrim + ' build Completed for : ' + (STRING8)STD.Date.Today() + '.'+'\n' +
 										 'The Workunit is ' + WORKUNIT +'\n';		
