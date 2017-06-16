@@ -13,13 +13,13 @@ EXPORT BuildAutomation(pModule,
 																										self.vault_record_status := left.__Tpe ;
 																										self:=left;));
 	
-	pEmailSourceinTrim := TRIM(pEmailSource, LEFT, RIGHT);
-  Successsubject  := 'The ' + pEmailSourceinTrim + ' build Completed for : ' + (STRING8)STD.Date.Today();
-	Successbody     := 'The ' + pEmailSourceinTrim + ' build Completed for : ' + (STRING8)STD.Date.Today() + '.'+'\n' +
+	pEmailTrim := TRIM(pEmailSource, LEFT, RIGHT);
+  Successsubject  := 'The ' + pEmailTrim + ' build Completed for : ' + (STRING8)STD.Date.Today();
+	Successbody     := 'The ' + pEmailTrim + ' build Completed for : ' + (STRING8)STD.Date.Today() + '.'+'\n' +
 										 'The Workunit is ' + WORKUNIT +'\n';		
 										
-	Failuresubject  := 'The ' + pEmailSourceinTrim + ' build Failed for : ' + (STRING8)STD.Date.Today();
-	Failurebody     := 'The ' + pEmailSourceinTrim + ' build Failed for : ' + (STRING8)STD.Date.Today() + '.'+'\n' +
+	Failuresubject  := 'The ' + pEmailTrim + ' build Failed for : ' + (STRING8)STD.Date.Today();
+	Failurebody     := 'The ' + pEmailTrim + ' build Failed for : ' + (STRING8)STD.Date.Today() + '.'+'\n' +
 										 'The Workunit is ' + WORKUNIT + '\n'+
 										 'ErrorMessage is ' + FAILMESSAGE + '\n\n';		
 	
