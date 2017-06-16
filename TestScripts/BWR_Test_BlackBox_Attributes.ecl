@@ -1,4 +1,4 @@
-#workunit('name', 'Testing_BlackBox_Attributes');
+﻿#workunit('name', 'Testing_BlackBox_Attributes');
 #option('expandSelectCreateRow', true); // Added to improve overall compile time
 
 IMPORT KELBlackBox, KELGlobal, UT;
@@ -23,7 +23,7 @@ BocaShellAttributes			:= KELGlobal.Q_Boca_Shell_Attributes(LexID, HistoricalDate
 InsuranceHeaderAttributes	:= KELGlobal.Q_Insurance_Header_Attributes(LexID, HistoricalDate).Res0;
 LengthOfResidencyAttributes	:= KELGlobal.Q_Length_Of_Residency_Attributes(LexID, HistoricalDate).Res0;
 MaritalStatusAttributes		:= KELGlobal.Q_Marital_Status_Attributes(LexID, HistoricalDate).Res0;
-MarketViewAttributes		:= KELGlobal.Q_Market_View_Attributes(LexID, HistoricalDate).Res0;
+MarketMagnifierAttributes		:= KELGlobal.Q_Market_Magnifier_Attributes(LexID, HistoricalDate).Res0;
 RiskViewAttributes			:= KELGlobal.Q_Risk_View_Attributes(LexID, HistoricalDate).Res0;
 
 #if(ReturnAttributeSnapshots)
@@ -32,7 +32,7 @@ BocaShellSnapshots			:= KELGlobal.Q_Boca_Shell_Snapshots(LexID, HistoricalDate).
 InsuranceHeaderSnapshots	:= KELGlobal.Q_Insurance_Header_Snapshots(LexID, HistoricalDate).Res0;
 LengthOfResidencySnapshots	:= KELGlobal.Q_Length_Of_Residency_Snapshots(LexID, HistoricalDate).Res0;
 MaritalStatusSnapshots		:= KELGlobal.Q_Marital_Status_Snapshots(LexID, HistoricalDate).Res0;
-MarketViewSnapshots			:= KELGlobal.Q_Market_View_Snapshots(LexID, HistoricalDate).Res0;
+MarketMagnifierSnapshots			:= KELGlobal.Q_Market_Magnifier_Snapshots(LexID, HistoricalDate).Res0;
 RiskViewSnapshots			:= KELGlobal.Q_Risk_View_Snapshots(LexID, HistoricalDate).Res0;
 #end
 
@@ -45,7 +45,7 @@ OUTPUT(BocaShellAttributes, NAMED('LexID_Boca_Shell_Attributes'));
 OUTPUT(InsuranceHeaderAttributes, NAMED('LexID_Insurance_Header_Attributes'));
 OUTPUT(LengthOfResidencyAttributes, NAMED('LexID_Length_of_Residency_Attributes'));
 OUTPUT(MaritalStatusAttributes, NAMED('LexID_Marital_Status_Attributes'));
-OUTPUT(MarketViewAttributes, NAMED('LexID_MarketView_Attributes'));
+OUTPUT(MarketMagnifierAttributes, NAMED('LexID_MarketMagnifier_Attributes'));
 OUTPUT(RiskViewAttributes, NAMED('LexID_RiskView_Attributes'));
 
 #if(ReturnAttributeSnapshots)
@@ -53,7 +53,7 @@ OUTPUT(BocaShellSnapshots, NAMED('LexID_Boca_Shell_Snapshots'));
 OUTPUT(InsuranceHeaderSnapshots, NAMED('LexID_Insurance_Header_Snapshots'));
 OUTPUT(LengthOfResidencySnapshots, NAMED('LexID_Length_of_Residency_Snapshots'));
 OUTPUT(MaritalStatusSnapshots, NAMED('LexID_Marital_Status_Snapshots'));
-OUTPUT(MarketViewSnapshots, NAMED('LexID_MarketView_Snapshots'));
+OUTPUT(MarketMagnifierSnapshots, NAMED('LexID_MarketMagnifier_Snapshots'));
 OUTPUT(RiskViewSnapshots, NAMED('LexID_RiskView_Snapshots'));
 #end
 
@@ -72,17 +72,17 @@ BocaShellAttributes			:= JOIN(LexIDSet, KELGlobal.Q_All_Boca_Shell_Attributes(Hi
 InsuranceHeaderAttributes	:= JOIN(LexIDSet, KELGlobal.Q_All_Insurance_Header_Attributes(HistoricalDate).Res0, LEFT.LexID = RIGHT.UID, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
 LengthOfResidencyAttributes	:= JOIN(LexIDSet, KELGlobal.Q_All_Length_Of_Residency_Attributes(HistoricalDate).Res0, LEFT.LexID = RIGHT.UID, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
 MaritalStatusAttributes		:= JOIN(LexIDSet, KELGlobal.Q_All_Marital_Status_Attributes(HistoricalDate).Res0, LEFT.LexID = RIGHT.UID, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
-MarketViewAttributes		:= JOIN(LexIDSet, KELGlobal.Q_All_Market_View_Attributes(HistoricalDate).Res0, LEFT.LexID = RIGHT.UID, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
+MarketMagnifierAttributes		:= JOIN(LexIDSet, KELGlobal.Q_All_Market_Magnifier_Attributes(HistoricalDate).Res0, LEFT.LexID = RIGHT.UID, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
 RiskViewAttributes			:= JOIN(LexIDSet, KELGlobal.Q_All_Risk_View_Attributes(HistoricalDate).Res0, LEFT.LexID = RIGHT.UID, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
 
 #if(ReturnAttributeSnapshots)
 // These queries produce the attribute "snapshots" for a given set of LexID's as of the historical date
-BocaShellSnapshots			:= JOIN(LexIDSet, KELGlobal.Q_All_Boca_Shell_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT.Subject_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
-InsuranceHeaderSnapshots	:= JOIN(LexIDSet, KELGlobal.Q_All_Insurance_Header_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT.Subject_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
-LengthOfResidencySnapshots	:= JOIN(LexIDSet, KELGlobal.Q_All_Length_Of_Residency_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT.Subject_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
-MaritalStatusSnapshots		:= JOIN(LexIDSet, KELGlobal.Q_All_Marital_Status_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT.Subject_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
-MarketViewSnapshots			:= JOIN(LexIDSet, KELGlobal.Q_All_Market_View_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT.Subject_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
-RiskViewSnapshots			:= JOIN(LexIDSet, KELGlobal.Q_All_Risk_View_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT.Subject_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
+BocaShellSnapshots			:= JOIN(LexIDSet, KELGlobal.Q_All_Boca_Shell_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT._r_Person_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
+InsuranceHeaderSnapshots	:= JOIN(LexIDSet, KELGlobal.Q_All_Insurance_Header_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT._r_Person_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
+LengthOfResidencySnapshots	:= JOIN(LexIDSet, KELGlobal.Q_All_Length_Of_Residency_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT._r_Person_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
+MaritalStatusSnapshots		:= JOIN(LexIDSet, KELGlobal.Q_All_Marital_Status_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT._r_Person_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
+MarketMagnifierSnapshots			:= JOIN(LexIDSet, KELGlobal.Q_All_Market_Magnifier_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT._r_Person_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
+RiskViewSnapshots			:= JOIN(LexIDSet, KELGlobal.Q_All_Risk_View_Snapshots(HistoricalDate).Res0, LEFT.LexID = RIGHT._r_Person_, TRANSFORM(RIGHT), KEEP(1), ATMOST(10), SMART);
 #end
 
 // This query produces the Relatives and Associates for a given set of LexID's
@@ -94,7 +94,7 @@ OUTPUT(CHOOSEN(BocaShellAttributes, MaxResults), NAMED('LexID_Boca_Shell_Attribu
 OUTPUT(CHOOSEN(InsuranceHeaderAttributes, MaxResults), NAMED('LexID_Insurance_Header_Attributes'));
 OUTPUT(CHOOSEN(LengthOfResidencyAttributes, MaxResults), NAMED('LexID_Length_of_Residency_Attributes'));
 OUTPUT(CHOOSEN(MaritalStatusAttributes, MaxResults), NAMED('LexID_Marital_Status_Attributes'));
-OUTPUT(CHOOSEN(MarketViewAttributes, MaxResults), NAMED('LexID_MarketView_Attributes'));
+OUTPUT(CHOOSEN(MarketMagnifierAttributes, MaxResults), NAMED('LexID_MarketMagnifier_Attributes'));
 OUTPUT(CHOOSEN(RiskViewAttributes, MaxResults), NAMED('LexID_RiskView_Attributes'));
 
 #if(ReturnAttributeSnapshots)
@@ -102,7 +102,7 @@ OUTPUT(CHOOSEN(BocaShellSnapshots, MaxResults), NAMED('LexID_Boca_Shell_Snapshot
 OUTPUT(CHOOSEN(InsuranceHeaderSnapshots, MaxResults), NAMED('LexID_Insurance_Header_Snapshots'));
 OUTPUT(CHOOSEN(LengthOfResidencySnapshots, MaxResults), NAMED('LexID_Length_of_Residency_Snapshots'));
 OUTPUT(CHOOSEN(MaritalStatusSnapshots, MaxResults), NAMED('LexID_Marital_Status_Snapshots'));
-OUTPUT(CHOOSEN(MarketViewSnapshots, MaxResults), NAMED('LexID_MarketView_Snapshots'));
+OUTPUT(CHOOSEN(MarketMagnifierSnapshots, MaxResults), NAMED('LexID_MarketMagnifier_Snapshots'));
 OUTPUT(CHOOSEN(RiskViewSnapshots, MaxResults), NAMED('LexID_RiskView_Snapshots'));
 #end
 

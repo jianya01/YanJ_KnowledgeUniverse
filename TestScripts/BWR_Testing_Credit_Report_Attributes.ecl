@@ -4,14 +4,14 @@
 IMPORT KELBlackBox, UT;
 IMPORT KELGlobal AS KELCodeLocation;
 
-Transaction := DATASET([{'8778015R13971833', 1514226899}], {STRING TransactionID, UNSIGNED6 LexID}); // Bankruptcies/Collections
-//Transaction := DATASET([{'0F19ADA9C0X3382', 1514226899}], {STRING TransactionID, UNSIGNED6 LexID}); // Bankruptcies/Collections/Tradeline/Inquiries
+//Transaction := DATASET([{'8778015R13971833', 1514226899}], {STRING TransactionID, UNSIGNED6 LexID}); // Bankruptcies/Collections
+Transaction := DATASET([{'0F19ADA9C0X3382', 1514226899}], {STRING TransactionID, UNSIGNED6 LexID}); // Bankruptcies/Collections/Tradeline/Inquiries
 
 // NCFVersion := 1; // Run NCF Version 1
 NCFVersion := 2; // Run NCF Version 2
 
-IncludeDebugQueries := true; // Only OUTPUT the top level CreditReport
-// IncludeDebugQueries := false; // OUTPUT all CreditReport* ENTITY results
+// IncludeDebugQueries := true; // Only OUTPUT the top level CreditReport
+IncludeDebugQueries := false; // OUTPUT all CreditReport* ENTITY results
 
 #if(NCFVersion = 1)
 	OUTPUT(KELCodeLocation.S_Credit_Report_V1.Result(Transaction_I_D_ = Transaction[1].TransactionID), NAMED('CreditReport'));

@@ -104,6 +104,11 @@ EXPORT Null := MODULE
     LOCAL __r := (TYPEOF(__to.v)) __v.v;
     RETURN ROW({ IF(__NullStatusAsBool(__v), __DefaultFromItem(__to), __r), __NullStatusAsFlag(__v) }, __NullableTypeOf(__r));
   ENDMACRO;
+  // Explicit nullable cast - cast the nullable value to the given explicit nullable type
+  EXPORT __ECAST(t, o) := FUNCTIONMACRO
+    LOCAL __v := o;
+    RETURN ROW({ __v.v, __v.f }, t); 
+  ENDMACRO;
   // Truncate - Truncate a nullable value to just the value (using the default when null)
   EXPORT __T(o) := FUNCTIONMACRO
     LOCAL __v := o;

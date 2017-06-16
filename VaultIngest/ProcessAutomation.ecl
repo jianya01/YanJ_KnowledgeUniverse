@@ -1,5 +1,7 @@
 ﻿EXPORT ProcessAutomation(	pModule,
+													// pBuildDate, 
 													pEmailSourceIn
+													// SourceDSKey = ''
 													) := FUNCTIONMACRO
 															
 															
@@ -11,7 +13,8 @@
 	SourceDSKey := pModule.Constants.SourceKey;
 	
 	// Verify the source file for duplicates
-
+	// in_ds := pSourcefile;
+	// sortedDS:=sort(in_ds,SourceDSKey);
 	UniqueCnt := count(VaultIngest.Macros.CountUnique(pSourcefile,SourceDSKey));
 	TotalCnt := count(pSourcefile);
 	

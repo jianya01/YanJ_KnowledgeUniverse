@@ -196,4 +196,9 @@ EXPORT FileUtil := MODULE
 	
 		RETURN combinedStats;
 	END;
+	
+	EXPORT FileCopyFunction(STRING SourceFileName, STRING DestinationCluster, STRING DestinationFileName, STRING SourceDALI, BOOLEAN AllowOverwrite = false, BOOLEAN Compress = false, BOOLEAN WaitForFileCopy = true, BOOLEAN Replicate = false, BOOLEAN AsSuperfile = false, BOOLEAN ForcePush = false) := FUNCTION
+       CopyAction := STD.File.Copy(SourceFileName, DestinationCluster, DestinationFileName, SourceDali, IF(WaitForFileCopy, -1, 0) /*timeout*/, /*espserverIPPort*/, 1 /*maxConnections*/, AllowOverwrite, Replicate, AsSuperfile, Compress, ForcePush);
+       RETURN CopyAction;
+	END;
 END;

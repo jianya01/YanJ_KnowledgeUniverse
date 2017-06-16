@@ -1,34 +1,41 @@
 ﻿// KEL Compiler Options and Configurations
-#OPTION(persist, 2)
+
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
- 
+  
 // Defining the ERA to allow for ASOF functionality
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
-
+ 
 // Defining the PERMITS to allow for NCF v1 and v2 to utilize the same ENTITY/Attribute definitions, but different USE statements
 PERMITS v1, v2;
-
+ 
 // Defined to support the Person/CreditReport ASSOCIATIONS
 Person := ENTITY(FLAT(UID=LexID));
 
 // Top level NCF Credit Report ENTITY
+/* ----------------
+Code Comment Legend
+-------------------
+v2 Name - Indicates this field has a new name in NCF Enhanced/V2, however it is reusing a Version 1 field
+v2+ Name - Indicates this field is exclusively used in NCF Enhanced/V2 and didn't exist in Version 1
+Cleaned Date - Indicates this field has some ECL Date manipulation happening to clean the date to YYYYMMDD prior to KEL ingest
+*/
 CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
 		STRING TransactionID,
 		BOOLEAN SubjectRecord,
 		INTEGER SubjectRecordCode,
 		INTEGER LexID,
-		STRING BureauCode, // v2+ Field
-		STRING Version, // v2+ Field
-		INTEGER PaymentHistoryType, // v2+ Field
-		DATE FileSinceDate, // v2+ Field
-		DATE DateReported,
+		STRING BureauCode, // v2+ Name: BureauCode
+		STRING Version, // v2+ Name: HDBureauVersion
+		INTEGER PaymentHistoryType, // v2+ Name: HDPaymentHistoryType
+		DATE FileSinceDate, // v2+ Name: HDFileSinceDate
+		DATE DateReported, // v2 Name: HDDateOfReport
 		DATE DateOfOrder,
 		DATE DateOfReceipt,
 		DATE DateOfCompletion,
-		STRING DateOfBirth, // v2+ Field, set to STRING as it can contain 0's in odd places
-		STRING DateOfDeath, // v2+ Field, set to STRING as it can contain 0's in odd places
+		DATE DateOfBirth, // v2+ Name: HDDateOfBirth, Cleaned Date
+		DATE DateOfDeath, // v2+ Name: HDDateOfDeath, Cleaned Date
 		STRING TimeOfReport,
 		STRING Quoteback,
 		STRING ReportCode,
@@ -37,11 +44,12 @@ CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
 		STRING AccountNumber,
 		STRING ProcessingCompletionStatus,
 		STRING ReportUsage,
-		STRING ReferenceNumber,
-		INTEGER ConsumerStatementOnFileFlag, // v2+ Field
-		STRING ContentType, // v2+ Field
-		INTEGER StatementLength, // v2+ Field
-		STRING ConsumerStatement, // v2+ Field
+		STRING ReferenceNumber, // v2 Name: ReferenceNumber
+		INTEGER ConsumerStatementOnFileFlag, // v2+ Name: HDConsumerStatementOnFileFlag
+		STRING ContentType, // v2+ Name: CNType
+		DATE DateStatementFiled, // v2+ Name: CNDateStatementFiled, Cleaned Date
+		INTEGER StatementLength, // v2+ Name: CNStatementLength
+		STRING ConsumerStatement, // v2+ Name: CNStatement
 		DATE DateCreditFileEstbed,
 		DATE OldestOpeningDateOfTrade,
 		DATE LatestReportingDateOfTrade,
@@ -87,11 +95,12 @@ CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
 		DATE NinetyDayInquiryHistoryDate,
 		INTEGER NumberOfRevolvingAccounts,
 		INTEGER NumberOfOpenEndedAccounts,
-		INTEGER NumberOfInstallmentAccounts),
+		INTEGER NumberOfInstallmentAccounts,
+		INTEGER LienJudgementSource=NULL('')),
 	MODEL(UID, 
 		TransactionID, 
 		ReferenceNumber,
-		BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, StatementLength, ConsumerStatement,
+		BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, DateStatementFiled, StatementLength, ConsumerStatement,
 		LexIDs{SubjectRecordCode, LexID}, 
 		ROWS{SubjectRecord, DateCreditFileEstbed, OldestOpeningDateOfTrade, LatestReportingDateOfTrade, DateOfLatestFileActivity, ReportIncludesBankruptcies, 
 			DateOfLatestBankruptcyV1, ReportIncludesPublicRecords, ReportIncludesCollectionItems, ReportIncludesConsumerStatements, HighCreditRangeLowAmount, 
@@ -104,61 +113,62 @@ CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
 			AmountOwedTotalInstallment, PastDueTotalRevolving, PastDueTotalOpenEnded, PastDueTotalInstallment, NinetyDayInquiryHistoryCount, NinetyDayInquiryHistoryDate, 
 			NumberOfRevolvingAccounts, NumberOfOpenEndedAccounts, NumberOfInstallmentAccounts}, 
 		DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, 
-		ProcessingCompletionStatus, ReportUsage));
+		ProcessingCompletionStatus, ReportUsage, LienJudgementSource));
 
 
 // Credit Report Sub-Section ENTITYs (Bankruptcy, Collection, Employment, Inquiry, Judgement, Lien, Narrative Remarks, Tradeline)
 CreditReportBankruptcy := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
-		STRING BureauCode, // v2+ Field
-		STRING ECOACode, // v2+ Field
-		STRING StatusDate, // v2+ Field
-		STRING ConsumerDisputeFlag, // v2+ Field
-		DATE DateReported,
-		DATE DateFiled,
+		STRING BureauCode, // v2+ Name: BureauCode
+		STRING StatusCode, // v2+ Name: PRStatusCode
+		STRING ConsumerDisputeFlag, // v2+ Name: PRConsumerDisputeFlag
+		DATE DateReported, // v2 Name: HDDateOfReport
+		DATE DateFiled, // v2 Name: PRDateFiled, Cleaned Date
 		STRING BankruptcyStatus,
 		INTEGER AssetsReported,
 		INTEGER LiabilitiesReported,
-		DATE SatisfiedDischargeDate,
-		STRING CourtNumber,
-		STRING CaseNumber,
+		DATE SatisfiedDischargeDate, // v2 Name: PRSatisfiedDischargeDate
+		STRING CourtNumber, // v2 Name: PRCourtNumber
+		STRING CaseNumber, // v2 Name: PRCaseNumber
 		STRING BankruptcyType,
-		STRING FilingType),
+		STRING FilingType), // v2 Name: PRFilingType
 	MODEL(*));
 
 CreditReportCollection := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
-		STRING BureauCode, // v2+ Field
-		STRING KindOfBusiness, // v2+ Field
-		DATE DateReported,
-		DATE DateAssigned,
+		STRING BureauCode, // v2+ Name: BureauCode
+		STRING KOB, // v2+ Name: COKOB - KindOfBusiness
+		DATE DateReported, // v2 Name: HDDateOfReport
+		DATE CODateReported, // v2+ Name: CODateReported
+		DATE DateAssigned, // v2 Name: CODateAssigned
 		STRING IndustryCode,
-		STRING ReportingMemberAgencyNumber,
-		STRING ClientNameOrNumber,
+		STRING ReportingMemberAgencyNumber, // v2 Name: COReportingMemberNumber
+		STRING MemberName, // v2+ Name: COMemberName
+		STRING ClientNameOrNumber, // v2 Name: COClientNameOrNumber
 		BOOLEAN IsMedicalClientName,
 		BOOLEAN IsMedicalCollectionClientName,
-		STRING OriginalCreditorName, // v2+ Field
-		STRING AccountNumber, // v2+ Field
-		STRING ECOACode,
+		STRING AccountNumber, // v2+ Name: COAccountSerialNumber
+		STRING ECOACode, // v2 Name: COECOACode
 		DATE DateOfLastActivity,
-		INTEGER OriginalAmount,
+		DATE LastPaymentDate, // v2+ Name: COLastPaymentDate, Cleaned Date
+		INTEGER OriginalAmount, // v2 Name: COOriginalAmount
 		DATE DateOfBalance,
-		INTEGER BalanceAmount,
-		INTEGER PastDueAmount, // v2+ Field
+		INTEGER BalanceAmount, // v2 Name: COBalanceAmount
+		INTEGER PastDueAmount, // v2+ Name: COPastDueAmount
 		DATE StatusDate,
-		STRING CollectionItemStatus,
+		STRING CollectionItemStatus, // v2 Name: COCollectionItemStatus
 		STRING CollectionItemStatusText,
-		STRING ClassificationCode, // v2+ Field
-		STRING ConsumerDisputeFlag, // v2+ Field
-		STRING AccountTypeCode, // v2+ Field
-		STRING ConsumerInfoIndicator, // v2+ Field
-		DATE DateOf1stDelinquency), // v2+ Field
+		STRING ClassificationCode, // v2+ Name: COClassificationCode
+		STRING ConsumerDisputeFlag, // v2+ Name: COConsumerDisputeFlag
+		STRING AccountPurposeType, // v2+ Name: COAccountPurposeType
+		STRING ConsumerInfoIndicator, // v2+ Name: COConsumerInfoIndicator
+		DATE DateOfFirstDelinquency), // v2+ Name: CODateOfFirstDelinquency
 	MODEL(*));
 
 CreditReportEmployment := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter, LineNumber),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
-		STRING BureauCode, // v2+ Field
-		DATE DateReported,
+		STRING BureauCode, // v2+ Name: BureauCode
+		DATE DateReported, // v2 Name: HDDateOfReport
 		STRING Classification,
 		STRING EmployerName,
 		STRING TypeOfPositionDescription,
@@ -168,129 +178,132 @@ CreditReportEmployment := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, 
 
 CreditReportInquiry := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter, LineNumber),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
-		STRING BureauCode, // v2+ Field
-		STRING KindOfBusiness, // v2+ Field
-		DATE DateReported,
-		DATE DateOfInquiry,
-		STRING InquirerName,
-		STRING InquirerID,
-		INTEGER Amount, // v2+ Field
-		STRING Type, // v2+ Field
-		STRING Abbreviation, // v2+ Field
-		STRING Terms, // v2+ Field
+		STRING BureauCode, // v2+ Name: BureauCode
+		STRING KOB, // v2+ Name: IQKOB - KindOfBusiness
+		DATE DateReported, // v2 Name: HDDateOfReport
+		DATE DateOfInquiry, // v2 Name: IQDateOfInquiry
+		STRING InquirerName, // v2 Name: IQInquirerName
+		STRING InquirerID, // v2 Name: IQInquirerID
+		INTEGER Amount, // v2+ Name: IQAmount
+		STRING Type, // v2+ Name: IQType
+		STRING Abbreviation, // v2+ Name: IQAbbreviation
+		STRING Terms, // v2+ Name: IQTerms
 		STRING IndustryID,
 		STRING IndustryIDFull),
 	MODEL(*));
 
 CreditReportJudgement := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
-		STRING BureauCode, // v2+ Field
-		STRING ECOACode, // v2+ Field
-		STRING StatusDate, // v2+ Field
-		STRING ConsumerDisputeFlag, // v2+ Field
-		DATE DateReported,
+		STRING BureauCode, // v2+ Name: BureauCode
+		STRING ConsumerDisputeFlag, // v2+ Name: PRConsumerDisputeFlag
+		DATE DateReported, // v2 Name: HDDateOfReport
 		STRING Classification,
-		DATE DateFiled,
-		STRING ReportingCourtNumber,
-		STRING CaseNumber,
-		INTEGER AmountInvolved,
+		DATE DateFiled, // v2 Name: PRDateFiled
+		STRING ReportingCourtNumber, // v2 Name: PRReportingCourtNumber
+		STRING CaseNumber, // v2 Name: PRCaseNumber
+		INTEGER AmountInvolved, // v2 Name: PRAmountInvolved
 		STRING TypeOfRecordItem,
-		DATE DateSatisfied,
+		STRING JudgmentType, // v2+ Name: PRJudgementType
+		DATE DateSatisfied, // v2 Name: PRDateSatisfied
 		STRING StatusOfRecordItem,
-		STRING Defendant,
-		STRING Plaintiff),
+		STRING Defendant, // v2 Name: PRDefendant
+		STRING Plaintiff), // v2 Name: PRPlaintiff
 	MODEL(*));
 
 CreditReportLien := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
-		STRING BureauCode, // v2+ Field
-		STRING ECOACode, // v2+ Field
-		STRING StatusDate, // v2+ Field
-		STRING ConsumerDisputeFlag, // v2+ Field
-		DATE DateReported,
-		DATE DateFiled,
-		STRING ReportingCourtNumber,
-		STRING CaseNumber,
-		INTEGER AmountOfLien,
-		STRING ACBCreditorClass,
-		DATE DateReleased),
+		STRING BureauCode, // v2+ Name: BureauCode
+		STRING ConsumerDisputeFlag, // v2+ Name: PRConsumerDisputeFlag
+		DATE DateReported, // v2 Name: HDDateOfReport
+		DATE DateFiled, // v2 Name: PRDateFiled
+		STRING ReportingCourtNumber, // v2 Name: PRReportingCourtNumber
+		STRING CaseNumber, // v2 Name: PRCaseNumber
+		INTEGER AmountOfLien, // v2 Name: PRAmountOfLien
+		STRING ACBCreditorClass, // v2 Name: PRACBCreditorClass
+		DATE DateReleased), // v2 Name: PRDateReleased
 	MODEL(*));
-
+ 
 CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
-		STRING BureauCode, // v2+ Field
-		INTEGER TradeKey, // v2+ Field
-		STRING KindOfBusiness, // v2+ Field
-		DATE DateReported,
-		DATE DateAccountOpened,
-		DATE DateOfLastActivity,
+		STRING BureauCode, // v2+ Name: BureauCode
+		INTEGER TradeKey, // v2+ Name: TradeKey
+		STRING KOB, // v2+ Name: TRKOB - KindOfBusiness
+		DATE DateReported, // v2 Name: HDDateOfReport
+		DATE TRDateReported, // v2+ Name: TRDateReported
+		DATE DateAccountOpened, // v2 Name: TRDateAccountOpened
+		DATE DateOfLastActivity, // v2 Name: TRDateLastActivity, Cleaned Date
 		STRING IndustryCode,
-		STRING ReportingMemberNumber,
-		STRING MemberName,
+		STRING ReportingMemberNumber, // v2 Name: TRReportingMemberNumber
+		STRING MemberName, // v2 Name: TRMemberName
 		BOOLEAN AutoLenderMemberName,
 		BOOLEAN TapeSupplierIndicator,
-		INTEGER HighestCreditAmount,
-		INTEGER CreditLimit, // v2+ Field
-		INTEGER ChargeOffAmount, // v2+ Field
-		STRING Terms,
-		STRING AccountNumber, // v2+ Field
-		STRING ECOACode, // v2+ Field
-		STRING PortfolioTypeCode, // v2+ Field
-		INTEGER AccountBalance,
-		INTEGER ScheduledPaymentAmount, // v2+ Field
-		INTEGER ActualPaymentAmount, // v2+ Field
-		INTEGER ActualPaymentNullIndicator, // v2+ Field
-		STRING MonthlyPaymentType, // v2+ Field
-		INTEGER AmountPastDue,
-		STRING AccountType,
-		STRING CurrentRateCode,
-		STRING StatusCode, // v2+ Field
-		STRING AccountConditionCode, // v2+ Field
-		INTEGER MonthsReviewed,
-		STRING AccountDesignatorCode,
-		INTEGER ThirtyDayCounter,
-		INTEGER SixtyDayCounter,
-		INTEGER NinetyDayCounter,
-		INTEGER DerogCounter, // v2+ Field
-		STRING OldHistoricalWorstRatingCode, // v2+ Field
-		STRING OldHistoricalWorstRatingDate, // v2+ Field, set to STRING as it can contain 0's in odd places
-		DATE StatusDate, // v2+ Field
-		STRING LastPaymentDate, // v2+ Field, set to STRING as it can contain different orders for YYYYMMDD/MMDDYYYY/DDMMYYYY
+		INTEGER HighestCreditAmount, // v2 Name: TRHighestCreditAmount
+		INTEGER CreditLimit, // v2+ Name: TRCreditLimit
+		INTEGER ChargeOffAmount, // v2+ Name: TRChargeOffAmount
+		STRING Terms, // v2 Name: TRTerms
+		STRING AccountNumber, // v2+ Name: TRAccountNumber
+		INTEGER AccountBalance, // v2 Name: TRAccountBalance
+		INTEGER ScheduledPaymentAmount, // v2+ Name: TRScheduledPaymentAmount
+		INTEGER ActualPaymentAmount, // v2+ Name: TRActualPaymentAmount
+		BOOLEAN ActualPaymentNullIndicator, // v2+ Name: TRActualPaymentNullInd
+		STRING MonthlyPaymentType, // v2+ Name: TRMonthlyPaymentType
+		INTEGER AmountPastDue, // v2 Name: TRPastDueAmount
+		STRING AccountType, // v2 Name: TRAccountType
+		STRING AccountPurposeType, // v2+ Name: TRAccountPurposeType
+		STRING CurrentRateCode, // v2 Name: TRCurrentRateCode
+		STRING StatusCode, // v2+ Name: TRStatusCode
+		STRING AccountConditionCode, // v2+ Name: TRAccountConditionCode
+		INTEGER MonthsReviewed, // v2 Name: TRMonthsReviewed
+		STRING AccountDesignatorCode, // v2 Name: TRAccountDesignatorCode
+		DATE ClosedDate, // v2 Name: TRClosedDate
+		INTEGER ThirtyDayCounter, // v2 Name: TRThirtyDayCounter
+		INTEGER SixtyDayCounter, // v2 Name: TRSixtyDayCounter
+		INTEGER NinetyDayCounter, // v2 Name: TRNinetyDayCounter
+		INTEGER DerogCounter, // v2+ Name: TRDerogCounter
+		STRING OldHistoricalWorstRatingCode, // v2+ Name: TROldHistoricalWorstRatingCode
+		DATE OldHistoricalWorstRatingDate, // v2+ Name: TROldHistoricalWorstRatingDate, Cleaned Date
+		DATE StatusDate, // v2+ Name: TRStatusDate
+		DATE LastPaymentDate, // v2+ Name: TRLastPaymentDate, Cleaned Date
 		STRING PreviousRateCode1,
 		DATE PreviousRateDate1,
 		STRING PreviousRateCode2,
 		DATE PreviousRateDate2,
 		STRING PreviousRateCode3,
 		DATE PreviousRateDate3,
-		STRING PaymentHistory84Months, // v2+ Field
-		STRING ConsumerDisputeFlag, // v2+ Field
-		STRING ConsumerInfoIndicator, // v2+ Field
-		STRING PaymentFrequency, // v2+ Field
-		STRING ActivityDesignatorCode, // v2+ Field
-		STRING MortgageID, // v2+ Field
-		DATE DeferredPaymentStartDate, // v2+ Field
-		INTEGER DeferredPaymentAmount, // v2+ Field
-		INTEGER BalloonPaymentAmount, // v2+ Field
-		STRING BalloonPaymentDueDate, // v2+ Field, set to STRING as it can contain 0's in odd places
-		DATE PaymentPatternStartDate, // v2+ Field
-		STRING TrendedDataStartDate, // v2+ Field
-		INTEGER MonthCounter, // v2+ Trended Field
-		INTEGER BalanceAmount, // v2+ Trended Field
-		INTEGER LoanAmountCreditLimit, // v2+ Trended Field
-		INTEGER ScheduledPayment, // v2+ Trended Field
-		INTEGER ActualPayment, // v2+ Trended Field
-		DATE LastPayment, // v2+ Trended Field
-		INTEGER ActualPaymentNullInd), // v2+ Trended Field
+		STRING PaymentHistory48Months, // v2+ Name: TR48MonthsPaymentHistory
+		STRING AdditionalPaymentHistory, // v2+ Name: TRAdditionalPaymentHistory
+		STRING PaymentHistory84Months, // v2+ Name: TR84MonthsPaymentHistory
+		INTEGER PaymentMonth, // v2+ Name: TR84MonthsPaymentHistory - Helper Field
+		STRING PaymentCode, // v2+ Name: TR84MonthsPaymentHistory - Helper Field
+		STRING ConsumerDisputeFlag, // v2+ Name: TRConsumerDisputeFlag
+		STRING ConsumerInfoIndicator, // v2+ Name: TRConsumerInfoIndicator
+		STRING PaymentFrequency, // v2+ Name: TRPaymentFrequency
+		STRING ActivityDesignatorCode, // v2+ Name: TRActivityDesignatorCode
+		STRING MortgageID, // v2+ Name: TRMortgageID
+		DATE DeferredPaymentStartDate, // v2+ Name: TRDeferredPaymentStartDate
+		INTEGER DeferredPaymentAmount, // v2+ Name: TRDeferredPaymentAmount
+		INTEGER BalloonPaymentAmount, // v2+ Name: TRBalloonPaymentAmount
+		DATE BalloonPaymentDueDate, // v2+ Name: TRBalloonPaymentDueDate, Cleaned Date
+		DATE PaymentPatternStartDate, // v2+ Name: TRPaymentPatternStartDate
+		INTEGER MonthCounter, // v2+ Trended Name: M01/M02/M03/.../M24 - Helper Field
+		DATE TrendedDataDate=FORMAT('YYYYMM01'), // v2+ Trended Name: TDTrendedDataDateM##
+		INTEGER BalanceAmount, // v2+ Trended Name: TDBalanceAmountM##
+		INTEGER LoanAmountCreditLimit, // v2+ Trended Name: TDLoanAmountCreditLimitM##
+		INTEGER ScheduledPayment, // v2+ Trended Name: TDScheduledPaymentM##
+		INTEGER ActualPayment, // v2+ Trended Name: TDActualPaymentM##
+		DATE TDLastPaymentDate, // v2+ Trended Name: TDLastPaymentDateM##
+		BOOLEAN TDActualPaymentNullInd), // v2+ Trended Name: TDActualPaymentNullIndM##
 	MODEL(UID, rCreditReport,
-		BureauCode, TradeKey, KindOfBusiness, DateReported, DateAccountOpened, DateOfLastActivity, IndustryCode, ReportingMemberNumber, MemberName, 
-		AutoLenderMemberName, TapeSupplierIndicator, HighestCreditAmount, CreditLimit, ChargeOffAmount, Terms, AccountNumber, ECOACode, PortfolioTypeCode, 
-		AccountBalance, ScheduledPaymentAmount, ActualPaymentAmount, ActualPaymentNullIndicator, MonthlyPaymentType, AmountPastDue, AccountType, 
-		CurrentRateCode, StatusCode, AccountConditionCode, MonthsReviewed, AccountDesignatorCode, ThirtyDayCounter, SixtyDayCounter, NinetyDayCounter, 
+		BureauCode, TradeKey, KOB, DateReported, TRDateReported, DateAccountOpened, DateOfLastActivity, IndustryCode, ReportingMemberNumber, MemberName, 
+		AutoLenderMemberName, TapeSupplierIndicator, HighestCreditAmount, CreditLimit, ChargeOffAmount, Terms, AccountNumber,
+		AccountBalance, ScheduledPaymentAmount, ActualPaymentAmount, ActualPaymentNullIndicator, MonthlyPaymentType, AmountPastDue, AccountType, AccountPurposeType, 
+		CurrentRateCode, StatusCode, AccountConditionCode, MonthsReviewed, AccountDesignatorCode, ClosedDate, ThirtyDayCounter, SixtyDayCounter, NinetyDayCounter, 
 		DerogCounter, OldHistoricalWorstRatingCode, OldHistoricalWorstRatingDate, StatusDate, LastPaymentDate, PreviousRateCode1, PreviousRateDate1, 
-		PreviousRateCode2, PreviousRateDate2, PreviousRateCode3, PreviousRateDate3, PaymentHistory84Months, ConsumerDisputeFlag, ConsumerInfoIndicator, 
-		PaymentFrequency, ActivityDesignatorCode, MortgageID, DeferredPaymentStartDate, DeferredPaymentAmount, BalloonPaymentAmount, 
-		BalloonPaymentDueDate, PaymentPatternStartDate, TrendedDataStartDate,
-		Trended{MonthCounter, BalanceAmount, LoanAmountCreditLimit, ScheduledPayment, ActualPayment, LastPayment, ActualPaymentNullInd}));
+		PreviousRateCode2, PreviousRateDate2, PreviousRateCode3, PreviousRateDate3, PaymentHistory48Months, AdditionalPaymentHistory, PaymentHistory84Months, ConsumerDisputeFlag,
+		ConsumerInfoIndicator, PaymentFrequency, ActivityDesignatorCode, MortgageID, DeferredPaymentStartDate, DeferredPaymentAmount, BalloonPaymentAmount, 
+		BalloonPaymentDueDate, PaymentPatternStartDate,
+		Trended{MonthCounter, TrendedDataDate, BalanceAmount, LoanAmountCreditLimit, ScheduledPayment, ActualPayment, TDLastPaymentDate, TDActualPaymentNullInd},
+		PaymentHistory84MonthsSM{PaymentMonth, PaymentCode}));
 
 CreditReportNarrativeRemarks := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter, NarrativeRemarkCounter),
 		CreditReport rCreditReport=UID(Transaction_ID, LexID),
@@ -485,7 +498,8 @@ USE Consumer_Credit.FilesCleaned.ReportRequest_Data(FLAT,
 		AccountNumber = AccountNumber,
 		ProcessingCompletionStatus = ProcessingCompletionStatus,
 		ReportUsage = ReportUsage,
-		ReferenceNumber = ReferenceNumber),
+		ReferenceNumber = ReferenceNumber,
+		LienJudgementSource = Attach2ProcessStatus),
 	PERMITS([v1]));
 
 USE Consumer_Credit.FilesCleaned.Bankruptcy_Data(FLAT,
@@ -595,7 +609,7 @@ USE Consumer_Credit.FilesCleaned.TradeLine_Data(FLAT,
 		Terms = Terms,
 		AccountBalance = AccountBalance,
 		AmountPastDue = AmountPastDue,
-		AccountType = AccountTypeCode,
+		AccountType = AccountPurposeType,
 		CurrentRateCode = CurrentRateCode,
 		MonthsReviewed = MonthsReviewed,
 		AccountDesignatorCode = AccountDesignatorCode,
@@ -776,7 +790,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.ReportRequest_Data(FLAT,
 		ReportUsage = ReportUsage,
 		ReferenceNumber = ReferenceNumber),
 	PERMITS([v2]));
-
+ 
 USE Consumer_Credit.FilesCleaned_NCF2_0.Bankruptcy_Data(FLAT,
 	CreditReportBankruptcy(
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
@@ -784,8 +798,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.Bankruptcy_Data(FLAT,
 		DateReported = Date_Reported,
 		DateFiled = DateFiled,
 		BureauCode = BureauCode,
-		ECOACode = ECOA,
-		StatusDate = StatusDate,
+		StatusCode = StatusCode,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
 		BankruptcyStatus = BankruptcyStatus,
 		AssetsReported = AssetsReported,
@@ -802,17 +815,17 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.Collection_Data(FLAT,
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
 		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = DateReported,
+		CODateReported = CODateReported,
 		DateAssigned = DateAssigned,
 		BureauCode = BureauCode,
-		KindOfBusiness = KOB,
-		OriginalCreditorName = OriginalCreditorName,
+		KOB = KOB,
 		AccountNumber = AccountNumber,
 		PastDueAmount = PastDueAmount,
 		ClassificationCode = ClassificationCode,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
-		AccountTypeCode = AccountTypeCode,
+		AccountPurposeType = AccountPurposeType,
 		ConsumerInfoIndicator = ConsumerInfoIndicator,
-		DateOf1stDelinquency = Date1stDelinquency,
+		DateOfFirstDelinquency = DateOfFirstDelinquency,
 		IndustryCode = IndustryCode,
 		ReportingMemberAgencyNumber = ReportingMemberAgencyNumber,
 		ClientNameOrNumber = ClientNameOrNumber,
@@ -820,6 +833,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.Collection_Data(FLAT,
 		IsMedicalCollectionClientName = MedicalCollectionClientName,
 		ECOACode = ECOACode,
 		DateOfLastActivity = DateOfLastActivity,
+		LastPaymentDate = LastPaymentDate,
 		OriginalAmount = OriginalAmount,
 		DateOfBalance = DateOfBalance,
 		BalanceAmount = BalanceAmount,
@@ -846,7 +860,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.InquiryHistory_Data(FLAT,
 		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		BureauCode = BureauCode, 
-		KindOfBusiness = KOB,
+		KOB = KOB,
 		Amount = Amount,
 		Type = IQType,
 		Abbreviation = Abbreviation,
@@ -864,8 +878,6 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.Judgement_Data(FLAT,
 		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		BureauCode = BureauCode,
-		ECOACode = ECOA,
-		StatusDate = StatusDate,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
 		Classification = Classification,
 		DateFiled = DateFiled,
@@ -873,6 +885,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.Judgement_Data(FLAT,
 		CaseNumber = CaseNumber,
 		AmountInvolved = AmountInvolved,
 		TypeOfRecordItem = TypeOfRecordItem,
+		JudgmentType = JudgmentType,
 		DateSatisfied = DateSatisfied,
 		StatusOfRecordItem = StatusOfRecordItem,
 		Defendant = Defendant,
@@ -886,8 +899,6 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TaxLien_Data(FLAT,
 		DateReported = Date_Reported,
 		DateFiled = DateFiled,
 		BureauCode = BureauCode,
-		ECOACode = ECOA,
-		StatusDate = StatusDate,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
 		ReportingCourtNumber = ReportingCourtNumber,
 		CaseNumber = CaseNumber,
@@ -901,18 +912,17 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Data(FLAT,
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
 		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
+		TRDateReported = TRDateReported,
 		BureauCode = BureauCode,
 		TradeKey = TradeKey,
-		KindOfBusiness = KOB,
-		ECOACode = ECOA,
-		PortfolioTypeCode = PortfolioTypeCode,
+		KOB = KOB,
 		CreditLimit = CreditLimit,
 		AccountNumber = AccountNumber,
 		ChargeOffAmount = ChargeOffAmount,
 		ScheduledPaymentAmount = ScheduledPaymentAmount,
 		MonthlyPaymentType = MonthlyPaymentType,
 		ActualPaymentAmount = ActualPaymentAmount,
-		ActualPaymentNullInd = ActualPaymentNullInd,
+		ActualPaymentNullIndicator = ActualPaymentNullInd,
 		StatusCode = StatusCode,
 		AccountConditionCode = AccountConditionCode,
 		DerogCounter = DerogCounter,
@@ -920,6 +930,8 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Data(FLAT,
 		OldHistoricalWorstRatingDate = OldHistoricWorstRatingDate,
 		StatusDate = StatusDate,
 		LastPaymentDate = LastPaymentDate,
+		PaymentHistory48Months = PaymentHistory48Months,
+		AdditionalPaymentHistory = AdditionalPaymentHistory,
 		PaymentHistory84Months = PaymentHistory84Months,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
 		ConsumerInfoIndicator = ConsumerInfoIndicator,
@@ -942,7 +954,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Data(FLAT,
 		Terms = Terms,
 		AccountBalance = AccountBalance,
 		AmountPastDue = AmountPastDue,
-		AccountType = AccountTypeCode,
+		AccountType = AccountPurposeType,
 		CurrentRateCode = CurrentRateCode,
 		MonthsReviewed = MonthsReviewed,
 		AccountDesignatorCode = AccountDesignatorCode,
@@ -956,6 +968,14 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Data(FLAT,
 		PreviousRateCode3 = PrevRateCode3,
 		PreviousRateDate3 = PrevRateDate3),
 	PERMITS([v2]));
+	
+USE Consumer_Credit.FilesCleaned_NCF2_0.Tradeline_History_Data(FLAT,
+	CreditReportTradeline(
+		DateFirstSeen = Date_Reported, // Contains information for ASOF
+		DateLastSeen = Date_Reported, // Contains information for ASOF
+		PaymentMonth = RecordCounter,
+		PaymentCode = RecordValue),
+	PERMITS([v2]));
 
 USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Trended_Data(FLAT,
 	CreditReportTradeline(
@@ -963,12 +983,13 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Trended_Data(FLAT,
 		DateLastSeen = Date_Reported, // Contains information for ASOF
 		DateReported = Date_Reported,
 		MonthCounter = MonthCounter,
+		TrendedDataDate = TrendedDataDate,
 		BalanceAmount = BalanceAmount,
 		LoanAmountCreditLimit = LoanAmountCreditLimit,
 		ScheduledPayment = ScheduledPayment,
 		ActualPayment = ActualPayment,
-		LastPayment = LastPaymentDate,
-		ActualPaymentNullInd = ActualPaymentNullInd),
+		TDLastPaymentDate = LastPaymentDate,
+		TDActualPaymentNullInd = TDActualPaymentNullInd),
 	PERMITS([v2]));
 
 USE Consumer_Credit.FilesCleaned_NCF2_0.NarrativeA_Data(FLAT,
@@ -1004,7 +1025,7 @@ CreditReportBankruptcy: DISMISSED_STATUS_CODE_LIST := ['M', 'E', 'K', 'J'];
 CreditReportBankruptcy: NATIONWIDE_STATUS_OF_RECORD_ITEM_CODE_LIST := ['V', 'D', 'F', 'G', 'N', 'C', 'A', 'L', 'I']; 
 
 CreditReportBankruptcy: => NarrativeRemarkCount := COUNT(CreditReportNarrativeRemarks);
-CreditReportBankruptcy: => AgeInMonths := IF(ValidDate, ABS(MONTHSBETWEEN(DateFiled, DateReported)), 65535);
+CreditReportBankruptcy: => AgeInMonths := IF(ValidDate, ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateFiled), MONTH(DateFiled), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1))), 65535);
 CreditReportBankruptcy: => AllstateDispute := BankruptcyStatus IN ALLSTATE_DISPUTE_CATEGORY_1_STATUS_CODE_LIST OR BankruptcyStatus IN ALLSTATE_DISPUTE_CATEGORY_4_STATUS_CODE_LIST;
 CreditReportBankruptcy: => Chapter11 := BankruptcyStatus IN CHAPTER_11_CODE_LIST;
 CreditReportBankruptcy: => Chapter12 := BankruptcyStatus IN CHAPTER_12_CODE_LIST;
@@ -1457,7 +1478,6 @@ CreditReport: => TotalDismissedChapter12Bankruptcies := COUNT(CreditReportBankru
 CreditReport: => TotalDismissedChapter13Bankruptcies := COUNT(CreditReportBankruptcy(Chapter13 AND Dismissed));
 
 // Tradeline CONSTANTs and Attributes for V2
-    
 CreditReportTradeline: KOB_COLLECTION_XP := ['YB','YD','YF'];
 CreditReportTradeline: KOB_COLLECTION_EQ := [''];
 CreditReportTradeline: KOB_COLLECTION_TU := ['BY','CY','DY','EY','FY','HY'];
@@ -1630,9 +1650,9 @@ CreditReportTradeline: GRID_120_180DPD_TU := ['5'];
 CreditReportTradeline: GRID_DEROG_XP := ['8','9','Y'];
 CreditReportTradeline: GRID_DEROG_EQ := ['8','9','Y'];
 CreditReportTradeline: GRID_DEROG_TU := ['8','9','Y'];																				 
-CreditReportTradeline: GRID_SATISFACTORY_STRING_XP := ['01N'];
-CreditReportTradeline: GRID_SATISFACTORY_STRING_EQ := ['01'];
-CreditReportTradeline: GRID_SATISFACTORY_STRING_TU := ['01']; 																				 																	                                                                             
+CreditReportTradeline: GRID_SATISFACTORY_STRING_XP := ['0','1','N'];
+CreditReportTradeline: GRID_SATISFACTORY_STRING_EQ := ['0','1'];
+CreditReportTradeline: GRID_SATISFACTORY_STRING_TU := ['0','1']; 																				 																	                                                                             
 CreditReportTradeline: GRID_30DPD_STRING_XP := ['2'];
 CreditReportTradeline: GRID_30DPD_STRING_EQ := ['2'];
 CreditReportTradeline: GRID_30DPD_STRING_TU := ['2'];  																				 
@@ -1642,12 +1662,12 @@ CreditReportTradeline: GRID_60DPD_STRING_TU := ['3'];
 CreditReportTradeline: GRID_90DPD_STRING_XP := ['4'];
 CreditReportTradeline: GRID_90DPD_STRING_EQ := ['4'];
 CreditReportTradeline: GRID_90DPD_STRING_TU := ['4'];   																				                           
-CreditReportTradeline: GRID_120_180DPD_STRING_XP := ['567'];
+CreditReportTradeline: GRID_120_180DPD_STRING_XP := ['5','6','7'];
 CreditReportTradeline: GRID_120_180DPD_STRING_EQ := ['5'];
 CreditReportTradeline: GRID_120_180DPD_STRING_TU := ['5'];																		 																				 
-CreditReportTradeline: GRID_DEROG_STRING_XP := ['89Y'];
-CreditReportTradeline: GRID_DEROG_STRING_EQ := ['89Y'];
-CreditReportTradeline: GRID_DEROG_STRING_TU := ['89Y']; 																				 																				 
+CreditReportTradeline: GRID_DEROG_STRING_XP := ['8','9','Y'];
+CreditReportTradeline: GRID_DEROG_STRING_EQ := ['8','9','Y'];
+CreditReportTradeline: GRID_DEROG_STRING_TU := ['8','9','Y']; 																				 																				 
 CreditReportTradeline: STATUS_COLLECTION_XP := ['93'];
 CreditReportTradeline: STATUS_COLLECTION_EQ := [''];
 CreditReportTradeline: STATUS_COLLECTION_TU := ['']; 																				 																				 
@@ -2464,8 +2484,7 @@ CreditReportTradeline: => NC_DISPUTE_STATUS_PENDING := MAP(BureauCode = XP => NC
                                          BureauCode = EQ => NC_DISPUTE_STATUS_PENDING_EQ,
                                          BureauCode = TU => NC_DISPUTE_STATUS_PENDING_TU,BLANK_SET);
 																				 
-// Collection CONSTANTs and Attributes for V2
-		
+// Collection CONSTANTs and Attributes for V2	
 CreditReportCollection: CO_CC_MEDICAL_XP := ['02'];
 CreditReportCollection: CO_CC_MEDICAL_EQ := ['02'];
 CreditReportCollection: CO_CC_MEDICAL_TU := ['02'];
@@ -3058,7 +3077,6 @@ CreditReportCollection: => NC_DISPUTE_STATUS_PENDING := MAP(BureauCode = XP => N
                                          BureauCode = TU => NC_DISPUTE_STATUS_PENDING_TU,BLANK_SET); 
 																				 
 // Inquiry CONSTANTs and Attributes for V2	                                         
-                                         
 CreditReportInquiry: IQ_ABBREVIATION_CREDIT_XP := [''];
 CreditReportInquiry: IQ_ABBREVIATION_CREDIT_EQ := ['CR'];
 CreditReportInquiry: IQ_ABBREVIATION_CREDIT_TU := [''];
@@ -3237,7 +3255,6 @@ CreditReportInquiry: => KOB_CHILD_SUPPORT := MAP(BureauCode = XP => KOB_CHILD_SU
                                          BureauCode = TU => KOB_CHILD_SUPPORT_TU,BLANK_SET); 
 																				 
 // Bankruptcy CONSTANTs and Attributes for V2
-    																			 
 CreditReportBankruptcy: PR_RECORD_BP_XP := [''];
 CreditReportBankruptcy: PR_RECORD_BP_EQ := ['BP'];
 CreditReportBankruptcy: PR_RECORD_BP_TU := [''];
@@ -3290,65 +3307,781 @@ CreditReportBankruptcy: => NC_DISPUTE_STATUS_PENDING := MAP(BureauCode = XP => N
                                          BureauCode = TU => NC_DISPUTE_STATUS_PENDING_TU,BLANK_SET);																																		 																	 																			 																		 
 
 //Global Attributes
-CreditReportBankruptcy: => PRDischargedBKP := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISCHARGED_BKP; //GPRDischargedBKP
-CreditReportBankruptcy: => PRDismissedBKP := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISMISSED_BKP; //GPRDismissedBKP
-CreditReportBankruptcy: => PRBankruptcy13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_BANKRUPTCY_13; //GPRBankruptcy13
-CreditReportBankruptcy: => PRDischargedBKP13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISCHARGED_BKP_13; //GPRDischargedBKP13
-CreditReportBankruptcy: => PRDismissedBKP13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISMISSED_BKP_13; //GPRDismissedBKP13
-CreditReportBankruptcy: => NCDispute := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportBankruptcy.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportBankruptcy.NC_DISPUTE_STATUS_PENDING))); //G1NCDispute
-CreditReportBankruptcy: => Dispute := NCDispute OR ConsumerDisputeFlag = 'Y'; //G2Dispute
+CreditReportBankruptcy: => GPRDischargedBKP := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISCHARGED_BKP;
+CreditReportBankruptcy: => GPRDismissedBKP := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISMISSED_BKP;
+CreditReportBankruptcy: => GPRBankruptcy13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_BANKRUPTCY_13;
+CreditReportBankruptcy: => GPRDischargedBKP13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISCHARGED_BKP_13;
+CreditReportBankruptcy: => GPRDismissedBKP13 := NOT BankruptcyStatus:Null AND BankruptcyStatus IN PR_DISMISSED_BKP_13;
+CreditReportBankruptcy: => G1NCDispute := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportBankruptcy.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportBankruptcy.NC_DISPUTE_STATUS_PENDING)));
+CreditReportBankruptcy: => G2Dispute := G1NCDispute OR ConsumerDisputeFlag = 'Y';
+CreditReportBankruptcy: => GMOSPRDateFiled := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateFiled), MONTH(DateFiled), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportBankruptcy: => GMOSPRSatisfiedDischargeDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(SatisfiedDischargeDate), MONTH(SatisfiedDischargeDate), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
 
-CreditReportCollection: => AuthorizedUser := NOT ECOACode:Null AND ECOACode IN ECOA_A; //GAuthorizedUser
-CreditReportCollection: => CORetail := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_RETAIL; //GCORetail
-CreditReportCollection: => COBankFinance := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_BANK_FINANCE; //GCOBankFinance
-CreditReportCollection: => COCableCellular := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_CABLE_CELLULAR; //GCOCableCellular
-CreditReportCollection: => COUtility := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_UTILITIES; //GCOUtility
-CreditReportCollection: => CORental := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_RENTAL; //GCORental
-CreditReportCollection: => COGovernment := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_GOVERNMENT; //GCOGovernment
-CreditReportCollection: => COInsurance := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_INSURANCE; //GCOInsurance
-CreditReportCollection: => ECOADeceased := NOT ECOACode:Null AND ECOACode IN ECOA_DECEASED; //G1ECOADeceased
-CreditReportCollection: => KOBMedical := NOT KindOfBusiness:Null AND SUBSTR(KindOfBusiness,1,1) IN KOB1_MEDICAL; //G1KOBMedical
-CreditReportCollection: => TypeMedical := NOT AccountTypeCode:Null AND AccountTypeCode IN TYPE_MEDICAL; //G1TypeMedical
-CreditReportCollection: => StatusDispute := NOT CollectionItemStatus:Null AND CollectionItemStatus IN CO_STATUS_DISPUTE; //G1StatusDispute
-CreditReportCollection: => StatusPaid := NOT CollectionItemStatus:Null AND CollectionItemStatus IN CO_STATUS_PAID; //G1StatusPaid
-CreditReportCollection: => StatusBankruptcy := NOT CollectionItemStatus:Null AND ((CollectionItemStatus IN CO_STATUS_BKP_INCLUDED) OR (CollectionItemStatus IN CO_STATUS_BKP_EXCLUDED)); //G1StatusBankruptcy
-CreditReportCollection: => StatusCOBKPExclusion := NOT CollectionItemStatus:Null AND CollectionItemStatus IN CO_STATUS_BKP_EXCLUDED; //G1StatusCOBKPExclusion
-CreditReportCollection: => NCMedical := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_MEDICAL) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_MEDICAL) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_MEDICAL) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_MEDICAL))); //G1NCMedical
-CreditReportCollection: => NCDispute := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING))); //G1NCDispute
-CreditReportCollection: => NCDeceased := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_DECEASED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_DECEASED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_DECEASED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_DECEASED))); //G1NCDeceased
-CreditReportCollection: => NCBankruptcy := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_BANKRUPTCY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_BANKRUPTCY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_BANKRUPTCY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_BANKRUPTCY))); //G1NCBankruptcy
-CreditReportCollection: => NCCOBankruptcyExclusion := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION))); //G1NCCOBankruptcyExclusion
-CreditReportCollection: => CIIBankruptcy := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY; //G1CIIBankruptcy
-CreditReportCollection: => CIICOBankruptcyExclusion := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_CO_BANKRUPTCY_EXCLUSION; //G1CIICOBankruptcyExclusion
-CreditReportCollection: => CCMedical := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_MEDICAL; //G1CCMedical
-CreditReportCollection: => Deceased := ECOADeceased OR NCDeceased; //G2Deceased
-CreditReportCollection: => Dispute := NCDispute OR StatusDispute OR (ConsumerDisputeFlag='Y'); //G2Dispute
-CreditReportCollection: => Medical := KOBMedical OR TypeMedical OR NCMedical OR CCMedical; //G2Medical
-CreditReportCollection: => Bankruptcy := NCBankruptcy OR CIIBankruptcy OR StatusBankruptcy; //G2Bankruptcy
-CreditReportCollection: => COBankruptcyExclusion := NCCOBankruptcyExclusion OR CIICOBankruptcyExclusion OR StatusCOBKPExclusion; //G2COBankruptcyExclusion
-CreditReportCollection: => COPaidPaying := StatusPaid OR (ABS(MONTHSBETWEEN(DateOfLastActivity, DateAssigned)) >=0) OR (BalanceAmount < OriginalAmount) OR (BalanceAmount <= 0); //G2COPaidPaying
-CreditReportCollection: => COPaid := StatusPaid OR BalanceAmount <= 0; //G2COPaid
-CreditReportCollection: => COExcluded := Medical OR Dispute OR AuthorizedUser OR Deceased OR (OriginalAmount <= 0) OR (DateAssigned:Null OR ABS(MONTHSBETWEEN(DateAssigned, DateReported)) > 83) OR (ABS(MONTHSBETWEEN(DateOf1stDelinquency, DateReported)) > 83); //G3COExcluded
+CreditReportCollection: => GAuthorizedUser := NOT ECOACode:Null AND ECOACode IN ECOA_A;
+CreditReportCollection: => GCORetail := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_RETAIL;
+CreditReportCollection: => GCOBankFinance := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_BANK_FINANCE;
+CreditReportCollection: => GCOCableCellular := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_CABLE_CELLULAR;
+CreditReportCollection: => GCOUtility := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_UTILITIES;
+CreditReportCollection: => GCORental := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_RENTAL;
+CreditReportCollection: => GCOGovernment := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_GOVERNMENT;
+CreditReportCollection: => GCOInsurance := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_INSURANCE;
+CreditReportCollection: => G1ECOADeceased := NOT ECOACode:Null AND ECOACode IN ECOA_DECEASED;
+CreditReportCollection: => G1KOBMedical := NOT KOB:Null AND SUBSTR(KOB,1,1) IN KOB1_MEDICAL;
+CreditReportCollection: => G1TypeMedical := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_MEDICAL;
+CreditReportCollection: => G1StatusDispute := NOT CollectionItemStatus:Null AND CollectionItemStatus IN CO_STATUS_DISPUTE;
+CreditReportCollection: => G1StatusPaid := NOT CollectionItemStatus:Null AND CollectionItemStatus IN CO_STATUS_PAID;
+CreditReportCollection: => G1StatusBankruptcy := NOT CollectionItemStatus:Null AND ((CollectionItemStatus IN CO_STATUS_BKP_INCLUDED) OR (CollectionItemStatus IN CO_STATUS_BKP_EXCLUDED));
+CreditReportCollection: => G1StatusCOBKPExclusion := NOT CollectionItemStatus:Null AND CollectionItemStatus IN CO_STATUS_BKP_EXCLUDED;
+CreditReportCollection: => G1NCMedical := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_MEDICAL) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_MEDICAL) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_MEDICAL) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_MEDICAL)));
+CreditReportCollection: => G1NCDispute := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_DISPUTE_STATUS_PENDING)));
+CreditReportCollection: => G1NCDeceased := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_DECEASED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_DECEASED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_DECEASED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_DECEASED)));
+CreditReportCollection: => G1NCBankruptcy := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_BANKRUPTCY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_BANKRUPTCY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_BANKRUPTCY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_BANKRUPTCY)));
+CreditReportCollection: => G1NCCOBankruptcyExclusion := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportCollection.NC_CO_BANKRUPTCY_EXCLUSION)));
+CreditReportCollection: => G1CIIBankruptcy := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY;
+CreditReportCollection: => G1CIICOBankruptcyExclusion := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_CO_BANKRUPTCY_EXCLUSION;
+CreditReportCollection: => G1CCMedical := NOT ClassificationCode:Null AND ClassificationCode IN CO_CC_MEDICAL;
+CreditReportCollection: => G2Deceased := G1ECOADeceased OR G1NCDeceased;
+CreditReportCollection: => G2Dispute := G1NCDispute OR G1StatusDispute OR (ConsumerDisputeFlag='Y');
+CreditReportCollection: => G2Medical := G1KOBMedical OR G1TypeMedical OR G1NCMedical OR G1CCMedical;
+CreditReportCollection: => G2Bankruptcy := G1NCBankruptcy OR G1CIIBankruptcy OR G1StatusBankruptcy;
+CreditReportCollection: => G2COBankruptcyExclusion := G1NCCOBankruptcyExclusion OR G1CIICOBankruptcyExclusion OR G1StatusCOBKPExclusion;
+CreditReportCollection: => G2COPaidPaying := G1StatusPaid OR (ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateOfLastActivity), MONTH(DateOfLastActivity), 1), DATEFROMPARTS(YEAR(DateAssigned), MONTH(DateAssigned), 1))) >= 0) OR (BalanceAmount < OriginalAmount) OR (BalanceAmount <= 0);
+CreditReportCollection: => G2COPaid := G1StatusPaid OR BalanceAmount <= 0;
+CreditReportCollection: => G3COExcluded := G2Medical OR G2Dispute OR GAuthorizedUser OR G2Deceased OR (OriginalAmount <= 0) OR (DateAssigned:Null OR ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateAssigned), MONTH(DateAssigned), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1))) > 83) OR (ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateOfFirstDelinquency), MONTH(DateOfFirstDelinquency), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1))) > 83);
+CreditReportCollection: => GMOSCODateFirstDelinquency := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateOfFirstDelinquency), MONTH(DateOfFirstDelinquency), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportCollection: => GMOSCODateAssigned := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateAssigned), MONTH(DateAssigned), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportCollection: => GMOSCODateReported := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(CODateReported), MONTH(CODateReported), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportCollection: => GMOSCOLastPaymentDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(LastPaymentDate), MONTH(LastPaymentDate), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportCollection: => GMOBCODateLastPaymentDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateAssigned), MONTH(DateAssigned), 1), DATEFROMPARTS(YEAR(LastPaymentDate), MONTH(LastPaymentDate), 1)));
 
-CreditReportInquiry: => CreditInquiry := BureauCode IN ['XPN','TRU'] OR (BureauCode IN ['EFX'] AND Abbreviation IN IQ_ABBREVIATION_CREDIT); //GCreditInquiry
-CreditReportInquiry: => MedicalInquiry := LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_MEDICAL; //GMedicalInquiry
-CreditReportInquiry: => AutoFinanceInquiry := (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_AUTO_FINANCE) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_AUTO_LEASE) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN IQ_KOB_AUTO_RESELLER); //GAutoFinanceInquiry
-CreditReportInquiry: => FinanceInquiry := (LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_FINANCE) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN IQ_KOB_FINANCE_RESELLER); //GFinanceInquiry
-CreditReportInquiry: => RetailInquiry := ((LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_RETAIL) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB2_RETAIL)) AND NOT AutoFinanceInquiry; //GRetailInquiry
-CreditReportInquiry: => BankInquiry := (LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_BANK) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB2_BANK); //GBankInquiry
-CreditReportInquiry: => PersonalFinanceInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_PERSONAL_FINANCE; //GPersonalFinanceInquiry
-CreditReportInquiry: => SalesFinanceInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_SALES_FINANCE; //GSalesFinanceInquiry
-CreditReportInquiry: => MortgageInquiry := (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_MORTGAGE) OR (LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN IQ_KOB_MORTGAGE_RESELLER); //GMortgageInquiry
-CreditReportInquiry: => CreditUnionInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_CREDIT_UNION; //GCreditUnionInquiry
-CreditReportInquiry: => StudentLoanInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN KOB_STUDENT_LOAN; //GStudentLoanInquiry
-CreditReportInquiry: => UtilityInquiry := LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_UTILITY; //GUtilityInquiry
-CreditReportInquiry: => GovernmentInquiry := LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_GOVERNMENT; //GGovernmentInquiry
-CreditReportInquiry: => CollectionInquiry := LENGTH(KindOfBusiness) = 2 AND (SUBSTR(KindOfBusiness,1,1) IN IQ_KOB1_COLLECTION OR KindOfBusiness IN KOB_COLLECTION); //GCollectionInquiry
-CreditReportInquiry: => InsuranceInquiry := LENGTH(KindOfBusiness) = 2 AND SUBSTR(KindOfBusiness,1,1) IN KOB1_INSURANCE; //GInsuranceInquiry
-CreditReportInquiry: => TenantScreenInquiry := LENGTH(KindOfBusiness) = 2 AND KindOfBusiness IN IQ_KOB_TENANT_RESELLER; //GTenantScreenInquiry
-CreditReportInquiry: => OtherFinanceInquiry := FinanceInquiry AND NOT AutoFinanceInquiry AND NOT PersonalFinanceInquiry AND NOT MortgageInquiry AND NOT StudentLoanInquiry AND NOT CreditUnionInquiry; //GOtherFinanceInquiry
+CreditReportInquiry: => GCreditInquiry := BureauCode IN ['XPN','TRU'] OR (BureauCode IN ['EFX'] AND Abbreviation IN IQ_ABBREVIATION_CREDIT);
+CreditReportInquiry: => GMedicalInquiry := LENGTH(TRIMALL(KOB)) = 2 AND SUBSTR(KOB,1,1) IN KOB1_MEDICAL;
+CreditReportInquiry: => GAutoFinanceInquiry := (LENGTH(TRIMALL(KOB)) = 2 AND KOB IN KOB_AUTO_FINANCE) OR (LENGTH(TRIMALL(KOB)) = 2 AND KOB IN KOB_AUTO_LEASE) OR (LENGTH(TRIMALL(KOB)) = 2 AND KOB IN IQ_KOB_AUTO_RESELLER);
+CreditReportInquiry: => GFinanceInquiry := (LENGTH(TRIMALL(KOB)) = 2 AND SUBSTR(KOB,1,1) IN KOB1_FINANCE) OR (LENGTH(TRIMALL(KOB)) = 2 AND KOB IN IQ_KOB_FINANCE_RESELLER);
+CreditReportInquiry: => GRetailInquiry := ((LENGTH(TRIMALL(KOB)) = 2 AND SUBSTR(KOB,1,1) IN KOB1_RETAIL) OR (LENGTH(TRIMALL(KOB)) = 2 AND KOB IN KOB2_RETAIL)) AND NOT GAutoFinanceInquiry;
+CreditReportInquiry: => GBankInquiry := (LENGTH(TRIMALL(KOB)) = 2 AND SUBSTR(KOB,1,1) IN KOB1_BANK) OR (LENGTH(TRIMALL(KOB)) = 2 AND KOB IN KOB2_BANK);
+CreditReportInquiry: => GPersonalFinanceInquiry := LENGTH(TRIMALL(KOB)) = 2 AND KOB IN KOB_PERSONAL_FINANCE;
+CreditReportInquiry: => GSalesFinanceInquiry := LENGTH(TRIMALL(KOB)) = 2 AND KOB IN KOB_SALES_FINANCE;
+CreditReportInquiry: => GMortgageInquiry := (LENGTH(TRIMALL(KOB)) = 2 AND KOB IN KOB_MORTGAGE) OR (LENGTH(TRIMALL(KOB)) = 2 AND KOB IN IQ_KOB_MORTGAGE_RESELLER);
+CreditReportInquiry: => GCreditUnionInquiry := LENGTH(TRIMALL(KOB)) = 2 AND KOB IN KOB_CREDIT_UNION;
+CreditReportInquiry: => GStudentLoanInquiry := LENGTH(TRIMALL(KOB)) = 2 AND KOB IN KOB_STUDENT_LOAN;
+CreditReportInquiry: => GUtilityInquiry := LENGTH(TRIMALL(KOB)) = 2 AND SUBSTR(KOB,1,1) IN KOB1_UTILITY;
+CreditReportInquiry: => GGovernmentInquiry := LENGTH(TRIMALL(KOB)) = 2 AND SUBSTR(KOB,1,1) IN KOB1_GOVERNMENT;
+CreditReportInquiry: => GCollectionInquiry := LENGTH(TRIMALL(KOB)) = 2 AND (SUBSTR(KOB,1,1) IN IQ_KOB1_COLLECTION OR KOB IN KOB_COLLECTION);
+CreditReportInquiry: => GInsuranceInquiry := LENGTH(TRIMALL(KOB)) = 2 AND SUBSTR(KOB,1,1) IN KOB1_INSURANCE;
+CreditReportInquiry: => GTenantScreenInquiry := LENGTH(TRIMALL(KOB)) = 2 AND KOB IN IQ_KOB_TENANT_RESELLER;
+CreditReportInquiry: => GOtherFinanceInquiry := GFinanceInquiry AND NOT GAutoFinanceInquiry AND NOT GPersonalFinanceInquiry AND NOT GMortgageInquiry AND NOT GStudentLoanInquiry AND NOT GCreditUnionInquiry;
+CreditReportInquiry: => GMOSInquiryDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateOfInquiry), MONTH(DateOfInquiry), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
 
-                                         																				 
+CreditReportTradeline: => GAuthorizedUser := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_A;
+CreditReportTradeline: => GIndividualAccount := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_I;
+CreditReportTradeline: => GPrimaryAccount := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_PRIMARY;
+CreditReportTradeline: => GJointAccount := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_J;
+CreditReportTradeline: => GSharedAccount := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_SHARED;
+CreditReportTradeline: => GMOSBalloonPaymentDueDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(BalloonPaymentDueDate), MONTH(BalloonPaymentDueDate), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => GMOSDateAccountOpened := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateAccountOpened), MONTH(DateAccountOpened), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => GMOSDateLastActivity := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DateOfLastActivity), MONTH(DateOfLastActivity), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => GMOSDeferredPaymentStartDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(DeferredPaymentStartDate), MONTH(DeferredPaymentStartDate), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => GMOSOldHistoricalWorstRatingDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(OldHistoricalWorstRatingDate), MONTH(OldHistoricalWorstRatingDate), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => G1ECOADeceased := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_DECEASED;
+CreditReportTradeline: => G1ECOAClosed := NOT AccountDesignatorCode:Null AND AccountDesignatorCode IN ECOA_CLOSED;
+CreditReportTradeline: => G1KOBCollection := NOT KOB:Null AND KOB IN KOB_COLLECTION;
+CreditReportTradeline: => G1KOBMedical := NOT KOB:Null AND SUBSTR(KOB,1,1) IN KOB1_MEDICAL;
+CreditReportTradeline: => G1KOBAutoFinance := NOT KOB:Null AND KOB IN KOB_AUTO_FINANCE;
+CreditReportTradeline: => G1KOBAutoLease := NOT KOB:Null AND KOB IN KOB_AUTO_LEASE;
+CreditReportTradeline: => G1KOBFinance := (NOT KOB:Null AND SUBSTR(KOB,1,1) IN KOB1_FINANCE) OR (NOT KOB:Null AND KOB IN KOB2_FINANCE);
+CreditReportTradeline: => G1KOBRetail := (NOT KOB:Null AND SUBSTR(KOB,1,1) IN KOB1_RETAIL) OR (NOT KOB:Null AND KOB IN KOB2_RETAIL);
+CreditReportTradeline: => G1KOBRecreationalItem := NOT KOB:Null AND KOB IN KOB_RECREATIONAL_ITEM;
+CreditReportTradeline: => G1KOBBank := (NOT KOB:Null AND SUBSTR(KOB,1,1) IN KOB1_BANK) OR (NOT KOB:Null AND KOB IN KOB2_BANK);
+CreditReportTradeline: => G1KOBPersonalFinance := NOT KOB:Null AND KOB IN KOB_PERSONAL_FINANCE;
+CreditReportTradeline: => G1KOBNationalCreditCard := (NOT KOB:Null AND SUBSTR(KOB,1,1) IN KOB1_NATIONAL_CREDIT_CARD) OR (NOT KOB:Null AND KOB IN KOB2_NATIONAL_CREDIT_CARD);
+CreditReportTradeline: => G1KOBCreditUnion := NOT KOB:Null AND KOB IN KOB_CREDIT_UNION;
+CreditReportTradeline: => G1KOBSalesFinance := NOT KOB:Null AND KOB IN KOB_SALES_FINANCE;
+CreditReportTradeline: => G1KOBMortgage := NOT KOB:Null AND KOB IN KOB_MORTGAGE;
+CreditReportTradeline: => G1KOBHomeEquity := NOT KOB:Null AND KOB IN KOB_HOME_EQUITY;
+CreditReportTradeline: => G1KOBStudentLoan := NOT KOB:Null AND KOB IN KOB_STUDENT_LOAN;
+CreditReportTradeline: => G1KOBUtility := NOT KOB:Null AND SUBSTR(KOB,1,1) IN KOB1_UTILITY;
+CreditReportTradeline: => G1KOBInstallment := NOT KOB:Null AND KOB IN KOB_INSTALLMENT;
+CreditReportTradeline: => G1KOBGovernment := NOT KOB:Null AND SUBSTR(KOB,1,1) IN KOB1_GOVERNMENT;
+CreditReportTradeline: => G1KOBInsurance := NOT KOB:Null AND SUBSTR(KOB,1,1) IN KOB1_INSURANCE;
+CreditReportTradeline: => G1KOBLOC := NOT KOB:Null AND KOB IN KOB_LOC;
+CreditReportTradeline: => G1KOBCableCellular := NOT KOB:Null AND KOB IN KOB_CABLE_CELLULAR;
+CreditReportTradeline: => G1KOBChildSupport := NOT KOB:Null AND KOB IN KOB_CHILD_SUPPORT;
+CreditReportTradeline: => G1TypeCollection := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_COLLECTION;
+CreditReportTradeline: => G1TypeFamilySupport := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_FAMILY_SUPPORT;
+CreditReportTradeline: => G1TypeCommercialAccount := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_COMMERCIAL;
+CreditReportTradeline: => G1TypeReturnedCheck := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_RETURNED_CHECK;
+CreditReportTradeline: => G1TypeMedical := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_MEDICAL;
+CreditReportTradeline: => G1TypeAuto := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_AUTO;
+CreditReportTradeline: => G1TypeAutoLease := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_AUTO_LEASE;
+CreditReportTradeline: => G1TypeLease := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_LEASE;
+CreditReportTradeline: => G1TypeRental := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_RENTAL;
+CreditReportTradeline: => G1TypeCreditCard := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_CREDIT_CARD;
+CreditReportTradeline: => G1TypeStudentLoan := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_STUDENT_LOAN;
+CreditReportTradeline: => G1TypeMortgage := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_MORTGAGE;
+CreditReportTradeline: => G1Type2ndMortgage := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_2ND_MORTGAGE;
+CreditReportTradeline: => G1TypeHELOC := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_HELOC;
+CreditReportTradeline: => G1TypeHomeEquity := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_HOME_EQUITY;
+CreditReportTradeline: => G1TypeSecured := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_SECURED;
+CreditReportTradeline: => G1TypeRecreationalItem := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_RECREATIONAL_ITEM;
+CreditReportTradeline: => G1TypeInstallment := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_INSTALLMENT;
+CreditReportTradeline: => G1TypePersonalFinance := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_PERSONAL_FINANCE;
+CreditReportTradeline: => G1TypeLOC := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_LOC;
+CreditReportTradeline: => G1TypeSalesFinance := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_SALES_FINANCE;
+CreditReportTradeline: => G1TypeGovernmentLoan := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_GOV_LOAN;
+CreditReportTradeline: => G1TypeGovernmentDebt := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_GOV_DEBT;
+CreditReportTradeline: => G1TypeUtility := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_UTILITY;
+CreditReportTradeline: => G1TypeCellular := NOT AccountPurposeType:Null AND AccountPurposeType IN TYPE_CELLULAR;
+CreditReportTradeline: => G1NCCollection := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_COLLECTION) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_COLLECTION) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_COLLECTION) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_COLLECTION)));
+CreditReportTradeline: => G1NCFamilySupport := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CHILD_FAMILY_SUPPORT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CHILD_FAMILY_SUPPORT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CHILD_FAMILY_SUPPORT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CHILD_FAMILY_SUPPORT)));
+CreditReportTradeline: => G1NCCommercialAccount := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_COMMERCIAL_ACCOUNT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_COMMERCIAL_ACCOUNT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_COMMERCIAL_ACCOUNT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_COMMERCIAL_ACCOUNT)));
+CreditReportTradeline: => G1NCMedical := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_MEDICAL) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_MEDICAL) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_MEDICAL) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_MEDICAL)));
+CreditReportTradeline: => G1NCReturnedCheck := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_RETURNED_CHECK) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_RETURNED_CHECK) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_RETURNED_CHECK) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_RETURNED_CHECK)));
+CreditReportTradeline: => G1NCAuto := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_AUTO) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_AUTO) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_AUTO) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_AUTO)));
+CreditReportTradeline: => G1NCAutoLease := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_AUTO_LEASE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_AUTO_LEASE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_AUTO_LEASE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_AUTO_LEASE)));
+CreditReportTradeline: => G1NCLease := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_LEASE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_LEASE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_LEASE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_LEASE)));
+CreditReportTradeline: => G1NCRental := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_RENTAL) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_RENTAL) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_RENTAL) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_RENTAL)));
+CreditReportTradeline: => G1NCCreditCard := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CREDIT_CARD) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CREDIT_CARD) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CREDIT_CARD) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CREDIT_CARD)));
+CreditReportTradeline: => G1NCPersonalFinance := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_PERSONAL_FINANCE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_PERSONAL_FINANCE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_PERSONAL_FINANCE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_PERSONAL_FINANCE)));
+CreditReportTradeline: => G1NCSalesFinance := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_SALES_FINANCE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_SALES_FINANCE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_SALES_FINANCE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_SALES_FINANCE)));
+CreditReportTradeline: => G1NCStudentLoan := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_STUDENT_LOAN) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_STUDENT_LOAN) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_STUDENT_LOAN) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_STUDENT_LOAN)));
+CreditReportTradeline: => G1NCMortgage := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_MORTGAGE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_MORTGAGE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_MORTGAGE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_MORTGAGE)));
+CreditReportTradeline: => G1NCHomeEquity := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_HOME_EQUITY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_HOME_EQUITY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_HOME_EQUITY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_HOME_EQUITY)));
+CreditReportTradeline: => G1NC2ndMortgage := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_2ND_MORTGAGE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_2ND_MORTGAGE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_2ND_MORTGAGE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_2ND_MORTGAGE)));
+CreditReportTradeline: => G1NCHELOC := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_HELOC) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_HELOC) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_HELOC) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_HELOC)));
+CreditReportTradeline: => G1NCSecured := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_SECURED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_SECURED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_SECURED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_SECURED)));
+CreditReportTradeline: => G1NCLOC := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_LOC) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_LOC) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_LOC) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_LOC)));
+CreditReportTradeline: => G1NCUtility := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_UTILITY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_UTILITY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_UTILITY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_UTILITY)));
+CreditReportTradeline: => G1NCForeclosure := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_FORECLOSURE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_FORECLOSURE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_FORECLOSURE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_FORECLOSURE)));
+CreditReportTradeline: => G1NCGovernmentLoan := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_GOVERNMENT_LOAN) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_GOVERNMENT_LOAN) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_GOVERNMENT_LOAN) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_GOVERNMENT_LOAN)));
+CreditReportTradeline: => G1NCRecreationalItem := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_RECREATIONAL_ITEM) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_RECREATIONAL_ITEM) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_RECREATIONAL_ITEM) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_RECREATIONAL_ITEM)));
+CreditReportTradeline: => G1NCRepo := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_REPO) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_REPO) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_REPO) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_REPO)));
+CreditReportTradeline: => G1NCDispute := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_DISPUTE_STATUS_PENDING) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_DISPUTE_STATUS_PENDING)));
+CreditReportTradeline: => G1NCClosed := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CLOSED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CLOSED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CLOSED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CLOSED)));
+CreditReportTradeline: => G1NCClosedIfZeroBalance := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CLOSED_IF_ZERO_BALANCE) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CLOSED_IF_ZERO_BALANCE) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CLOSED_IF_ZERO_BALANCE) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CLOSED_IF_ZERO_BALANCE)));
+CreditReportTradeline: => G1NCDeceased := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_DECEASED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_DECEASED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_DECEASED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_DECEASED)));
+CreditReportTradeline: => G1NCDeferred := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_DEFERRED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_DEFERRED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_DEFERRED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_DEFERRED)));
+CreditReportTradeline: => G1NCCurrent120180 := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_CURRENT_120_180) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_CURRENT_120_180) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_CURRENT_120_180) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_CURRENT_120_180)));
+CreditReportTradeline: => G1NCBankruptcy := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY)));
+CreditReportTradeline: => G1NCBankruptcy13 := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY_13) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY_13) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY_13) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY_13)));
+CreditReportTradeline: => G1NCBankruptcyDischarged := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY_DISCHARGED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY_DISCHARGED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY_DISCHARGED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY_DISCHARGED)));
+CreditReportTradeline: => G1NCBankruptcyDismissed := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY_DISMISSED) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY_DISMISSED) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY_DISMISSED) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY_DISMISSED)));
+CreditReportTradeline: => G1NCBankruptcyWithdrawn := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_BANKRUPTCY_WITHDRAWN) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_BANKRUPTCY_WITHDRAWN) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_BANKRUPTCY_WITHDRAWN) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_BANKRUPTCY_WITHDRAWN)));
+CreditReportTradeline: => G1NCGovernmentDebt := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_GOVERNMENT_DEBT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_GOVERNMENT_DEBT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_GOVERNMENT_DEBT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_GOVERNMENT_DEBT)));
+CreditReportTradeline: => G1NCHighcreditIsChargeoffAmt := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CHARGEOFF_AMNT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CHARGEOFF_AMNT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CHARGEOFF_AMNT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CHARGEOFF_AMNT)));
+CreditReportTradeline: => G1NCHighcreditIsCreditLimit := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CREDIT_LIMIT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CREDIT_LIMIT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CREDIT_LIMIT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_HIGHCREDIT_IS_CREDIT_LIMIT)));
+CreditReportTradeline: => G1NCInstallment := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_INSTALLMENT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_INSTALLMENT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_INSTALLMENT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_INSTALLMENT)));
+CreditReportTradeline: => G1NCMilitary := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_MILITARY) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_MILITARY) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_MILITARY) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_MILITARY)));
+CreditReportTradeline: => G1NCDerog := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_DEROG) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_DEROG) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_DEROG) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_DEROG)));
+CreditReportTradeline: => G1NCLostStolen := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_LOST_STOLEN) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_LOST_STOLEN) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_LOST_STOLEN) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_LOST_STOLEN)));
+CreditReportTradeline: => G1NCPaidPayingBadDebt := EXISTS(CreditReportNarrativeRemarks((NOT RemarksCode1:Null AND RemarksCode1 IN CreditReportTradeline.NC_PAID_PAYING_BAD_DEBT) OR (NOT RemarksCode2:Null AND RemarksCode2 IN CreditReportTradeline.NC_PAID_PAYING_BAD_DEBT) OR (NOT RemarksCode3:Null AND RemarksCode3 IN CreditReportTradeline.NC_PAID_PAYING_BAD_DEBT) OR (NOT RemarksCode4:Null AND RemarksCode4 IN CreditReportTradeline.NC_PAID_PAYING_BAD_DEBT)));
+CreditReportTradeline: => G1AccountTypeC := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_C;
+CreditReportTradeline: => G1AccountTypeR := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_R;
+CreditReportTradeline: => G1AccountTypeI := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_I;
+CreditReportTradeline: => G1AccountTypeM := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_M;
+CreditReportTradeline: => G1AccountTypeO := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_O;
+CreditReportTradeline: => G1AccountTypeValid := NOT AccountType:Null AND AccountType IN PORTFOLIO_TYPE_VALID;
+CreditReportTradeline: => G1ActivityDesignatorLostStolen := NOT ActivityDesignatorCode:Null AND ActivityDesignatorCode IN ACTIVITY_DESIGNATOR_LOST_STOLEN;
+CreditReportTradeline: => G1ActivityDesignatorClosed := NOT ActivityDesignatorCode:Null AND ActivityDesignatorCode IN ACTIVITY_DESIGNATOR_CLOSED;
+CreditReportTradeline: => G1ActivityDesignatorDerog := NOT ActivityDesignatorCode:Null AND ActivityDesignatorCode IN ACTIVITY_DESIGNATOR_DEROG;
+CreditReportTradeline: => G1RateDeceased := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_DECEASED;
+CreditReportTradeline: => G1RateLostStolen := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_LOST_STOLEN;
+CreditReportTradeline: => G1RateSatisfactory := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_SATISFACTORY;
+CreditReportTradeline: => G1Rate30DPD := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_30DPD;
+CreditReportTradeline: => G1Rate60DPD := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_60DPD;
+CreditReportTradeline: => G1Rate90DPD := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_90DPD;
+CreditReportTradeline: => G1Rate120180DPD := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_120_180DPD;
+CreditReportTradeline: => G1RateCollection := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_COLLECTION;
+CreditReportTradeline: => G1RateDispute := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_DISPUTED;
+CreditReportTradeline: => G1RateClosed := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_CLOSED;
+CreditReportTradeline: => G1RateDerog := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_DEROG;
+CreditReportTradeline: => G1RateBankruptcy13 := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_BANKRUPTCY_13;
+CreditReportTradeline: => G1RatePaidPayingDebt := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_PAID_PAYING_BAD_DEBT;
+CreditReportTradeline: => G1RateBankruptcy := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_BANKRUPTCY;
+CreditReportTradeline: => G1RateUR := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_UR;
+CreditReportTradeline: => G1RateForeclosure := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_FORECLOSURE;
+CreditReportTradeline: => G1RateRepo := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_REPO;
+CreditReportTradeline: => G1RateDefaultedStudentLoan := NOT CurrentRateCode:Null AND CurrentRateCode IN RATE_DEFAULTED_STUDENT_LOAN;
+CreditReportTradeline: => G1OldRate30DPD := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_30DPD;
+CreditReportTradeline: => G1OldRate60DPD := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_60DPD;
+CreditReportTradeline: => G1OldRate90DPD := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_90DPD;
+CreditReportTradeline: => G1OldRate120180DPD := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_120_180DPD;
+CreditReportTradeline: => G1OldRateCollection := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_COLLECTION;
+CreditReportTradeline: => G1OldRateDerog := NOT OldHistoricalWorstRatingCode:Null AND OldHistoricalWorstRatingCode IN RATE_DEROG;
+CreditReportTradeline: => G1GridSatisfactoryEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_SATISFACTORY_STRING);
+CreditReportTradeline: => G1Grid30DPDEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_30DPD_STRING);
+CreditReportTradeline: => G1Grid60DPDEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_60DPD_STRING);
+CreditReportTradeline: => G1Grid90DPDEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_90DPD_STRING);
+CreditReportTradeline: => G1Grid120180DPDEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_120_180DPD_STRING);
+CreditReportTradeline: => G1GridDerogEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN GRID_DEROG_STRING);
+CreditReportTradeline: => G1GridCollectionEver := EXISTS(PaymentHistory84MonthsSM) AND EXISTS(PaymentHistory84MonthsSM.PaymentCode IN ['Y']);
+CreditReportTradeline: => G1FrequencyDeferred := NOT PaymentFrequency:Null AND PaymentFrequency IN FREQUENCY_DEFERRED;
+CreditReportTradeline: => G1FrequencySinglePaymentLoan := NOT PaymentFrequency:Null AND PaymentFrequency IN FREQUENCY_SINGLE_PAYMENT_LOAN;
+CreditReportTradeline: => G1StatusCollection := (NOT StatusCode:Null AND StatusCode IN STATUS_COLLECTION) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_COLLECTION);
+CreditReportTradeline: => G1StatusDeceased := (NOT StatusCode:Null AND StatusCode IN STATUS_DECEASED) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_DECEASED);
+CreditReportTradeline: => G1StatusLostStolen := (NOT StatusCode:Null AND StatusCode IN STATUS_LOST_STOLEN) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_LOST_STOLEN);
+CreditReportTradeline: => G1StatusCurrentSat := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_SAT) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_SAT);
+CreditReportTradeline: => G1StatusCurrent30DPD := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_30DPD) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_30DPD);
+CreditReportTradeline: => G1StatusCurrent60DPD := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_60DPD) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_60DPD);
+CreditReportTradeline: => G1StatusCurrent90DPD := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_90DPD) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_90DPD);
+CreditReportTradeline: => G1StatusCurrent120180DPD := (NOT StatusCode:Null AND StatusCode IN STATUS_CURRENT_120_180DPD) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CURRENT_120_180DPD);
+CreditReportTradeline: => G1StatusClosed := (NOT StatusCode:Null AND StatusCode IN STATUS_CLOSED) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_CLOSED);
+CreditReportTradeline: => G1StatusDerogatory := (NOT StatusCode:Null AND StatusCode IN STATUS_DEROGATORY) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_DEROGATORY);
+CreditReportTradeline: => G1StatusBankruptcy := (NOT StatusCode:Null AND StatusCode IN STATUS_BANKRUPTCY) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_BANKRUPTCY);
+CreditReportTradeline: => G1StatusBankruptcy13 := (NOT StatusCode:Null AND StatusCode IN STATUS_BANKRUPTCY_13) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_BANKRUPTCY_13);
+CreditReportTradeline: => G1StatusForeclosure := (NOT StatusCode:Null AND StatusCode IN STATUS_FORECLOSURE) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_FORECLOSURE);
+CreditReportTradeline: => G1StatusRepo := (NOT StatusCode:Null AND StatusCode IN STATUS_REPO) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_REPO);
+CreditReportTradeline: => G1StatusPaidPayingBadDebt := (NOT StatusCode:Null AND StatusCode IN STATUS_PAID_PAYING_BAD_DEBT) OR (NOT AccountConditionCode:Null AND AccountConditionCode IN STATUS_PAID_PAYING_BAD_DEBT);
+CreditReportTradeline: => G1CIIBankruptcy := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY;
+CreditReportTradeline: => G1CIIBankruptcy13 := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_13;
+CreditReportTradeline: => G1CIIBankruptcyDischarged := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_DISCHARGED;
+CreditReportTradeline: => G1CIIBankruptcyDismissed := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_DISMISSED;
+CreditReportTradeline: => G1CIIBankruptcyWithdrawn := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_BANKRUPTCY_WITHDRAWN;
+CreditReportTradeline: => G1CIIPaidPayingBadDebt := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_PAID_PAYING_BAD_DEBT;
+CreditReportTradeline: => G1CIIDerog := NOT ConsumerInfoIndicator:Null AND ConsumerInfoIndicator IN CII_DEROG;
+
+CreditReportTradeline: => GMOSPaymentPatternStartDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(PaymentPatternStartDate), MONTH(PaymentPatternStartDate), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => G1GridL3_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 3 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING);
+CreditReportTradeline: => G1GridL3_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 3 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING);
+CreditReportTradeline: => G1GridL3_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 3 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING);
+CreditReportTradeline: => G1GridL3_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 3 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING);
+CreditReportTradeline: => G1GridL3_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 3 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING);
+CreditReportTradeline: => G1GridL3_Collection := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 3 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (3 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN ['Y']);
+CreditReportTradeline: => G1GridL6_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 6 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING);
+CreditReportTradeline: => G1GridL6_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 6 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING);
+CreditReportTradeline: => G1GridL6_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 6 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING);
+CreditReportTradeline: => G1GridL6_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 6 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING);
+CreditReportTradeline: => G1GridL6_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 6 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING);
+CreditReportTradeline: => G1GridL6_Collection := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 6 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (6 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN ['Y']);
+CreditReportTradeline: => G1GridL12_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 12 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING);
+CreditReportTradeline: => G1GridL12_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 12 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING);
+CreditReportTradeline: => G1GridL12_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 12 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING);
+CreditReportTradeline: => G1GridL12_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 12 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING);
+CreditReportTradeline: => G1GridL12_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 12 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING);
+CreditReportTradeline: => G1GridL12_Collection := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 12 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (12 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN ['Y']);
+CreditReportTradeline: => G1GridL24_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 24 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING);
+CreditReportTradeline: => G1GridL24_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 24 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING);
+CreditReportTradeline: => G1GridL24_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 24 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING);
+CreditReportTradeline: => G1GridL24_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 24 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING);
+CreditReportTradeline: => G1GridL24_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 24 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING);
+CreditReportTradeline: => G1GridL24_Collection := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 24 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (24 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN ['Y']);
+CreditReportTradeline: => G1GridL36_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 36 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING);
+CreditReportTradeline: => G1GridL36_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 36 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING);
+CreditReportTradeline: => G1GridL36_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 36 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING);
+CreditReportTradeline: => G1GridL36_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 36 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING);
+CreditReportTradeline: => G1GridL36_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 36 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING);
+CreditReportTradeline: => G1GridL36_Collection := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 36 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (36 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN ['Y']);
+CreditReportTradeline: => G1GridL48_Satisfactory := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 48 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_SATISFACTORY_STRING);
+CreditReportTradeline: => G1GridL48_30DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 48 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_30DPD_STRING);
+CreditReportTradeline: => G1GridL48_60DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 48 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_60DPD_STRING);
+CreditReportTradeline: => G1GridL48_90DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 48 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_90DPD_STRING);
+CreditReportTradeline: => G1GridL48_120180DPD := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 48 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN GRID_120_180DPD_STRING);
+CreditReportTradeline: => G1GridL48_Collection := EXISTS(PaymentHistory84MonthsSM) AND (GMOSPaymentPatternStartDate <= 48 AND GMOSPaymentPatternStartDate > 0) AND EXISTS(PaymentHistory84MonthsSM(PaymentMonth >= 1 AND PaymentMonth <= (48 - (GMOSPaymentPatternStartDate - 1))).PaymentCode IN ['Y']);
+
+// Level 2 Globals
+CreditReportTradeline: => G2Deceased := G1ECOADeceased OR G1NCDeceased OR G1RateDeceased OR G1StatusDeceased;
+CreditReportTradeline: => G2FamilySupport := G1TypeFamilySupport OR G1NCFamilySupport;
+CreditReportTradeline: => G2CommercialAccount := G1TypeCommercialAccount OR G1NCCommercialAccount;
+CreditReportTradeline: => G2ReturnedCheck := G1TypeReturnedCheck OR  G1NCReturnedCheck;
+CreditReportTradeline: => G2Dispute := G1NCDispute OR G1RateDispute OR (ConsumerDisputeFlag='Y');
+CreditReportTradeline: => G2LostStolen := G1NCLostStolen OR G1ActivityDesignatorLostStolen OR G1RateLostStolen OR G1StatusLostStolen;
+CreditReportTradeline: => G2Medical := G1KOBMedical OR G1TypeMedical OR G1NCMedical;
+CreditReportTradeline: => G2Deferred := G1NCDeferred OR G1FrequencyDeferred;
+CreditReportTradeline: => G2GovernmentTrade := G1KOBGovernment OR G1TypeGovernmentLoan OR G1NCGovernmentLoan OR G1TypeGovernmentDebt;
+CreditReportTradeline: => G2GovernmentLoan := G1TypeGovernmentLoan OR G1NCGovernmentLoan;
+CreditReportTradeline: => G2GovernmentDebt := G2GovernmentTrade AND NOT G2GovernmentLoan;
+CreditReportTradeline: => G2RentalOrLease := G1TypeRental OR G1NCRental OR G1TypeLease OR G1NCLease;
+CreditReportTradeline: => G2UtilityTrade := G1KOBUtility OR G1TypeUtility OR G1NCUtility;
+CreditReportTradeline: => G3AllExcluded3 := G2LostStolen OR G2CommercialAccount OR G2Medical;
+CreditReportTradeline: => G3AllExcluded := G2LostStolen OR G2CommercialAccount OR G2Medical OR G2FamilySupport OR GAuthorizedUser OR G2ReturnedCheck;
+CreditReportTradeline: => G2SpecialExclusion := G2ReturnedCheck OR G2FamilySupport;
+CreditReportTradeline: => G2OpenEndedAccount := G1AccountTypeO;
+CreditReportTradeline: => G2AllInstallment := G1KOBInstallment OR G1TypeInstallment OR G1AccountTypeI;
+CreditReportTradeline: => G2AllRevolving := G1AccountTypeR OR (G1AccountTypeC OR G1KOBLOC OR G1TypeHELOC OR G1TypeLOC OR G1NCHELOC OR G1NCLOC);
+CreditReportTradeline: => G2CreditUnion := G1KOBCreditUnion;
+CreditReportTradeline: => G2RetailCreditCard := G1KOBRetail AND (G1TypeCreditCard OR G1NCCreditCard OR G1AccountTypeR) AND NOT (G1AccountTypeC OR G1AccountTypeI OR G1AccountTypeM);
+CreditReportTradeline: => G2RetailNonCreditCard := G1KOBRetail AND NOT G2RetailCreditCard AND NOT G1AccountTypeM;
+CreditReportTradeline: => G2BankCard := (G1KOBNationalCreditCard OR ((G1KOBBank OR G1KOBFinance) AND (G1TypeCreditCard OR G1NCCreditCard OR G1AccountTypeR))) AND NOT(G1AccountTypeI OR G1AccountTypeM OR G1AccountTypeC);
+CreditReportTradeline: => G2MortgageOrHomeEquity := (G1KOBMortgage OR G1KOBHomeEquity OR ((G1KOBFinance OR G1KOBBank) AND (G1AccountTypeM OR G1TypeMortgage OR G1Type2ndMortgage OR G1TypeHELOC OR G1NCMortgage OR G1NCHomeEquity OR G1NCHELOC OR G1NCForeclosure OR G1RateForeclosure OR G1StatusForeclosure))) AND NOT G1AccountTypeO AND NOT G2RentalOrLease;
+
+CreditReportTradeline: => G4HomeEquity := G2MortgageOrHomeEquity AND (G1KOBHomeEquity OR G1AccountTypeC OR G1AccountTypeR OR G1TypeHELOC OR G1NCHELOC OR G1NCHomeEquity OR G1TypeHomeEquity OR G1TypeLOC OR G1NCLOC);
+CreditReportTradeline: => G5Mortgage := G2MortgageOrHomeEquity AND NOT G4HomeEquity;
+CreditReportTradeline: => G5HomeEquityLineOfCredit := G4HomeEquity AND (G1AccountTypeC OR G1AccountTypeR OR G1TypeHELOC OR G1NCHELOC OR (G1TypeSecured AND G1TypeLOC) OR (G1NCSecured AND G1NCLOC));
+CreditReportTradeline: => G6HomeEquityLoan := G4HomeEquity AND NOT G5HomeEquityLineOfCredit;
+CreditReportTradeline: => G2AutoLease := (G1TypeAutoLease OR G1NCAutoLease OR ((G1TypeAuto OR G1NCAuto) AND (G1TypeLease OR G1NCLease) AND (G1KOBFinance OR G1KOBBank))) AND NOT (G1AccountTypeR OR G1AccountTypeC OR G1AccountTypeM);
+CreditReportTradeline: => G4Auto := (G1KOBAutoFinance OR G1KOBAutoLease OR ((G1KOBFinance OR G1KOBBank) AND (G1TypeAuto OR G1NCAuto OR G1TypeAutoLease OR G1NCAutoLease OR G1NCRepo OR G1RateRepo OR G1StatusRepo))) AND (NOT G1AccountTypeR AND NOT G1AccountTypeC AND NOT G1AccountTypeM) AND (NOT G2MortgageOrHomeEquity);
+CreditReportTradeline: => G5AutoLoan := G4Auto AND NOT G2AutoLease;
+CreditReportTradeline: => G5AutoBank := G4Auto AND G1KOBBank AND NOT (G1TypeAutoLease OR G1NCAutoLease OR G1TypeLease OR G1NCLease);
+CreditReportTradeline: => G6AutoFinance := G4Auto AND NOT G5AutoBank;
+CreditReportTradeline: => G4OtherLineOfCredit := G1AccountTypeC AND NOT G2MortgageOrHomeEquity;
+CreditReportTradeline: => G4OtherIntallment := G2AllInstallment AND NOT G2MortgageOrHomeEquity;
+CreditReportTradeline: => G5StudentLoan := (G1KOBStudentLoan OR G1TypeStudentLoan OR G1NCStudentLoan OR G1RateDefaultedStudentLoan) AND NOT (G2AllRevolving OR G2MortgageOrHomeEquity OR G4Auto);
+CreditReportTradeline: => G3RecreationalItem := (G1KOBRecreationalItem OR G1TypeRecreationalItem OR G1NCRecreationalItem) AND NOT G2AllRevolving;
+CreditReportTradeline: => G6ConsumerFinance := (G1KOBSalesFinance OR G1TypeSalesFinance OR G1NCSalesFinance OR G2RetailNonCreditCard OR G2UtilityTrade) AND NOT (G2MortgageOrHomeEquity OR G4Auto OR G5StudentLoan OR G2AllRevolving OR G2BankCard);
+CreditReportTradeline: => G7PersonalFinance := (G1KOBPersonalFinance OR G1NCPersonalFinance OR G1TypePersonalFinance) AND (G1AccountTypeI OR G1AccountTypeO OR (NOT G1AccountTypeValid)) AND NOT (G2MortgageOrHomeEquity OR G4Auto OR G5StudentLoan OR G6ConsumerFinance) AND NOT (G1TypeSecured OR G1NCSecured);
+CreditReportTradeline: => G6InstallmentEXCLMortgageAutoSTL := (G1KOBFinance OR G1KOBBank) AND (G1KOBInstallment OR G1TypeInstallment OR G1AccountTypeI) AND NOT (G2MortgageOrHomeEquity OR G4Auto OR G5StudentLoan OR G2AllRevolving);
+CreditReportTradeline: => G7BankInstallment := G1KOBBank AND G6InstallmentEXCLMortgageAutoSTL;
+CreditReportTradeline: => G7FinanceInstallment := G1KOBFinance AND G6InstallmentEXCLMortgageAutoSTL;
+CreditReportTradeline: => G7CreditUnionInstallment := G1KOBCreditUnion AND G6InstallmentEXCLMortgageAutoSTL;
+
+CreditReportTradeline: => G2Current120180 := G1Rate120180DPD OR G1StatusCurrent120180DPD;
+CreditReportTradeline: => G2Current90 := G1Rate90DPD OR G1StatusCurrent90DPD;
+CreditReportTradeline: => G2Current60 := G1Rate60DPD OR G1StatusCurrent60DPD;
+CreditReportTradeline: => G2Current30 := G1Rate30DPD OR G1StatusCurrent30DPD;
+CreditReportTradeline: => G2CurrentSatisfactory := G1RateSatisfactory OR G1StatusCurrentSat;
+CreditReportTradeline: => G2PaidPayingBadDebt := G1RatePaidPayingDebt OR G1StatusPaidPayingBadDebt OR G1NCPaidPayingBadDebt OR G1CIIPaidPayingBadDebt;
+CreditReportTradeline: => G2Foreclosure := G1RateForeclosure OR G1StatusForeclosure OR G1NCForeclosure;
+CreditReportTradeline: => G2Repo := G1RateRepo OR G1StatusRepo OR G1NCRepo;
+CreditReportTradeline: => G2Bankruptcy := G1RateBankruptcy OR G1NCBankruptcy OR G1StatusBankruptcy OR G1CIIBankruptcy;
+CreditReportTradeline: => G2Bankruptcy13 := G1RateBankruptcy13 OR G1NCBankruptcy13 OR G1StatusBankruptcy13 OR G1CIIBankruptcy13;
+CreditReportTradeline: => G2BankruptcyDischarged := G1NCBankruptcyDischarged OR G1CIIBankruptcyDischarged;
+CreditReportTradeline: => G2BankruptcyDismissed := G1NCBankruptcyDismissed  OR G1CIIBankruptcyDismissed;
+CreditReportTradeline: => G2BankruptcyWithdrawn := G1NCBankruptcyWithdrawn  OR G1CIIBankruptcyWithdrawn;
+CreditReportTradeline: => G2Derogatory := G1NCDerog OR G1ActivityDesignatorDerog OR G1RateDerog OR G1StatusDerogatory OR G1CIIDerog OR G1NCHighcreditIsChargeoffAmt;
+
+CreditReportTradeline: => GMOSStatusDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(StatusDate), MONTH(StatusDate), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => GMOSLastPaymentDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(LastPaymentDate), MONTH(LastPaymentDate), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => G3MOSDerogatory := IF(G2Derogatory, IF(GMOSStatusDate >= 0, GMOSStatusDate, IF(GMOSLastPaymentDate >= 0, GMOSLastPaymentDate + 6, -9999)),-9999);
+CreditReportTradeline: => G3Collection := G1KOBCollection OR G1StatusCollection OR G1TypeCollection OR G1NCCollection OR G1RateCollection OR G2ReturnedCheck OR G2FamilySupport;
+CreditReportTradeline: => G3EverDerog := G2Derogatory OR G1OldRateDerog OR G1GridDerogEver;
+CreditReportTradeline: => G3EverCollection := G3Collection OR G1OldRateCollection OR G1GridCollectionEver;
+CreditReportTradeline: => G3Ever90P := G2Current120180 OR G1OldRate120180DPD OR G1Grid120180DPDEver OR G2Current90 OR G1OldRate90DPD OR G1Grid90DPDEver OR (NinetyDayCounter > 0);
+CreditReportTradeline: => G3Ever60 := G2Current60 OR G1OldRate60DPD OR G1Grid60DPDEver OR (SixtyDayCounter > 0);
+CreditReportTradeline: => G3Ever30 := G2Current30 OR G1OldRate30DPD OR G1Grid30DPDEver OR (ThirtyDayCounter > 0);
+
+CreditReportTradeline: => GMOSDateReported := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(TRDateReported), MONTH(TRDateReported), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => G3_SatisfactoryIn3M := (G2CurrentSatisfactory AND GMOSDateReported >= 0 AND GMOSDateReported <= 3) OR G1GridL3_Satisfactory;
+CreditReportTradeline: => G3_30DPDIn3M := (G2Current30 AND GMOSDateReported >= 0 AND GMOSDateReported <= 3) OR G1GridL3_30DPD;
+CreditReportTradeline: => G3_60DPDIn3M := (G2Current60 AND GMOSDateReported >= 0 AND GMOSDateReported <= 3) OR G1GridL3_60DPD;
+CreditReportTradeline: => G3_90DPDIn3M := (G2Current90 AND GMOSDateReported >= 0 AND GMOSDateReported <= 3) OR G1GridL3_90DPD;
+CreditReportTradeline: => G3_120180DPDIn3M := (G2Current120180 AND GMOSDateReported >= 0 AND GMOSDateReported <= 3) OR G1GridL3_120180DPD;
+CreditReportTradeline: => G4_CollectionIn3M := (G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 3) OR G1GridL3_Collection;
+CreditReportTradeline: => G3_SatisfactoryIn6M := (G2CurrentSatisfactory AND GMOSDateReported >= 0 AND GMOSDateReported <= 6) OR G1GridL6_Satisfactory;
+CreditReportTradeline: => G3_30DPDIn6M := (G2Current30 AND GMOSDateReported >= 0 AND GMOSDateReported <= 6) OR G1GridL6_30DPD;
+CreditReportTradeline: => G3_60DPDIn6M := (G2Current60 AND GMOSDateReported >= 0 AND GMOSDateReported <= 6) OR G1GridL6_60DPD;
+CreditReportTradeline: => G3_90DPDIn6M := (G2Current90 AND GMOSDateReported >= 0 AND GMOSDateReported <= 6) OR G1GridL6_90DPD;
+CreditReportTradeline: => G3_120180DPDIn6M := (G2Current120180 AND GMOSDateReported >= 0 AND GMOSDateReported <= 6) OR G1GridL6_120180DPD;
+CreditReportTradeline: => G4_CollectionIn6M := (G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 6) OR G1GridL6_Collection;
+CreditReportTradeline: => G3_Satisfactoryin12M := (G2CurrentSatisfactory AND GMOSDateReported >= 0 AND GMOSDateReported <= 12) OR G1GridL12_Satisfactory;
+CreditReportTradeline: => G3_30DPDIn12M := (G2Current30 AND GMOSDateReported >= 0 AND GMOSDateReported <= 12) OR G1GridL12_30DPD;
+CreditReportTradeline: => G3_60DPDIn12M := (G2Current60 AND GMOSDateReported >= 0 AND GMOSDateReported <= 12) OR G1GridL12_60DPD;
+CreditReportTradeline: => G3_90DPDIn12M := (G2Current90 AND GMOSDateReported >= 0 AND GMOSDateReported <= 12) OR G1GridL12_90DPD;
+CreditReportTradeline: => G3_120180DPDIn12M := (G2Current120180 AND GMOSDateReported >= 0 AND GMOSDateReported <= 12) OR G1GridL12_120180DPD;
+CreditReportTradeline: => G4_CollectionIn12M := (G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 12) OR G1GridL12_Collection;
+CreditReportTradeline: => G3_SatisfactoryIn24M := (G2CurrentSatisfactory AND GMOSDateReported >= 0 AND GMOSDateReported <= 24) OR G1GridL24_Satisfactory;
+CreditReportTradeline: => G3_30DPDIn24M := (G2Current30 AND GMOSDateReported >= 0 AND GMOSDateReported <= 24) OR G1GridL24_30DPD;
+CreditReportTradeline: => G3_60DPDIn24M := (G2Current60 AND GMOSDateReported >= 0 AND GMOSDateReported <= 24) OR G1GridL24_60DPD;
+CreditReportTradeline: => G3_90DPDIn24M := (G2Current90 AND GMOSDateReported >= 0 AND GMOSDateReported <= 24) OR G1GridL24_90DPD;
+CreditReportTradeline: => G3_120180DPDIn24M := (G2Current120180 AND GMOSDateReported >= 0 AND GMOSDateReported <= 24) OR G1GridL24_120180DPD;
+CreditReportTradeline: => G4_CollectionIn24M := (G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 24) OR G1GridL24_Collection;
+CreditReportTradeline: => G3_SatisfactoryIn36M := (G2CurrentSatisfactory AND GMOSDateReported >= 0 AND GMOSDateReported <= 36) OR G1GridL36_Satisfactory;
+CreditReportTradeline: => G3_30DPDIn36M := (G2Current30 AND GMOSDateReported >= 0 AND GMOSDateReported <= 36) OR G1GridL36_30DPD;
+CreditReportTradeline: => G3_60DPDIn36M := (G2Current60 AND GMOSDateReported >= 0 AND GMOSDateReported <= 36) OR G1GridL36_60DPD;
+CreditReportTradeline: => G3_90DPDIn36M := (G2Current90 AND GMOSDateReported >= 0 AND GMOSDateReported <= 36) OR G1GridL36_90DPD;
+CreditReportTradeline: => G3_120180DPDIn36M := (G2Current120180 AND GMOSDateReported >= 0 AND GMOSDateReported <= 36) OR G1GridL36_120180DPD;
+CreditReportTradeline: => G4_CollectionIn36M := (G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 36) OR G1GridL36_Collection;
+CreditReportTradeline: => G3_SatisfactoryIn48M := (G2CurrentSatisfactory AND GMOSDateReported >= 0 AND GMOSDateReported <= 48) OR G1GridL48_Satisfactory;
+CreditReportTradeline: => G3_30DPDIn48M := (G2Current30 AND GMOSDateReported >= 0 AND GMOSDateReported <= 48) OR G1GridL48_30DPD;
+CreditReportTradeline: => G3_60DPDIn48M := (G2Current60 AND GMOSDateReported >= 0 AND GMOSDateReported <= 48) OR G1GridL48_60DPD;
+CreditReportTradeline: => G3_90DPDIn48M := (G2Current90 AND GMOSDateReported >= 0 AND GMOSDateReported <= 48) OR G1GridL48_90DPD;
+CreditReportTradeline: => G3_120180DPDIn48M := (G2Current120180 AND GMOSDateReported >= 0 AND GMOSDateReported <= 48) OR G1GridL48_120180DPD;
+CreditReportTradeline: => G4_CollectionIn48M := (G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 48) OR G1GridL48_Collection;
+CreditReportTradeline: => WorstRating3M := IF(G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 3, 6, IF(G2Derogatory AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 3, 7, IF(G3_120180DPDIn3M, 5, IF(G3_90DPDIn3M, 4, IF(G3_60DPDIn3M, 3, IF(G3_30DPDIn3M, 2, IF(G3_SatisfactoryIn3M, 1, 0)))))));
+CreditReportTradeline: => G4WorstRating6M := IF(G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 6, 6, IF(G2Derogatory AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 6, 7, IF(G3_120180DPDIn6M, 5, IF(G3_90DPDIn6M, 4, IF(G3_60DPDIn6M, 3, IF(G3_30DPDIn6M, 2, IF(G3_SatisfactoryIn6M, 1, 0)))))));
+CreditReportTradeline: => G4WorstRating12M := IF(G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 12, 6, IF(G2Derogatory AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 12, 7, IF(G3_120180DPDIn12M, 5, IF(G3_90DPDIn12M, 4, IF(G3_60DPDIn12M, 3, IF(G3_30DPDIn12M, 2, IF(G3_Satisfactoryin12M, 1, 0)))))));
+CreditReportTradeline: => G4WorstRating24M := IF(G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 24, 6, IF(G2Derogatory AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 24, 7, IF(G3_120180DPDIn24M, 5, IF(G3_90DPDIn24M, 4, IF(G3_60DPDIn24M, 3, IF(G3_30DPDIn24M, 2, IF(G3_SatisfactoryIn24M, 1, 0)))))));
+CreditReportTradeline: => G4WorstRating36M := IF(G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 36, 6, IF(G2Derogatory AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 36, 7, IF(G3_120180DPDIn36M, 5, IF(G3_90DPDIn36M, 4, IF(G3_60DPDIn36M, 3, IF(G3_30DPDIn36M, 2, IF(G3_SatisfactoryIn36M, 1, 0)))))));
+CreditReportTradeline: => G4WorstRating48M := IF(G3Collection AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 48, 6, IF(G2Derogatory AND G3MOSDerogatory >= 0 AND G3MOSDerogatory <= 48, 7, IF(G3_120180DPDIn48M, 5, IF(G3_90DPDIn48M, 4, IF(G3_60DPDIn48M, 3, IF(G3_30DPDIn48M, 2, IF(G3_SatisfactoryIn48M, 1, 0)))))));
+CreditReportTradeline: => G4RecoveredAccount := G3EverDerog AND NOT G2Derogatory;
+CreditReportTradeline: => G4CurrentImprovedAccount := NOT G3EverDerog AND ((G3Ever90P AND (G2Current60 OR G2Current30 OR G2CurrentSatisfactory)) OR (G3Ever60  AND (G2Current30 OR G2CurrentSatisfactory)) OR (G3Ever30 AND G2CurrentSatisfactory));
+CreditReportTradeline: => G4RevivedAccount := G2CurrentSatisfactory AND (G3EverDerog OR G3Ever90P OR G3Ever60 OR G3Ever30);
+CreditReportTradeline: => GMOSClosedDate := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(ClosedDate), MONTH(ClosedDate), 1), DATEFROMPARTS(YEAR(DateReported), MONTH(DateReported), 1)));
+CreditReportTradeline: => G3Closed := G2Deceased OR G1ECOAClosed OR G1NCClosed OR (G1NCClosedIfZeroBalance AND NOT (AccountBalance > 0)) OR G1ActivityDesignatorClosed OR G1RateClosed OR G1StatusClosed OR (G1AccountTypeI AND NOT (AccountBalance > 0)) OR (G1AccountTypeM AND NOT (AccountBalance > 0)) OR (NOT ClosedDate:Null AND GMOSClosedDate >= 0) OR G2Derogatory;
+
+// Trade Globals
+CreditReportTradeline: =>  GCreditLimitOrHighCredit := IF(CreditLimit > 0, CreditLimit, IF(HighestCreditAmount > 0, HighestCreditAmount, -9999));
+CreditReportTradeline: =>  GChargeOffAmount := IF(ChargeOffAmount > 0, ChargeOffAmount, IF(G1NCHighcreditIsChargeoffAmt, HighestCreditAmount, -9999));
+CreditReportTradeline: =>  GCollectionAmount := IF(G3Collection, IF(GChargeOffAmount > 0, GChargeOffAmount, IF(G1KOBCollection OR G1TypeCollection OR G2ReturnedCheck OR G2FamilySupport, IF(ThirtyDayCounter = 0 AND SixtyDayCounter = 0 AND NinetyDayCounter = 0, HighestCreditAmount, MAX(AccountBalance, AmountPastDue)),AccountBalance)), -9999);
+
+// Month Attributes
+CreditReportTradeline: =>  BalanceAmount0 := ONLY(Trended(MonthCounter = 1), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount1 := ONLY(Trended(MonthCounter = 2), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount2 := ONLY(Trended(MonthCounter = 3), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount3 := ONLY(Trended(MonthCounter = 4), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount4 := ONLY(Trended(MonthCounter = 5), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount5 := ONLY(Trended(MonthCounter = 6), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount6 := ONLY(Trended(MonthCounter = 7), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount7 := ONLY(Trended(MonthCounter = 8), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount8 := ONLY(Trended(MonthCounter = 9), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount9 := ONLY(Trended(MonthCounter = 10), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount10 := ONLY(Trended(MonthCounter = 11), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount11 := ONLY(Trended(MonthCounter = 12), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount12 := ONLY(Trended(MonthCounter = 13), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount13 := ONLY(Trended(MonthCounter = 14), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount14 := ONLY(Trended(MonthCounter = 15), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount15 := ONLY(Trended(MonthCounter = 16), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount16 := ONLY(Trended(MonthCounter = 17), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount17 := ONLY(Trended(MonthCounter = 18), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount18 := ONLY(Trended(MonthCounter = 19), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount19 := ONLY(Trended(MonthCounter = 20), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount20 := ONLY(Trended(MonthCounter = 21), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount21 := ONLY(Trended(MonthCounter = 22), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount22 := ONLY(Trended(MonthCounter = 23), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount23 := ONLY(Trended(MonthCounter = 24), BalanceAmount);
+CreditReportTradeline: =>  BalanceAmount24 := ONLY(Trended(MonthCounter = 25), BalanceAmount);
+
+CreditReportTradeline: =>  ActualPayment0 := ONLY(Trended(MonthCounter = 1), ActualPayment);
+CreditReportTradeline: =>  ActualPayment1 := ONLY(Trended(MonthCounter = 2), ActualPayment);
+CreditReportTradeline: =>  ActualPayment2 := ONLY(Trended(MonthCounter = 3), ActualPayment);
+CreditReportTradeline: =>  ActualPayment3 := ONLY(Trended(MonthCounter = 4), ActualPayment);
+CreditReportTradeline: =>  ActualPayment4 := ONLY(Trended(MonthCounter = 5), ActualPayment);
+CreditReportTradeline: =>  ActualPayment5 := ONLY(Trended(MonthCounter = 6), ActualPayment);
+CreditReportTradeline: =>  ActualPayment6 := ONLY(Trended(MonthCounter = 7), ActualPayment);
+CreditReportTradeline: =>  ActualPayment7 := ONLY(Trended(MonthCounter = 8), ActualPayment);
+CreditReportTradeline: =>  ActualPayment8 := ONLY(Trended(MonthCounter = 9), ActualPayment);
+CreditReportTradeline: =>  ActualPayment9 := ONLY(Trended(MonthCounter = 10), ActualPayment);
+CreditReportTradeline: =>  ActualPayment10 := ONLY(Trended(MonthCounter = 11), ActualPayment);
+CreditReportTradeline: =>  ActualPayment11 := ONLY(Trended(MonthCounter = 12), ActualPayment);
+CreditReportTradeline: =>  ActualPayment12 := ONLY(Trended(MonthCounter = 13), ActualPayment);
+CreditReportTradeline: =>  ActualPayment13 := ONLY(Trended(MonthCounter = 14), ActualPayment);
+CreditReportTradeline: =>  ActualPayment14 := ONLY(Trended(MonthCounter = 15), ActualPayment);
+CreditReportTradeline: =>  ActualPayment15 := ONLY(Trended(MonthCounter = 16), ActualPayment);
+CreditReportTradeline: =>  ActualPayment16 := ONLY(Trended(MonthCounter = 17), ActualPayment);
+CreditReportTradeline: =>  ActualPayment17 := ONLY(Trended(MonthCounter = 18), ActualPayment);
+CreditReportTradeline: =>  ActualPayment18 := ONLY(Trended(MonthCounter = 19), ActualPayment);
+CreditReportTradeline: =>  ActualPayment19 := ONLY(Trended(MonthCounter = 20), ActualPayment);
+CreditReportTradeline: =>  ActualPayment20 := ONLY(Trended(MonthCounter = 21), ActualPayment);
+CreditReportTradeline: =>  ActualPayment21 := ONLY(Trended(MonthCounter = 22), ActualPayment);
+CreditReportTradeline: =>  ActualPayment22 := ONLY(Trended(MonthCounter = 23), ActualPayment);
+CreditReportTradeline: =>  ActualPayment23 := ONLY(Trended(MonthCounter = 24), ActualPayment);
+CreditReportTradeline: =>  ActualPayment24 := ONLY(Trended(MonthCounter = 25), ActualPayment);
+
+CreditReportTradeline: =>  ScheduledPayment0 := ONLY(Trended(MonthCounter = 1), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment1 := ONLY(Trended(MonthCounter = 2), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment2 := ONLY(Trended(MonthCounter = 3), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment3 := ONLY(Trended(MonthCounter = 4), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment4 := ONLY(Trended(MonthCounter = 5), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment5 := ONLY(Trended(MonthCounter = 6), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment6 := ONLY(Trended(MonthCounter = 7), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment7 := ONLY(Trended(MonthCounter = 8), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment8 := ONLY(Trended(MonthCounter = 9), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment9 := ONLY(Trended(MonthCounter = 10), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment10 := ONLY(Trended(MonthCounter = 11), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment11 := ONLY(Trended(MonthCounter = 12), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment12 := ONLY(Trended(MonthCounter = 13), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment13 := ONLY(Trended(MonthCounter = 14), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment14 := ONLY(Trended(MonthCounter = 15), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment15 := ONLY(Trended(MonthCounter = 16), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment16 := ONLY(Trended(MonthCounter = 17), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment17 := ONLY(Trended(MonthCounter = 18), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment18 := ONLY(Trended(MonthCounter = 19), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment19 := ONLY(Trended(MonthCounter = 20), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment20 := ONLY(Trended(MonthCounter = 21), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment21 := ONLY(Trended(MonthCounter = 22), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment22 := ONLY(Trended(MonthCounter = 23), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment23 := ONLY(Trended(MonthCounter = 24), ScheduledPayment);
+CreditReportTradeline: =>  ScheduledPayment24 := ONLY(Trended(MonthCounter = 25), ScheduledPayment);
+
+CreditReportTradeline: =>  TDActualPaymentNullInd0 := ONLY(Trended(MonthCounter = 1), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd1 := ONLY(Trended(MonthCounter = 2), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd2 := ONLY(Trended(MonthCounter = 3), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd3 := ONLY(Trended(MonthCounter = 4), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd4 := ONLY(Trended(MonthCounter = 5), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd5 := ONLY(Trended(MonthCounter = 6), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd6 := ONLY(Trended(MonthCounter = 7), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd7 := ONLY(Trended(MonthCounter = 8), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd8 := ONLY(Trended(MonthCounter = 9), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd9 := ONLY(Trended(MonthCounter = 10), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd10 := ONLY(Trended(MonthCounter = 11), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd11 := ONLY(Trended(MonthCounter = 12), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd12 := ONLY(Trended(MonthCounter = 13), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd13 := ONLY(Trended(MonthCounter = 14), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd14 := ONLY(Trended(MonthCounter = 15), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd15 := ONLY(Trended(MonthCounter = 16), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd16 := ONLY(Trended(MonthCounter = 17), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd17 := ONLY(Trended(MonthCounter = 18), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd18 := ONLY(Trended(MonthCounter = 19), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd19 := ONLY(Trended(MonthCounter = 20), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd20 := ONLY(Trended(MonthCounter = 21), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd21 := ONLY(Trended(MonthCounter = 22), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd22 := ONLY(Trended(MonthCounter = 23), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd23 := ONLY(Trended(MonthCounter = 24), TDActualPaymentNullInd);
+CreditReportTradeline: =>  TDActualPaymentNullInd24 := ONLY(Trended(MonthCounter = 25), TDActualPaymentNullInd);
+
+//Trended Attributes
+CreditReportTradeline.Trended: => GTDMOSLastPaymentM := ABS(MONTHSBETWEEN(DATEFROMPARTS(YEAR(TDLastPaymentDate), MONTH(TDLastPaymentDate), 1), DATEFROMPARTS(YEAR(CreditReportTradeline.DateReported), MONTH(CreditReportTradeline.DateReported), 1)));
+CreditReportTradeline.Trended: => GTAvailableM := NOT ((BalanceAmount <= 0) AND (LoanAmountCreditLimit <= 0) AND (ScheduledPayment <= 0) AND TDLastPaymentDate:Null AND (ActualPayment <= 0) AND (TDActualPaymentNullInd = TRUE));
+CreditReportTradeline.Trended: => GTDUtilizationM := IF(LoanAmountCreditLimit > 0, MIN(ROUND((MAX(BalanceAmount, 0) * 10000)/LoanAmountCreditLimit)/100, 999.99), 0);
+CreditReportTradeline: => GTDNMAvailable24 := Trended(GTAvailableM = TRUE):Count;
+
+CreditReportTradeline: =>  OverPayment0 := MAX(ActualPayment0, 0) - MAX(ScheduledPayment1, 0);
+CreditReportTradeline: =>  OverPayment1 := MAX(ActualPayment1, 0) - MAX(ScheduledPayment2, 0);
+CreditReportTradeline: =>  OverPayment2 := MAX(ActualPayment2, 0) - MAX(ScheduledPayment3, 0);
+CreditReportTradeline: =>  OverPayment3 := MAX(ActualPayment3, 0) - MAX(ScheduledPayment4, 0);
+CreditReportTradeline: =>  OverPayment4 := MAX(ActualPayment4, 0) - MAX(ScheduledPayment5, 0);
+CreditReportTradeline: =>  OverPayment5 := MAX(ActualPayment5, 0) - MAX(ScheduledPayment6, 0);
+CreditReportTradeline: =>  OverPayment6 := MAX(ActualPayment6, 0) - MAX(ScheduledPayment7, 0);
+CreditReportTradeline: =>  OverPayment7 := MAX(ActualPayment7, 0) - MAX(ScheduledPayment8, 0);
+CreditReportTradeline: =>  OverPayment8 := MAX(ActualPayment8, 0) - MAX(ScheduledPayment9, 0);
+CreditReportTradeline: =>  OverPayment9 := MAX(ActualPayment9, 0) - MAX(ScheduledPayment10, 0);
+CreditReportTradeline: =>  OverPayment10 := MAX(ActualPayment10, 0) - MAX(ScheduledPayment11, 0);
+CreditReportTradeline: =>  OverPayment11 := MAX(ActualPayment11, 0) - MAX(ScheduledPayment12, 0);
+CreditReportTradeline: =>  OverPayment12 := MAX(ActualPayment12, 0) - MAX(ScheduledPayment13, 0);
+CreditReportTradeline: =>  OverPayment13 := MAX(ActualPayment13, 0) - MAX(ScheduledPayment14, 0);
+CreditReportTradeline: =>  OverPayment14 := MAX(ActualPayment14, 0) - MAX(ScheduledPayment15, 0);
+CreditReportTradeline: =>  OverPayment15 := MAX(ActualPayment15, 0) - MAX(ScheduledPayment16, 0);
+CreditReportTradeline: =>  OverPayment16 := MAX(ActualPayment16, 0) - MAX(ScheduledPayment17, 0);
+CreditReportTradeline: =>  OverPayment17 := MAX(ActualPayment17, 0) - MAX(ScheduledPayment18, 0);
+CreditReportTradeline: =>  OverPayment18 := MAX(ActualPayment18, 0) - MAX(ScheduledPayment19, 0);
+CreditReportTradeline: =>  OverPayment19 := MAX(ActualPayment19, 0) - MAX(ScheduledPayment20, 0);
+CreditReportTradeline: =>  OverPayment20 := MAX(ActualPayment20, 0) - MAX(ScheduledPayment21, 0);
+CreditReportTradeline: =>  OverPayment21 := MAX(ActualPayment21, 0) - MAX(ScheduledPayment22, 0);
+CreditReportTradeline: =>  OverPayment22 := MAX(ActualPayment22, 0) - MAX(ScheduledPayment23, 0);
+CreditReportTradeline: =>  OverPayment23 := MAX(ActualPayment23, 0) - MAX(ScheduledPayment24, 0);
+
+CreditReportTradeline: =>  OverBalance0 := MAX(ActualPayment0, 0) - MAX(BalanceAmount1, 0);
+CreditReportTradeline: =>  OverBalance1 := MAX(ActualPayment1, 0) - MAX(BalanceAmount2, 0);
+CreditReportTradeline: =>  OverBalance2 := MAX(ActualPayment2, 0) - MAX(BalanceAmount3, 0);
+CreditReportTradeline: =>  OverBalance3 := MAX(ActualPayment3, 0) - MAX(BalanceAmount4, 0);
+CreditReportTradeline: =>  OverBalance4 := MAX(ActualPayment4, 0) - MAX(BalanceAmount5, 0);
+CreditReportTradeline: =>  OverBalance5 := MAX(ActualPayment5, 0) - MAX(BalanceAmount6, 0);
+CreditReportTradeline: =>  OverBalance6 := MAX(ActualPayment6, 0) - MAX(BalanceAmount7, 0);
+CreditReportTradeline: =>  OverBalance7 := MAX(ActualPayment7, 0) - MAX(BalanceAmount8, 0);
+CreditReportTradeline: =>  OverBalance8 := MAX(ActualPayment8, 0) - MAX(BalanceAmount9, 0);
+CreditReportTradeline: =>  OverBalance9 := MAX(ActualPayment9, 0) - MAX(BalanceAmount10, 0);
+CreditReportTradeline: =>  OverBalance10 := MAX(ActualPayment10, 0) - MAX(BalanceAmount11, 0);
+CreditReportTradeline: =>  OverBalance11 := MAX(ActualPayment11, 0) - MAX(BalanceAmount12, 0);
+CreditReportTradeline: =>  OverBalance12 := MAX(ActualPayment12, 0) - MAX(BalanceAmount13, 0);
+CreditReportTradeline: =>  OverBalance13 := MAX(ActualPayment13, 0) - MAX(BalanceAmount14, 0);
+CreditReportTradeline: =>  OverBalance14 := MAX(ActualPayment14, 0) - MAX(BalanceAmount15, 0);
+CreditReportTradeline: =>  OverBalance15 := MAX(ActualPayment15, 0) - MAX(BalanceAmount16, 0);
+CreditReportTradeline: =>  OverBalance16 := MAX(ActualPayment16, 0) - MAX(BalanceAmount17, 0);
+CreditReportTradeline: =>  OverBalance17 := MAX(ActualPayment17, 0) - MAX(BalanceAmount18, 0);
+CreditReportTradeline: =>  OverBalance18 := MAX(ActualPayment18, 0) - MAX(BalanceAmount19, 0);
+CreditReportTradeline: =>  OverBalance19 := MAX(ActualPayment19, 0) - MAX(BalanceAmount20, 0);
+CreditReportTradeline: =>  OverBalance20 := MAX(ActualPayment20, 0) - MAX(BalanceAmount21, 0);
+CreditReportTradeline: =>  OverBalance21 := MAX(ActualPayment21, 0) - MAX(BalanceAmount22, 0);
+CreditReportTradeline: =>  OverBalance22 := MAX(ActualPayment22, 0) - MAX(BalanceAmount23, 0);
+CreditReportTradeline: =>  OverBalance23 := MAX(ActualPayment23, 0) - MAX(BalanceAmount24, 0);
+
+CreditReportTradeline: =>  IncrBalance0 := MAX(BalanceAmount0, 0) - MAX(BalanceAmount1, 0);
+CreditReportTradeline: =>  IncrBalance1 := MAX(BalanceAmount1, 0) - MAX(BalanceAmount2, 0);
+CreditReportTradeline: =>  IncrBalance2 := MAX(BalanceAmount2, 0) - MAX(BalanceAmount3, 0);
+CreditReportTradeline: =>  IncrBalance3 := MAX(BalanceAmount3, 0) - MAX(BalanceAmount4, 0);
+CreditReportTradeline: =>  IncrBalance4 := MAX(BalanceAmount4, 0) - MAX(BalanceAmount5, 0);
+CreditReportTradeline: =>  IncrBalance5 := MAX(BalanceAmount5, 0) - MAX(BalanceAmount6, 0);
+CreditReportTradeline: =>  IncrBalance6 := MAX(BalanceAmount6, 0) - MAX(BalanceAmount7, 0);
+CreditReportTradeline: =>  IncrBalance7 := MAX(BalanceAmount7, 0) - MAX(BalanceAmount8, 0);
+CreditReportTradeline: =>  IncrBalance8 := MAX(BalanceAmount8, 0) - MAX(BalanceAmount9, 0);
+CreditReportTradeline: =>  IncrBalance9 := MAX(BalanceAmount9, 0) - MAX(BalanceAmount10, 0);
+CreditReportTradeline: =>  IncrBalance10 := MAX(BalanceAmount10, 0) - MAX(BalanceAmount11, 0);
+CreditReportTradeline: =>  IncrBalance11 := MAX(BalanceAmount11, 0) - MAX(BalanceAmount12, 0);
+CreditReportTradeline: =>  IncrBalance12 := MAX(BalanceAmount12, 0) - MAX(BalanceAmount13, 0);
+CreditReportTradeline: =>  IncrBalance13 := MAX(BalanceAmount13, 0) - MAX(BalanceAmount14, 0);
+CreditReportTradeline: =>  IncrBalance14 := MAX(BalanceAmount14, 0) - MAX(BalanceAmount15, 0);
+CreditReportTradeline: =>  IncrBalance15 := MAX(BalanceAmount15, 0) - MAX(BalanceAmount16, 0);
+CreditReportTradeline: =>  IncrBalance16 := MAX(BalanceAmount16, 0) - MAX(BalanceAmount17, 0);
+CreditReportTradeline: =>  IncrBalance17 := MAX(BalanceAmount17, 0) - MAX(BalanceAmount18, 0);
+CreditReportTradeline: =>  IncrBalance18 := MAX(BalanceAmount18, 0) - MAX(BalanceAmount19, 0);
+CreditReportTradeline: =>  IncrBalance19 := MAX(BalanceAmount19, 0) - MAX(BalanceAmount20, 0);
+CreditReportTradeline: =>  IncrBalance20 := MAX(BalanceAmount20, 0) - MAX(BalanceAmount21, 0);
+CreditReportTradeline: =>  IncrBalance21 := MAX(BalanceAmount21, 0) - MAX(BalanceAmount22, 0);
+CreditReportTradeline: =>  IncrBalance22 := MAX(BalanceAmount22, 0) - MAX(BalanceAmount23, 0);
+CreditReportTradeline: =>  IncrBalance23 := MAX(BalanceAmount23, 0) - MAX(BalanceAmount24, 0);
+
+CreditReportTradeline: =>  PercentBalanceChange0 := IF(BalanceAmount1 > 0, ROUND(IncrBalance0 * 10000 / BalanceAmount1) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange1 := IF(BalanceAmount2 > 0, ROUND(IncrBalance1 * 10000 / BalanceAmount2) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange2 := IF(BalanceAmount3 > 0, ROUND(IncrBalance2 * 10000 / BalanceAmount3) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange3 := IF(BalanceAmount4 > 0, ROUND(IncrBalance3 * 10000 / BalanceAmount4) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange4 := IF(BalanceAmount5 > 0, ROUND(IncrBalance4 * 10000 / BalanceAmount5) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange5 := IF(BalanceAmount6 > 0, ROUND(IncrBalance5 * 10000 / BalanceAmount6) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange6 := IF(BalanceAmount7 > 0, ROUND(IncrBalance6 * 10000 / BalanceAmount7) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange7 := IF(BalanceAmount8 > 0, ROUND(IncrBalance7 * 10000 / BalanceAmount8) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange8 := IF(BalanceAmount9 > 0, ROUND(IncrBalance8 * 10000 / BalanceAmount9) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange9 := IF(BalanceAmount10 > 0, ROUND(IncrBalance9 * 10000 / BalanceAmount10) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange10 := IF(BalanceAmount11 > 0, ROUND(IncrBalance10 * 10000 / BalanceAmount11) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange11 := IF(BalanceAmount11 > 0, ROUND(IncrBalance11 * 10000 / BalanceAmount12) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange12 := IF(BalanceAmount11 > 0, ROUND(IncrBalance12 * 10000 / BalanceAmount13) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange13 := IF(BalanceAmount11 > 0, ROUND(IncrBalance13 * 10000 / BalanceAmount14) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange14 := IF(BalanceAmount11 > 0, ROUND(IncrBalance14 * 10000 / BalanceAmount15) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange15 := IF(BalanceAmount11 > 0, ROUND(IncrBalance15 * 10000 / BalanceAmount16) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange16 := IF(BalanceAmount11 > 0, ROUND(IncrBalance16 * 10000 / BalanceAmount17) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange17 := IF(BalanceAmount11 > 0, ROUND(IncrBalance17 * 10000 / BalanceAmount18) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange18 := IF(BalanceAmount11 > 0, ROUND(IncrBalance18 * 10000 / BalanceAmount19) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange19 := IF(BalanceAmount11 > 0, ROUND(IncrBalance19 * 10000 / BalanceAmount20) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange20 := IF(BalanceAmount11 > 0, ROUND(IncrBalance20 * 10000 / BalanceAmount21) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange21 := IF(BalanceAmount11 > 0, ROUND(IncrBalance21 * 10000 / BalanceAmount22) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange22 := IF(BalanceAmount11 > 0, ROUND(IncrBalance22 * 10000 / BalanceAmount23) / 100, 0);
+CreditReportTradeline: =>  PercentBalanceChange23 := IF(BalanceAmount11 > 0, ROUND(IncrBalance23 * 10000 / BalanceAmount24) / 100, 0);
+
+CreditReportTradeline: =>  RatioAP2SP0 := IF(ScheduledPayment1 > 0 AND TDActualPaymentNullInd0 = FALSE, MIN(ROUND(MAX(ActualPayment0, 0) * 10000 / ScheduledPayment1) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP1 := IF(ScheduledPayment2 > 0 AND TDActualPaymentNullInd1 = FALSE, MIN(ROUND(MAX(ActualPayment1, 0) * 10000 / ScheduledPayment2) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP2 := IF(ScheduledPayment3 > 0 AND TDActualPaymentNullInd2 = FALSE, MIN(ROUND(MAX(ActualPayment2, 0) * 10000 / ScheduledPayment3) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP3 := IF(ScheduledPayment4 > 0 AND TDActualPaymentNullInd3 = FALSE, MIN(ROUND(MAX(ActualPayment3, 0) * 10000 / ScheduledPayment4) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP4 := IF(ScheduledPayment5 > 0 AND TDActualPaymentNullInd4 = FALSE, MIN(ROUND(MAX(ActualPayment4, 0) * 10000 / ScheduledPayment5) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP5 := IF(ScheduledPayment6 > 0 AND TDActualPaymentNullInd5 = FALSE, MIN(ROUND(MAX(ActualPayment5, 0) * 10000 / ScheduledPayment6) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP6 := IF(ScheduledPayment7 > 0 AND TDActualPaymentNullInd6 = FALSE, MIN(ROUND(MAX(ActualPayment6, 0) * 10000 / ScheduledPayment7) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP7 := IF(ScheduledPayment8 > 0 AND TDActualPaymentNullInd7 = FALSE, MIN(ROUND(MAX(ActualPayment7, 0) * 10000 / ScheduledPayment8) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP8 := IF(ScheduledPayment9 > 0 AND TDActualPaymentNullInd8 = FALSE, MIN(ROUND(MAX(ActualPayment8, 0) * 10000 / ScheduledPayment9) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP9 := IF(ScheduledPayment10 > 0 AND TDActualPaymentNullInd9 = FALSE, MIN(ROUND(MAX(ActualPayment9, 0) * 10000 / ScheduledPayment10) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP10 := IF(ScheduledPayment11 > 0 AND TDActualPaymentNullInd10 = FALSE, MIN(ROUND(MAX(ActualPayment10, 0) * 10000 / ScheduledPayment11) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP11 := IF(ScheduledPayment12 > 0 AND TDActualPaymentNullInd11 = FALSE, MIN(ROUND(MAX(ActualPayment11, 0) * 10000 / ScheduledPayment12) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP12 := IF(ScheduledPayment13 > 0 AND TDActualPaymentNullInd12 = FALSE, MIN(ROUND(MAX(ActualPayment12, 0) * 10000 / ScheduledPayment13) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP13 := IF(ScheduledPayment14 > 0 AND TDActualPaymentNullInd13 = FALSE, MIN(ROUND(MAX(ActualPayment13, 0) * 10000 / ScheduledPayment14) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP14 := IF(ScheduledPayment15 > 0 AND TDActualPaymentNullInd14 = FALSE, MIN(ROUND(MAX(ActualPayment14, 0) * 10000 / ScheduledPayment15) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP15 := IF(ScheduledPayment16 > 0 AND TDActualPaymentNullInd15 = FALSE, MIN(ROUND(MAX(ActualPayment15, 0) * 10000 / ScheduledPayment16) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP16 := IF(ScheduledPayment17 > 0 AND TDActualPaymentNullInd16 = FALSE, MIN(ROUND(MAX(ActualPayment16, 0) * 10000 / ScheduledPayment17) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP17 := IF(ScheduledPayment18 > 0 AND TDActualPaymentNullInd17 = FALSE, MIN(ROUND(MAX(ActualPayment17, 0) * 10000 / ScheduledPayment18) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP18 := IF(ScheduledPayment19 > 0 AND TDActualPaymentNullInd18 = FALSE, MIN(ROUND(MAX(ActualPayment18, 0) * 10000 / ScheduledPayment19) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP19 := IF(ScheduledPayment20 > 0 AND TDActualPaymentNullInd19 = FALSE, MIN(ROUND(MAX(ActualPayment19, 0) * 10000 / ScheduledPayment20) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP20 := IF(ScheduledPayment21 > 0 AND TDActualPaymentNullInd20 = FALSE, MIN(ROUND(MAX(ActualPayment20, 0) * 10000 / ScheduledPayment21) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP21 := IF(ScheduledPayment22 > 0 AND TDActualPaymentNullInd21 = FALSE, MIN(ROUND(MAX(ActualPayment21, 0) * 10000 / ScheduledPayment22) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP22 := IF(ScheduledPayment23 > 0 AND TDActualPaymentNullInd22 = FALSE, MIN(ROUND(MAX(ActualPayment22, 0) * 10000 / ScheduledPayment23) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2SP23 := IF(ScheduledPayment24 > 0 AND TDActualPaymentNullInd23 = FALSE, MIN(ROUND(MAX(ActualPayment23, 0) * 10000 / ScheduledPayment24) / 100, 999.99), -9999);
+
+CreditReportTradeline: =>  RatioAP2Balance0 := IF(BalanceAmount1 > 0 AND TDActualPaymentNullInd0 = FALSE, MIN(ROUND(MAX(ActualPayment0, 0) * 10000 / BalanceAmount1) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance1 := IF(BalanceAmount2 > 0 AND TDActualPaymentNullInd1 = FALSE, MIN(ROUND(MAX(ActualPayment1, 0) * 10000 / BalanceAmount2) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance2 := IF(BalanceAmount3 > 0 AND TDActualPaymentNullInd2 = FALSE, MIN(ROUND(MAX(ActualPayment2, 0) * 10000 / BalanceAmount3) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance3 := IF(BalanceAmount4 > 0 AND TDActualPaymentNullInd3 = FALSE, MIN(ROUND(MAX(ActualPayment3, 0) * 10000 / BalanceAmount4) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance4 := IF(BalanceAmount5 > 0 AND TDActualPaymentNullInd4 = FALSE, MIN(ROUND(MAX(ActualPayment4, 0) * 10000 / BalanceAmount5) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance5 := IF(BalanceAmount6 > 0 AND TDActualPaymentNullInd5 = FALSE, MIN(ROUND(MAX(ActualPayment5, 0) * 10000 / BalanceAmount6) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance6 := IF(BalanceAmount7 > 0 AND TDActualPaymentNullInd6 = FALSE, MIN(ROUND(MAX(ActualPayment6, 0) * 10000 / BalanceAmount7) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance7 := IF(BalanceAmount8 > 0 AND TDActualPaymentNullInd7 = FALSE, MIN(ROUND(MAX(ActualPayment7, 0) * 10000 / BalanceAmount8) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance8 := IF(BalanceAmount9 > 0 AND TDActualPaymentNullInd8 = FALSE, MIN(ROUND(MAX(ActualPayment8, 0) * 10000 / BalanceAmount9) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance9 := IF(BalanceAmount10 > 0 AND TDActualPaymentNullInd9 = FALSE, MIN(ROUND(MAX(ActualPayment9, 0) * 10000 / BalanceAmount10) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance10 := IF(BalanceAmount11 > 0 AND TDActualPaymentNullInd10 = FALSE, MIN(ROUND(MAX(ActualPayment10, 0) * 10000 / BalanceAmount11) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance11 := IF(BalanceAmount12 > 0 AND TDActualPaymentNullInd11 = FALSE, MIN(ROUND(MAX(ActualPayment11, 0) * 10000 / BalanceAmount12) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance12 := IF(BalanceAmount13 > 0 AND TDActualPaymentNullInd12 = FALSE, MIN(ROUND(MAX(ActualPayment12, 0) * 10000 / BalanceAmount13) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance13 := IF(BalanceAmount14 > 0 AND TDActualPaymentNullInd13 = FALSE, MIN(ROUND(MAX(ActualPayment13, 0) * 10000 / BalanceAmount14) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance14 := IF(BalanceAmount15 > 0 AND TDActualPaymentNullInd14 = FALSE, MIN(ROUND(MAX(ActualPayment14, 0) * 10000 / BalanceAmount15) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance15 := IF(BalanceAmount16 > 0 AND TDActualPaymentNullInd15 = FALSE, MIN(ROUND(MAX(ActualPayment15, 0) * 10000 / BalanceAmount16) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance16 := IF(BalanceAmount17 > 0 AND TDActualPaymentNullInd16 = FALSE, MIN(ROUND(MAX(ActualPayment16, 0) * 10000 / BalanceAmount17) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance17 := IF(BalanceAmount18 > 0 AND TDActualPaymentNullInd17 = FALSE, MIN(ROUND(MAX(ActualPayment17, 0) * 10000 / BalanceAmount18) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance18 := IF(BalanceAmount19 > 0 AND TDActualPaymentNullInd18 = FALSE, MIN(ROUND(MAX(ActualPayment18, 0) * 10000 / BalanceAmount19) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance19 := IF(BalanceAmount20 > 0 AND TDActualPaymentNullInd19 = FALSE, MIN(ROUND(MAX(ActualPayment19, 0) * 10000 / BalanceAmount20) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance20 := IF(BalanceAmount21 > 0 AND TDActualPaymentNullInd20 = FALSE, MIN(ROUND(MAX(ActualPayment20, 0) * 10000 / BalanceAmount21) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance21 := IF(BalanceAmount22 > 0 AND TDActualPaymentNullInd21 = FALSE, MIN(ROUND(MAX(ActualPayment21, 0) * 10000 / BalanceAmount22) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance22 := IF(BalanceAmount23 > 0 AND TDActualPaymentNullInd22 = FALSE, MIN(ROUND(MAX(ActualPayment22, 0) * 10000 / BalanceAmount23) / 100, 999.99), -9999);
+CreditReportTradeline: =>  RatioAP2Balance23 := IF(BalanceAmount24 > 0 AND TDActualPaymentNullInd23 = FALSE, MIN(ROUND(MAX(ActualPayment23, 0) * 10000 / BalanceAmount24) / 100, 999.99), -9999);
+
+
+CreditReportTradeline.Trended: => GTDNBalanceGM := IF(BalanceAmount > 0, 1, 0);
+CreditReportTradeline: => GTDNBalanceG0_6 := GTDNBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum;
+CreditReportTradeline: => GTDNBalanceG0_12 := GTDNBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum;
+CreditReportTradeline: => GTDNBalanceG0_18 := GTDNBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum;
+CreditReportTradeline: => GTDNBalanceG0_24 := GTDNBalanceGM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum;
+
+CreditReportTradeline.Trended: => GTDNActualPaymentGM := IF(ActualPayment > 0, 1, 0);
+CreditReportTradeline: => GTDNActualPaymentG0_6 := GTDNActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum;
+CreditReportTradeline: => GTDNActualPaymentG0_12 := GTDNActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum;
+CreditReportTradeline: => GTDNActualPaymentG0_18 := GTDNActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum;
+CreditReportTradeline: => GTDNActualPaymentG0_24 := GTDNActualPaymentGM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum;
+
+CreditReportTradeline.Trended: => GTDNLastPayment6M := IF((GTDMOSLastPaymentM >= 0 AND GTDMOSLastPaymentM <= 6), 1, 0);
+CreditReportTradeline: => GTDNLastPayment6 := GTDNLastPayment6M$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0);
+CreditReportTradeline.Trended: => GTDNLastPayment12M := IF((GTDMOSLastPaymentM >= 0 AND GTDMOSLastPaymentM <= 12), 1, 0);
+CreditReportTradeline: => GTDNLastPayment12 := GTDNLastPayment12M$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0);
+CreditReportTradeline.Trended: => GTDNLastPayment18M := IF((GTDMOSLastPaymentM >= 0 AND GTDMOSLastPaymentM <= 18), 1, 0);
+CreditReportTradeline: => GTDNLastPayment18 := GTDNLastPayment18M$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0);
+CreditReportTradeline.Trended: => GTDNLastPayment24M := IF((GTDMOSLastPaymentM >= 0 AND GTDMOSLastPaymentM <= 24), 1, 0);
+CreditReportTradeline: => GTDNLastPayment24 := GTDNLastPayment24M$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum + IF(EXISTS(Trended(MonthCounter = 1 AND ActualPayment > 0)), 1, 0);
+
+CreditReportTradeline.Trended: => GTDSumActualPaymentM := MAX(ActualPayment, 0);
+CreditReportTradeline: => GTDSumActualPayment6 := GTDSumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 7):Sum;
+CreditReportTradeline: => GTDSumActualPayment12 := GTDSumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 13):Sum;
+CreditReportTradeline: => GTDSumActualPayment18 := GTDSumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 19):Sum;
+CreditReportTradeline: => GTDSumActualPayment24 := GTDSumActualPaymentM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum;
+
+CreditReportTradeline: => GTDNCarryBalance6 := IF(OverBalance0 < 0, 1, 0) + IF(OverBalance1 < 0, 1, 0) + IF(OverBalance2 < 0, 1, 0) + IF(OverBalance3 < 0, 1, 0) + IF(OverBalance4 < 0, 1, 0) + IF(OverBalance5 < 0, 1, 0) + IF(OverBalance6 < 0, 1, 0);
+CreditReportTradeline: => GTDNOverPayment6 := IF(OverPayment0 > 0, 1, 0) + IF(OverPayment1 > 0, 1, 0) + IF(OverPayment2 > 0, 1, 0) + IF(OverPayment3 > 0, 1, 0) + IF(OverPayment4 > 0, 1, 0) + IF(OverPayment5 > 0, 1, 0) + IF(OverPayment6 > 0, 1, 0);
+CreditReportTradeline: => GTDNPastDue6 := IF(OverPayment0 < 0, 1, 0) + IF(OverPayment1 < 0, 1, 0) + IF(OverPayment2 < 0, 1, 0) + IF(OverPayment3 < 0, 1, 0) + IF(OverPayment4 < 0, 1, 0) + IF(OverPayment5 < 0, 1, 0) + IF(OverPayment6 < 0, 1, 0);
+CreditReportTradeline: => GTDNIncrBalance6 := IF(IncrBalance0 > 0, 1, 0) + IF(IncrBalance1 > 0, 1, 0) + IF(IncrBalance2 > 0, 1, 0) + IF(IncrBalance3 > 0, 1, 0) + IF(IncrBalance4 > 0, 1, 0) + IF(IncrBalance5 > 0, 1, 0) + IF(IncrBalance6 > 0, 1, 0);
+
+CreditReportTradeline: => GTDNCarryBalance12 := IF(OverBalance0 < 0, 1, 0) + IF(OverBalance1 < 0, 1, 0) + IF(OverBalance2 < 0, 1, 0) + IF(OverBalance3 < 0, 1, 0) + IF(OverBalance4 < 0, 1, 0) + IF(OverBalance5 < 0, 1, 0) + IF(OverBalance6 < 0, 1, 0) + IF(OverBalance7 < 0, 1, 0) + IF(OverBalance8 < 0, 1, 0) + IF(OverBalance9 < 0, 1, 0) + IF(OverBalance10 < 0, 1, 0) + IF(OverBalance11 < 0, 1, 0) + IF(OverBalance12 < 0, 1, 0);
+CreditReportTradeline: => GTDNOverPayment12 := IF(OverPayment0 > 0, 1, 0) + IF(OverPayment1 > 0, 1, 0) + IF(OverPayment2 > 0, 1, 0) + IF(OverPayment3 > 0, 1, 0) + IF(OverPayment4 > 0, 1, 0) + IF(OverPayment5 > 0, 1, 0) + IF(OverPayment6 > 0, 1, 0) + IF(OverPayment7 > 0, 1, 0) + IF(OverPayment8 > 0, 1, 0) + IF(OverPayment9 > 0, 1, 0) + IF(OverPayment10 > 0, 1, 0) + IF(OverPayment11 > 0, 1, 0) + IF(OverPayment12 > 0, 1, 0);
+CreditReportTradeline: => GTDNPastDue12 := IF(OverPayment0 < 0, 1, 0) + IF(OverPayment1 < 0, 1, 0) + IF(OverPayment2 < 0, 1, 0) + IF(OverPayment3 < 0, 1, 0) + IF(OverPayment4 < 0, 1, 0) + IF(OverPayment5 < 0, 1, 0) + IF(OverPayment6 < 0, 1, 0) + IF(OverPayment7 < 0, 1, 0) + IF(OverPayment8 < 0, 1, 0) + IF(OverPayment9 < 0, 1, 0) + IF(OverPayment10 < 0, 1, 0) + IF(OverPayment11 < 0, 1, 0) + IF(OverPayment12 < 0, 1, 0);
+CreditReportTradeline: => GTDNIncrBalance12 := IF(IncrBalance0 > 0, 1, 0) + IF(IncrBalance1 > 0, 1, 0) + IF(IncrBalance2 > 0, 1, 0) + IF(IncrBalance3 > 0, 1, 0) + IF(IncrBalance4 > 0, 1, 0) + IF(IncrBalance5 > 0, 1, 0) + IF(IncrBalance6 > 0, 1, 0) + IF(IncrBalance7 > 0, 1, 0) + IF(IncrBalance8 > 0, 1, 0) + IF(IncrBalance9 > 0, 1, 0) + IF(IncrBalance10 > 0, 1, 0) + IF(IncrBalance11 > 0, 1, 0) + IF(IncrBalance12 > 0, 1, 0);
+
+CreditReportTradeline: => GTDNCarryBalance18 := IF(OverBalance0 < 0, 1, 0) + IF(OverBalance1 < 0, 1, 0) + IF(OverBalance2 < 0, 1, 0) + IF(OverBalance3 < 0, 1, 0) + IF(OverBalance4 < 0, 1, 0) + IF(OverBalance5 < 0, 1, 0) + IF(OverBalance6 < 0, 1, 0) + IF(OverBalance7 < 0, 1, 0) + IF(OverBalance8 < 0, 1, 0) + IF(OverBalance9 < 0, 1, 0) + IF(OverBalance10 < 0, 1, 0) + IF(OverBalance11 < 0, 1, 0) + IF(OverBalance12 < 0, 1, 0) + IF(OverBalance13 < 0, 1, 0) + IF(OverBalance14 < 0, 1, 0) + IF(OverBalance15 < 0, 1, 0) + IF(OverBalance16 < 0, 1, 0) + IF(OverBalance17 < 0, 1, 0) + IF(OverBalance18 < 0, 1, 0);
+CreditReportTradeline: => GTDNOverPayment18 := IF(OverPayment0 > 0, 1, 0) + IF(OverPayment1 > 0, 1, 0) + IF(OverPayment2 > 0, 1, 0) + IF(OverPayment3 > 0, 1, 0) + IF(OverPayment4 > 0, 1, 0) + IF(OverPayment5 > 0, 1, 0) + IF(OverPayment6 > 0, 1, 0) + IF(OverPayment7 > 0, 1, 0) + IF(OverPayment8 > 0, 1, 0) + IF(OverPayment9 > 0, 1, 0) + IF(OverPayment10 > 0, 1, 0) + IF(OverPayment11 > 0, 1, 0) + IF(OverPayment12 > 0, 1, 0) + IF(OverPayment13 > 0, 1, 0) + IF(OverPayment14 > 0, 1, 0) + IF(OverPayment15 > 0, 1, 0) + IF(OverPayment16 > 0, 1, 0) + IF(OverPayment17 > 0, 1, 0) + IF(OverPayment18 > 0, 1, 0);
+CreditReportTradeline: => GTDNPastDue18 := IF(OverPayment0 < 0, 1, 0) + IF(OverPayment1 < 0, 1, 0) + IF(OverPayment2 < 0, 1, 0) + IF(OverPayment3 < 0, 1, 0) + IF(OverPayment4 < 0, 1, 0) + IF(OverPayment5 < 0, 1, 0) + IF(OverPayment6 < 0, 1, 0) + IF(OverPayment7 < 0, 1, 0) + IF(OverPayment8 < 0, 1, 0) + IF(OverPayment9 < 0, 1, 0) + IF(OverPayment10 < 0, 1, 0) + IF(OverPayment11 < 0, 1, 0) + IF(OverPayment12 < 0, 1, 0) + IF(OverPayment13 < 0, 1, 0) + IF(OverPayment14 < 0, 1, 0) + IF(OverPayment15 < 0, 1, 0) + IF(OverPayment16 < 0, 1, 0) + IF(OverPayment17 < 0, 1, 0) + IF(OverPayment18 < 0, 1, 0);
+CreditReportTradeline: => GTDNIncrBalance18 := IF(IncrBalance0 > 0, 1, 0) + IF(IncrBalance1 > 0, 1, 0) + IF(IncrBalance2 > 0, 1, 0) + IF(IncrBalance3 > 0, 1, 0) + IF(IncrBalance4 > 0, 1, 0) + IF(IncrBalance5 > 0, 1, 0) + IF(IncrBalance6 > 0, 1, 0) + IF(IncrBalance7 > 0, 1, 0) + IF(IncrBalance8 > 0, 1, 0) + IF(IncrBalance9 > 0, 1, 0) + IF(IncrBalance10 > 0, 1, 0) + IF(IncrBalance11 > 0, 1, 0) + IF(IncrBalance12 > 0, 1, 0) + IF(IncrBalance13 > 0, 1, 0) + IF(IncrBalance14 > 0, 1, 0) + IF(IncrBalance15 > 0, 1, 0) + IF(IncrBalance16 > 0, 1, 0) + IF(IncrBalance17 > 0, 1, 0) + IF(IncrBalance18 > 0, 1, 0);
+
+CreditReportTradeline: => GTDNCarryBalance24 := IF(OverBalance0 < 0, 1, 0) + IF(OverBalance1 < 0, 1, 0) + IF(OverBalance2 < 0, 1, 0) + IF(OverBalance3 < 0, 1, 0) + IF(OverBalance4 < 0, 1, 0) + IF(OverBalance5 < 0, 1, 0) + IF(OverBalance6 < 0, 1, 0) + IF(OverBalance7 < 0, 1, 0) + IF(OverBalance8 < 0, 1, 0) + IF(OverBalance9 < 0, 1, 0) + IF(OverBalance10 < 0, 1, 0) + IF(OverBalance11 < 0, 1, 0) + IF(OverBalance12 < 0, 1, 0) + IF(OverBalance13 < 0, 1, 0) + IF(OverBalance14 < 0, 1, 0) + IF(OverBalance15 < 0, 1, 0) + IF(OverBalance16 < 0, 1, 0) + IF(OverBalance17 < 0, 1, 0) + IF(OverBalance18 < 0, 1, 0) + IF(OverBalance19 < 0, 1, 0) + IF(OverBalance20 < 0, 1, 0) + IF(OverBalance21 < 0, 1, 0) + IF(OverBalance22 < 0, 1, 0) + IF(OverBalance23 < 0, 1, 0);
+CreditReportTradeline: => GTDNOverPayment24 := IF(OverPayment0 > 0, 1, 0) + IF(OverPayment1 > 0, 1, 0) + IF(OverPayment2 > 0, 1, 0) + IF(OverPayment3 > 0, 1, 0) + IF(OverPayment4 > 0, 1, 0) + IF(OverPayment5 > 0, 1, 0) + IF(OverPayment6 > 0, 1, 0) + IF(OverPayment7 > 0, 1, 0) + IF(OverPayment8 > 0, 1, 0) + IF(OverPayment9 > 0, 1, 0) + IF(OverPayment10 > 0, 1, 0) + IF(OverPayment11 > 0, 1, 0) + IF(OverPayment12 > 0, 1, 0) + IF(OverPayment13 > 0, 1, 0) + IF(OverPayment14 > 0, 1, 0) + IF(OverPayment15 > 0, 1, 0) + IF(OverPayment16 > 0, 1, 0) + IF(OverPayment17 > 0, 1, 0) + IF(OverPayment18 > 0, 1, 0) + IF(OverPayment19 > 0, 1, 0) + IF(OverPayment20 > 0, 1, 0) + IF(OverPayment21 > 0, 1, 0) + IF(OverPayment22 > 0, 1, 0) + IF(OverPayment23 > 0, 1, 0);
+CreditReportTradeline: => GTDNPastDue24 := IF(OverPayment0 < 0, 1, 0) + IF(OverPayment1 < 0, 1, 0) + IF(OverPayment2 < 0, 1, 0) + IF(OverPayment3 < 0, 1, 0) + IF(OverPayment4 < 0, 1, 0) + IF(OverPayment5 < 0, 1, 0) + IF(OverPayment6 < 0, 1, 0) + IF(OverPayment7 < 0, 1, 0) + IF(OverPayment8 < 0, 1, 0) + IF(OverPayment9 < 0, 1, 0) + IF(OverPayment10 < 0, 1, 0) + IF(OverPayment11 < 0, 1, 0) + IF(OverPayment12 < 0, 1, 0) + IF(OverPayment13 < 0, 1, 0) + IF(OverPayment14 < 0, 1, 0) + IF(OverPayment15 < 0, 1, 0) + IF(OverPayment16 < 0, 1, 0) + IF(OverPayment17 < 0, 1, 0) + IF(OverPayment18 < 0, 1, 0) + IF(OverPayment19 < 0, 1, 0) + IF(OverPayment20 < 0, 1, 0) + IF(OverPayment21 < 0, 1, 0) + IF(OverPayment22 < 0, 1, 0) + IF(OverPayment23 < 0, 1, 0);
+CreditReportTradeline: => GTDNIncrBalance24 := IF(IncrBalance0 > 0, 1, 0) + IF(IncrBalance1 > 0, 1, 0) + IF(IncrBalance2 > 0, 1, 0) + IF(IncrBalance3 > 0, 1, 0) + IF(IncrBalance4 > 0, 1, 0) + IF(IncrBalance5 > 0, 1, 0) + IF(IncrBalance6 > 0, 1, 0) + IF(IncrBalance7 > 0, 1, 0) + IF(IncrBalance8 > 0, 1, 0) + IF(IncrBalance9 > 0, 1, 0) + IF(IncrBalance10 > 0, 1, 0) + IF(IncrBalance11 > 0, 1, 0) + IF(IncrBalance12 > 0, 1, 0) + IF(IncrBalance13 > 0, 1, 0) + IF(IncrBalance14 > 0, 1, 0) + IF(IncrBalance15 > 0, 1, 0) + IF(IncrBalance16 > 0, 1, 0) + IF(IncrBalance17 > 0, 1, 0) + IF(IncrBalance18 > 0, 1, 0) + IF(IncrBalance19 > 0, 1, 0) + IF(IncrBalance20 > 0, 1, 0) + IF(IncrBalance21 > 0, 1, 0) + IF(IncrBalance22 > 0, 1, 0) + IF(IncrBalance23 > 0, 1, 0);
+
+CreditReportTradeline: => GTDMaxBalance24 := Trended.BalanceAmount$Max;
+CreditReportTradeline: => GTDMaxLoanCreditLimit24 := Trended.LoanAmountCreditLimit$Max;
+CreditReportTradeline: => GTDMaxScheduledPayment24 := Trended.ScheduledPayment$Max;
+CreditReportTradeline: => GTDMaxActualPayment24 := Trended.ActualPayment$Max;
+CreditReportTradeline: => GTDMaxOverPayment24 := MAX(OverPayment0, OverPayment1, OverPayment2, OverPayment3, OverPayment4, OverPayment5, OverPayment6, OverPayment7, OverPayment8, OverPayment9, OverPayment10, OverPayment11, OverPayment12, OverPayment13, OverPayment14, OverPayment15, OverPayment16, OverPayment17, OverPayment18, OverPayment19, OverPayment20, OverPayment21, OverPayment22, OverPayment23);
+CreditReportTradeline: => GTDMaxOverBalance24 := MAX(OverBalance0, OverBalance1, OverBalance2, OverBalance3, OverBalance4, OverBalance5, OverBalance6, OverBalance7, OverBalance8, OverBalance9, OverBalance10, OverBalance11, OverBalance12, OverBalance13, OverBalance14, OverBalance15, OverBalance16, OverBalance17, OverBalance18, OverBalance19, OverBalance20, OverBalance21, OverBalance22, OverBalance23);
+CreditReportTradeline: => GTDMaxIncrBalance24 := MAX(IncrBalance0, IncrBalance1, IncrBalance2, IncrBalance3, IncrBalance4, IncrBalance5, IncrBalance6, IncrBalance7, IncrBalance8, IncrBalance9, IncrBalance10, IncrBalance11, IncrBalance12, IncrBalance13, IncrBalance14, IncrBalance15, IncrBalance16, IncrBalance17, IncrBalance18, IncrBalance19, IncrBalance20, IncrBalance21, IncrBalance22, IncrBalance23);
+
+CreditReportTradeline: => GTDMinBalance24 := Trended.BalanceAmount$Min;
+CreditReportTradeline: => GTDMinLoanCreditLimit24 := Trended.LoanAmountCreditLimit$Min;
+CreditReportTradeline: => GTDMinScheduledPayment24 := Trended.ScheduledPayment$Min;
+CreditReportTradeline: => GTDMinActualPayment24 := Trended.ActualPayment$Min;
+CreditReportTradeline: => GTDMinOverPayment24 := MIN(OverPayment0, OverPayment1, OverPayment2, OverPayment3, OverPayment4, OverPayment5, OverPayment6, OverPayment7, OverPayment8, OverPayment9, OverPayment10, OverPayment11, OverPayment12, OverPayment13, OverPayment14, OverPayment15, OverPayment16, OverPayment17, OverPayment18, OverPayment19, OverPayment20, OverPayment21, OverPayment22, OverPayment23);
+CreditReportTradeline: => GTDMinOverBalance24 := MIN(OverBalance0, OverBalance1, OverBalance2, OverBalance3, OverBalance4, OverBalance5, OverBalance6, OverBalance7, OverBalance8, OverBalance9, OverBalance10, OverBalance11, OverBalance12, OverBalance13, OverBalance14, OverBalance15, OverBalance16, OverBalance17, OverBalance18, OverBalance19, OverBalance20, OverBalance21, OverBalance22, OverBalance23);
+CreditReportTradeline: => GTDMinIncrBalance24 := MIN(IncrBalance0, IncrBalance1, IncrBalance2, IncrBalance3, IncrBalance4, IncrBalance5, IncrBalance6, IncrBalance7, IncrBalance8, IncrBalance9, IncrBalance10, IncrBalance11, IncrBalance12, IncrBalance13, IncrBalance14, IncrBalance15, IncrBalance16, IncrBalance17, IncrBalance18, IncrBalance19, IncrBalance20, IncrBalance21, IncrBalance22, IncrBalance23);
+
+CreditReportTradeline: => GTDRangeBalance24 := MAX(GTDMaxBalance24, 0) - MAX(GTDMinBalance24, 0);
+CreditReportTradeline: => GTDRangeLoanCreditLimit24 := MAX(GTDMaxLoanCreditLimit24, 0) - MAX(GTDMinLoanCreditLimit24, 0);
+CreditReportTradeline: => GTDRangeScheduledPayment24 := MAX(GTDMaxScheduledPayment24, 0) - MAX(GTDMinScheduledPayment24, 0);
+CreditReportTradeline: => GTDRangeActualPayment24 := MAX(GTDMaxActualPayment24, 0) - MAX(GTDMinActualPayment24, 0);
+
+CreditReportTradeline: => GTDMaxUtilization24 := Trended.GTDUtilizationM$Max;
+CreditReportTradeline: => GTDMaxPercentBalanceChange24 := MAX(PercentBalanceChange0, PercentBalanceChange1, PercentBalanceChange2, PercentBalanceChange3, PercentBalanceChange4, PercentBalanceChange5, PercentBalanceChange6, PercentBalanceChange7, PercentBalanceChange8, PercentBalanceChange9, PercentBalanceChange10, PercentBalanceChange11, PercentBalanceChange12, PercentBalanceChange13, PercentBalanceChange14, PercentBalanceChange15, PercentBalanceChange16, PercentBalanceChange17, PercentBalanceChange18, PercentBalanceChange19, PercentBalanceChange20, PercentBalanceChange21, PercentBalanceChange22, PercentBalanceChange23);
+
+CreditReportTradeline: => GTDMeanBalance6 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 7), BalanceAmount);
+CreditReportTradeline: => GTDMeanBalance12 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 13), BalanceAmount);
+CreditReportTradeline: => GTDMeanBalance18 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 19), BalanceAmount);
+CreditReportTradeline: => GTDMeanBalance24 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 25), BalanceAmount);
+
+CreditReportTradeline: => GTDStdBalance12 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 13), BalanceAmount);
+CreditReportTradeline: => GTDStdBalance18 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 19), BalanceAmount);
+CreditReportTradeline: => GTDStdBalance24 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 25), BalanceAmount);
+CreditReportTradeline: => GTDMeanUtilization6 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 7), GTDUtilizationM);
+CreditReportTradeline: => GTDMeanUtilization12 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 13), GTDUtilizationM);
+CreditReportTradeline: => GTDMeanUtilization18 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 19), GTDUtilizationM);
+CreditReportTradeline: => GTDMeanUtilization24 := AVE(Trended(MonthCounter >= 1 AND MonthCounter <= 25), GTDUtilizationM);
+CreditReportTradeline: => GTDStdUtilization24 := STDDEV(Trended(MonthCounter >= 1 AND MonthCounter <= 25), GTDUtilizationM);
+ 
+CreditReportTradeline: => GTDSlopeBalance24 := (25 * SUM(Trended, (25 - MonthCounter) * MAX(BalanceAmount, 0)) - SUM(Trended, 25 - MonthCounter) * SUM(Trended, MAX(BalanceAmount, 0)))/(25 * SUM(Trended,(25 - MonthCounter)*(25 - MonthCounter)) - SUM(Trended, 25 - MonthCounter) * SUM(Trended, 25 - MonthCounter));
+CreditReportTradeline: => GTDSlopeBalance18 := (19 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), (19 - MonthCounter) * MAX(BalanceAmount, 0)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), 19 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), MAX(BalanceAmount, 0)))/(25 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19),(19 - MonthCounter)*(19 - MonthCounter)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), 19 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 19), 19 - MonthCounter));
+CreditReportTradeline: => GTDSlopeBalance12 := (13 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), (13 - MonthCounter) * MAX(BalanceAmount, 0)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), 13 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), MAX(BalanceAmount, 0)))/(25 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13),(13 - MonthCounter)*(13 - MonthCounter)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), 13 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 13), 13 - MonthCounter));
+CreditReportTradeline: => GTDSlopeBalance6 := (7 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), (7 - MonthCounter) * MAX(BalanceAmount, 0)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), 7 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), MAX(BalanceAmount, 0)))/(25 * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7),(7 - MonthCounter)*(7 - MonthCounter)) - SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), 7 - MonthCounter) * SUM(Trended(MonthCounter >= 1 AND MonthCounter <= 7), 7 - MonthCounter));
+
+CreditReportTradeline.Trended: => GTDRatingM := IF((CreditReportTradeline.GMOSPaymentPatternStartDate <= 24 AND CreditReportTradeline.GMOSPaymentPatternStartDate > 0) AND (MonthCounter >= CreditReportTradeline.GMOSPaymentPatternStartDate AND MonthCounter <= 24) AND MonthCounter <= LENGTH(TRIMALL(CreditReportTradeline.PaymentHistory84Months)), SUBSTR(CreditReportTradeline.PaymentHistory84Months, MonthCounter, 1),IF(NOT CreditReportTradeline.CurrentRateCode:Null AND (CreditReportTradeline.GMOSDateReported <= 24 AND CreditReportTradeline.GMOSDateReported >= 0) AND MonthCounter = CreditReportTradeline.GMOSDateReported + 1, SUBSTR(CreditReportTradeline.CurrentRateCode, 1, 1), '-'));
+
+CreditReportTradeline: => GTDMax30PBalance24 := MAX(MAX(Trended((GTDRatingM IN GRID_30DPD) OR (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax60PBalance24 := MAX(MAX(Trended((GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax90PBalance24 := MAX(MAX(Trended((GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax120PBalance24 := MAX(MAX(Trended((GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMaxDerogBalance24 := MAX(MAX(Trended(GTDRatingM IN GRID_DEROG), BalanceAmount), -9999); //GTDMaxDerogBalance24
+
+CreditReportTradeline: => GTDMax30PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (GTDRatingM IN GRID_30DPD) OR (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax60PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax90PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax120PBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMaxDerogBalance18 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 19) AND GTDRatingM IN GRID_DEROG), BalanceAmount), -9999);
+
+CreditReportTradeline: => GTDMax30PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (GTDRatingM IN GRID_30DPD) OR (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax60PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax90PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax120PBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMaxDerogBalance12 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 13) AND GTDRatingM IN GRID_DEROG), BalanceAmount), -9999);
+
+CreditReportTradeline: => GTDMax30PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_30DPD) OR (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax60PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_60DPD) OR (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax90PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMax120PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), BalanceAmount), -9999);
+CreditReportTradeline: => GTDMaxDerogBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND GTDRatingM IN GRID_DEROG), BalanceAmount), -9999);
+ 
+
 // Testing/Debug KEL Outputs
 QUERY: CreditReportBankruptcyV1(SearchForTransactionID) <= CreditReportBankruptcy(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
 QUERY: CreditReportCollectionV1(SearchForTransactionID) <= CreditReportCollection(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
@@ -3358,6 +4091,7 @@ QUERY: CreditReportJudgementV1(SearchForTransactionID) <= CreditReportJudgement(
 QUERY: CreditReportLienV1(SearchForTransactionID) <= CreditReportLien(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
 QUERY: CreditReportNarrativeRemarksV1(SearchForTransactionID) <= CreditReportNarrativeRemarks(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
 QUERY: CreditReportTradelineV1(SearchForTransactionID) <= CreditReportTradeline(rCreditReport.TransactionID = SearchForTransactionID) USING [v1];
+QUERY: CreditReportV1(SearchForTransactionID) <= CreditReport(TransactionID = SearchForTransactionID) USING [v1];
 
 QUERY: CreditReportBankruptcyV2(SearchForTransactionID) <= CreditReportBankruptcy(rCreditReport.TransactionID = SearchForTransactionID) USING [v2];
 QUERY: CreditReportCollectionV2(SearchForTransactionID) <= CreditReportCollection(rCreditReport.TransactionID = SearchForTransactionID) USING [v2];
@@ -3369,5 +4103,5 @@ QUERY: CreditReportNarrativeRemarksV2(SearchForTransactionID) <= CreditReportNar
 QUERY: CreditReportTradelineV2(SearchForTransactionID) <= CreditReportTradeline(rCreditReport.TransactionID = SearchForTransactionID) USING [v2];
    
 // Final KEL Outputs
-SHELL: CreditReportV1 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, StatementLength, ConsumerStatement, LexIDs, ROWS, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies} USING [v1];
+SHELL: CreditReportV1 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, StatementLength, ConsumerStatement, LexIDs, ROWS, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies, LienJudgementSource} USING [v1];
 SHELL: CreditReportV2 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, StatementLength, ConsumerStatement, LexIDs, ROWS, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies} USING [v2];

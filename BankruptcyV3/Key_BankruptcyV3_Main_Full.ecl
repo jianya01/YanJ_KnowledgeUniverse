@@ -109,7 +109,7 @@ END;
 fileName := '~thor::base::bankruptcy::main_v3';
 Key_BankruptcyV3_Main_Full_input := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutBankruptcy, THOR),
-	DATASET(fileName, LayoutBankruptcy, THOR) ((UNSIGNED8)DID IN _Control.LexIDFilterSet));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutBankruptcy, THOR), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));
 
 
 normalizedRecord := RECORD

@@ -1,5 +1,5 @@
 ﻿import SALT35;
-
+#WARNING('mac_profile is deprecated - utilize SALTNN.MOD_Profile instead');
 // pass it any dataset for salt base profiling (dIn)
 // return value will contain the results from SALT35.MAC_Character_Counts.FN_Profile
 // for all field in the dataset

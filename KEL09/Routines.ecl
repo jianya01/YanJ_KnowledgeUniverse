@@ -497,17 +497,23 @@ EXPORT Routines := MODULE
   EXPORT MinN(v1, v2) := FUNCTIONMACRO
         LOCAL __v1 := v1;
         LOCAL __v2 := v2;
-        RETURN MAP(__NL(__v1) => __v2,
-                   __NL(__v2) => __v1,
-                   __T(__v1) < __T(__v2) => __v1,
-                   __v2);
-        ENDMACRO;
+        LOCAL __v1Null := __NL(__v1);
+        LOCAL __v2Null := __NL(__v2);
+        LOCAL __v1Value := __T(__v1);
+        LOCAL __v2Value := __T(__v2);
+        LOCAL __flag := __v1Null AND __v2NULL;
+        LOCAL __value := MAP(__v1Null => __v2Value, __v2Null => __v1Value, __v1Value < __v2Value => __v1Value, __v2Value); 
+        RETURN __BN(__value, __flag);
+  ENDMACRO;
   EXPORT MaxN(v1, v2) := FUNCTIONMACRO
         LOCAL __v1 := v1;
         LOCAL __v2 := v2;
-        RETURN MAP(__NL(__v1) => __v2,
-                   __NL(__v2) => __v1,
-                   __T(__v1) > __T(__v2) => __v1,
-                   __v2);
-        ENDMACRO;
+        LOCAL __v1Null := __NL(__v1);
+        LOCAL __v2Null := __NL(__v2);
+        LOCAL __v1Value := __T(__v1);
+        LOCAL __v2Value := __T(__v2);
+        LOCAL __flag := __v1Null AND __v2NULL;
+        LOCAL __value := MAP(__v1Null => __v2Value, __v2Null => __v1Value, __v1Value > __v2Value => __v1Value, __v2Value); 
+        RETURN __BN(__value, __flag);
+  ENDMACRO;
 END;

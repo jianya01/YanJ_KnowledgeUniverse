@@ -7,12 +7,13 @@ EXPORT BuildAutomation(pModule,
 												pEmailSource
 												) := FUNCTIONMACRO
 	
-	ingestMod := pModule.Ingest(true); 
+	ingestMod := pModule.Ingest(TRUE); 
 	result:= ingestMod.AllRecords;
 	final:= project(result, transform(pModule.Layout_Vault,		
 																										self.vault_record_status := left.__Tpe ;
 																										self:=left;));
-	pEmailSourceTrim := TRIM(pEmailSource, LEFT, RIGHT);
+	
+	pEmailSourceinTrim := TRIM(pEmailSource, LEFT, RIGHT);
   Successsubject  := 'The ' + pEmailSourceinTrim + ' build Completed for : ' + (STRING8)STD.Date.Today();
 	Successbody     := 'The ' + pEmailSourceinTrim + ' build Completed for : ' + (STRING8)STD.Date.Today() + '.'+'\n' +
 										 'The Workunit is ' + WORKUNIT +'\n';		
