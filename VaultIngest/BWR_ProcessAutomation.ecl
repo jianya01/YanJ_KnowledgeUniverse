@@ -4,7 +4,7 @@
    IMPORT STD,CCtlogPol, VaultIngest, Vault_layout;
    
    VaultIngest.ProcessAutomation(CCtlogPol, //module name
-   														(STRING)Std.Date.Today(), 
+   														// (STRING)Std.Date.Today(), 
    														'Vault SALT38PV3 Ingest CCtlogPol Test forBuildLog');	
 
 
