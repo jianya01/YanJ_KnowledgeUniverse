@@ -1,11 +1,11 @@
 ﻿#workunit('name', 'Generate_Default_SALT_SPC');
 //Step 1: Add Module name to import
-IMPORT SALT38, CCtlogPol;
+IMPORT Vault, I_Insurance_Header;
 
 //Step 2: Define Input file
-InputFile := CCtlogPol.Source;
+InputFile := I_Insurance_Header.Constants.Sourcefile;
 //Run SPC macro to generate the default specification
-SALT38.MAC_Default_SPC(InputFile, generatedSALTSpecification);
+Vault.SALT_Ingest_Create_SPC(InputFile, generatedSALTSpecification);
 
 FinalSALTSpecification := ROLLUP(generatedSALTSpecification, TRUE, TRANSFORM(RECORDOF(LEFT), SELF.s := LEFT.s + '\n' + RIGHT.s));
 
