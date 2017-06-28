@@ -20,10 +20,10 @@
 	
 	Boolean VerifyUniqueCount := (UniqueCnt = TotalCnt); 
 	
-	pEmailSourceTrim := TRIM(pEmailSourceIn, LEFT, RIGHT);
+	pEmailSourceinTrim := TRIM(pEmailSourceIn, LEFT, RIGHT);
 										
-	FailureProcessSubject  := 'The ' + pEmailSourceTrim + ' build Failed for : ' + (STRING8)STD.Date.Today();
-	FailureProcessBody     := 'The ' + pEmailSourceTrim + ' build Failed for : ' + (STRING8)STD.Date.Today() + '.'+'\n' +
+	FailureProcessSubject  := 'The ' + pEmailSourceinTrim + ' build Failed for : ' + (STRING8)STD.Date.Today();
+	FailureProcessBody     := 'The ' + pEmailSourceinTrim + ' build Failed for : ' + (STRING8)STD.Date.Today() + '.'+'\n' +
 										 '**Sourcefile may have duplicate records**. The Workunit is ' + WORKUNIT + '.'+ '\n'+
 										 'Vault Ingest build was NOT processed for ' + (STRING8)STD.Date.Today() + '.'+'\n';		
 	
