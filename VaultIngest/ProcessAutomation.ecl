@@ -1,6 +1,7 @@
 ﻿EXPORT ProcessAutomation(	pModule,
-													pBuildDate, 
+													// pBuildDate, 
 													pEmailSourceIn
+													// SourceDSKey = ''
 													) := FUNCTIONMACRO
 															
 															
@@ -12,10 +13,10 @@
 	SourceDSKey := pModule.Constants.SourceKey;
 	
 	// Verify the source file for duplicates
-	in_ds := pSourcefile;
-	sortedDS:=sort(in_ds,SourceDSKey);
-	UniqueCnt := count(VaultIngest.Macros.CountUnique(sortedDS,SourceDSKey));
-	TotalCnt := count(in_ds);
+	// in_ds := pSourcefile;
+	// sortedDS:=sort(in_ds,SourceDSKey);
+	UniqueCnt := count(VaultIngest.Macros.CountUnique(pSourcefile,SourceDSKey));
+	TotalCnt := count(pSourcefile);
 	
 	Boolean VerifyUniqueCount := (UniqueCnt = TotalCnt); 
 	
@@ -27,7 +28,7 @@
 										 'Vault Ingest build was NOT processed for ' + (STRING8)STD.Date.Today() + '.'+'\n';		
 	
 	ProcessBuild := IF (VerifyUniqueCount, 
-   											SEQUENTIAL(VaultIngest.BuildAutomation(pModule,pBaseprefix,pBaseSuffix,pBuildDate,pVaultFileDS,pEmailSourceIn)),
+   											SEQUENTIAL(VaultIngest.BuildAutomation(pModule,pBaseprefix,pBaseSuffix,pVaultFileDS,pEmailSourceIn)),
 												Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_EmailAddresses, FailureProcessSubject, FailureProcessBody)); //failure email
 	
 	RETURN ProcessBuild;				

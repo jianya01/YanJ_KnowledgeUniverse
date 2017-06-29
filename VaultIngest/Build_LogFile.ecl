@@ -1,19 +1,20 @@
-﻿EXPORT Build_LogFile(pVaultFile, pCurrent_Date, pYesterday, pBaseprefix, pBaseSuffix) := FUNCTIONMACRO
+﻿EXPORT Build_LogFile(pVaultFile, pBaseprefix, pBaseSuffix) := FUNCTIONMACRO
 
 
 	LogFile_Existing := pBaseprefix + '::prod::' + pBaseSuffix + '::LogFile';
 	
-	LogFile_Existing_DS := DATASET(LogFile_Existing, Vault_Layout.Layout_Logfile, THOR, OPT);
+	LogFile_Existing_DS := DATASET(LogFile_Existing, Vault_Layout.LogFile_Layout, THOR, OPT);
 	
-	InputDate := (STRING8)pCurrent_Date;
-	New_Log_DS := DATASET([{InputDate[1..4] + '-' + InputDate[5..6] + '-' + InputDate[7..8],
+	Yesterday := GLOBAL((UNSIGNED4)VaultIngest.date_math((STRING)std.date.today(), -1));
+	
+	New_Log_DS := DATASET([{WORKUNIT[2..9],
    													COUNT(pVaultFile), 
    													COUNT(pVaultFile(vault_date_last_seen = 0)),// active as per current build
-   													COUNT(pVaultFile(vault_date_last_seen = pYesterday)),//expired in this build
+   													COUNT(pVaultFile(vault_record_status = 5 AND Vault_Date_Last_Seen = Yesterday)),//Updated
    													COUNT(pVaultFile(vault_record_status = 6)),//new
-   													COUNT(pVaultFile(vault_record_status = 5))//updated
+   													COUNT(pVaultFile(vault_record_status = 4))//unchanged
    													}],
-   													Vault_Layout.Layout_Logfile);
+   													Vault_Layout.LogFile_Layout);
 									
 	Update_LogFile := New_Log_DS + LogFile_Existing_DS;
 	

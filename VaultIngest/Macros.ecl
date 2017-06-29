@@ -1,6 +1,6 @@
 ﻿EXPORT Macros := MODULE
 
 EXPORT 	DATASET CountUnique(File,X) := 	MACRO
-																					dedup(File,#expand(X))
+																					dedup(sort(File,#expand(X)),#expand(X))
 																				ENDMACRO;
 END;
