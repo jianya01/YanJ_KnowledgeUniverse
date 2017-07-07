@@ -1,6 +1,7 @@
 ﻿// functions/transforms to take different types of statistics outputs and convert them to Layout_Stats_Standard
 EXPORT mod_StandardStatsTransforms := MODULE
-	EXPORT mac_hygieneSummaryTransform(mymod, numfields, inLayout, hasSourceField, outputECLText = FALSE) := MACRO
+
+	EXPORT mac_hygieneSummaryTransform(mymod, fieldsAttr, inLayout, hasSourceField, outputECLText = FALSE) := MACRO
 		IMPORT mymod;
 		#DECLARE(outECL);
 		#DECLARE(fieldnameECL);
@@ -23,11 +24,11 @@ EXPORT mod_StandardStatsTransforms := MODULE
 		#APPEND(fieldnameECL, '  SELF.field := CHOOSE(((cnt-1) DIV 6) + 1');
 		#APPEND(statvalECL, '  SELF.statValue := CHOOSE(cnt');
 		#LOOP
-			#SET(currentField, mymod.Fields.FieldName(%nField%));
-			#SET(currentFlat, mymod.Fields.FlatName(%nField%));
-			#IF (%nField% > numfields)
+			#SET(currentField, mymod.fieldsAttr.FieldName(%nField%));
+			#SET(currentFlat, mymod.fieldsAttr.FlatName(%nField%));
+			#IF (%nField% > mymod.fieldsAttr.NumFields)
 				#BREAK
-			#ELSEIF (mymod.Fields.InBaseLayout(%nField%))
+			#ELSEIF (mymod.fieldsAttr.InBaseLayout(%nField%))
 				#APPEND(fieldnameECL, ', \'' + TRIM(%'currentField'%) + '\'');
 				#APPEND(statvalECL, ', le.populated_' + TRIM(%'currentFlat'%) + '_cnt');
 				#APPEND(statvalECL, ', le.populated_' + TRIM(%'currentFlat'%) + '_pcnt');
@@ -96,7 +97,7 @@ EXPORT mod_StandardStatsTransforms := MODULE
 		RETURN dsStandard;
 	END;
 	
-	EXPORT mac_scrubsSummaryStatsFieldErrTransform(mymod, numfields, inLayout, srcField, outputECLText = FALSE) := MACRO
+	EXPORT mac_scrubsSummaryStatsFieldErrTransform(mymod, fieldsAttr, inLayout, srcField, outputECLText = FALSE) := MACRO
 		IMPORT mymod;
 		#DECLARE(outECL);
 		#DECLARE(fieldnameECL);
@@ -132,16 +133,16 @@ EXPORT mod_StandardStatsTransforms := MODULE
 		#APPEND(statdetailECL, '  SELF.statDetail := CHOOSE(cnt');
 		#APPEND(ruletypeECL, '  SELF.ruleType := CHOOSE(cnt');
 		#LOOP	
-			#IF (%nField% > numfields)
+			#IF (%nField% > mymod.fieldsAttr.NumFields)
 				#BREAK
-			#ELSEIF (COUNT(mymod.Fields.FieldRules(%nField%)) > 0)
-			  #SET(currentField, mymod.Fields.FieldName(%nField%));
+			#ELSEIF (COUNT(mymod.fieldsAttr.FieldRules(%nField%)) > 0)
+			  #SET(currentField, mymod.fieldsAttr.FieldName(%nField%));
 				#SET(nRule, 1);
 				#LOOP				
-					#IF (%nRule% > COUNT(mymod.Fields.FieldRules(%nField%)))
+					#IF (%nRule% > COUNT(mymod.fieldsAttr.FieldRules(%nField%)))
 						#BREAK
 					#ELSE
-					  #SET(currentRule, mymod.Fields.FieldRules(%nField%)[%nRule%]);						
+					  #SET(currentRule, mymod.fieldsAttr.FieldRules(%nField%)[%nRule%]);						
 						#APPEND(fieldnameECL, ', \'' + TRIM(%'currentField'%) + '\'');
 						#APPEND(fieldnameECL, ', \'' + TRIM(%'currentField'%) + '\'');
 						#APPEND(fieldnameECL, ', \'' + TRIM(%'currentField'%) + '\'');
@@ -154,8 +155,8 @@ EXPORT mod_StandardStatsTransforms := MODULE
 						#APPEND(statdescECL, ',  \'Scrub:' + TRIM(%'currentField'%) + '_' + TRIM(%'currentRule'%) + ':PcntRecsErr\' + IF(TRIM(suffixIn) > \'\', \'_\' + suffixIn, \'\')');
 						#APPEND(statdescECL, ',  \'Scrub:' + TRIM(%'currentField'%) + '_' + TRIM(%'currentRule'%) + ':CntRecsOk\' + IF(TRIM(suffixIn) > \'\', \'_\' + suffixIn, \'\')');
 						#APPEND(statdescECL, ',  \'Scrub:' + TRIM(%'currentField'%) + '_' + TRIM(%'currentRule'%) + ':PcntRecsOk\' + IF(TRIM(suffixIn) > \'\', \'_\' + suffixIn, \'\')');
-						#APPEND(statdetailECL, ',' + #TEXT(myMod) + '.Fields.InvalidMessage_' + TRIM(%'currentField'%) + '(' + %'nRule'% + ')');
-						#APPEND(statdetailECL, ',' + #TEXT(myMod) + '.Fields.InvalidMessage_' + TRIM(%'currentField'%) + '(' + %'nRule'% + ')');
+						#APPEND(statdetailECL, ',' + #TEXT(myMod) + '.' + #TEXT(fieldsAttr) + '.InvalidMessage_' + TRIM(%'currentField'%) + '(' + %'nRule'% + ')');
+						#APPEND(statdetailECL, ',' + #TEXT(myMod) + '.' + #TEXT(fieldsAttr) + '.InvalidMessage_' + TRIM(%'currentField'%) + '(' + %'nRule'% + ')');
 						#APPEND(statdetailECL, ', \'\'');
 						#APPEND(statdetailECL, ', \'\'');
 						#APPEND(ruleTypeECL, ', \'' + TRIM(%'currentRule'%) + '\'');
@@ -169,10 +170,10 @@ EXPORT mod_StandardStatsTransforms := MODULE
 				#APPEND(fieldnameECL, ', \'' + TRIM(%'currentField'%) + '\'');
 				#APPEND(fieldnameECL, ', \'' + TRIM(%'currentField'%) + '\'');
 				#APPEND(fieldnameECL, ', \'' + TRIM(%'currentField'%) + '\'');
-				#APPEND(statvalECL, ', le.' + TRIM(%'currentField'%) + '_' + TRIM(IF(COUNT(mymod.Fields.FieldRules(%nField%)) > 1, 'Total', TRIM(%'currentRule'%))) + '_ErrorCount');
-				#APPEND(statvalECL, ', IF(le.TotalCnt > 0, le.' + TRIM(%'currentField'%) + '_' + TRIM(IF(COUNT(mymod.Fields.FieldRules(%nField%)) > 1, 'Total', TRIM(%'currentRule'%))) + '_ErrorCount/le.TotalCnt * 100, 0)');
-				#APPEND(statvalECL, ', le.TotalCnt - le.' + TRIM(%'currentField'%) + '_' + TRIM(IF(COUNT(mymod.Fields.FieldRules(%nField%)) > 1, 'Total', TRIM(%'currentRule'%))) + '_ErrorCount');
-				#APPEND(statvalECL, ', IF(le.TotalCnt > 0, (le.TotalCnt - le.' + TRIM(%'currentField'%) + '_' + TRIM(IF(COUNT(mymod.Fields.FieldRules(%nField%)) > 1, 'Total', TRIM(%'currentRule'%))) + '_ErrorCount)/le.TotalCnt * 100, 0)');
+				#APPEND(statvalECL, ', le.' + TRIM(%'currentField'%) + '_' + TRIM(IF(COUNT(mymod.fieldsAttr.FieldRules(%nField%)) > 1, 'Total', TRIM(%'currentRule'%))) + '_ErrorCount');
+				#APPEND(statvalECL, ', IF(le.TotalCnt > 0, le.' + TRIM(%'currentField'%) + '_' + TRIM(IF(COUNT(mymod.fieldsAttr.FieldRules(%nField%)) > 1, 'Total', TRIM(%'currentRule'%))) + '_ErrorCount/le.TotalCnt * 100, 0)');
+				#APPEND(statvalECL, ', le.TotalCnt - le.' + TRIM(%'currentField'%) + '_' + TRIM(IF(COUNT(mymod.fieldsAttr.FieldRules(%nField%)) > 1, 'Total', TRIM(%'currentRule'%))) + '_ErrorCount');
+				#APPEND(statvalECL, ', IF(le.TotalCnt > 0, (le.TotalCnt - le.' + TRIM(%'currentField'%) + '_' + TRIM(IF(COUNT(mymod.fieldsAttr.FieldRules(%nField%)) > 1, 'Total', TRIM(%'currentRule'%))) + '_ErrorCount)/le.TotalCnt * 100, 0)');
 				#APPEND(statdescECL, ',  \'Scrub:' + TRIM(%'currentField'%) + '_Total:CntRecsErr\' + IF(TRIM(suffixIn) > \'\', \'_\' + suffixIn, \'\')');
 				#APPEND(statdescECL, ',  \'Scrub:' + TRIM(%'currentField'%) + '_Total:PcntRecsErr\' + IF(TRIM(suffixIn) > \'\', \'_\' + suffixIn, \'\')');
 				#APPEND(statdescECL, ',  \'Scrub:' + TRIM(%'currentField'%) + '_Total:CntRecsOk\' + IF(TRIM(suffixIn) > \'\', \'_\' + suffixIn, \'\')');
@@ -198,7 +199,7 @@ EXPORT mod_StandardStatsTransforms := MODULE
 		#APPEND(outECL, %'statdescECL'%);
 		#APPEND(outECL, %'statdetailECL'%);
 		#APPEND(outECL, %'ruletypeECL'%);
-		#APPEND(outECL, '  SELF.measureType := CHOOSE(cnt % 2, \'RecCnt\', \'RecPcnt\');\n');
+		#APPEND(outECL, '  SELF.measureType := CHOOSE(cnt % 2, \'CntRecs\', \'PcntRecs\');\n');
 		#APPEND(outECL, '  SELF.statCategory := \'Scrub\';\n');
 		#APPEND(outECL, '  SELF.statCategory_More := statCategoryMoreIn;\n');
 		#APPEND(outECL, '  SELF := [];\n');
@@ -220,7 +221,7 @@ EXPORT mod_StandardStatsTransforms := MODULE
 			#END
 			SELF.statCategory := 'Scrub';
 			SELF.statCategory_More := statCategoryMoreIn;
-			SELF.measureType := CHOOSE(cnt, 'RecCnt', 'RecCnt', 'FieldCnt', 'FieldCnt', 'RuleCnt', 'RuleCnt', 'UNKNOWN');
+			SELF.measureType := CHOOSE(cnt, 'CntRecs', 'CntRecs', 'CntFields', 'CntFields', 'CntRules', 'CntRules', 'UNKNOWN');
 			SELF.statDesc := 'Scrub:' + TRIM(CHOOSE(cnt, 'AnyRule:CntRecsErr', 'AnyRule:CntRecsOk', 'AnyRule:CntFieldsErr', 'AnyRule:CntFieldsOk', 'AnyRule:CntRulesErr', 'AnyRule:CntRulesOk', 'UNKNOWN')) + IF(TRIM(suffixIn) > '', '_' + suffixIn, '');
 			SELF.statValue := CHOOSE(cnt, le.AnyRule_WithErrorsCount, le.TotalCnt - le.AnyRule_WithErrorsCount, le.FieldsChecked_WithErrors, le.FieldsChecked_NoErrors, le.Rules_WithErrors, le.Rules_NoErrors, 0);
 			SELF := [];
@@ -241,6 +242,7 @@ EXPORT mod_StandardStatsTransforms := MODULE
 		#SET(fieldnameECL, '');
 		#SET(statvalECL, '');
 		#SET(nField, 1);
+
 		#APPEND(outECL, 'SALT38.Layout_Stats_Standard.Main xByRIDFieldChanges(' + inLayout + 'le, INTEGER cnt, UNSIGNED useTimestamp, STRING suffixIn = \'\', STRING statCategoryMoreIn = \'\') := TRANSFORM\n');
 		#APPEND(outECL, '  SELF.dateTimeStamp := useTimeStamp;\n');
 		#APPEND(outECL, '  SELF.wuid := WORKUNIT;\n');
@@ -264,7 +266,7 @@ EXPORT mod_StandardStatsTransforms := MODULE
 		#APPEND(statvalECL, ', 0);\n');
 		#APPEND(outECL, %'fieldnameECL'%);
 		#APPEND(outECL, %'statvalECL'%);
-		#APPEND(outECL, '  SELF.measureType := \'RecCnt\';\n');
+		#APPEND(outECL, '  SELF.measureType := \'CntRecs\';\n');
 		#APPEND(outECL, '  SELF.statCategory := \'FieldInfo\';\n');
 		#APPEND(outECL, '  SELF.statCategory_More := CHOOSE(cnt % 3, \'added\', \'removed\', \'modified\');\n');
 		#APPEND(outECL, '  useSuffix := IF(TRIM(suffixIn) > \'\', \'_\' + suffixIn, \'\');\n');
@@ -288,6 +290,7 @@ EXPORT mod_StandardStatsTransforms := MODULE
 		#SET(fieldnameECL, '');
 		#SET(statvalECL, '');
 		#SET(nField, 1);
+
 		#APPEND(outECL, 'SALT38.Layout_Stats_Standard.Main xBySrcRIDFieldChanges(' + inLayout + 'le, INTEGER cnt, UNSIGNED useTimestamp, STRING suffixIn = \'\', STRING statCategoryMoreIn = \'\') := TRANSFORM\n');
 		#APPEND(outECL, '  SELF.dateTimeStamp := useTimeStamp;\n');
 		#APPEND(outECL, '  SELF.wuid := WORKUNIT;\n');
@@ -323,4 +326,5 @@ EXPORT mod_StandardStatsTransforms := MODULE
 			%outECL%;
 		#END
 	ENDMACRO;
+
 END;
