@@ -1,7 +1,7 @@
 ﻿IMPORT STD;
 EXPORT Fn_Now(STRING dt_resolution) := FUNCTION
-	nowDate := (STRING)STD.Date.Today();
-	nowTime := (STRING)STD.Date.CurrentTime(TRUE);
+	nowDate := INTFORMAT(STD.Date.Today(),8,1);
+	nowTime := INTFORMAT(STD.Date.CurrentTime(TRUE),6,1);
 	nowDateTime := nowDate + nowTime;
 	
 	nowUse := MAP(dt_resolution = 'YYYYMMDDHHMMSS' => nowDateTime,

@@ -67,6 +67,7 @@ EXPORT mac_Patch_spcString(
 		,SELF.rid					:= LEFT.rid
 		,SELF.realfield		:= stringlib.stringtolowercase(LEFT.realfield)
 	));
+
 	//join SPC file dataset to specificities dataset to replace specificities in the spc file
 	LOCAL djoin2 := JOIN(
 		 datts_getnumrecs

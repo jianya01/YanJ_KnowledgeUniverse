@@ -1,10 +1,10 @@
-﻿﻿IMPORT STD, SALT37, SALTRoutines;
+﻿﻿IMPORT STD, SALT38, SALTRoutines;
 FieldTypeLayout := RECORD
 	UNSIGNED8 Field_Number;
 	STRING Field_Name;
 	STRING Potential_KEL_Field_Type;
 	STRING Potential_ECL_Field_Type;
-	RECORDOF(SALT37.MAC_Character_Counts.ResultLine_Layout) - cardinality - minval30 - maxval30 - asnumber_minval - asnumber_maxval - asnumber_mean - asnumber_var - len - words - characters - fldno - fieldname;
+	RECORDOF(SALT38.MAC_Character_Counts.ResultLine_Layout) - cardinality - minval30 - maxval30 - asnumber_minval - asnumber_maxval - asnumber_mean - asnumber_var - len - words - characters - fldno - fieldname;
 END;
 EXPORT SALT_Profile_Produce_ENTITY(DATASET(FieldTypeLayout) FieldTypes, INTEGER NumberOfDataPatternsToShow = 5, INTEGER NumberOfFrequentTermsToShow = 3) := FUNCTION
 	populatedFields := FieldTypes (TRIM(Potential_KEL_Field_Type) != 'Never Populated: STRING' AND TRIM(Potential_KEL_Field_Type) != 'Never Populated: INTEGER');

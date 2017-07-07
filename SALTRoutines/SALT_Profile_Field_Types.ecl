@@ -1,9 +1,9 @@
 ﻿// This function takes in a SALT profile, the number of data patterns to show (-1 == show all), 
 // and then outputs some potential field type information for both KEL and ECL
 
-IMPORT SALT37;
+IMPORT SALT38;
 
-EXPORT SALT_Profile_Field_Types(DATASET(SALT37.MAC_Character_Counts.ResultLine_Layout) InputSALTProfile, INTEGER NumberOfDataPatternsToShow = 5, INTEGER NumberOfFrequentTermsToShow = 3) := FUNCTION
+EXPORT SALT_Profile_Field_Types(DATASET(SALT38.MAC_Character_Counts.ResultLine_Layout) InputSALTProfile, INTEGER NumberOfDataPatternsToShow = 5, INTEGER NumberOfFrequentTermsToShow = 3) := FUNCTION
 	SlimmedSALTProfile := PROJECT(InputSALTProfile, TRANSFORM({RECORDOF(LEFT) - cardinality - minval30 - maxval30 - asnumber_minval - asnumber_maxval - asnumber_mean - asnumber_var - len - words - characters}, SELF := LEFT));
 	
 	FieldTypeLayout := RECORD

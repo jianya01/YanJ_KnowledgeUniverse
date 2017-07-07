@@ -5,7 +5,7 @@
 #WORKUNIT('name', 'SALT_Profile_CLUE_Property');
 #WORKUNIT('protect', TRUE); // Comment this out if you DON'T want your SALT profile to be protected from auto-archiving and deletion
 
-IMPORT SALT37, SALTRoutines, KELBlackBox; 
+IMPORT SALT38, SALTRoutines, KELBlackBox; 
 
 // ---- Step 1.) Read in your data ----
 RawInputDataset := KELBlackBox.FileCLUECleaned.FileCLUEPropertyCleaned;

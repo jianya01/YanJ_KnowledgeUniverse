@@ -1,9 +1,9 @@
-﻿IMPORT SALT37, SALTRoutines;
+﻿IMPORT SALT38, SALTRoutines;
 
 EXPORT SALT_Profile_Run_Everything(RawInputDataset, FileName = '', UIDField = '', SourceField = '') := FUNCTIONMACRO
 	myInputDataset := SALTRoutines.MAC_Eliminate_Child_Datasets(RawInputDataset, FileName);
 	SALTRoutines.Mac_Flatten(myInputDataset, myFlatInputDataset);
-	SALTProfileResults := SALT37.MOD_Profile(myFlatInputDataset, UIDField, SourceField);
+	SALTProfileResults := SALT38.MOD_Profile(myFlatInputDataset, UIDField, SourceField);
 	SALTFullProfile := SALTProfileResults.AllProfiles;
 	SALTFieldTypes := SALTRoutines.SALT_Profile_Field_Types(SALTFullProfile, 5, 3);
 
