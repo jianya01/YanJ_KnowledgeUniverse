@@ -23,8 +23,8 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
   END;
  
   // Ingest0: Merge Base with IngestFiles to get old, new and unchanged
-  Ingest0 := JOIN( Base0,FilesToIngest0,LEFT.vault_uid_hash=RIGHT.vault_uid_hash AND LEFT.transaction_id=RIGHT.transaction_id AND LEFT.product_id=RIGHT.product_id AND LEFT.date_added=RIGHT.date_added AND LEFT.process_type=RIGHT.process_type AND LEFT.processing_time=RIGHT.processing_time AND LEFT.vendor_code=RIGHT.vendor_code
-              AND LEFT.request_type=RIGHT.request_type AND LEFT.product_version=RIGHT.product_version AND LEFT.reference_number=RIGHT.reference_number AND LEFT.content_data=RIGHT.content_data AND LEFT.vault_date_first_seen=RIGHT.vault_date_first_seen AND LEFT.vault_date_last_seen=RIGHT.vault_date_last_seen,MergeData(LEFT,RIGHT),FULL OUTER,HASH);
+  Ingest0 := JOIN( Base0,FilesToIngest0,LEFT.vault_uid_hash=RIGHT.vault_uid_hash AND LEFT.batch_job_id=RIGHT.batch_job_id AND LEFT.product_id=RIGHT.product_id AND LEFT.start_time=RIGHT.start_time AND LEFT.end_time=RIGHT.end_time AND LEFT.total_process_time=RIGHT.total_process_time AND LEFT.account=RIGHT.account
+              AND LEFT.total_order=RIGHT.total_order AND LEFT.hits=RIGHT.hits AND LEFT.no_hits=RIGHT.no_hits AND LEFT.errors=RIGHT.errors AND LEFT.date_added=RIGHT.date_added AND LEFT.vault_date_first_seen=RIGHT.vault_date_first_seen AND LEFT.vault_date_last_seen=RIGHT.vault_date_last_seen,MergeData(LEFT,RIGHT),FULL OUTER,HASH);
   WithRT MergeData1(WithRT le, WithRT ri) := TRANSFORM // old, updated, new
     SELF.vault_date_first_seen := MAP (le.__Tpe = 0 => ri.vault_date_first_seen,ri.__Tpe = 0 => le.vault_date_first_seen,le.vault_date_first_seen<ri.vault_date_first_seen => le.vault_date_first_seen,ri.vault_date_first_seen);
     SELF.__Tpe := MAP (le.__Tpe = 0 => ri.__Tpe,ri.__Tpe = 0 => le.__Tpe,RecordType.Updated);
@@ -32,8 +32,8 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
   END;
  
   // Ingest1: Merge Open Old with Open New to get old, updated, new
-  Ingest1 := JOIN( Ingest0(__Tpe=RecordType.Old),Ingest0(__Tpe=RecordType.New),LEFT.vault_uid_hash=RIGHT.vault_uid_hash AND LEFT.transaction_id=RIGHT.transaction_id AND LEFT.product_id=RIGHT.product_id AND LEFT.date_added=RIGHT.date_added AND LEFT.process_type=RIGHT.process_type AND LEFT.processing_time=RIGHT.processing_time AND LEFT.vendor_code=RIGHT.vendor_code
-              AND LEFT.request_type=RIGHT.request_type AND LEFT.product_version=RIGHT.product_version AND LEFT.reference_number=RIGHT.reference_number AND LEFT.content_data=RIGHT.content_data AND LEFT.vault_date_last_seen=0 AND RIGHT.vault_date_last_seen=0,MergeData1(LEFT,RIGHT),FULL OUTER,HASH);
+  Ingest1 := JOIN( Ingest0(__Tpe=RecordType.Old),Ingest0(__Tpe=RecordType.New),LEFT.vault_uid_hash=RIGHT.vault_uid_hash AND LEFT.batch_job_id=RIGHT.batch_job_id AND LEFT.product_id=RIGHT.product_id AND LEFT.start_time=RIGHT.start_time AND LEFT.end_time=RIGHT.end_time AND LEFT.total_process_time=RIGHT.total_process_time AND LEFT.account=RIGHT.account
+              AND LEFT.total_order=RIGHT.total_order AND LEFT.hits=RIGHT.hits AND LEFT.no_hits=RIGHT.no_hits AND LEFT.errors=RIGHT.errors AND LEFT.date_added=RIGHT.date_added AND LEFT.vault_date_last_seen=0 AND RIGHT.vault_date_last_seen=0,MergeData1(LEFT,RIGHT),FULL OUTER,HASH);
   WithRT CloseRecords(WithRT le, WithRT ri) := TRANSFORM
     SELF.vault_date_last_seen := IF(ri.__Tpe=0,le.vault_date_last_seen,(TYPEOF(ri.vault_date_first_seen))SALT38.Fn_DecrementDate(ri.vault_date_first_seen,'YYYYMMDD'));
     SELF.__Tpe := IF(ri.__Tpe=0,le.__Tpe,RecordType.Updated);
@@ -62,7 +62,7 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
     SELF := ri;
   END;
   NR1 := ITERATE(NR(vault_rid=0),AddNewRid(LEFT,RIGHT),LOCAL);
-  SHARED AllRecs := ORe+NR1+NR(vault_rid<>0) : PERSIST('~temp::I_dataenh_inquiry_history::Ingest_Cache',EXPIRE(I_dataenh_inquiry_history.Config.PersistExpire));
+  SHARED AllRecs := ORe+NR1+NR(vault_rid<>0) : PERSIST('~temp::I_dataenh_transaction_log_batch_summary::Ingest_Cache',EXPIRE(I_dataenh_transaction_log_batch_summary.Config.PersistExpire));
   EXPORT UpdateStats := SORT(TABLE(AllRecs, {__Tpe,SALT38.StrType INGESTSTATUS:=RTToText(AllRecs.__Tpe),UNSIGNED Cnt:=COUNT(GROUP)}, __Tpe, FEW),__Tpe, FEW);
   SHARED S0 := OUTPUT(UpdateStats, {{UpdateStats} AND NOT __Tpe}, ALL, NAMED('UpdateStats'));
  
