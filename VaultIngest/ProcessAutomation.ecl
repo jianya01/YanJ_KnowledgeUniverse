@@ -29,7 +29,7 @@
 	
 	ProcessBuild := IF (VerifyUniqueCount, 
    											SEQUENTIAL(VaultIngest.BuildAutomation(pModule,pBaseprefix,pBaseSuffix,pVaultFileDS,pEmailSourceIn)),
-												Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_EmailAddresses, FailureProcessSubject, FailureProcessBody)); //failure email
+												Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_DataDev_EmailAddresses, FailureProcessSubject, FailureProcessBody)); //failure email
 	
 	RETURN ProcessBuild;				
 	
