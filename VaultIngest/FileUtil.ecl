@@ -8,11 +8,11 @@
    		RETURN OUTPUT(Dset, ,FileNameNewLogical, CSV(HEADING(0),SEPARATOR(['|']),TERMINATOR(['\n','\r\n','\n\r'])), OVERWRITE, __COMPRESSED__);
    		
 	END;
-   	
+	
 	EXPORT FN_OutputFile(DATASET Dset, STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION
 
-   		FileNameNewLogical := TRIM(IF(Append = '', FileNamePrefix + '::' + WORKUNIT[2..9] + '::' + Suffix, 
-																		FileNamePrefix + '::' + Append + '::' + Suffix), ALL);
+   		FileNameNewLogical := TRIM(IF(Append = '', FileNamePrefix + '::' +  Suffix + '::' + WORKUNIT[2..9], 
+																		FileNamePrefix + '::' + Suffix + '::' + Append), ALL);
 
 		  RETURN OUTPUT(Dset, , FileNameNewLogical, OVERWRITE, __COMPRESSED__);	
 					 
@@ -20,11 +20,11 @@
    
   EXPORT FN_PromoteFile(STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION   	
    
-   		FileNameNewLogical 				:= TRIM(IF(TRIM(Append,LEFT,RIGHT) = '', FileNamePrefix + '::' + WORKUNIT[2..9] + '::' + Suffix, 
-																				FileNamePrefix + '::' + Append + '::' + Suffix), ALL);
-   		FileNameProd	 						:= TRIM(FileNamePrefix + '::prod::' + Suffix, ALL);
-   		FileNameFather 						:= TRIM(FileNamePrefix + '::father::' + Suffix, ALL);
-   		FileNameGrandFather 			:= TRIM(FileNamePrefix + '::grandfather::' + Suffix, ALL);
+   		FileNameNewLogical 				:= TRIM(IF(TRIM(Append,LEFT,RIGHT) = '', FileNamePrefix +  '::' +  Suffix + '::' + WORKUNIT[2..9], 
+																				FileNamePrefix + '::' + Suffix + '::' + Append ), ALL);
+   		FileNameProd	 						:= TRIM(FileNamePrefix + '::' + Suffix + '::prod' , ALL);
+   		FileNameFather 						:= TRIM(FileNamePrefix + '::' + Suffix + '::father' , ALL);
+   		FileNameGrandFather 			:= TRIM(FileNamePrefix + '::' + Suffix + '::grandfather' , ALL);
    
    		PromotionList := FileServices.PromoteSuperFileList([FileNameProd,
    																												FileNameFather,
@@ -33,6 +33,32 @@
    
    		RETURN PromotionList;
   END;
+/*    	
+   	EXPORT FN_OutputFile(DATASET Dset, STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION
+   
+      		FileNameNewLogical := TRIM(IF(Append = '', FileNamePrefix + '::' + WORKUNIT[2..9] + '::' + Suffix, 
+   																		FileNamePrefix + '::' + Append + '::' + Suffix), ALL);
+   
+   		  RETURN OUTPUT(Dset, , FileNameNewLogical, OVERWRITE, __COMPRESSED__);	
+   					 
+   	END;
+      
+     EXPORT FN_PromoteFile(STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION   	
+      
+      		FileNameNewLogical 				:= TRIM(IF(TRIM(Append,LEFT,RIGHT) = '', FileNamePrefix + '::' + WORKUNIT[2..9] + '::' + Suffix, 
+   																				FileNamePrefix + '::' + Append + '::' + Suffix), ALL);
+      		FileNameProd	 						:= TRIM(FileNamePrefix + '::prod::' + Suffix, ALL);
+      		FileNameFather 						:= TRIM(FileNamePrefix + '::father::' + Suffix, ALL);
+      		FileNameGrandFather 			:= TRIM(FileNamePrefix + '::grandfather::' + Suffix, ALL);
+      
+      		PromotionList := FileServices.PromoteSuperFileList([FileNameProd,
+      																												FileNameFather,
+      																												FileNameGrandFather],
+      																											  FileNameNewLogical, TRUE);
+      
+      		RETURN PromotionList;
+     END;
+*/
 	
   EXPORT FN_PromoteSingleFile(STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION   	
    

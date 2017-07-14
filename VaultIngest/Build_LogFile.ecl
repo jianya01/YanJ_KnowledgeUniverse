@@ -1,7 +1,8 @@
 ﻿EXPORT Build_LogFile(pVaultFile, pBaseprefix, pBaseSuffix) := FUNCTIONMACRO
 
 
-	LogFile_Existing := pBaseprefix + '::prod::' + pBaseSuffix + '::LogFile';
+	// LogFile_Existing := pBaseprefix + '::prod::' + pBaseSuffix + '::LogFile';
+	LogFile_Existing := pBaseprefix + '::' + pBaseSuffix + '::LogFile::'+'prod';
 	
 	LogFile_Existing_DS := DATASET(LogFile_Existing, Vault_Layout.LogFile_Layout, THOR, OPT);
 	
