@@ -1,8 +1,8 @@
-﻿EXPORT Build_LogFile(pVaultFile, pBaseprefix, pBaseSuffix) := FUNCTIONMACRO
+﻿EXPORT Build_LogFile(pBuildfilename,pVaultFile, pBaseprefix, pBaseSuffix) := FUNCTIONMACRO
 
 
-	// LogFile_Existing := pBaseprefix + '::prod::' + pBaseSuffix + '::LogFile';
-	LogFile_Existing := pBaseprefix + '::' + pBaseSuffix + '::LogFile::'+'prod';
+	LogFile_Existing := pBaseprefix + '::prod::' + pBaseSuffix + '::LogFile';
+	// LogFile_Existing := pBaseprefix + '::' + pBaseSuffix + '::LogFile::'+'prod';
 	
 	LogFile_Existing_DS := DATASET(LogFile_Existing, Vault_Layout.LogFile_Layout, THOR, OPT);
 	
@@ -13,7 +13,9 @@
    													COUNT(pVaultFile(vault_date_last_seen = 0)),// active as per current build
    													COUNT(pVaultFile(vault_record_status = 5 AND Vault_Date_Last_Seen = Yesterday)),//Updated
    													COUNT(pVaultFile(vault_record_status = 6)),//new
-   													COUNT(pVaultFile(vault_record_status = 4))//unchanged
+   													COUNT(pVaultFile(vault_record_status = 4)),//unchanged
+														pBuildfilename,
+														WORKUNIT
    													}],
    													Vault_Layout.LogFile_Layout);
 									

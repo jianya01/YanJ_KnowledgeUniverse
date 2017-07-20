@@ -23,11 +23,12 @@ EXPORT BuildAutomation(pModule,
 										 'The Workunit is ' + WORKUNIT + '\n'+
 										 'ErrorMessage is ' + FAILMESSAGE + '\n\n';		
 	
+	pBuildfilename := pModule.constants.BasePrefix+'::'+WORKUNIT[2..9] + WORKUNIT[11..16]+'::'+pModule.constants.BaseSuffix;
 	CreateFile := SEQUENTIAL(VaultIngest.FileUtil.FN_OutputAndPromoteFile(final, pBaseprefix, pBaseSuffix, WORKUNIT[2..9] + WORKUNIT[11..16]),
 														ingestMod.DoStats, 
-														// STD.File.SetFileDescription(pModule.Constants.BasePrefix+'::prod::'+pModule.Constants.BaseSuffix, STD.Str.FilterOut(pModule.Constants.SourceFileName, '~')),
-														STD.File.SetFileDescription(pModule.Constants.BasePrefix+'::'+pModule.Constants.BaseSuffix+'::prod', STD.Str.FilterOut(pModule.Constants.SourceFileName, '~')),
-														VaultIngest.Build_LogFile(pVaultFileDS, pBaseprefix, pBaseSuffix),
+														STD.File.SetFileDescription(pModule.Constants.BasePrefix+'::prod::'+pModule.Constants.BaseSuffix, STD.Str.FilterOut(pModule.Constants.SourceFileName, '~')),
+														// STD.File.SetFileDescription(pModule.Constants.BasePrefix+'::'+pModule.Constants.BaseSuffix+'::prod', STD.Str.FilterOut(pModule.Constants.SourceFileName, '~')),
+														VaultIngest.Build_LogFile(pBuildfilename,pVaultFileDS, pBaseprefix, pBaseSuffix),
 														Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_EmailAddresses, Successsubject, Successbody)) 
 													: FAILURE(Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_EmailAddresses, Failuresubject, Failurebody));
 									

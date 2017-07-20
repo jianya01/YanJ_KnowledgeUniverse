@@ -5,4 +5,6 @@
 	UNSIGNED8 Records_Expired;//updated
 	UNSIGNED8 Records_New;//new
 	UNSIGNED8 Records_Unchanged;//unchanged
+	string80 file_name;
+	string20 wuid;
 END;
