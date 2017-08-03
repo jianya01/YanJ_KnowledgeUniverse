@@ -1,2 +1,4 @@
-﻿EXPORT TransactionIDFilterSet := [];
-// EXPORT TransactionIDFilterSet := ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194'];
+﻿// EXPORT TransactionIDFilterSet := DATASET([], {STRING75 TransactionID}); // Include every single TransactionID in the base files (Full File Runs)
+// EXPORT TransactionIDFilterSet := DATASET('~bpahl::suspect_addr::filterTransactionIDs', {STRING75 TransactionID}, THOR, __COMPRESSED__); // Grab a set of TransactionID's from a file (Filtered File Runs)
+// EXPORT TransactionIDFilterSet := NORMALIZE(DATASET([0], {STRING75 TransactionID}), /*NumberOfTransactionIDs*/500, TRANSFORM({STRING75 TransactionID}, SELF.TransactionID := (STRING)(COUNTER + (/*StartingNumber*/1 - 1)))); // Set up a range of TransactionID's to filter by (Only works when Transaction ID is numeric)
+EXPORT TransactionIDFilterSet := DATASET(['6994415R3141133', '8778015R13971833', '0F19ADA9C0X3382'], {STRING75 TransactionID}); // Filter the base files to only keep the records which have a TransactionID in this set (Filtered File Runs)
