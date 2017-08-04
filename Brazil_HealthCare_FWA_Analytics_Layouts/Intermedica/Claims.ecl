@@ -1,4 +1,6 @@
-﻿insurer_rec := RECORD
+﻿IMPORT _Control;
+
+insurer_rec := RECORD
    string25 insurerirdacode;
    string128 insurername;
   END;
@@ -77,4 +79,6 @@ LayoutClaim := RECORD
  END;
  
 fileName := '~thor::base::global::health::brazil::201770606::claims';
-EXPORT ClaimsIntermedica := DATASET(fileName, LayoutClaim, THOR);
+EXPORT Claims := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+	DATASET(fileName, LayoutClaim, THOR),
+	DATASET(fileName, LayoutClaim, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

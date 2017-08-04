@@ -1,4 +1,6 @@
-﻿LayoutLine := RECORD
+﻿IMPORT _Control;
+
+LayoutLine := RECORD
   string5 insurerirdacode;
   string55 generatedkey;
   string2 claimtype;
@@ -45,4 +47,6 @@
  END;
 
 fileName := '~thor::base::global::health::brazil::201770606::lineitem';
-EXPORT LineItemIntermedica := DATASET(fileName, LayoutLine, THOR);
+EXPORT LineItem := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+	DATASET(fileName, LayoutLine, THOR),
+	DATASET(fileName, LayoutLine, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

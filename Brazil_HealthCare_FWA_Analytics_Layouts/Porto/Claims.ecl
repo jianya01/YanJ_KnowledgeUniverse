@@ -1,5 +1,4 @@
 ﻿IMPORT _Control;
-
 insurer_rec := RECORD
    string25 insurerirdacode;
    string128 insurername;
@@ -52,6 +51,9 @@ LayoutClaim := RECORD
   decimal12_2 totalcorporateamountfloaterusedamount;
   decimal12_2 totaldisallowedamount;
   decimal12_2 totalpaidamount;
+  decimal12_2 deductibleamount;
+  decimal12_2 coordinationofbenefitsamount;
+  decimal12_2 coinsuranceamount;
   string1000 tparemarks;
   string12 policysi;
   string12 policybsi;
@@ -69,16 +71,30 @@ LayoutClaim := RECORD
   string11 deathregistration;
   string5 adjustmentcode;
   string2 adjustmentnumber;
-  string2 authorizationcode;
   string2 source_ae_or_ca;
   string25 tranreferencenumber;
-  string10 requestreceiveddate;
-  string1 requestimpact;
-  string2 requeststatus;
-  string20 requeststatusdescription;
+  string50 pcpproviderkey;
+  string50 billingproviderkey;
+  string50 referingproviderkey;
+  string51 primaryinsuredkey;
+  string10 facilitynpi;
+  string9 companyid;
+  string10 claimlinenumber;
+  string8 servicedate;
+  string20 agreementid;
+  string12 lineofbusiness;
+  string20 typeofplan;
+  string20 benefitplan;
+  string8 claimreceiveddate;
+  string22 claimdateandtimestamp;
+  string2 securitycode;
  END;
+
  
-fileName := '~thor::base::global::health::brazil::test::full::version2::20170726::claims';//~thor::base::global::health::brazil::test::full::20170721::claims'; //testdata - thor::base::global::health::brazil::201770606::claims
-EXPORT ClaimsPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+fileName := '~thor::base::health::brazil::test::full::version::20170802::claims';//~thor::base::global::health::brazil::test::full::20170721::claims'; //testdata - thor::base::global::health::brazil::201770606::claims
+EXPORT Claims := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutClaim, THOR),
-	JOIN(DATASET(fileName, LayoutClaim, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutClaim,self:=left)));
+	DATASET(fileName, LayoutClaim, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
+// EXPORT ClaimsPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+	// DATASET(fileName, LayoutClaim, THOR),
+	// JOIN(DATASET(fileName, LayoutClaim, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutClaim,self:=left)));

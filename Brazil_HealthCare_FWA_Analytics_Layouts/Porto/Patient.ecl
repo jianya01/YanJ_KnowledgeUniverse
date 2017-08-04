@@ -1,4 +1,12 @@
-﻿addresslayout := RECORD
+﻿IMPORT _Control;
+
+namelayout := RECORD
+   string35 firstname;
+   string35 middlename;
+   string35 lastname;
+  END;
+
+addresslayout := RECORD
    string20 countryname;
    string20 statename;
    string25 cityname;
@@ -30,13 +38,17 @@ LayoutPatient := RECORD
   string50 industryinsuredid;
   string10 industryinsuredidtype;
   string25 policycertificatenumber;
+  string12 patientnumber;
+  string50 medicalrecnumber;
+  string patientacctnumber;
+  string1 patientstatus;
   string50 employeeid;
   string2 familylinkid;
   string1 patientsameasprimarymemberindicator;
   string1 patientsameasproposerindicator;
   string10 employeedoj;
   string10 employeedoe;
-  string128 name;
+  namelayout name;
   string10 dateofbirth;
   string10 dateofdeath;
   string1 gender;
@@ -49,11 +61,15 @@ LayoutPatient := RECORD
   string2 authorizationcode;
   string50 primaryinsuredmemberkey;
   string25 tpainsuredid;
-  string10 iligibledate;
   string50 planname;
   string10 eligibledate;
   string50 plannumber;
  END;
 
-fileName := '~thor::base::global::health::brazil::201770606::patient';
-EXPORT PatientIntermedica := DATASET(fileName, LayoutPatient, THOR);
+fileName := '~thor::base::health::brazil::test::full::version::20170802::patient';//~thor::base::global::health::brazil::test::full::20170721::patient';
+EXPORT Patient := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+	DATASET(fileName, LayoutPatient, THOR),
+	DATASET(fileName, LayoutPatient, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
+// EXPORT PatientPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+	// DATASET(fileName, LayoutPatient, THOR),
+	// JOIN(DATASET(fileName, LayoutPatient, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutPatient,self:=left)));

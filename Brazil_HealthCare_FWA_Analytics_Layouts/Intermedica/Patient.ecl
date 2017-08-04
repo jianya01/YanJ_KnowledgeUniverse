@@ -51,12 +51,13 @@ LayoutPatient := RECORD
   string2 authorizationcode;
   string50 primaryinsuredmemberkey;
   string25 tpainsuredid;
+  string10 iligibledate;
   string50 planname;
   string10 eligibledate;
   string50 plannumber;
  END;
 
-fileName := '~thor::base::global::health::brazil::test::full::version2::20170726::patient';//~thor::base::global::health::brazil::test::full::20170721::patient';
-EXPORT PatientPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+fileName := '~thor::base::global::health::brazil::201770606::patient';
+EXPORT Patient := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutPatient, THOR),
-	JOIN(DATASET(fileName, LayoutPatient, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutPatient,self:=left)));
+	DATASET(fileName, LayoutPatient, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

@@ -1,9 +1,5 @@
 ﻿IMPORT _Control;
 
-specialitydetail_rec := RECORD
-   string10 specialitycode;
-  END;
-
 addresslayout := RECORD
    string20 countryname;
    string20 statename;
@@ -34,13 +30,11 @@ LayoutProvider := RECORD
   string10 taxonomy;
   string12 providerfacilitynumber;
   string1 watchcode;
-  DATASET(specialitydetail_rec) specialitydetails;
+  string9 specialitydetails;
   addresslayout address;
  END;
 
-
-fileName := '~analyt_thor400_90_dev::thor::base::global::health::brazil::test::full::version2::20170726::provider';//~thor::base::global::health::brazil::test::full::20170721::provider'; //testdata - thor::base::global::health::brazil::201770606::provider
-EXPORT ProviderPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+fileName := '~thor::base::global::health::brazil::201770606::provider';
+EXPORT Provider := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutProvider, THOR),
-	JOIN(DATASET(fileName, LayoutProvider, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutProvider,self:=left)));
-	
+	DATASET(fileName, LayoutProvider, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

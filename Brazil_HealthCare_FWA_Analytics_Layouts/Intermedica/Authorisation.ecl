@@ -1,4 +1,6 @@
-﻿LayoutAuthorization := RECORD
+﻿IMPORT _Control;
+
+LayoutAuthorization := RECORD
   string5 insurerirdacode;
   string55 generatedkey;
   string2 claimtype;
@@ -12,4 +14,6 @@
  END;
 
 fileName := '~thor::base::global::health::brazil::201770606::auhtorisationdetails';
-EXPORT AuthorisationIntermedica := DATASET(fileName, LayoutAuthorization, THOR);
+EXPORT Authorisation := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+	DATASET(fileName, LayoutAuthorization, THOR),
+	DATASET(fileName, LayoutAuthorization, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

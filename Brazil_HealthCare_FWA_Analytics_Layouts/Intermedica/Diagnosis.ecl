@@ -1,4 +1,6 @@
-﻿diagnosistype_rec := RECORD
+﻿IMPORT _Control;
+
+diagnosistype_rec := RECORD
    string2 source;
    string20 diagnosiscode;
    string2 codetype;
@@ -72,4 +74,6 @@ LayoutDiagnosis := RECORD
  END;
 
 fileName := '~thor::base::global::health::brazil::201770606::diagnosisdetails';
-EXPORT DiagnosisIntermedica := DATASET(fileName, LayoutDiagnosis, THOR);
+EXPORT Diagnosis := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+	DATASET(fileName, LayoutDiagnosis, THOR),
+	DATASET(fileName, LayoutDiagnosis, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

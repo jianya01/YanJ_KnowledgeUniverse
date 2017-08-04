@@ -4,6 +4,7 @@ LayoutLine := RECORD
   string5 insurerirdacode;
   string55 generatedkey;
   string2 claimtype;
+  string97 transactionid;
   string datasource;
   integer2 expensetype;
   string300 otherexpensetypedescription;
@@ -44,9 +45,13 @@ LayoutLine := RECORD
   string1 priceindicator;
   decimal12_2 chargeamount;
   decimal12_2 reasonableandcustomaryamount;
+  string1 networkindicator;
  END;
 
-fileName := '~thor::base::global::health::brazil::test::full::version2::20170726::lineitem';//~thor::base::global::health::brazil::test::full::20170721::lineitem'; //testdata - thor::base::global::health::brazil::201770606::lineitem
-EXPORT LineItemPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+fileName := '~thor::base::health::brazil::test::full::version::20170802::lineitem';//~thor::base::global::health::brazil::test::full::20170721::lineitem'; //testdata - thor::base::global::health::brazil::201770606::lineitem
+EXPORT LineItem := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutLine, THOR),
-	JOIN(DATASET(fileName, LayoutLine, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutLine,self:=left)));
+	DATASET(fileName, LayoutLine, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
+// EXPORT LineItemPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+	// DATASET(fileName, LayoutLine, THOR),
+	// JOIN(DATASET(fileName, LayoutLine, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutLine,self:=left)));

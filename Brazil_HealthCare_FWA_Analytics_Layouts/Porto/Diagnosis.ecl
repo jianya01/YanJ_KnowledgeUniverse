@@ -52,6 +52,17 @@ injurydetails_rec := RECORD
    string1 medicolegalindicator;
   END;
 
+addresslayout := RECORD
+   string20 countryname;
+   string20 statename;
+   string25 cityname;
+   string25 homecitycode;
+   string128 address;
+   string128 addresscomplementary;
+   string5 homenumber;
+   string10 zipcode;
+  END;
+
 LayoutDiagnosis := RECORD
   string5 insurerirdacode;
   string55 generatedkey;
@@ -66,14 +77,24 @@ LayoutDiagnosis := RECORD
   DATASET(maternitydetails_rec) maternitydetails;
   string1 hospitalizationduetoinjuryindicator;
   DATASET(injurydetails_rec) injurytype;
+  addresslayout address;
   string patientreasonforvisitdiagnosiscode;
   string placeofservice;
   string unitofservicetype;
   string unitsofservice;
   string unitsofserviceallowed;
+  string typeofservice;
+  string icdversionindicator;
+  string principaldiagnosiscode;
+  string admissiondiagnosiscode;
+  string principalprocedurecode;
  END;
 
-fileName := '~thor::base::global::health::brazil::test::full::version2::20170726::diagnosisdetails';//~thor::base::global::health::brazil::test::full::20170721::diagnosisdetails'; //testdata - thor::base::global::health::brazil::201770606::diagnosisdetails
-EXPORT DiagnosisPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+fileName := '~thor::base::health::brazil::test::full::version::20170802::diagnosisdetails';//~thor::base::global::health::brazil::test::full::20170721::diagnosisdetails'; //testdata - thor::base::global::health::brazil::201770606::diagnosisdetails
+EXPORT Diagnosis := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutDiagnosis, THOR),
-	JOIN(DATASET(fileName, LayoutDiagnosis, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutDiagnosis,self:=left)));
+	DATASET(fileName, LayoutDiagnosis, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
+
+// EXPORT DiagnosisPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
+	// DATASET(fileName, LayoutDiagnosis, THOR),
+	// JOIN(DATASET(fileName, LayoutDiagnosis, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutDiagnosis,self:=left)));
