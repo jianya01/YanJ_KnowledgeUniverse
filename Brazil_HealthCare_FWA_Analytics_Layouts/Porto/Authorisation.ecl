@@ -4,9 +4,13 @@ requestrejectioncode_rec := RECORD
   END;
 
 LayoutAuthorization := RECORD
-  string5 insurerirdacode;
-  string55 generatedkey;
+  string5 insureruniqueid;
+  string200 generatedkey;
   string2 claimtype;
+  string5 customernumber;
+  string9 batch_no;
+  unsigned8 loaddatetime;
+  unsigned8 rec_seq_no;
   string2 requeststatus;
   string1 requestimpact;
   string300 requeststatusdescription;
@@ -19,7 +23,8 @@ LayoutAuthorization := RECORD
   string300 requestrejectionreason;
  END;
 
-fileName := '~thor::base::health::brazil::test::full::version::20170802::authorisationdetails';//~thor::base::global::health::brazil::test::full::20170721::auhtorisationdetails';
+
+fileName := '~thor::base::health::brazil::test::full::version::20170807::authorisationdetails';//~thor::base::global::health::brazil::test::full::20170721::auhtorisationdetails';
 EXPORT Authorisation := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutAuthorization, THOR),
 	DATASET(fileName, LayoutAuthorization, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

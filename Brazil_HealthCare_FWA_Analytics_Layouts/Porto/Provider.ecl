@@ -21,9 +21,13 @@ namelayout := RECORD
   END;
 
 LayoutProvider := RECORD
-  string5 insurerirdacode;
-  string55 generatedkey;
+  string5 insureruniqueid;
+  string200 generatedkey;
   string2 claimtype;
+  string5 customernumber;
+  string9 batch_no;
+  unsigned8 loaddatetime;
+  unsigned8 rec_seq_no;
   string50 providerkey;
   string50 insurerprovidernumber;
   string50 insurerprovidernumbersuffix;
@@ -48,7 +52,7 @@ LayoutProvider := RECORD
   namelayout providerindividualname;
  END;
 
-fileName := '~thor::base::health::brazil::test::full::version::20170802::provider';//~thor::base::global::health::brazil::test::full::20170721::provider'; //testdata - thor::base::global::health::brazil::201770606::provider
+fileName := '~thor::base::health::brazil::test::full::version::20170807::provider';//~thor::base::global::health::brazil::test::full::20170721::provider'; //testdata - thor::base::global::health::brazil::201770606::provider
 EXPORT Provider := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutProvider, THOR),
 	DATASET(fileName, LayoutProvider, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

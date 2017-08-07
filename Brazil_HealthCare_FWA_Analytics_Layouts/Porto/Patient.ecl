@@ -31,9 +31,13 @@ telephonelayout := RECORD
   END;
 
 LayoutPatient := RECORD
-  string5 insurerirdacode;
-  string55 generatedkey;
+  string5 insureruniqueid;
+  string200 generatedkey;
   string2 claimtype;
+  string5 customernumber;
+  string9 batch_no;
+  unsigned8 loaddatetime;
+  unsigned8 rec_seq_no;
   string50 insurerinsuredid;
   string50 industryinsuredid;
   string10 industryinsuredidtype;
@@ -66,7 +70,7 @@ LayoutPatient := RECORD
   string50 plannumber;
  END;
 
-fileName := '~thor::base::health::brazil::test::full::version::20170802::patient';//~thor::base::global::health::brazil::test::full::20170721::patient';
+fileName := '~thor::base::health::brazil::test::full::version::20170807::patient';//~thor::base::global::health::brazil::test::full::20170721::patient';
 EXPORT Patient := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutPatient, THOR),
 	DATASET(fileName, LayoutPatient, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

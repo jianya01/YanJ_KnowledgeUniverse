@@ -1,9 +1,13 @@
 ﻿IMPORT _Control;
 
 LayoutUD := RECORD
-  string5 insurerirdacode;
-  string55 generatedkey;
+  string5 insureruniqueid;
+  string200 generatedkey;
   string2 claimtype;
+  string5 customernumber;
+  string9 batch_no;
+  unsigned8 loaddatetime;
+  unsigned8 rec_seq_no;
   string med_user_def_01;
   string med_user_def_02;
   string med_user_def_03;
@@ -37,8 +41,7 @@ LayoutUD := RECORD
   string prov_user_def_09;
  END;
 
-
-fileName := '~thor::base::health::brazil::test::full::version::20170802::miscellaneous';
+fileName := '~thor::base::health::brazil::test::full::version::20170807::miscellaneous';
 EXPORT UserDefinitions := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutUD, THOR),
 	DATASET(fileName, LayoutUD, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

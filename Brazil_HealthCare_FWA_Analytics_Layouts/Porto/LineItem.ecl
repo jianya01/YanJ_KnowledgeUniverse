@@ -1,9 +1,13 @@
 ﻿IMPORT _Control;
 
 LayoutLine := RECORD
-  string5 insurerirdacode;
-  string55 generatedkey;
+  string5 insureruniqueid;
+  string200 generatedkey;
   string2 claimtype;
+  string5 customernumber;
+  string9 batch_no;
+  unsigned8 loaddatetime;
+  unsigned8 rec_seq_no;
   string97 transactionid;
   string datasource;
   integer2 expensetype;
@@ -48,7 +52,7 @@ LayoutLine := RECORD
   string1 networkindicator;
  END;
 
-fileName := '~thor::base::health::brazil::test::full::version::20170802::lineitem';//~thor::base::global::health::brazil::test::full::20170721::lineitem'; //testdata - thor::base::global::health::brazil::201770606::lineitem
+fileName := '~thor::base::health::brazil::test::full::version::20170807::lineitem';//~thor::base::global::health::brazil::test::full::20170721::lineitem'; //testdata - thor::base::global::health::brazil::201770606::lineitem
 EXPORT LineItem := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutLine, THOR),
 	DATASET(fileName, LayoutLine, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

@@ -1,6 +1,6 @@
 ﻿IMPORT _Control;
 insurer_rec := RECORD
-   string25 insurerirdacode;
+   string25 insureruniqueid;
    string128 insurername;
   END;
 
@@ -15,14 +15,19 @@ claimreopendetails_rec := RECORD
   END;
 
 LayoutClaim := RECORD
-  string5 insurerirdacode;
-  string55 generatedkey;
+  string5 insureruniqueid;
+  string200 generatedkey;
   string2 claimtype;
+  string5 customernumber;
+  string9 batch_no;
+  unsigned8 loaddatetime;
+  unsigned8 rec_seq_no;
   insurer_rec insurer;
   tpa_rec tpa;
   claimreopendetails_rec claimreopendetails;
   string1 authorizationrequestedindicator;
   string1 domiciliaryhospitalisationindicator;
+  string97 transactionid;
   string7 transactiontype;
   string1 datacontributortype;
   string20 transactioncreationdatetime;
@@ -91,7 +96,7 @@ LayoutClaim := RECORD
  END;
 
  
-fileName := '~thor::base::health::brazil::test::full::version::20170802::claims';//~thor::base::global::health::brazil::test::full::20170721::claims'; //testdata - thor::base::global::health::brazil::201770606::claims
+fileName := '~thor::base::health::brazil::test::full::version::20170807::claims';//~thor::base::global::health::brazil::test::full::20170721::claims'; //testdata - thor::base::global::health::brazil::201770606::claims
 EXPORT Claims := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutClaim, THOR),
 	DATASET(fileName, LayoutClaim, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

@@ -157,15 +157,18 @@ Policy := ENTITY(FLAT(UID = PolicyNumber,
 // NationalIdentificationNumber := ENTITY(FLAT(UID = NIN), 
 	// MODEL(UID));
 
-Claim := ENTITY(FLAT(UID(InsurerNumber, GeneratedKey, Type),
-		STRING InsurerNumber,			//InsurerIRDACode (Specific to India)
-		INTEGER GeneratedKey,			//GeneratedKey = IF(ClaimNumber <> '', ClaimNumber,  AuthorisationNumber)
+Claim := ENTITY(FLAT(UID(GeneratedKey),
+		STRING InsurerNumber,			//InsurerIRDACode (Specific to India) InsurerUniqueID
+		STRING GeneratedKey,			//GeneratedKey = IF(ClaimNumber <> '', ClaimNumber,  AuthorisationNumber)
 		STRING Type,
+		INTEGER CustomerNumber,			//50302  - Porto Seguro, 50286 – Intermedica, 50198 - Unimed
 		INTEGER ClaimNumber,
 		INTEGER TransactionID,
 		STRING InsurerName,
 		STRING ThirdPartyAdministratorCode,
 		STRING ThirdPartyAdministratorName,
+		STRING ClaimProviderNumber,
+		STRING ClaimInsurerNumber,
 		DATE ReopenDate,
 		STRING ReopenRemarks,
 		STRING AuthorizationRequestedIndicator,
@@ -230,6 +233,9 @@ Claim := ENTITY(FLAT(UID(InsurerNumber, GeneratedKey, Type),
 		DATE ReceivedDate,
 		STRING DateAndTimeStamp,
 		STRING SecurityCode,
+		//ClaimPolicy fields
+		DATE InsuredEffectiveEligibilityDate,
+		DATE InsuredExpirationEligibilityDate,
 		//Authorization fields
 		STRING AuthorizationTranReferenceNumber,
 		DATE AuthorizationRequestReceivedDate,
@@ -335,12 +341,19 @@ Claim := ENTITY(FLAT(UID(InsurerNumber, GeneratedKey, Type),
 		DATE InjuryDate,
 		STRING InjuryCause,
 		STRING InjuryCauseDescription,
-		STRING MedicolegalIndicator),
+		STRING MedicolegalIndicator,
+		INTEGER MedicalDefinitionCounter,
+		STRING MedicalUserDefinitions,
+		INTEGER PatientDefinitionCounter, 
+		STRING PatientUserDefinitions,
+		INTEGER ProviderDefinitionCounter, 
+		STRING ProviderUserDefinitions),
 	MODEL(UID,
-	InsurerNumber, GeneratedKey, Type,
-	ClaimNumber, InsurerName, ThirdPartyAdministratorCode, ThirdPartyAdministratorName, IntimationNumber, IntimationDate, Status, Nature, ThirdPartyAdministratorRemarks, PolicySumInsured,
-	PolicyBalanceSumInsured, MemberSumInsured, MemberBalanceSumInsured, CorporateFloaterSumInsured, CorporateFloaterBalanceSumInsured, OPDSumInsured, OPDBalanceSumInsured, BirthRegistration,
-	DeathRegistration, ReceivedDate, DateAndTimeStamp, SecurityCode, BenefitPlan, TypeOfPlan,
+	InsurerNumber, GeneratedKey, Type, CustomerNumber,
+	ClaimNumber, InsurerName, ThirdPartyAdministratorCode, ThirdPartyAdministratorName, ClaimProviderNumber, ClaimInsurerNumber,IntimationNumber, IntimationDate, Status, Nature,
+	ThirdPartyAdministratorRemarks, PolicySumInsured,	PolicyBalanceSumInsured, MemberSumInsured, MemberBalanceSumInsured, CorporateFloaterSumInsured,
+	CorporateFloaterBalanceSumInsured, OPDSumInsured, OPDBalanceSumInsured, BirthRegistration, DeathRegistration, ReceivedDate, DateAndTimeStamp, SecurityCode, BenefitPlan, TypeOfPlan,
+	ClaimPolicy{InsuredEffectiveEligibilityDate, InsuredExpirationEligibilityDate},
 	LineItem{ClaimLineNumber, TransactionID, ReopenDate, ReopenRemarks,AuthorizationRequestedIndicator, DomiciliaryHospitalisationIndicator, TransactionType, DataContributorType,
 		TransactionCreationDateTime, AuthorizationNumber,	AdmittanceDate, DischargeDate, DayCareTreatmentIndicator, ExtendedCareInpatientRehabilitationIndicator, RejectReasonCode,
 		RejectionReductionReasonDescription, ReopenIndicator, AdjustmentCode, AdjustmentNumber, Source, DataSource, ExpenseType, OtherExpenseTypeDescription, HospitalizationExpensesDetails,
@@ -362,351 +375,21 @@ Claim := ENTITY(FLAT(UID(InsurerNumber, GeneratedKey, Type),
 	IllnessDetails{DiseaseFirstDetectedDate, FirstConsultationDate, PresentComplaints, PresentAilmentDuration, PedCompilationIndicator, PedComplicationDetails, 
 		PreviousSurgeryComplicationIndicator, AlcoholConsumptionIndicator, CongenitalDiseaseIndicator, MedicalHistory},
 	MaternityDetails{DeliveryDate, PrematureBabyIndicator, HospitalizationDueToMaternityIndicator},
-	InjuryDetails{InjuryDate, InjuryCause, InjuryCauseDescription, MedicolegalIndicator, HospitalizationDueToInjuryIndicator}));
-
+	InjuryDetails{InjuryDate, InjuryCause, InjuryCauseDescription, MedicolegalIndicator, HospitalizationDueToInjuryIndicator},
+	UserDefinitions{MedicalDefinitionCounter, MedicalUserDefinitions, PatientDefinitionCounter, PatientUserDefinitions, ProviderDefinitionCounter, ProviderUserDefinitions}));
 
 
 PatientPhone := ASSOCIATION(FLAT(Patient Subject, Phone PhoneNumber));
 PatientPolicyHolderRelation := ASSOCIATION(FLAT(Patient First, PolicyHolder Second, STRING FamilyLinkID, INTEGER RelationshipCode));
 PatientAddress := ASSOCIATION(FLAT(Patient Subject, Address Location=UID(Address1, Address2, ZipCode)));
-PatientClaim := ASSOCIATION(FLAT(Patient Subject, Claim MedicalClaim=UID(InsurerNumber, GeneratedKey, Type)));
-PolicyHolderClaim := ASSOCIATION(FLAT(PolicyHolder Insured, Claim MedicalClaim=UID(InsurerNumber, GeneratedKey, Type)));
-PolicyClaim := ASSOCIATION(FLAT(Policy Insurance, Claim MedicalClaim=UID(InsurerNumber, GeneratedKey, Type)));
-DiagnosisCentre := ASSOCIATION(FLAT(Claim MedicalClaim=UID(InsurerNumber, GeneratedKey, Type), Address Location=UID(Address1, Address2, ZipCode)));
+PatientClaim := ASSOCIATION(FLAT(Patient Subject, Claim MedicalClaim=UID(GeneratedKey)));
+PolicyHolderClaim := ASSOCIATION(FLAT(PolicyHolder Insured, Claim MedicalClaim=UID(GeneratedKey)));
+PolicyClaim := ASSOCIATION(FLAT(Policy Insurance, Claim MedicalClaim=UID(GeneratedKey)));
+DiagnosisCentre := ASSOCIATION(FLAT(Claim MedicalClaim=UID(GeneratedKey), Address Location=UID(Address1, Address2, ZipCode)));
 ProviderFacilityAddress := ASSOCIATION(FLAT(ProviderFacility Facility=UID(ProviderKey), Address Location=UID(Address1, Address2, ZipCode)));
 MedicalProviderAddress := ASSOCIATION(FLAT(MedicalProvider Professional=UID(ProviderKey), Address Location=UID(Address1, Address2, ZipCode)));
-ProviderFacilityClaim := ASSOCIATION(FLAT(ProviderFacility Facility=UID(ProviderKey), Claim MedicalClaim=UID(InsurerNumber, GeneratedKey, Type)));
-MedicalProviderClaim := ASSOCIATION(FLAT(MedicalProvider Professional=UID(ProviderKey), Claim MedicalClaim=UID(InsurerNumber, GeneratedKey, Type)));
-
-USE Brazil_HealthCare_FWA_Analytics_Layouts.Intermedica.Patient(FLAT,
-	Patient(
-		UID = insurerinsuredid,
-		IndustryInsuredID = industryinsuredid,
-		IndustryInsuredIDType = industryinsuredidtype,
-		FirstName = name,
-		DateOfBirth = dateofbirth,
-		DateOfDeath = dateofdeath,
-		Gender = gender,
-		TPAInsuredID = tpainsuredid,
-		Email = email,
-		IdentityDocumentType = identityproofdetails.documenttype,
-		IdentityDocumentID = identityproofdetails.documentid,
-		IdentityDescription = identityproofdetails.description,
-		IsPolicyHolder = patientsameasprimarymemberindicator,
-		IsProposer = patientsameasproposerindicator,
-		MedicalHistory = medicalhistory,
-		AuthorizationCode = authorizationcode),
-	PolicyHolder(
-		UID = primaryinsuredmemberkey,
-		PolicyCertificateNumber = policycertificatenumber,
-		EmployeeID = employeeid,
-		EmployeeDateOfJoining = employeedoj,
-		EmployeeDateOfExit = employeedoe,
-		EffectiveDate = eligibledate,
-		ExpirationDate = iligibledate,
-		PlanName = planname,
-		PlanNumber = plannumber),
-	Phone(
-		UID = telephones.phonenumber,
-		PhoneNumber = telephones.phonenumber,
-		CountryCode = telephones.countrycode,
-		StateCode = telephones.statecode,
-		PhoneType = telephones.phonetype),
-	Address(
-		Address1 = address.address,
-		Address2 = address.addresscomplementary,
-		HomeNumber = address.homenumber,
-		City = address.cityname,
-		State = address.statename,
-		ZipCode = address.zipcode,
-		HomeCityCode = address.homecitycode,
-		Country = address.countryname),
-	PatientAddress(
-		Subject = insurerinsuredid,
-		Address1 = address.address,
-		Address2 = address.addresscomplementary,
-		ZipCode = address.zipcode),
-	PatientPolicyHolderRelation(
-		First = insurerinsuredid,
-		Second = primaryinsuredmemberkey,
-		FamilyLinkID = familylinkid,
-		RelationshipCode = relationshipcode),
-	PatientPhone(
-		Subject = insurerinsuredid,
-		PhoneNumber = telephones.phonenumber),
-	PatientClaim(
-		Subject = insurerinsuredid,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
-	PolicyHolderClaim(
-		Insured = primaryinsuredmemberkey,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
-	PERMITS([Intermedica]));
-
-USE Brazil_HealthCare_FWA_Analytics_Layouts.Intermedica.Policy(FLAT,
-	Policy(UID = policynumber,
-		ApplicationNumber = applicationnumber,
-		Status = policystatus,
-		GroupNumber = employergroupnumber,
-		DivisionNumber = primaryinsureddivisionnumber,
-		Classification = policyclassification,
-		GroupPolicyClassification = grouppolicyclassification,
-		PlanType = plantype,
-		IRDAProductType = irdaproducttype,
-		CoverageType = coveragetype,
-		CoverageStatus = coveragestatus,
-		StartDate = policystartdate,
-		EndDate = policyenddate,
-		CancellationTerminationDate = policycancellationterminationdate),
-	PolicyClaim(
-		Insurance = policynumber,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
-	PERMITS([Intermedica]));
-
-USE Brazil_HealthCare_FWA_Analytics_Layouts.Intermedica.Provider(FLAT,
-	ProviderFacility(FILTER(providertype = '1'),
-		ProviderKey = providerfacilitynumber,
-		InsurerProviderNumber = insurerprovidernumber,
-		IndustryProviderNumber = industryprovidernumber,
-		IndustryProviderIDType = industryprovideridtype,
-		Type = providertype,
-		TaxID = providertaxid,
-		NetworkCode = networkcode,
-		FirstName = providername,
-		RecentBirthIndicator = recentbirthindicator,
-		RegimeOfHospitalisation = regimeofhospitalisation,
-		CPFOrCNPJ = providercpforcnpj,
-		AuthorizationCode = authorizationcode,
-		DrugEnforcementAdministrationNumber = drugenforcementadministrationnumberdea,
-		Taxanomy = taxonomy,
-		WatchCode = watchcode,
-		SpecialityCode = specialitydetails),
-	MedicalProvider(FILTER(providertype != '1'),
-		InsurerProviderNumber = insurerprovidernumber,
-		IndustryProviderNumber = industryprovidernumber,
-		IndustryProviderIDType = industryprovideridtype,
-		Type = providertype,
-		TaxID = providertaxid,
-		NetworkCode = networkcode,
-		FirstName = providername,
-		RecentBirthIndicator = recentbirthindicator,
-		RegimeOfHospitalisation = regimeofhospitalisation,
-		CPFOrCNPJ = providercpforcnpj,
-		AuthorizationCode = authorizationcode,
-		DrugEnforcementAdministrationNumber = drugenforcementadministrationnumberdea,
-		Taxanomy = taxonomy,
-		ProviderKey = providerfacilitynumber,
-		WatchCode = watchcode,
-		SpecialityCode = specialitydetails),
-	Address(
-		Address1 = address.address,
-		Address2 = address.addresscomplementary,
-		City = address.cityname,
-		State = address.statename,
-		ZipCode = address.zipcode,
-		HomeNumber = address.homenumber,
-		Country = address.countryname,
-		HomeCityCode = address.homecitycode),
-	ProviderFacilityAddress(FILTER(providertype = '1'),
-		ProviderKey = providerfacilitynumber,
-		Address1 = address.address,
-		Address2 = address.addresscomplementary,
-		ZipCode = address.zipcode),
-	MedicalProviderAddress(FILTER(providertype != '1'),
-		ProviderKey = insurerprovidernumber,
-		Address1 = address.address,
-		Address2 = address.addresscomplementary,
-		ZipCode = address.zipcode),
-	ProviderFacilityClaim(FILTER(providertype = '1'),
-		ProviderKey = providerfacilitynumber,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
-	MedicalProviderClaim(FILTER(providertype != '1'),
-		ProviderKey = insurerprovidernumber,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
-	PERMITS([Intermedica]));
-
-USE Brazil_HealthCare_FWA_Analytics_Layouts.Intermedica.Claims(FLAT,
-	Claim(
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype,
-		// ProviderNumber = claimprovidernumber,
-		// PatientInsurerNumber = claiminsurernumber,
-		InsurerName = insurer.insurername,
-		ThirdPartyAdministratorCode = tpa.tpacode,
-		ThirdPartyAdministratorName = tpa.tpaname,
-		ReopenDate = claimreopendetails.reopendate,
-		ReopenRemarks = claimreopendetails.reopenremarks,
-		AuthorizationRequestedIndicator = authorizationrequestedindicator,
-		DomiciliaryHospitalisationIndicator = domiciliaryhospitalisationindicator,
-		TransactionType = transactiontype,
-		DataContributorType = datacontributortype,
-		TransactionCreationDateTime = transactioncreationdatetime,
-		AuthorizationNumber = authorizationnumber,
-		IntimationNumber = claimintimationnumber,
-		IntimationDate = claimintimationdate,
-		ClaimNumber = claimnumber,
-		Status = claimstatus,
-		AdmittanceDate = admittancedate,
-		DischargeDate = dischargedate,
-		DayCareTreatmentIndicator = daycaretreatmentindicator,
-		ExtendedCareInpatientRehabilitationIndicator = extendedcareinpatientrehabilitationindicator,
-		Nature = claimnature,
-		RejectReasonCode = rejectreasoncode,
-		RejectionReductionReasonDescription = claimrejectionreductionreasondescription,
-		ReopenIndicator = claimreopenindicator,
-		CopayApplicabilityIndicator = copayapplicabilityindicator,
-		CopayApplicabilityReason = copayapplicabilityreason,
-		CopayApplicabilityReasonOtherDescription = copayapplicabilityreasonotherdescription,
-		CopayAmount = copayamount,
-		DeductibleExcessIndicator = deductibleexcessindicator,
-		DeductibleExcessAmount = deductibleexcessamount,
-		TotalClaimedAmount = totalclaimedamount,
-		TotalSanctionedAmount = totalsanctionedamount,
-		TotalOutOfPocketExpenseAmount = totaloutofpocketexpenseamount,
-		TotalCorporateAmountFloaterUsedAmount = totalcorporateamountfloaterusedamount,
-		TotalDisallowedAmount = totaldisallowedamount,
-		TotalPaidAmount = totalpaidamount,
-		ThirdPartyAdministratorRemarks = tparemarks,
-		PolicySumInsured = policysi,
-		PolicyBalanceSumInsured = policybsi,
-		MemberSumInsured = membersi,
-		MemberBalanceSumInsured = memberbsi,
-		CorporateFloaterSumInsured = corporatefloatersi,
-		CorporateFloaterBalanceSumInsured = corporatefloaterbsi,
-		OPDSumInsured = opdsi,
-		OPDBalanceSumInsured = opdbsi,
-		BillingStartDate = billingstartdate,
-		BillingEndDate = billingenddate,
-		BirthRegistration = birthregistration,
-		DeathRegistration = deathregistration,
-		AdjustmentCode = adjustmentcode,
-		AdjustmentNumber = adjustmentnumber,
-		AuthorizationCode = authorizationcode,
-		Source = source_ae_or_ca,
-		AuthorizationTranReferenceNumber = tranreferencenumber,
-		AuthorizationRequestReceivedDate = requestreceiveddate,
-		AuthorizationRequestStatus = requeststatus,
-		AuthorizationRequestStatusDescription = requeststatusdescription,
-		AuthorizationRequestImpact = requestimpact),
-	PERMITS([Intermedica]));
-
-USE Brazil_HealthCare_FWA_Analytics_Layouts.Intermedica.LineItem(FLAT,
-	Claim(
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype,
-		DataSource = datasource,
-		ExpenseType = expensetype,
-		OtherExpenseTypeDescription = otherexpensetypedescription,
-		HospitalizationExpensesDetails = hospitalisationexpensesdetails,
-		LineType = linetype,
-		LineCode = linecode,
-		LineDescription = linedescription,
-		ClaimedAmount = claimedamount,
-		ApprovedAmount = approvedamount,
-		RejectedReducedAmount = rejectedreducedamount,
-		RejectedReducedReason = rejectedreducedreason,
-		DaysBilled = daysbilled,
-		DischargeReason = dischargereason,
-		TotalProcedures = totalprocedures,
-		TotalBedCost = totalbedcost,
-		TotalRentals = totalrentals,
-		TotalMaterials = totalmaterials,
-		TotalConsidered = totalconsidered,
-		TotalToSuppliers = totaltosuppliers,
-		TotalChargedVsProprietaryCodes = totalchargedvsproprietarycodes,
-		QuantityCharged = quantitycharged,
-		CheckNumber = checknumber,
-		CheckPaidDate = checkpaiddate,
-		PaymentType = paymenttype,
-		ReimbursementMethodType = reimbursementmethodtype,
-		ReimbursementMethodVersion = reimbursementmethodversion,
-		ReimbursementCode = reimbursementcode,
-		SecondaryReimbursementcode = secondaryreimbursementcode,
-		DiagnosisRelatedGroupPricing = drgpricing,
-		OutlierCode = outliercode,
-		RevenueCode = revenuecode,
-		PayeeCode = payeecode,
-		ProviderMedicareParticipation = providermedicareparticipation,
-		MaxOutOfPocketMetIndividualInd = maxoutofpocketmetindividualind,
-		MaxOutOfPocketMetFamilyInd = maxoutofpocketmetfamilyind,
-		DeductibleMetIndividualInd = deductiblemetindividualind,
-		DeductibleMetFamilyInd = deductiblemetfamilyind,
-		PriceIndicator = priceindicator,
-		ChargeAmount = chargeamount,
-		ReasonableAndCustomaryAmount = reasonableandcustomaryamount),
-	PERMITS([Intermedica]));
-
-
-USE Brazil_HealthCare_FWA_Analytics_Layouts.Intermedica.Diagnosis(FLAT,
-	Claim(
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype,
-		HospitalizationType = hospitalizationtype,
-		HospitalizationDueToMaternityIndicator = hospitalizationduetomaternityindicator,
-		HospitalizationDueToInjuryIndicator = hospitalizationduetoinjuryindicator,
-		PatientReasonForVisitDiagnosisCode = patientreasonforvisitdiagnosiscode,
-		PlaceOfService = placeofservice,
-		UnitOfServiceType = unitofservicetype,
-		UnitsOfService = unitsofservice,
-		UnitsOfServiceAllowed = unitsofserviceallowed,
-		DiagnosisTypeSource = diagnosistype.source,
-		DiagnosisCode = diagnosistype.diagnosiscode,
-		DiagnosisCodeType = diagnosistype.codetype,
-		DiagnosisDescription = diagnosistype.description,
-		ProcedureTypeSource = proceduretype.source,
-		ProcedureCode = proceduretype.procedurecode,
-		ProcedureCodeType = proceduretype.procedurecodetype,
-		ProcedureDescription = proceduretype.description,
-		NDCCode = ndcdetails.code,
-		NDCQuantity = ndcdetails.quantity,
-		NDCUnitsOfMeasure = ndcdetails.unitsofmeasure,
-		TreatmentType = treatmentdetails.treatmenttype,
-		SurgeryType = treatmentdetails.surgerytype,
-		MedicineSystem = treatmentdetails.medicinesystem,
-		TreatmentGiven = treatmentdetails.treatmentgiven,
-		DiseaseFirstDetectedDate = illnessdetails.diseasefirstdetecteddate,
-		FirstConsultationDate = illnessdetails.firstconsultationdate,
-		PresentComplaints = illnessdetails.presentcomplaints,
-		PresentAilmentDuration = illnessdetails.presentailmentduration,
-		PedCompilationIndicator = illnessdetails.pedcomplicationindicator,
-		PedComplicationDetails = illnessdetails.pedcomplicationdetails,
-		PreviousSurgeryComplicationIndicator = illnessdetails.prevsurgerycomplicationindicator,
-		AlcoholConsumptionIndicator = illnessdetails.alcoholconsumptionindicator,
-		CongenitalDiseaseIndicator = illnessdetails.congenitaldiseaseindicator,
-		MedicalHistory = illnessdetails.medicalhistory,
-		DeliveryDate = maternitydetails.deliverydate,
-		PrematureBabyIndicator = maternitydetails.prematurebabyindicator,
-		InjuryDate = injurytype.injurydate,
-		InjuryCause = injurytype.injurycause,
-		InjuryCauseDescription = injurytype.injurycausedescription,
-		MedicolegalIndicator = injurytype.medicolegalindicator),
-	PERMITS([Intermedica]));
-		
-USE Brazil_HealthCare_FWA_Analytics_Layouts.Intermedica.Authorisation(FLAT,
-	Claim(
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype,
-		AuthorizationRequestReceivedDate = requestreceiveddate,
-		AuthorizationDate = authorizationdate,
-		AuthorizationExpectedStayLength = expectedstaylength,
-		AuthorizationReuestRejectionIndicator = requestrejectionindicator,
-		AuthorizationReuestRejectionReason = requestrejectionreason,
-		AuthorizationRequestStatus = requeststatus,
-		AuthorizationRequestStatusDescription = requeststatusdescription),
-	PERMITS([Intermedica]));
+ProviderFacilityClaim := ASSOCIATION(FLAT(ProviderFacility Facility=UID(ProviderKey), Claim MedicalClaim=UID(GeneratedKey)));
+MedicalProviderClaim := ASSOCIATION(FLAT(MedicalProvider Professional=UID(ProviderKey), Claim MedicalClaim=UID(GeneratedKey)));
 
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Patient(FLAT,
 	Patient(
@@ -772,14 +455,10 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Patient(FLAT,
 		PhoneNumber = telephones.phonenumber),
 	PatientClaim(
 		Subject = insurerinsuredid,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
+		GeneratedKey = generatedkey),
 	PolicyHolderClaim(
 		Insured = primaryinsuredmemberkey,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
+		GeneratedKey = generatedkey),
 	PERMITS([Porto]));
 
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Policy(FLAT,
@@ -805,13 +484,11 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Policy(FLAT,
 		PolicyHolderEmployerGroupNumber = primaryinsuredsubscriberempgrpnumber),
 	PolicyClaim(
 		Insurance = policynumber,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
+		GeneratedKey = generatedkey),
 	PERMITS([Porto]));
 
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Provider(FLAT,
-	ProviderFacility(FILTER(providertype = '1'),
+	ProviderFacility(FILTER(providertype = 'F'),
 		ProviderKey = providerkey,
 		InsurerProviderNumber = insurerprovidernumber,
 		InsurerProviderNumberSuffix = insurerprovidernumbersuffix,
@@ -834,7 +511,7 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Provider(FLAT,
 		ProviderFacilityNumber = providerfacilitynumber,
 		WatchCode = watchcode,
 		SpecialityCode = specialitydetails.specialitycode),
-	MedicalProvider(FILTER(providertype != '1'),
+	MedicalProvider(FILTER(providertype != 'F'),
 		ProviderKey = providerkey,
 		InsurerProviderNumber = insurerprovidernumber,
 		InsurerProviderNumberSuffix = insurerprovidernumbersuffix,
@@ -866,38 +543,35 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Provider(FLAT,
 		HomeNumber = address.homenumber,
 		Country = address.countryname,
 		HomeCityCode = address.homecitycode),
-	ProviderFacilityAddress(FILTER(providertype = '1'),
+	ProviderFacilityAddress(FILTER(providertype = 'F'),
 		ProviderKey = providerkey,
 		Address1 = address.address,
 		Address2 = address.addresscomplementary,
 		ZipCode = address.zipcode),
-	MedicalProviderAddress(FILTER(providertype != '1'),
+	MedicalProviderAddress(FILTER(providertype != 'F'),
 		ProviderKey = providerkey,
 		Address1 = address.address,
 		Address2 = address.addresscomplementary,
 		ZipCode = address.zipcode),
-	ProviderFacilityClaim(FILTER(providertype = '1'),
+	ProviderFacilityClaim(FILTER(providertype = 'F'),
 		ProviderKey = providerkey,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
-	MedicalProviderClaim(FILTER(providertype != '1'),
+		GeneratedKey = generatedkey),
+	MedicalProviderClaim(FILTER(providertype != 'F'),
 		ProviderKey = providerkey,
-		InsurerNumber = insurerirdacode,
-		GeneratedKey = generatedkey,
-		Type = claimtype),
+		GeneratedKey = generatedkey),
 	PERMITS([Porto]));
 
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Claims(FLAT,
 	Claim(
-		InsurerNumber = insurerirdacode,
 		GeneratedKey = generatedkey,
+		TransactionID = transactionid,
+		InsurerNumber = insureruniqueid,
 		Type = claimtype,
-		// ProviderNumber = claimprovidernumber,
-		// PatientInsurerNumber = claiminsurernumber,
 		InsurerName = insurer.insurername,
 		ThirdPartyAdministratorCode = tpa.tpacode,
 		ThirdPartyAdministratorName = tpa.tpaname,
+		ClaimProviderNumber = claimprovidernumber,
+		ClaimInsurerNumber = claiminsurernumber,
 		ReopenDate = claimreopendetails.reopendate,
 		ReopenRemarks = claimreopendetails.reopenremarks,
 		AuthorizationRequestedIndicator = authorizationrequestedindicator,
@@ -965,13 +639,21 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Claims(FLAT,
 		ReceivedDate = claimreceiveddate,
 		DateAndTimeStamp = claimdateandtimestamp,
 		SecurityCode = securitycode),
+	PolicyHolderClaim(
+		Insured = primaryinsuredkey,
+		GeneratedKey = generatedkey),
 	PERMITS([Porto]));
 
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Policy(FLAT,
+	Claim(
+		GeneratedKey = generatedkey,
+		InsuredEffectiveEligibilityDate = insuredeffectiveeligibilitydate,
+		InsuredEffectiveEligibilityDate = insuredexpirationeligibilitydate),
+	PERMITS([Porto]));
+	
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.LineItem(FLAT,
 	Claim(
-		InsurerNumber = insurerirdacode,
 		GeneratedKey = generatedkey,
-		Type = claimtype,
 		TransactionID = transactionid,
 		DataSource = datasource,
 		ExpenseType = expensetype,
@@ -1019,9 +701,7 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.LineItem(FLAT,
 
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Diagnosis(FLAT,
 	Claim(
-		InsurerNumber = insurerirdacode,
 		GeneratedKey = generatedkey,
-		Type = claimtype,
 		HospitalizationType = hospitalizationtype,
 		HospitalizationDueToMaternityIndicator = hospitalizationduetomaternityindicator,
 		HospitalizationDueToInjuryIndicator = hospitalizationduetoinjuryindicator,
@@ -1076,9 +756,7 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Diagnosis(FLAT,
 		Country = address.countryname,
 		HomeCityCode = address.homecitycode),
 	DiagnosisCentre(
-		InsurerNumber = insurerirdacode,
 		GeneratedKey = generatedkey,
-		Type = claimtype,
 		Address1 = address.address,
 		Address2 = address.addresscomplementary,
 		ZipCode = address.zipcode),
@@ -1086,9 +764,7 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Diagnosis(FLAT,
 		
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Authorisation(FLAT,
 	Claim(
-		InsurerNumber = insurerirdacode,
 		GeneratedKey = generatedkey,
-		Type = claimtype,
 		AuthorizationCode = authorizationcode,
 		AuthorizationRequestReceivedDate = requestreceiveddate,
 		AuthorizationRequestRejectionCode = requestrejectioncode.requestrejectioncode,
@@ -1101,25 +777,36 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Authorisation(FLAT,
 		AuthorizationRequestStatusDescription = requeststatusdescription),
 	PERMITS([Porto]));
 
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.FileCMDCleaned.UserDefinition(FLAT,
+	Claim(
+		GeneratedKey = GeneratedKey,
+		MedicalDefinitionCounter = MedicalDefinitionCounter,
+		MedicalUserDefinitions = MedicalUserDefinition,
+		ProviderDefinitionCounter = ProviderDefinitionCounter,
+		ProviderUserDefinitions = ProviderUserDefinition,
+		PatientDefinitionCounter = PatientDefinitionCounter,
+		PatientUserDefinitions = PatientUserDefinition),
+	PERMITS([Porto]));
 
-QUERY: PatientDump <= Patient USING [Intermedica];
-QUERY: ProviderFacilityDump <= ProviderFacility USING [Intermedica];
-QUERY: MedicalProviderDump <= MedicalProvider USING [Intermedica];
-QUERY: ClaimDump <= Claim USING [Intermedica];
-QUERY: PhoneDump <= Phone USING [Intermedica];
-QUERY: AddressDump <= Address USING [Intermedica];
-QUERY: PolicyDump <= Policy USING [Intermedica];
-QUERY: PolicyHolderDump <= PolicyHolder USING [Intermedica];
-QUERY: PatientPhoneDump <= PatientPhone USING [Intermedica];
-QUERY: PatientPolicyHolderRelationDump <= PatientPolicyHolderRelation USING [Intermedica];
-QUERY: PatientAddressDump <= PatientAddress USING [Intermedica];
-QUERY: PatientClaimDump <= PatientClaim USING [Intermedica];
-QUERY: PolicyHolderClaimDump <= PolicyHolderClaim USING [Intermedica];
-QUERY: PolicyClaimDump <= PolicyClaim USING [Intermedica];
-QUERY: ProviderFacilityAddressDump <= ProviderFacilityAddress USING [Intermedica];
-QUERY: MedicalProviderAddressDump <= MedicalProviderAddress USING [Intermedica];
-QUERY: ProviderFacilityClaimDump <= ProviderFacilityClaim USING [Intermedica];
-QUERY: MedicalProviderClaimDump <= MedicalProviderClaim USING [Intermedica];
+
+// QUERY: PatientDump <= Patient USING [Intermedica];
+// QUERY: ProviderFacilityDump <= ProviderFacility USING [Intermedica];
+// QUERY: MedicalProviderDump <= MedicalProvider USING [Intermedica];
+// QUERY: ClaimDump <= Claim USING [Intermedica];
+// QUERY: PhoneDump <= Phone USING [Intermedica];
+// QUERY: AddressDump <= Address USING [Intermedica];
+// QUERY: PolicyDump <= Policy USING [Intermedica];
+// QUERY: PolicyHolderDump <= PolicyHolder USING [Intermedica];
+// QUERY: PatientPhoneDump <= PatientPhone USING [Intermedica];
+// QUERY: PatientPolicyHolderRelationDump <= PatientPolicyHolderRelation USING [Intermedica];
+// QUERY: PatientAddressDump <= PatientAddress USING [Intermedica];
+// QUERY: PatientClaimDump <= PatientClaim USING [Intermedica];
+// QUERY: PolicyHolderClaimDump <= PolicyHolderClaim USING [Intermedica];
+// QUERY: PolicyClaimDump <= PolicyClaim USING [Intermedica];
+// QUERY: ProviderFacilityAddressDump <= ProviderFacilityAddress USING [Intermedica];
+// QUERY: MedicalProviderAddressDump <= MedicalProviderAddress USING [Intermedica];
+// QUERY: ProviderFacilityClaimDump <= ProviderFacilityClaim USING [Intermedica];
+// QUERY: MedicalProviderClaimDump <= MedicalProviderClaim USING [Intermedica];
 
 QUERY: PatientDumpPorto <= Patient USING [Porto];
 QUERY: ProviderFacilityDumpPorto <= ProviderFacility USING [Porto];

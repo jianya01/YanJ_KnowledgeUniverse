@@ -1,9 +1,13 @@
 ﻿IMPORT _Control;
 
 LayoutPolicy := RECORD
-  string5 insurerirdacode;
-  string55 generatedkey;
+  string5 insureruniqueid;
+  string200 generatedkey;
   string2 claimtype;
+  string5 customernumber;
+  string9 batch_no;
+  unsigned8 loaddatetime;
+  unsigned8 rec_seq_no;
   string35 applicationnumber;
   string35 policynumber;
   string2 policystatus;
@@ -26,7 +30,7 @@ LayoutPolicy := RECORD
   string primaryinsuredsubscriberempgrpnumber;
  END;
  
-fileName := '~thor::base::health::brazil::test::full::version::20170802::claimpolicy';//~thor::base::global::health::brazil::test::full::20170721::claimpolicy'; //testdata - thor::base::global::health::brazil::201770606::claimpolicy
+fileName := '~thor::base::health::brazil::test::full::version::20170807::claimpolicy';//~thor::base::global::health::brazil::test::full::20170721::claimpolicy'; //testdata - thor::base::global::health::brazil::201770606::claimpolicy
 EXPORT Policy := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutPolicy, THOR),
 	DATASET(fileName, LayoutPolicy, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));

@@ -64,9 +64,13 @@ addresslayout := RECORD
   END;
 
 LayoutDiagnosis := RECORD
-  string5 insurerirdacode;
-  string55 generatedkey;
+  string5 insureruniqueid;
+  string200 generatedkey;
   string2 claimtype;
+  string5 customernumber;
+  string9 batch_no;
+  unsigned8 loaddatetime;
+  unsigned8 rec_seq_no;
   DATASET(diagnosistype_rec) diagnosistype;
   DATASET(proceduretype_rec) proceduretype;
   DATASET(ndcdetails_rec) ndcdetails;
@@ -90,7 +94,7 @@ LayoutDiagnosis := RECORD
   string principalprocedurecode;
  END;
 
-fileName := '~thor::base::health::brazil::test::full::version::20170802::diagnosisdetails';//~thor::base::global::health::brazil::test::full::20170721::diagnosisdetails'; //testdata - thor::base::global::health::brazil::201770606::diagnosisdetails
+fileName := '~thor::base::health::brazil::test::full::version::20170807::diagnosisdetails';//~thor::base::global::health::brazil::test::full::20170721::diagnosisdetails'; //testdata - thor::base::global::health::brazil::201770606::diagnosisdetails
 EXPORT Diagnosis := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutDiagnosis, THOR),
 	DATASET(fileName, LayoutDiagnosis, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
