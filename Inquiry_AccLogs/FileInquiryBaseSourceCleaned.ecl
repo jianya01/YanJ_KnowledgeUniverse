@@ -15,8 +15,9 @@ EXPORT FileInquiryBaseSourceCleaned := MODULE
 		SELF := l;
 	END;
 	
-	EXPORT FileInquiryCleaned := IF(COUNT(_Control.TransactionIDFilterSet) <= 0, 
-		PROJECT(Inquiry_AccLogs.File_FCRA_Inquiry_BaseSource, CleanDateTimeStamp(LEFT)),
-		PROJECT(Inquiry_AccLogs.File_FCRA_Inquiry_BaseSource, CleanDateTimeStamp(LEFT)) (search_info.transaction_id IN _Control.TransactionIDFilterSet));
+	CleanedBaseSource := PROJECT(Inquiry_AccLogs.File_FCRA_Inquiry_BaseSource, CleanDateTimeStamp(LEFT));
 	
+	EXPORT FileInquiryCleaned := IF(COUNT(_Control.TransactionIDFilterSet) <= 0, 
+		CleanedBaseSource,
+		JOIN(DISTRIBUTE(CleanedBaseSource, HASH64((STRING75)search_info.transaction_id)), DISTRIBUTE(_Control.TransactionIDFilterSet(TRIM(TransactionID) != ''), HASH64(TransactionID)), (STRING75)LEFT.search_info.transaction_id = RIGHT.TransactionID, TRANSFORM(LEFT), LOCAL));
 END;
