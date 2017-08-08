@@ -2,7 +2,9 @@
 	STRING10 Grouping;
 	UNSIGNED8 CountGroup;
 	UNSIGNED8 Current_Build_Records;
-	UNSIGNED8 Records_Expired;
-	UNSIGNED8 Records_New;
-	UNSIGNED8 Records_Updated;
+	UNSIGNED8 Records_Expired;//updated
+	UNSIGNED8 Records_New;//new
+	UNSIGNED8 Records_Unchanged;//unchanged
+	string80 file_name;
+	string20 wuid;
 END;

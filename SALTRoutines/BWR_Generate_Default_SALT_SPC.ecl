@@ -3,8 +3,8 @@
 IMPORT Consumer_Credit;
 InputFile := Consumer_Credit.Files.Bankruptcy_Data;
 
-IMPORT SALT35;
-SALT35.MAC_Default_SPC(InputFile, generatedSALTSpecification);
+IMPORT SALT38;
+SALT38.MAC_Default_SPC(InputFile, generatedSALTSpecification);
 
 FinalSALTSpecification := ROLLUP(generatedSALTSpecification, TRUE, TRANSFORM(RECORDOF(LEFT), SELF.s := LEFT.s + '\n' + RIGHT.s));
 

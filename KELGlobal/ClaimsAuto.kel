@@ -69,8 +69,9 @@ ClaimsAutoSubjectID := ENTITY(FLAT(ClaimsAuto rClaimsAuto=RecordIdentifier,
 		Subject{SubjectIDRecordCounter, SubjectUnitNumber, SubjectRecordCode, SubjectClassification, Last, First, Middle, Suffix, DateOfBirth, Sex, Ssn},
 		CurrentLicense{CurrentLicenseUnitNumber, CurrentLicenseRecordCode, CurrentLicenseClassification, CurrentLicenseLicenseNumber, CurrentLicenseState}));
 
-ClaimsAutoClaim := ENTITY(FLAT(UID(RecordIdentifier, ClaimIdRecordCounter),
+ClaimsAutoClaim := ENTITY(FLAT(UID(RecordIdentifier, ClaimIdRecordCounter, SectionIdentifier),
 		ClaimsAuto rClaimsAuto=RecordIdentifier,
+		STRING SectionIdentifier,
 		INTEGER ClaimInfoUnitNumber,
 		INTEGER ClaimInfoGroupSequenceNumber,
 		STRING ClaimInfoRecordCode,
@@ -170,7 +171,7 @@ ClaimsAutoClaim := ENTITY(FLAT(UID(RecordIdentifier, ClaimIdRecordCounter),
 		INTEGER ClaimCatAmount,
 		STRING ClaimCatDisp), 
 	MODEL(UID,  
-		rClaimsAuto,
+		rClaimsAuto, SectionIdentifier,
 		ClaimInfoUnitNumber, ClaimInfoGroupSequenceNumber, ClaimInfoRecordCode, DateOfClaim, ClaimAgeYears, ClaimAgeMonths,	ContributorClaimNumber, ClaimFileNumber, 
 		ScopeOfClaim, AtFaultIndicator, FirstClaimPaymentDate, ContributorAMBestNumber,	VehicleOperatorIndicator, ClaimAssociationIndicator,
 		PolicyUnitNumber, PolicyGroupSequenceNumber,	PolicyRecordCode, PolicyType, PolicyNumber, PolicyIssuerName, PolicyFsiType, PolicyFsiNumber, PolicyFsiIssuerName,
@@ -273,6 +274,7 @@ USE KELBlackBox.FileCLUECleaned.FileCLUEAutoCleaned(FLAT,
 
 USE KELBlackBox.FileCLUECleaned.FileCLUEAutoPaymentsFlat(FLAT,
 	 ClaimsAutoClaim(
+		SectionIdentifier = SectionIdentifier,
 		ClaimCatType = ClaimCatType,
 		ClaimCatAmount = ClaimCatAmount,
 		ClaimCatDisp = ClaimCatDisp),
@@ -280,6 +282,7 @@ USE KELBlackBox.FileCLUECleaned.FileCLUEAutoPaymentsFlat(FLAT,
 
 USE KELBlackBox.FileCLUECleaned.FileCLUEAutoClaim(FLAT,
 	ClaimsAutoClaim(
+		SectionIdentifier = SectionIdentifier,
 		ClaimInfoUnitNumber = ClaimInfo.unitnumber,
 		ClaimInfoGroupSequenceNumber = ClaimInfo.groupsequencenumber,
 		ClaimInfoRecordCode = ClaimInfo.recordcode,
@@ -497,6 +500,7 @@ USE KELBlackBox.FileCLDACleaned.FileCDAutoSubjectID(FLAT,
 
 USE KELBlackBox.FileCLDACleaned.FileCDAutoPaymentsFlat(FLAT,
 	 ClaimsAutoClaim(
+		SectionIdentifier = SectionIdentifier, 
 		ClaimCatType = ClaimCatType,
 		ClaimCatAmount = ClaimCatAmount,
 		ClaimCatDisp = ClaimCatDisp),
@@ -504,6 +508,7 @@ USE KELBlackBox.FileCLDACleaned.FileCDAutoPaymentsFlat(FLAT,
 
 USE KELBlackBox.FileCLDACleaned.FileCDAutoClaim(FLAT,
 	ClaimsAutoClaim(
+		SectionIdentifier = SectionIdentifier,
 		ClaimInfoUnitNumber = ClaimInfo.unitnumber,
 		ClaimInfoGroupSequenceNumber = ClaimInfo.groupsequencenumber,
 		ClaimInfoRecordCode = ClaimInfo.recordcode,
@@ -624,12 +629,16 @@ ClaimsAutoClaim: OPEN_DISPOSITION_LIST := ['O'];
 ClaimsAutoClaim: CLOSED_DISPOSITION_LIST := ['C'];
 ClaimsAutoClaim: OPEN_CLOSED_DISPOSITION_LIST := ['O', 'C', ''];
 
-ClaimsAutoClaim: => IsValidClaim := ISVALIDDATE(DateOfClaim) AND ISVALIDDATE(rClaimsAuto.DateOfOrder) AND DateOfClaim < rClaimsAuto.DateOfOrder AND rClaimsAuto.ProcessingCompletionStatus = 'C'; 										
+ClaimsAutoClaim: FULL_SCOPE_CODE_LIST := ['F'];
+ClaimsAutoClaim: CLSUB_CODE_LIST := ['CLSUB'];
+
+ClaimsAutoClaim: => IsValidClaim := ISVALIDDATE(DateOfClaim) AND ISVALIDDATE(rClaimsAuto.DateOfReceipt) AND DateOfClaim < rClaimsAuto.DateOfReceipt AND rClaimsAuto.ProcessingCompletionStatus = 'C' AND ScopeOfClaim IN FULL_SCOPE_CODE_LIST AND SectionIdentifier IN CLSUB_CODE_LIST; 										
+
 ClaimsAutoClaim: => AdjustedClaimDate := ADJUSTCALENDAR(DateOfClaim, 0, 0, 1);
 
 ClaimsAutoClaim.Payments: => cClaimCatType := IF(ClaimCatType:Null, '', ClaimCatType);
 //EDITS holds last 2 bytes of ClaimCatAmount for cents so 54300 is really $543.00; Converted cClaimCatAmount to include dollars and cents
-ClaimsAutoClaim.Payments: => cClaimCatAmount := IF(ClaimCatAmount:Null, 0, ClaimCatAmount/100);
+ClaimsAutoClaim.Payments: => cClaimCatAmount := IF(ClaimCatAmount:Null, 0, ClaimCatAmount);
 ClaimsAutoClaim.Payments: => cClaimCatDisp := IF(ClaimCatDisp:Null, '', ClaimCatDisp);
 
 ClaimsAutoClaim: => IsAccidentClaim :=  EXISTS(Payments(cClaimCatType IN ACCIDENT_CODE_LIST));
@@ -686,345 +695,365 @@ ClaimsAutoClaim: => ClaimAmountLessTL := SUM(Payments, NoTLPaymentTmp);
 ClaimsAutoClaim.Payments: => AtFaultClaimAmountTmp := IF(cClaimCatType IN ClaimsAutoClaim.AT_FAULT_CODE_LIST, cClaimCatAmount, 0);
 ClaimsAutoClaim: => TotalAtFaultClaimAmount := SUM(Payments, AtFaultClaimAmountTmp);
 
+ClaimsAutoClaim: =>	YrBetweenClaimDateAndReceiptDate := YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfReceipt);
+
 ClaimsAutoClaim.Payments: => IsGMCompNZTmp := cClaimCatType IN ClaimsAutoClaim.GEN_MED_CODE_LIST AND cClaimCatAmount > 0;
-ClaimsAutoClaim: => GMComponentTmp1 := IF(IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfOrder) < 1, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);  
-ClaimsAutoClaim: => GMComponentTmp2 := IF(IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfOrder) < 2, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);  
-ClaimsAutoClaim: => GMComponentTmp3 := IF(IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfOrder) < 3, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);  
-ClaimsAutoClaim: => GMComponentTmp4 := IF(IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfOrder) < 4, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);   
-ClaimsAutoClaim: => GMComponentTmp5 := IF(IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfOrder) < 5, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);
+ClaimsAutoClaim: => GMComponentTmp1 := IF(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);  
+ClaimsAutoClaim: => GMComponentTmp2 := IF(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);  
+ClaimsAutoClaim: => GMComponentTmp3 := IF(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);  
+ClaimsAutoClaim: => GMComponentTmp4 := IF(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);   
+ClaimsAutoClaim: => GMComponentTmp5 := IF(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5, COUNT(Payments(IsGMCompNZTmp = TRUE)), 0);
 
 //Used in TOT_ATFAULT3
-ClaimsAuto: => NumAtFaultClmWithin3YrTmp := COUNT(ClaimsAutoClaim(IsMultiCarClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder)<3));
+ClaimsAuto: => NumAtFaultClmWithin3YrTmp := COUNT(ClaimsAutoClaim(IsMultiCarClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));
 
 //Used in CLAIMAMT
-ClaimsAutoClaim: => ClaimAmount5YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfOrder) < 5, TotalClaimAmount, 0);
+ClaimsAutoClaim: => ClaimAmount5YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5, TotalClaimAmount, 0);
 
 //Used in AVGPRV2 and AVGPRV3
-ClaimsAutoClaim: => ClaimAmount2YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfOrder) < 2, TotalClaimAmount, 0);
+ClaimsAutoClaim: => ClaimAmount2YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2, TotalClaimAmount, 0);
 ClaimsAuto: => TotalClmAmtWithin2YrTmp := SUM(ClaimsAutoClaim, ClaimAmount2YrTmp);
-ClaimsAuto: => NumNZNonClosedClmWithin2Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));
-ClaimsAutoClaim: => ClaimAmount3YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfOrder) < 3, TotalClaimAmount, 0);
+ClaimsAuto: => NumNZNonClosedClmWithin2Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));
+ClaimsAutoClaim: => ClaimAmount3YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3, TotalClaimAmount, 0);
 ClaimsAuto: => TotalClmAmtWithin3YrTmp := SUM(ClaimsAutoClaim, ClaimAmount3YrTmp);
-ClaimsAuto: => NumNZNonClosedClmWithin3Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));
+ClaimsAuto: => NumNZNonClosedClmWithin3Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));
 
 ClaimsAuto: => LatestClaimDate := MAX(ClaimsAutoClaim(IsValidClaim), DateOfClaim);
 ClaimsAuto: => LatestClaimDateAF := MAX(ClaimsAutoClaim(IsAtFaultClaim AND IsValidClaim), DateOfClaim);
 
-//	ACLE1001	ACLE1002	ACLE1003	ACLE1004	ACLE1005
-ClaimsAuto: => NumAccidentsLE100Within1Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumAccidentsLE100Within2Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumAccidentsLE100Within3Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumAccidentsLE100Within4Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumAccidentsLE100Within5Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	ACLE1001	ACLE1002	ACLE1003	ACLE1004	ACLE1005	ACLE1006	ACLE1007
+ClaimsAuto: => NumAccidentsLE100Within1Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumAccidentsLE100Within2Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumAccidentsLE100Within3Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumAccidentsLE100Within4Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumAccidentsLE100Within5Yr := COUNT(ClaimsAutoClaim(IsAccidentClaim = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	AFGE10K1	AFGE10K2	AFGE10K3	AFGE10K4	AFGE10K5
-ClaimsAuto: => NumAtFaultClmGE10000Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumAtFaultClmGE10000Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumAtFaultClmGE10000Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumAtFaultClmGE10000Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumAtFaultClmGE10000Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	AFGE10K1	AFGE10K2	AFGE10K3	AFGE10K4	AFGE10K5	AFGE10K6	AFGE10K7
+ClaimsAuto: => NumAtFaultClmGE10000Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumAtFaultClmGE10000Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumAtFaultClmGE10000Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumAtFaultClmGE10000Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumAtFaultClmGE10000Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	AFGE15H1	AFGE15H2	AFGE15H3	AFGE15H4	AFGE15H5
-ClaimsAuto: => NumAtFaultClmGE1500Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumAtFaultClmGE1500Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumAtFaultClmGE1500Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumAtFaultClmGE1500Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumAtFaultClmGE1500Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	AFGE15H1	AFGE15H2	AFGE15H3	AFGE15H4	AFGE15H5	AFGE15H6	AFGE15H7
+ClaimsAuto: => NumAtFaultClmGE1500Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumAtFaultClmGE1500Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumAtFaultClmGE1500Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumAtFaultClmGE1500Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumAtFaultClmGE1500Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1500 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	AFGE1K1	AFGE1K2	AFGE1K3	AFGE1K4	AFGE1K5
-ClaimsAuto: => NumAtFaultClmGE1000Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumAtFaultClmGE1000Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumAtFaultClmGE1000Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumAtFaultClmGE1000Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumAtFaultClmGE1000Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	AFGE1K1	AFGE1K2	AFGE1K3	AFGE1K4	AFGE1K5	AFGE1K6	AFGE1K7
+ClaimsAuto: => NumAtFaultClmGE1000Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumAtFaultClmGE1000Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumAtFaultClmGE1000Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumAtFaultClmGE1000Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumAtFaultClmGE1000Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 1000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	AFGE5K1	AFGE5K2	AFGE5K3	AFGE5K4	AFGE5K5
-ClaimsAuto: => NumAtFaultClmGE5000Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumAtFaultClmGE5000Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumAtFaultClmGE5000Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumAtFaultClmGE5000Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumAtFaultClmGE5000Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	AFGE5K1	AFGE5K2	AFGE5K3	AFGE5K4	AFGE5K5	AFGE5K6	AFGE5K7
+ClaimsAuto: => NumAtFaultClmGE5000Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumAtFaultClmGE5000Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumAtFaultClmGE5000Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumAtFaultClmGE5000Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumAtFaultClmGE5000Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	AFGE7501	AFGE7502	AFGE7503	AFGE7504	AFGE7505
-ClaimsAuto: => NumAtFaultClmGE750Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumAtFaultClmGE750Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumAtFaultClmGE750Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumAtFaultClmGE750Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumAtFaultClmGE750Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	AFGE7501	AFGE7502	AFGE7503	AFGE7504	AFGE7505	AFGE7506	AFGE7507
+ClaimsAuto: => NumAtFaultClmGE750Within1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumAtFaultClmGE750Within2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumAtFaultClmGE750Within3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumAtFaultClmGE750Within4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumAtFaultClmGE750Within5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND TotalAtFaultClaimAmount >= 750 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	CPONLYCNT1	CPONLYCNT2	CPONLYCNT3	CPONLYCNT4	CPONLYCNT5
-ClaimsAuto: => NumNZCompOnlyClmWithin1Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZCompOnlyClmWithin2Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZCompOnlyClmWithin3Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZCompOnlyClmWithin4Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZCompOnlyClmWithin5Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	CPONLYCNT1	CPONLYCNT2	CPONLYCNT3	CPONLYCNT4	CPONLYCNT5	CPONLYCNT6	CPONLYCNT7
+ClaimsAuto: => NumNZCompOnlyClmWithin1Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZCompOnlyClmWithin2Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZCompOnlyClmWithin3Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZCompOnlyClmWithin4Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZCompOnlyClmWithin5Yr := COUNT(ClaimsAutoClaim(IsOnlyCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	ALLGM1	ALLGM2	ALLGM3	ALLGM4	ALLGM5
-ClaimsAuto: => NumNZGenMedClmWithin1Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZGenMedClmWithin2Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZGenMedClmWithin3Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZGenMedClmWithin4Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZGenMedClmWithin5Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	ALLGM1	ALLGM2	ALLGM3	ALLGM4	ALLGM5	ALLGM6	ALLGM7
+ClaimsAuto: => NumNZGenMedClmWithin1Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZGenMedClmWithin2Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZGenMedClmWithin3Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZGenMedClmWithin4Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZGenMedClmWithin5Yr := COUNT(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	ALLRR1	ALLRR2	ALLRR3	ALLRR4	ALLRR5
-ClaimsAuto: => NumNZRentalReimbClmWithin1Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZRentalReimbClmWithin2Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZRentalReimbClmWithin3Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZRentalReimbClmWithin4Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZRentalReimbClmWithin5Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
- 
-//	ATFGM1	ATFGM2	ATFGM3	ATFGM4	ATFGM5
-ClaimsAuto: => NumAtFaultNZGenMedClmWithin1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumAtFaultNZGenMedClmWithin2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumAtFaultNZGenMedClmWithin3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumAtFaultNZGenMedClmWithin4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumAtFaultNZGenMedClmWithin5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	ALLRR1	ALLRR2	ALLRR3	ALLRR4	ALLRR5	ALLRR6	ALLRR7
+ClaimsAuto: => NumNZRentalReimbClmWithin1Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZRentalReimbClmWithin2Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZRentalReimbClmWithin3Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZRentalReimbClmWithin4Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZRentalReimbClmWithin5Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	ATFRR1	ATFRR2	ATFRR3	ATFRR4	ATFRR5
-ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	ATFGM1	ATFGM2	ATFGM3	ATFGM4	ATFGM5	ATFGM6	ATFGM7
+ClaimsAuto: => NumAtFaultNZGenMedClmWithin1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumAtFaultNZGenMedClmWithin2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumAtFaultNZGenMedClmWithin3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumAtFaultNZGenMedClmWithin4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumAtFaultNZGenMedClmWithin5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	CO_CNT1NZ	CO_CNT2NZ	CO_CNT3NZ	CO_CNT4NZ	CO_CNT5NZ
-ClaimsAuto: => NumNZCollCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZCollCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZCollCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZCollCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZCollCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	ATFRR1	ATFRR2	ATFRR3	ATFRR4	ATFRR5	ATFRR6	ATFRR7
+ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumAtFaultNZRentalReimbClmWithin5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	MAJCPRV1	MAJCPRV2	MAJCPRV3	MAJCPRV4	MAJCPRV5
-ClaimsAuto: => NumClmGE5000Within1Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumClmGE5000Within2Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumClmGE5000Within3Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumClmGE5000Within4Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumClmGE5000Within5Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	CO_CNT1NZ	CO_CNT2NZ	CO_CNT3NZ	CO_CNT4NZ	CO_CNT5NZ	CO_CNT6NZ	CO_CNT7NZ
+ClaimsAuto: => NumNZCollCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZCollCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZCollCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZCollCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZCollCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsCOClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	MAJGE10K1	MAJGE10K2	MAJGE10K3	MAJGE10K4	MAJGE10K5
-ClaimsAuto: => NumClmGE10000Within1Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumClmGE10000Within2Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumClmGE10000Within3Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumClmGE10000Within4Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumClmGE10000Within5Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	MAJCPRV1	MAJCPRV2	MAJCPRV3	MAJCPRV4	MAJCPRV5	MAJCPRV6	MAJCPRV7
+ClaimsAuto: => NumClmGE5000Within1Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumClmGE5000Within2Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumClmGE5000Within3Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumClmGE5000Within4Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumClmGE5000Within5Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 5000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	MINCCPV1	MINCCPV2	MINCCPV3	MINCCPV4	MINCCPV5
-ClaimsAuto: => NumNZClmLE100Within1Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZClmLE100Within2Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZClmLE100Within3Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZClmLE100Within4Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZClmLE100Within5Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	MAJGE10K1	MAJGE10K2	MAJGE10K3	MAJGE10K4	MAJGE10K5	MAJGE10K6	MAJGE10K7
+ClaimsAuto: => NumClmGE10000Within1Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumClmGE10000Within2Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumClmGE10000Within3Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumClmGE10000Within4Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumClmGE10000Within5Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount >= 10000 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
+
+//	MINCCPV1	MINCCPV2	MINCCPV3	MINCCPV4	MINCCPV5	MINCCPV6	MINCCPV7
+ClaimsAuto: => NumNZClmLE100Within1Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZClmLE100Within2Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZClmLE100Within3Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZClmLE100Within4Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZClmLE100Within5Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
 //	MOSINCE	MOSINCAF			
-ClaimsAuto: => NumMosSinceLastClm := IF(LatestClaimDate:Null, 9999, MONTHSBETWEEN(LatestClaimDate, ClaimsAuto.DateOfOrder));
-ClaimsAuto: => NumMosSinceLastAtFaultClm := IF(LatestClaimDateAF:Null, 9999, MONTHSBETWEEN(LatestClaimDateAF, ClaimsAuto.DateOfOrder));
+ClaimsAuto: => NumMosSinceLastClm := IF(LatestClaimDate:Null, 9999, MONTHSBETWEEN(LatestClaimDate, ClaimsAuto.DateOfReceipt));
+ClaimsAuto: => NumMosSinceLastAtFaultClm := IF(LatestClaimDateAF:Null, 9999, MONTHSBETWEEN(LatestClaimDateAF, ClaimsAuto.DateOfReceipt));
 
-//	PD_CNT1NZ	PD_CNT2NZ	PD_CNT3NZ	PD_CNT4NZ	PD_CNT5NZ
-ClaimsAuto: => NumNZPropDamCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZPropDamCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZPropDamCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZPropDamCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZPropDamCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	PD_CNT1NZ	PD_CNT2NZ	PD_CNT3NZ	PD_CNT4NZ	PD_CNT5NZ	PD_CNT6NZ	PD_CNT7NZ
+ClaimsAuto: => NumNZPropDamCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZPropDamCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZPropDamCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZPropDamCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZPropDamCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsPDClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
 // PD_CNT3 PD_CNT
-ClaimsAuto: => NumPropDamClmWithin3Yr := COUNT(ClaimsAutoClaim(IsPDClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumPropDamClmWithin5Yr := COUNT(ClaimsAutoClaim(IsPDClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+ClaimsAuto: => NumPropDamClmWithin3Yr := COUNT(ClaimsAutoClaim(IsPDClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumPropDamClmWithin5Yr := COUNT(ClaimsAutoClaim(IsPDClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
 // PD_Z_PR3
-ClaimsAuto: => ExistPropDamZClmWithin3Yr := IF(ClaimsAutoClaim(IsPDClaimZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3), 1, 0);
+ClaimsAuto: => ExistPropDamZClmWithin3Yr := IF(ClaimsAutoClaim(IsPDClaimZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), 1, 0);
 
-//	SINGAC01	SINGAC02	SINGAC03/SINGACC3	SINGAC04	SINGAC05
+// SINGAC03 is pointing to NumNZSingCarAccClmWithin3Yr based on Beth on 5/30. Should we change the whole group of SINGAC0#?
+//	SINGAC01	SINGAC02	SINGAC03/SINGACC3	SINGAC04	SINGAC05	SINGAC06	SINGAC07 Need to change later to sync ac03
 //modified on 3/21/17 after uncovering the spec document with Beth Simpson; SINGAC03 should be the same as SINGACC3
 //updated KEL name to better match updated spec, former names NumGenMedNotAtFaultClmWithin1Yr NumGenMedNotAtFaultClmWithin2Yr NumGenMedNotAtFaultClmWithin3Yr NumGenMedNotAtFaultClmWithin4Yr NumGenMedNotAtFaultClmWithin5Yr
-ClaimsAuto: => NumSingCarAccClmWithin1Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumSingCarAccClmWithin2Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumSingCarAccClmWithin3Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumSingCarAccClmWithin4Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumSingCarAccClmWithin5Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+
+// ClaimsAuto: => NumSingCarAccClmWithin1Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+// ClaimsAuto: => NumSingCarAccClmWithin2Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+// ClaimsAuto: => NumSingCarAccClmWithin3Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+// ClaimsAuto: => NumSingCarAccClmWithin4Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+// ClaimsAuto: => NumSingCarAccClmWithin5Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
+
+// SINGACC3
+ClaimsAuto: => NumSingCarAccClmWithin3Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2Claim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+
+
+//	SINGAC01	SINGAC02	SINGAC03	SINGAC04	SINGAC05	SINGAC06	SINGAC07
+// Update by Beth on 5/31
+ClaimsAuto: => NumNotAtFaultNZAccClmWithin1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = FALSE AND IsAccidentComb2ClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNotAtFaultNZAccClmWithin2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = FALSE AND IsAccidentComb2ClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNotAtFaultNZAccClmWithin3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = FALSE AND IsAccidentComb2ClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNotAtFaultNZAccClmWithin4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = FALSE AND IsAccidentComb2ClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNotAtFaultNZAccClmWithin5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = FALSE AND IsAccidentComb2ClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
 // SINGACC3_AR 
-ClaimsAuto: => NumSingCarAccClmWithin3YrAR := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND (IsGMClaimNZ = TRUE OR IsCOClaim = TRUE) AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
+ClaimsAuto: => NumSingCarAccClmWithin3YrAR := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND (IsGMClaimNZ = TRUE OR IsCOClaim = TRUE) AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
 // SINGACC3_NZ
-ClaimsAuto: => NumNZSingCarAccClmWithin3Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2ClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
+ClaimsAuto: => NumNZSingCarAccClmWithin3Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = FALSE AND IsAccidentComb2ClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
 
-//	TL_CNT1NZ	TL_CNT2NZ	TL_CNT3NZ	TL_CNT4NZ	TL_CNT5NZ
-ClaimsAuto: => NumNZTowLaborCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZTowLaborCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZTowLaborCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZTowLaborCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZTowLaborCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	TL_CNT1NZ	TL_CNT2NZ	TL_CNT3NZ	TL_CNT4NZ	TL_CNT5NZ	TL_CNT6NZ	TL_CNT7NZ
+ClaimsAuto: => NumNZTowLaborCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZTowLaborCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZTowLaborCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZTowLaborCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZTowLaborCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	TLONLYCNT1	TLONLYCNT2	TLONLYCNT3	TLONLYCNT4	TLONLYCNT5
-ClaimsAuto: => NumNZTowLaborOnlyClmWithin1Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZTowLaborOnlyClmWithin2Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZTowLaborOnlyClmWithin3Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZTowLaborOnlyClmWithin4Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZTowLaborOnlyClmWithin5Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	TLONLYCNT1	TLONLYCNT2	TLONLYCNT3	TLONLYCNT4	TLONLYCNT5	TLONLYCNT6	TLONLYCNT7
+ClaimsAuto: => NumNZTowLaborOnlyClmWithin1Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZTowLaborOnlyClmWithin2Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZTowLaborOnlyClmWithin3Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZTowLaborOnlyClmWithin4Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZTowLaborOnlyClmWithin5Yr := COUNT(ClaimsAutoClaim(IsOnlyTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	BI_CNT1NZ	BI_CNT2NZ	BI_CNT3NZ	BI_CNT4NZ	BI_CNT5NZ
-ClaimsAuto: => NumNZBodilyInjCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZBodilyInjCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZBodilyInjCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZBodilyInjCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZBodilyInjCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	BI_CNT1NZ	BI_CNT2NZ	BI_CNT3NZ	BI_CNT4NZ	BI_CNT5NZ	BI_CNT6NZ	BI_CNT7NZ
+ClaimsAuto: => NumNZBodilyInjCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZBodilyInjCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZBodilyInjCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZBodilyInjCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZBodilyInjCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsBIClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
 //	CLMS1NZ	CLMS2NZ/CLMS2No0	CLMS3NZ	CLMS4NZ	CLMS6NZ CLMS7NZ
 //CLMS2NZ and CLMS2No0 are identical
-ClaimsAuto: => NumNZClmWithin1Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZClmWithin2Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZClmWithin3Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZClmWithin4Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZClmWithin6Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 6));			
-ClaimsAuto: => NumNZClmWithin7Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 7));			
+ClaimsAuto: => NumNZClmWithin1Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZClmWithin2Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZClmWithin3Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZClmWithin4Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZClmWithin6Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 6));			
+ClaimsAuto: => NumNZClmWithin7Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 7));			
 
-//	CP_CNT1NZ	CP_CNT2NZ	CP_CNT3NZ	CP_CNT4NZ	CP_CNT5NZ
-ClaimsAuto: => NumNZCompCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZCompCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZCompCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZCompCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZCompCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	CP_CNT1NZ	CP_CNT2NZ	CP_CNT3NZ	CP_CNT4NZ	CP_CNT5NZ	CP_CNT6NZ	CP_CNT7NZ
+ClaimsAuto: => NumNZCompCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZCompCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZCompCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZCompCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZCompCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	GM_CNT1NZ	GM_CNT2NZ	GM_CNT3NZ	GM_CNT4NZ	GM_CNT5NZ
+//	GM_CNT1NZ	GM_CNT2NZ	GM_CNT3NZ	GM_CNT4NZ	GM_CNT5NZ	GM_CNT6NZ	GM_CNT7NZ
 ClaimsAuto: => NumNZGenMedCpntWithin1Yr := SUM(ClaimsAutoClaim, GMComponentTmp1); 			
 ClaimsAuto: => NumNZGenMedCpntWithin2Yr := SUM(ClaimsAutoClaim, GMComponentTmp2); 			
 ClaimsAuto: => NumNZGenMedCpntWithin3Yr := SUM(ClaimsAutoClaim, GMComponentTmp3); 			
 ClaimsAuto: => NumNZGenMedCpntWithin4Yr := SUM(ClaimsAutoClaim, GMComponentTmp4); 			
-ClaimsAuto: => NumNZGenMedCpntWithin5Yr := SUM(ClaimsAutoClaim, GMComponentTmp5);			
+ClaimsAuto: => NumNZGenMedCpntWithin5Yr := SUM(ClaimsAutoClaim, GMComponentTmp5);	
 
-//	RR_CNT1NZ	RR_CNT2NZ	RR_CNT3NZ	RR_CNT4NZ	RR_CNT5NZ
-ClaimsAuto: => NumNZRentalReimbCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZRentalReimbCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZRentalReimbCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZRentalReimbCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZRentalReimbCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	RR_CNT1NZ	RR_CNT2NZ	RR_CNT3NZ	RR_CNT4NZ	RR_CNT5NZ	RR_CNT6NZ	RR_CNT7NZ
+ClaimsAuto: => NumNZRentalReimbCpntWithin1Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZRentalReimbCpntWithin2Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZRentalReimbCpntWithin3Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZRentalReimbCpntWithin4Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZRentalReimbCpntWithin5Yr := COUNT(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	MINCBPV1	MINCBPV2	MINCBPV3	MINCBPV4	MINCBPV5
-ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin1Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin2Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin3Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin4Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin5Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	MINCBPV1	MINCBPV2	MINCBPV3	MINCBPV4	MINCBPV5	MINCBPV6	MINCBPV7
+ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin1Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin2Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin3Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin4Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZClmLE100NoTowLaborPmtWithin5Yr := COUNT(ClaimsAutoClaim(ClaimAmountLessTL > 0 AND ClaimAmountLessTL <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
-//	PDNOCO1	PDNOCO2	PDNOCO3	PDNOCO4	PDNOCO5
-ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin1Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin2Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin3Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin4Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin5Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+//	PDNOCO1	PDNOCO2	PDNOCO3	PDNOCO4	PDNOCO5	PDNOCO6	PDNOCO7
+ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin1Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin2Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin3Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin4Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumPropDamGT1000NoCollPmtWithin5Yr := COUNT(ClaimsAutoClaim(IsPDPaymentGreater1000 = TRUE AND IsCOClaimNZ=FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 
 // TOT_ATFAULT1NZ	TOT_ATFAULT2NZ	TOT_ATFAULT3NZ TOT_ATFAULT4NZ TOT_ATFAULT5NZ	TOT_ATFAULT6NZ	TOT_ATFAULT7NZ
-ClaimsAuto: => NumNZAtFaultClmWithin1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumNZAtFaultClmWithin2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
-ClaimsAuto: => NumNZAtFaultClmWithin3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumNZAtFaultClmWithin4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4));			
-ClaimsAuto: => NumNZAtFaultClmWithin5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
-ClaimsAuto: => NumNZAtFaultClmWithin6Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 6));			
-ClaimsAuto: => NumNZAtFaultClmWithin7Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 7));			
+ClaimsAuto: => NumNZAtFaultClmWithin1Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumNZAtFaultClmWithin2Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
+ClaimsAuto: => NumNZAtFaultClmWithin3Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumNZAtFaultClmWithin4Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4));			
+ClaimsAuto: => NumNZAtFaultClmWithin5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
+ClaimsAuto: => NumNZAtFaultClmWithin6Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 6));			
+ClaimsAuto: => NumNZAtFaultClmWithin7Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 7));			
 
-// AFCLM45				
-ClaimsAuto: => NumAtFaultClmFrom3YrTo5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) >= 3 AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));
+// AFCLM45	AFCLM47	AFCLM67		
+ClaimsAuto: => NumAtFaultClmFrom3YrTo5Yr := COUNT(ClaimsAutoClaim(IsAtFaultClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate >= 3 AND YrBetweenClaimDateAndReceiptDate < 5));
+
 // TOT_ATFAULT3
 ClaimsAuto: => NumAtFaultClmWithin3Yr := IF(NumAtFaultClmWithin3YrTmp = 0, 999, NumAtFaultClmWithin3YrTmp);
 // TOT_ATFAULT5 
-ClaimsAuto: => NumAtFaultClmWithin5Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder)<5));
+ClaimsAuto: => NumAtFaultClmWithin5Yr := COUNT(ClaimsAutoClaim(IsMultiCarClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate<5));
 
 // PI_CNT_1 PI_CNT_3 PI_CNT 
-ClaimsAuto: => NumPersInjClmWithin1Yr := COUNT(ClaimsAutoClaim(IsPIClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));			
-ClaimsAuto: => NumPersInjClmWithin3Yr := COUNT(ClaimsAutoClaim(IsPIClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-ClaimsAuto: => NumPersInjClmWithin5Yr := COUNT(ClaimsAutoClaim(IsPIClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));			
+ClaimsAuto: => NumPersInjClmWithin1Yr := COUNT(ClaimsAutoClaim(IsPIClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));			
+ClaimsAuto: => NumPersInjClmWithin3Yr := COUNT(ClaimsAutoClaim(IsPIClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+ClaimsAuto: => NumPersInjClmWithin5Yr := COUNT(ClaimsAutoClaim(IsPIClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));			
 // PI_OP_N8
-ClaimsAuto: => NumPersInjClmOpenDispWithin1Yr := COUNT(ClaimsAutoClaim(IsPIOpenClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));
+ClaimsAuto: => NumPersInjClmOpenDispWithin1Yr := COUNT(ClaimsAutoClaim(IsPIOpenClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));
 // PILAST24
-ClaimsAuto: => NumZPersInjClmWithin2Yr := COUNT(ClaimsAutoClaim(IsPIClaimZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));			
+ClaimsAuto: => NumZPersInjClmWithin2Yr := COUNT(ClaimsAutoClaim(IsPIClaimZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));			
 
 //RR_CNT, RR_CNT_3, RR_PR1   **verified with Beth Simpson that these SF names are misleading and should be indicators instead of counts
-ClaimsAuto: => ExistRentalReimbClmWithin1Yr := IF(ClaimsAutoClaim(IsRRClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
-ClaimsAuto: => ExistRentalReimbClmWithin3Yr := IF(ClaimsAutoClaim(IsRRClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3), 1, 0);
-ClaimsAuto: => ExistRentalReimbClmWithin5Yr := IF(ClaimsAutoClaim(IsRRClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5), 1, 0);
+ClaimsAuto: => ExistRentalReimbClmWithin1Yr := IF(ClaimsAutoClaim(IsRRClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
+ClaimsAuto: => ExistRentalReimbClmWithin3Yr := IF(ClaimsAutoClaim(IsRRClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), 1, 0);
+ClaimsAuto: => ExistRentalReimbClmWithin5Yr := IF(ClaimsAutoClaim(IsRRClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5), 1, 0);
 
-//RR_PR1NZ, RR_PR3NZ, RR_PR4NZ
-ClaimsAuto: => ExistNZRentalReimbClmWithin1Yr := IF(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
-ClaimsAuto: => ExistNZRentalReimbClmWithin3Yr := IF(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3), 1, 0);
-ClaimsAuto: => ExistNZRentalReimbClmWithin4Yr := IF(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 4), 1, 0);
+//RR_PR1NZ, RR_PR2NZ, RR_PR3NZ, RR_PR4NZ, RR_PR5NZ, RR_PR6NZ, RR_PR7NZ
+ClaimsAuto: => ExistNZRentalReimbClmWithin1Yr := IF(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
+ClaimsAuto: => ExistNZRentalReimbClmWithin3Yr := IF(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), 1, 0);
+ClaimsAuto: => ExistNZRentalReimbClmWithin4Yr := IF(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4), 1, 0);
 
 //RR_CNT3
-ClaimsAuto: => NumRentalReimbClmWithin3Yr := COUNT(ClaimsAutoClaim(IsRRClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));			
-   
-//TL_PR1NZ TL_PR5NZ
-ClaimsAuto: => ExistNZTowLaborClmWithin1Yr := IF(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
-ClaimsAuto: => ExistNZTowLaborClmWithin5Yr := IF(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5), 1, 0);
+ClaimsAuto: => NumRentalReimbClmWithin3Yr := COUNT(ClaimsAutoClaim(IsRRClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));			
+    
+//TL_PR1NZ	TL_PR2NZ TL_PR53Z TL_PR4NZ TL_PR5NZ TL_PR6NZ TL_PR7NZ
+ClaimsAuto: => ExistNZTowLaborClmWithin1Yr := IF(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
+ClaimsAuto: => ExistNZTowLaborClmWithin5Yr := IF(ClaimsAutoClaim(IsTLClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5), 1, 0);
 
 // TOT_CLMS TOT_CLMS_1 CLMS2 TOT_CLMS_3/CLMS3 
 // TOT_CLMS_3 and CLMS3 are identical
 // ClaimsAuto(UID = 15159) is a good test report for the variations
-ClaimsAuto: => NumClmWithin1Yr := COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1));
-ClaimsAuto: => NumClmWithin2Yr := COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2));
-ClaimsAuto: => NumClmWithin3Yr := COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));
-ClaimsAuto: => NumClmWithin5Yr := COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));
+ClaimsAuto: => NumClmWithin1Yr := COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));
+ClaimsAuto: => NumClmWithin2Yr := COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));
+ClaimsAuto: => NumClmWithin3Yr := COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));
+ClaimsAuto: => NumClmWithin5Yr := COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));
 // TOT_CLMS_NJ TOT_CLMS_SF TOT_CLMS_3_SF 
-ClaimsAuto: => NumClmWithin5YrNJ := COUNT(ClaimsAutoClaim(((IsNJSpecialCriteria = TRUE AND TotalClaimAmount > 0 AND TotalClaimAmount < 1000) OR (IsNJSpecialCriteria = FALSE AND TotalClaimAmount > 0)) AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));
-ClaimsAuto: => NumClmWithin3YrSF := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3));
-ClaimsAuto: => NumClmWithin5YrSF := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));
+ClaimsAuto: => NumClmWithin5YrNJ := COUNT(ClaimsAutoClaim(((IsNJSpecialCriteria = TRUE AND TotalClaimAmount > 0 AND TotalClaimAmount < 1000) OR (IsNJSpecialCriteria = FALSE AND TotalClaimAmount > 0)) AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));
+ClaimsAuto: => NumClmWithin3YrSF := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));
+ClaimsAuto: => NumClmWithin5YrSF := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));
 // TOT_CLMSAR
-ClaimsAuto: => NumClmWithin5YrAR := COUNT(ClaimsAutoClaim((IsARSpecialCriteriaNZ = TRUE OR IsNotARSpecialCriteria = TRUE) AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5));
+ClaimsAuto: => NumClmWithin5YrAR := COUNT(ClaimsAutoClaim((IsARSpecialCriteriaNZ = TRUE OR IsNotARSpecialCriteria = TRUE) AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5));
 
 //TOT_CLMSNZ
-ClaimsAuto: => NumNZClmWithin5Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5)); 
+ClaimsAuto: => NumNZClmWithin5Yr := COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5)); 
 
 //UM_CNT UM_CNT_3
-ClaimsAuto: => ExistUninsMotClmWithin3Yr := IF(ClaimsAutoClaim(IsUMClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3), 1, 0);
-ClaimsAuto: => ExistUninsMotClmWithin5Yr := IF(ClaimsAutoClaim(IsUMClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5), 1, 0);
+ClaimsAuto: => ExistUninsMotClmWithin3Yr := IF(ClaimsAutoClaim(IsUMClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), 1, 0);
+ClaimsAuto: => ExistUninsMotClmWithin5Yr := IF(ClaimsAutoClaim(IsUMClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5), 1, 0);
 
 //UNLAST24 UN_PR1NZ
-ClaimsAuto: => ExistNZUnderinsMotClmWithin1Yr := IF(ClaimsAutoClaim(IsUNClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
-ClaimsAuto: => ExistNZUnderinsMotClmWithin2Yr := IF(ClaimsAutoClaim(IsUNClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2), 1, 0);
+ClaimsAuto: => ExistNZUnderinsMotClmWithin1Yr := IF(ClaimsAutoClaim(IsUNClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
+ClaimsAuto: => ExistNZUnderinsMotClmWithin2Yr := IF(ClaimsAutoClaim(IsUNClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2), 1, 0);
 
-//ACCPRV1 ACCPRV3 ACCIND
-ClaimsAuto: => ExistAccidentClmWithin1Yr := IF(ClaimsAutoClaim(IsAccidentClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
-ClaimsAuto: => ExistAccidentClmWithin3Yr := IF(ClaimsAutoClaim(IsAccidentClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3), 1, 0);
-ClaimsAuto: => ExistAccidentClmWithin5Yr := IF(ClaimsAutoClaim(IsAccidentClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5), 1, 0);
+//ACCPRV1 ACCPRV2 ACCPRV3	ACCPRV4 ACCIND ACCPRV6 ACCPRV7
+ClaimsAuto: => ExistAccidentClmWithin1Yr := IF(ClaimsAutoClaim(IsAccidentClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
+ClaimsAuto: => ExistAccidentClmWithin3Yr := IF(ClaimsAutoClaim(IsAccidentClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), 1, 0);
+ClaimsAuto: => ExistAccidentClmWithin5Yr := IF(ClaimsAutoClaim(IsAccidentClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5), 1, 0);
 
-//NACCPRV1 NACCPRV5
-ClaimsAuto: => ExistNonAccidentClmWithin1Yr := IF(ClaimsAutoClaim(IsNonAccidentClaim = TRUE AND IsAccidentClaim = FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
-ClaimsAuto: => ExistNonAccidentClmWithin5Yr := IF(ClaimsAutoClaim(IsNonAccidentClaim = TRUE AND IsAccidentClaim = FALSE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5), 1, 0);
+//NACCPRV1 NACCPRV2 NACCPRV3 NACCPRV4 NACCPRV5 NACCPRV6 NACCPRV7
+ClaimsAuto: => ExistNonAccidentClmWithin1Yr := IF(ClaimsAutoClaim(IsNonAccidentClaim = TRUE AND IsAccidentClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
+ClaimsAuto: => ExistNonAccidentClmWithin5Yr := IF(ClaimsAutoClaim(IsNonAccidentClaim = TRUE AND IsAccidentClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5), 1, 0);
 
 //MP_CL_N8 
-ClaimsAuto: => NumMedPmtCloseDispClmWithin1Yr := COUNT(ClaimsAutoClaim(IsMPClosedClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1)); 
+ClaimsAuto: => NumMedPmtCloseDispClmWithin1Yr := COUNT(ClaimsAutoClaim(IsMPClosedClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1)); 
 
 //MP_CNT
-ClaimsAuto: => NumMedPmtClmWithin5Yr := COUNT(ClaimsAutoClaim(IsMPClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5)); 
+ClaimsAuto: => NumMedPmtClmWithin5Yr := COUNT(ClaimsAutoClaim(IsMPClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5)); 
 
-//GM_PR1NZ GM_PR3NZ
-ClaimsAuto: => ExistGenMedNZClmWithin1Yr := IF(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
-ClaimsAuto: => ExistGenMedNZClmWithin3Yr := IF(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3), 1, 0);
+//GM_PR1NZ GM_PR2NZ GM_PR3NZ GM_PR4NZ GM_PR5NZ GM_PR6NZ GM_PR7NZ
+ClaimsAuto: => ExistGenMedNZClmWithin1Yr := IF(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
+ClaimsAuto: => ExistGenMedNZClmWithin3Yr := IF(ClaimsAutoClaim(IsGMClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), 1, 0);
 
 //GM_PR1 
-ClaimsAuto: => ExistGenMedClmWithin1Yr := IF(ClaimsAutoClaim(IsGMClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
+ClaimsAuto: => ExistGenMedClmWithin1Yr := IF(ClaimsAutoClaim(IsGMClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
 //GM_CNT_1
-ClaimsAuto: => NumGenMedClmWithin1Yr := COUNT(ClaimsAutoClaim(IsGMClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1)); 
+ClaimsAuto: => NumGenMedClmWithin1Yr := COUNT(ClaimsAutoClaim(IsGMClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1)); 
 
 //CP_ZR_N1 CPLAST24
-ClaimsAuto: => NumCompZClmWithin1Yr := COUNT(ClaimsAutoClaim(IsCPClaimZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1)); 
-ClaimsAuto: => NumCompZClmWithin2Yr := COUNT(ClaimsAutoClaim(IsCPClaimZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 2)); 
+ClaimsAuto: => NumCompZClmWithin1Yr := COUNT(ClaimsAutoClaim(IsCPClaimZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1)); 
+ClaimsAuto: => NumCompZClmWithin2Yr := COUNT(ClaimsAutoClaim(IsCPClaimZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2)); 
 
-//CPPRVN1 CP_PR3NZ
-ClaimsAuto: => ExistCompNZClmWithin1Yr := IF(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
-ClaimsAuto: => ExistCompNZClmWithin3Yr := IF(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3), 1, 0);
+//CPPRVN1 CP_PR2NZ CP_PR3NZ CP_PR4NZ CP_PR5NZ CP_PR6NZ CP_PR7NZ
+ClaimsAuto: => ExistCompNZClmWithin1Yr := IF(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
+ClaimsAuto: => ExistCompNZClmWithin3Yr := IF(ClaimsAutoClaim(IsCPClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), 1, 0);
 
 //CP_CNT
-ClaimsAuto: => NumCompClmWithin5Yr := COUNT(ClaimsAutoClaim(IsCPClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5)); 
+ClaimsAuto: => NumCompClmWithin5Yr := COUNT(ClaimsAutoClaim(IsCPClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5)); 
 
 //CO_ZR_N1
-ClaimsAuto: => NumCollZClmWithin1Yr := IF(ClaimsAutoClaim(IsCOClaimZ = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1), 1, 0);
+//INCORRECT
+//ClaimsAuto: => NumCollZClmWithin1Yr := IF(ClaimsAutoClaim(IsCOClaimZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
+//CORRECT 
+ClaimsAuto: => NumCollZClmWithin1Yr := COUNT(ClaimsAutoClaim(IsCOClaimZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1));
 
 //BI_PR3
-ClaimsAuto: => ExistBodilyInjClmWithin3Yr := IF(ClaimsAutoClaim(IsBIClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 3), 1, 0);
+ClaimsAuto: => ExistBodilyInjClmWithin3Yr := IF(ClaimsAutoClaim(IsBIClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), 1, 0);
 
 //BI_CNT
-ClaimsAuto: => NumBodilyInjClmWithin5Yr := COUNT(ClaimsAutoClaim(IsBIClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 5)); 
+ClaimsAuto: => NumBodilyInjClmWithin5Yr := COUNT(ClaimsAutoClaim(IsBIClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5)); 
 
 //BI_OT_N8
-ClaimsAuto: => NumBodilyInjOtherDispClmWithin1Yr := COUNT(ClaimsAutoClaim(IsBIOtherClaim = TRUE AND IsValidClaim = TRUE AND YEARSBETWEEN(AdjustedClaimDate, ClaimsAuto.DateOfOrder) < 1)); 
+ClaimsAuto: => NumBodilyInjOtherDispClmWithin1Yr := COUNT(ClaimsAutoClaim(IsBIOtherClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1)); 
 
 //CLAIMAMT
 ClaimsAuto: => TotalClmAmtWithin5Yr := MAP(NumClmWithin5Yr = 0 => 99999999,  
@@ -1041,14 +1070,12 @@ ClaimsAuto: => AvgClmAmtWithin3Yr := MAP(NumNZNonClosedClmWithin3Yr = 0 => 99999
 																					TotalClmAmtWithin3YrTmp / NumNZNonClosedClmWithin3Yr);
 
 
-
-
-
 // Non-FCRA: Claims Discovery
 // Debugging QUERY's
 QUERY: ClaimsDiscoveryAutoSubjectID(SearchForID) <= ClaimsAutoSubjectID(rClaimsAuto = SearchForID) USING [NonFCRA];
 QUERY: ClaimsDiscoveryAutoClaim(SearchForID) <= ClaimsAutoClaim(rClaimsAuto = SearchForID) USING [NonFCRA];
 QUERY: ClaimsDiscoveryAutoRecap(SearchForID) <= ClaimsAutoRecap(rClaimsAuto = SearchForID) USING [NonFCRA];
+QUERY: ClaimsDiscoveryAutoNew63 <= ClaimsAuto{UID, ExistAccidentClmWithin5Yr, ExistAccidentClmWithin1Yr, ExistAccidentClmWithin3Yr, AvgClmAmtWithin2Yr, AvgClmAmtWithin3Yr, NumBodilyInjClmWithin5Yr, NumBodilyInjOtherDispClmWithin1Yr, ExistBodilyInjClmWithin3Yr, TotalClmAmtWithin5Yr, NumNZClmWithin2Yr, NumClmWithin2Yr, NumClmWithin3Yr, NumCollZClmWithin1Yr, NumCompClmWithin5Yr, ExistCompNZClmWithin3Yr, NumCompZClmWithin1Yr, ExistCompNZClmWithin1Yr, NumCompZClmWithin2Yr, NumGenMedClmWithin1Yr, ExistGenMedClmWithin1Yr, ExistGenMedNZClmWithin1Yr, ExistGenMedNZClmWithin3Yr, NumClmGE5000Within5Yr, NumMedPmtClmWithin5Yr, NumMedPmtCloseDispClmWithin1Yr, ExistNonAccidentClmWithin1Yr, ExistNonAccidentClmWithin5Yr, NumPropDamClmWithin5Yr, ExistPropDamZClmWithin3Yr, NumPropDamClmWithin3Yr, NumPersInjClmWithin5Yr, NumPersInjClmWithin1Yr, NumPersInjClmWithin3Yr, NumPersInjClmOpenDispWithin1Yr, NumZPersInjClmWithin2Yr, ExistRentalReimbClmWithin5Yr, NumRentalReimbClmWithin3Yr, ExistRentalReimbClmWithin3Yr, ExistRentalReimbClmWithin1Yr, ExistNZRentalReimbClmWithin1Yr, ExistNZRentalReimbClmWithin3Yr, ExistNZRentalReimbClmWithin4Yr, NumNotAtFaultNZAccClmWithin3Yr, NumSingCarAccClmWithin3YrAR, NumNZSingCarAccClmWithin3Yr, ExistNZTowLaborClmWithin1Yr, ExistNZTowLaborClmWithin5Yr, NumAtFaultClmWithin3Yr, NumNZAtFaultClmWithin3Yr, NumAtFaultClmWithin5Yr, NumNZAtFaultClmWithin5Yr, NumClmWithin5Yr, NumClmWithin5YrAR, NumNZClmWithin5Yr, NumClmWithin1Yr, NumClmWithin3Yr, NumClmWithin5YrNJ, NumClmWithin5YrSF, NumClmWithin3YrSF, ExistUninsMotClmWithin5Yr, ExistUninsMotClmWithin3Yr, ExistNZUnderinsMotClmWithin2Yr, ExistNZUnderinsMotClmWithin1Yr} USING [NonFCRA];
 // Final SHELL
 SHELL: ClaimsDiscoveryAuto <= ClaimsAuto{UID, ReportRequestRecordCode, QuoteBack, ReportCode, ReportType, AccountNumber, AccountSuffix, SpecialBillID, DateOfOrder, DateOfReceipt, DateOfCompletion, ProcessingCompletionStatus, ReportUsage, ReferenceNumber, TimeOfReport, RecordVersion, ReportidSupplementA, ReportSectionHeader, GroupCurrentAddress} USING [NonFCRA];
 
@@ -1057,72 +1084,7 @@ SHELL: ClaimsDiscoveryAuto <= ClaimsAuto{UID, ReportRequestRecordCode, QuoteBack
 QUERY: CLUEAutoSubjectID(SearchForID) <= ClaimsAutoSubjectID(rClaimsAuto = SearchForID) USING [FCRA];
 QUERY: CLUEAutoClaim(SearchForID) <= ClaimsAutoClaim(rClaimsAuto = SearchForID) USING [FCRA];
 QUERY: CLUEAutoRecap(SearchForID) <= ClaimsAutoRecap(rClaimsAuto = SearchForID) USING [FCRA];
+QUERY: CLUEAutoNew63 <= ClaimsAuto{UID, ExistAccidentClmWithin5Yr, ExistAccidentClmWithin1Yr, ExistAccidentClmWithin3Yr, AvgClmAmtWithin2Yr, AvgClmAmtWithin3Yr, NumBodilyInjClmWithin5Yr, NumBodilyInjOtherDispClmWithin1Yr, ExistBodilyInjClmWithin3Yr, TotalClmAmtWithin5Yr, NumNZClmWithin2Yr, NumClmWithin2Yr, NumClmWithin3Yr, NumCollZClmWithin1Yr, NumCompClmWithin5Yr, ExistCompNZClmWithin3Yr, NumCompZClmWithin1Yr, ExistCompNZClmWithin1Yr, NumCompZClmWithin2Yr, NumGenMedClmWithin1Yr, ExistGenMedClmWithin1Yr, ExistGenMedNZClmWithin1Yr, ExistGenMedNZClmWithin3Yr, NumClmGE5000Within5Yr, NumMedPmtClmWithin5Yr, NumMedPmtCloseDispClmWithin1Yr, ExistNonAccidentClmWithin1Yr, ExistNonAccidentClmWithin5Yr, NumPropDamClmWithin5Yr, ExistPropDamZClmWithin3Yr, NumPropDamClmWithin3Yr, NumPersInjClmWithin5Yr, NumPersInjClmWithin1Yr, NumPersInjClmWithin3Yr, NumPersInjClmOpenDispWithin1Yr, NumZPersInjClmWithin2Yr, ExistRentalReimbClmWithin5Yr, NumRentalReimbClmWithin3Yr, ExistRentalReimbClmWithin3Yr, ExistRentalReimbClmWithin1Yr, ExistNZRentalReimbClmWithin1Yr, ExistNZRentalReimbClmWithin3Yr, ExistNZRentalReimbClmWithin4Yr, NumNotAtFaultNZAccClmWithin3Yr, NumSingCarAccClmWithin3YrAR, NumNZSingCarAccClmWithin3Yr, ExistNZTowLaborClmWithin1Yr, ExistNZTowLaborClmWithin5Yr, NumAtFaultClmWithin3Yr, NumNZAtFaultClmWithin3Yr, NumAtFaultClmWithin5Yr, NumNZAtFaultClmWithin5Yr, NumClmWithin5Yr, NumClmWithin5YrAR, NumNZClmWithin5Yr, NumClmWithin1Yr, NumClmWithin3Yr, NumClmWithin5YrNJ, NumClmWithin5YrSF, NumClmWithin3YrSF, ExistUninsMotClmWithin5Yr, ExistUninsMotClmWithin3Yr, ExistNZUnderinsMotClmWithin2Yr, ExistNZUnderinsMotClmWithin1Yr} USING [FCRA];
 // Final SHELL
 SHELL: CLUEAuto <= ClaimsAuto{UID, ReportRequestRecordCode, QuoteBack, ReportCode, ReportType, AccountNumber, AccountSuffix, SpecialBillID, DateOfOrder, DateOfReceipt, DateOfCompletion, ProcessingCompletionStatus, ReportUsage, ReferenceNumber, TimeOfReport, RecordVersion, ReportidSupplementA, ReportSectionHeader, GroupCurrentAddress} USING [FCRA];
-SHELL: CLUEAutoStateFarm <= ClaimsAuto{UID, NumAccidentsLE100Within1Yr , NumAccidentsLE100Within2Yr, NumAccidentsLE100Within3Yr, NumAccidentsLE100Within4Yr, NumAccidentsLE100Within5Yr, NumAtFaultClmFrom3YrTo5Yr, NumAtFaultClmGE10000Within1Yr, NumAtFaultClmGE10000Within2Yr, NumAtFaultClmGE10000Within3Yr, NumAtFaultClmGE10000Within4Yr, NumAtFaultClmGE10000Within5Yr, NumAtFaultClmGE1500Within1Yr, NumAtFaultClmGE1500Within2Yr, NumAtFaultClmGE1500Within3Yr, NumAtFaultClmGE1500Within4Yr, NumAtFaultClmGE1500Within5Yr, NumAtFaultClmGE1000Within1Yr, NumAtFaultClmGE1000Within2Yr, NumAtFaultClmGE1000Within3Yr, NumAtFaultClmGE1000Within4Yr, NumAtFaultClmGE1000Within5Yr, NumAtFaultClmGE5000Within1Yr, NumAtFaultClmGE5000Within2Yr, NumAtFaultClmGE5000Within3Yr, NumAtFaultClmGE5000Within4Yr, NumAtFaultClmGE5000Within5Yr, NumAtFaultClmGE750Within1Yr, NumAtFaultClmGE750Within2Yr, NumAtFaultClmGE750Within3Yr, NumAtFaultClmGE750Within4Yr, NumAtFaultClmGE750Within5Yr, NumNZGenMedClmWithin1Yr, NumNZGenMedClmWithin2Yr, NumNZGenMedClmWithin3Yr, NumNZGenMedClmWithin4Yr, NumNZGenMedClmWithin5Yr, NumNZRentalReimbClmWithin1Yr, NumNZRentalReimbClmWithin2Yr, NumNZRentalReimbClmWithin3Yr, NumNZRentalReimbClmWithin4Yr, NumNZRentalReimbClmWithin5Yr, NumAtFaultNZGenMedClmWithin1Yr, NumAtFaultNZGenMedClmWithin2Yr, NumAtFaultNZGenMedClmWithin3Yr, NumAtFaultNZGenMedClmWithin4Yr, NumAtFaultNZGenMedClmWithin5Yr, NumAtFaultNZRentalReimbClmWithin1Yr, NumAtFaultNZRentalReimbClmWithin2Yr, NumAtFaultNZRentalReimbClmWithin3Yr, NumAtFaultNZRentalReimbClmWithin4Yr, NumAtFaultNZRentalReimbClmWithin5Yr, NumNZBodilyInjCpntWithin1Yr, NumNZBodilyInjCpntWithin2Yr, NumNZBodilyInjCpntWithin3Yr, NumNZBodilyInjCpntWithin4Yr, NumNZBodilyInjCpntWithin5Yr, NumNZClmWithin1Yr, NumNZClmWithin2Yr, NumNZClmWithin3Yr, NumNZClmWithin4Yr, NumNZClmWithin6Yr, NumNZClmWithin7Yr, NumNZCollCpntWithin1Yr, NumNZCollCpntWithin2Yr, NumNZCollCpntWithin3Yr, NumNZCollCpntWithin4Yr, NumNZCollCpntWithin5Yr, NumNZCompCpntWithin1Yr, NumNZCompCpntWithin2Yr, NumNZCompCpntWithin3Yr, NumNZCompCpntWithin4Yr, NumNZCompCpntWithin5Yr, NumNZCompOnlyClmWithin1Yr, NumNZCompOnlyClmWithin2Yr, NumNZCompOnlyClmWithin3Yr, NumNZCompOnlyClmWithin4Yr, NumNZCompOnlyClmWithin5Yr, NumNZGenMedCpntWithin1Yr, NumNZGenMedCpntWithin2Yr, NumNZGenMedCpntWithin3Yr, NumNZGenMedCpntWithin4Yr, NumNZGenMedCpntWithin5Yr, NumClmGE5000Within1Yr, NumClmGE5000Within2Yr, NumClmGE5000Within3Yr, NumClmGE5000Within4Yr, NumClmGE5000Within5Yr, NumClmGE10000Within1Yr, NumClmGE10000Within2Yr, NumClmGE10000Within3Yr, NumClmGE10000Within4Yr, NumClmGE10000Within5Yr, NumNZClmLE100NoTowLaborPmtWithin1Yr, NumNZClmLE100NoTowLaborPmtWithin2Yr, NumNZClmLE100NoTowLaborPmtWithin3Yr, NumNZClmLE100NoTowLaborPmtWithin4Yr, NumNZClmLE100NoTowLaborPmtWithin5Yr, NumNZClmLE100Within1Yr, NumNZClmLE100Within2Yr, NumNZClmLE100Within3Yr, NumNZClmLE100Within4Yr, NumNZClmLE100Within5Yr, NumMosSinceLastAtFaultClm, NumMosSinceLastClm, NumNZPropDamCpntWithin1Yr, NumNZPropDamCpntWithin2Yr, NumNZPropDamCpntWithin3Yr, NumNZPropDamCpntWithin4Yr, NumNZPropDamCpntWithin5Yr, NumPropDamGT1000NoCollPmtWithin1Yr, NumPropDamGT1000NoCollPmtWithin2Yr, NumPropDamGT1000NoCollPmtWithin3Yr, NumPropDamGT1000NoCollPmtWithin4Yr, NumPropDamGT1000NoCollPmtWithin5Yr, NumNZRentalReimbCpntWithin1Yr, NumNZRentalReimbCpntWithin2Yr, NumNZRentalReimbCpntWithin3Yr, NumNZRentalReimbCpntWithin4Yr, NumNZRentalReimbCpntWithin5Yr, NumSingCarAccClmWithin1Yr, NumSingCarAccClmWithin2Yr, NumSingCarAccClmWithin3Yr, NumSingCarAccClmWithin4Yr, NumSingCarAccClmWithin5Yr, NumNZTowLaborCpntWithin1Yr, NumNZTowLaborCpntWithin2Yr, NumNZTowLaborCpntWithin3Yr, NumNZTowLaborCpntWithin4Yr, NumNZTowLaborCpntWithin5Yr, NumNZTowLaborOnlyClmWithin1Yr, NumNZTowLaborOnlyClmWithin2Yr, NumNZTowLaborOnlyClmWithin3Yr, NumNZTowLaborOnlyClmWithin4Yr, NumNZTowLaborOnlyClmWithin5Yr, NumNZAtFaultClmWithin1Yr, NumNZAtFaultClmWithin2Yr, NumNZAtFaultClmWithin4Yr, NumNZAtFaultClmWithin6Yr, NumNZAtFaultClmWithin7Yr} USING [FCRA];
-
-QUERY: AllNewAuto63 <= ClaimsAuto{UID, 
-ExistAccidentClmWithin5Yr	, 
-ExistAccidentClmWithin1Yr	, 
-ExistAccidentClmWithin3Yr	, 
-AvgClmAmtWithin2Yr	, 
-AvgClmAmtWithin3Yr	, 
-NumBodilyInjClmWithin5Yr	, 
-NumBodilyInjOtherDispClmWithin1Yr	, 
-ExistBodilyInjClmWithin3Yr	, 
-TotalClmAmtWithin5Yr	, 
-NumNZClmWithin2Yr	, 
-NumClmWithin2Yr	, 
-NumClmWithin3Yr	, 
-NumCollZClmWithin1Yr	, 
-NumCompClmWithin5Yr	, 
-ExistCompNZClmWithin3Yr	, 
-NumCompZClmWithin1Yr	, 
-ExistCompNZClmWithin1Yr	, 
-NumCompZClmWithin2Yr	, 
-NumGenMedClmWithin1Yr	, 
-ExistGenMedClmWithin1Yr	, 
-ExistGenMedNZClmWithin1Yr	, 
-ExistGenMedNZClmWithin3Yr	, 
-NumClmGE5000Within5Yr	, 
-NumMedPmtClmWithin5Yr	, 
-NumMedPmtCloseDispClmWithin1Yr	, 
-ExistNonAccidentClmWithin1Yr	, 
-ExistNonAccidentClmWithin5Yr	, 
-NumPropDamClmWithin5Yr	, 
-ExistPropDamZClmWithin3Yr	, 
-NumPropDamClmWithin3Yr	, 
-NumPersInjClmWithin5Yr	, 
-NumPersInjClmWithin1Yr	, 
-NumPersInjClmWithin3Yr	, 
-NumPersInjClmOpenDispWithin1Yr	, 
-NumZPersInjClmWithin2Yr	, 
-ExistRentalReimbClmWithin5Yr	, 
-NumRentalReimbClmWithin3Yr	, 
-ExistRentalReimbClmWithin3Yr	, 
-ExistRentalReimbClmWithin1Yr	, 
-ExistNZRentalReimbClmWithin1Yr	, 
-ExistNZRentalReimbClmWithin3Yr	, 
-ExistNZRentalReimbClmWithin4Yr	, 
-NumSingCarAccClmWithin3Yr	, 
-NumSingCarAccClmWithin3YrAR	, 
-NumNZSingCarAccClmWithin3Yr	, 
-ExistNZTowLaborClmWithin1Yr	, 
-ExistNZTowLaborClmWithin5Yr	, 
-NumAtFaultClmWithin3Yr	, 
-NumNZAtFaultClmWithin3Yr	, 
-NumAtFaultClmWithin5Yr	, 
-NumNZAtFaultClmWithin5Yr	, 
-NumClmWithin5Yr	, 
-NumClmWithin5YrAR	, 
-NumNZClmWithin5Yr	, 
-NumClmWithin1Yr	, 
-NumClmWithin3Yr	, 
-NumClmWithin5YrNJ	, 
-NumClmWithin5YrSF	, 
-NumClmWithin3YrSF	, 
-ExistUninsMotClmWithin5Yr	, 
-ExistUninsMotClmWithin3Yr	, 
-ExistNZUnderinsMotClmWithin2Yr	, 
-ExistNZUnderinsMotClmWithin1Yr	 
-};
+SHELL: CLUEAutoStateFarm <= ClaimsAuto{UID, NumAccidentsLE100Within1Yr , NumAccidentsLE100Within2Yr, NumAccidentsLE100Within3Yr, NumAccidentsLE100Within4Yr, NumAccidentsLE100Within5Yr, NumAtFaultClmFrom3YrTo5Yr, NumAtFaultClmGE10000Within1Yr, NumAtFaultClmGE10000Within2Yr, NumAtFaultClmGE10000Within3Yr, NumAtFaultClmGE10000Within4Yr, NumAtFaultClmGE10000Within5Yr, NumAtFaultClmGE1500Within1Yr, NumAtFaultClmGE1500Within2Yr, NumAtFaultClmGE1500Within3Yr, NumAtFaultClmGE1500Within4Yr, NumAtFaultClmGE1500Within5Yr, NumAtFaultClmGE1000Within1Yr, NumAtFaultClmGE1000Within2Yr, NumAtFaultClmGE1000Within3Yr, NumAtFaultClmGE1000Within4Yr, NumAtFaultClmGE1000Within5Yr, NumAtFaultClmGE5000Within1Yr, NumAtFaultClmGE5000Within2Yr, NumAtFaultClmGE5000Within3Yr, NumAtFaultClmGE5000Within4Yr, NumAtFaultClmGE5000Within5Yr, NumAtFaultClmGE750Within1Yr, NumAtFaultClmGE750Within2Yr, NumAtFaultClmGE750Within3Yr, NumAtFaultClmGE750Within4Yr, NumAtFaultClmGE750Within5Yr, NumNZGenMedClmWithin1Yr, NumNZGenMedClmWithin2Yr, NumNZGenMedClmWithin3Yr, NumNZGenMedClmWithin4Yr, NumNZGenMedClmWithin5Yr, NumNZRentalReimbClmWithin1Yr, NumNZRentalReimbClmWithin2Yr, NumNZRentalReimbClmWithin3Yr, NumNZRentalReimbClmWithin4Yr, NumNZRentalReimbClmWithin5Yr, NumAtFaultNZGenMedClmWithin1Yr, NumAtFaultNZGenMedClmWithin2Yr, NumAtFaultNZGenMedClmWithin3Yr, NumAtFaultNZGenMedClmWithin4Yr, NumAtFaultNZGenMedClmWithin5Yr, NumAtFaultNZRentalReimbClmWithin1Yr, NumAtFaultNZRentalReimbClmWithin2Yr, NumAtFaultNZRentalReimbClmWithin3Yr, NumAtFaultNZRentalReimbClmWithin4Yr, NumAtFaultNZRentalReimbClmWithin5Yr, NumNZBodilyInjCpntWithin1Yr, NumNZBodilyInjCpntWithin2Yr, NumNZBodilyInjCpntWithin3Yr, NumNZBodilyInjCpntWithin4Yr, NumNZBodilyInjCpntWithin5Yr, NumNZClmWithin1Yr, NumNZClmWithin2Yr, NumNZClmWithin3Yr, NumNZClmWithin4Yr, NumNZClmWithin6Yr, NumNZClmWithin7Yr, NumNZCollCpntWithin1Yr, NumNZCollCpntWithin2Yr, NumNZCollCpntWithin3Yr, NumNZCollCpntWithin4Yr, NumNZCollCpntWithin5Yr, NumNZCompCpntWithin1Yr, NumNZCompCpntWithin2Yr, NumNZCompCpntWithin3Yr, NumNZCompCpntWithin4Yr, NumNZCompCpntWithin5Yr, NumNZCompOnlyClmWithin1Yr, NumNZCompOnlyClmWithin2Yr, NumNZCompOnlyClmWithin3Yr, NumNZCompOnlyClmWithin4Yr, NumNZCompOnlyClmWithin5Yr, NumNZGenMedCpntWithin1Yr, NumNZGenMedCpntWithin2Yr, NumNZGenMedCpntWithin3Yr, NumNZGenMedCpntWithin4Yr, NumNZGenMedCpntWithin5Yr, NumClmGE5000Within1Yr, NumClmGE5000Within2Yr, NumClmGE5000Within3Yr, NumClmGE5000Within4Yr, NumClmGE5000Within5Yr, NumClmGE10000Within1Yr, NumClmGE10000Within2Yr, NumClmGE10000Within3Yr, NumClmGE10000Within4Yr, NumClmGE10000Within5Yr, NumNZClmLE100NoTowLaborPmtWithin1Yr, NumNZClmLE100NoTowLaborPmtWithin2Yr, NumNZClmLE100NoTowLaborPmtWithin3Yr, NumNZClmLE100NoTowLaborPmtWithin4Yr, NumNZClmLE100NoTowLaborPmtWithin5Yr, NumNZClmLE100Within1Yr, NumNZClmLE100Within2Yr, NumNZClmLE100Within3Yr, NumNZClmLE100Within4Yr, NumNZClmLE100Within5Yr, NumMosSinceLastAtFaultClm, NumMosSinceLastClm, NumNZPropDamCpntWithin1Yr, NumNZPropDamCpntWithin2Yr, NumNZPropDamCpntWithin3Yr, NumNZPropDamCpntWithin4Yr, NumNZPropDamCpntWithin5Yr, NumPropDamGT1000NoCollPmtWithin1Yr, NumPropDamGT1000NoCollPmtWithin2Yr, NumPropDamGT1000NoCollPmtWithin3Yr, NumPropDamGT1000NoCollPmtWithin4Yr, NumPropDamGT1000NoCollPmtWithin5Yr, NumNZRentalReimbCpntWithin1Yr, NumNZRentalReimbCpntWithin2Yr, NumNZRentalReimbCpntWithin3Yr, NumNZRentalReimbCpntWithin4Yr, NumNZRentalReimbCpntWithin5Yr, NumSingCarAccClmWithin3Yr, NumNotAtFaultNZAccClmWithin1Yr, NumNotAtFaultNZAccClmWithin2Yr, NumNotAtFaultNZAccClmWithin3Yr, NumNotAtFaultNZAccClmWithin4Yr, NumNotAtFaultNZAccClmWithin5Yr, NumNZTowLaborCpntWithin1Yr, NumNZTowLaborCpntWithin2Yr, NumNZTowLaborCpntWithin3Yr, NumNZTowLaborCpntWithin4Yr, NumNZTowLaborCpntWithin5Yr, NumNZTowLaborOnlyClmWithin1Yr, NumNZTowLaborOnlyClmWithin2Yr, NumNZTowLaborOnlyClmWithin3Yr, NumNZTowLaborOnlyClmWithin4Yr, NumNZTowLaborOnlyClmWithin5Yr, NumNZAtFaultClmWithin1Yr, NumNZAtFaultClmWithin2Yr, NumNZAtFaultClmWithin4Yr, NumNZAtFaultClmWithin6Yr, NumNZAtFaultClmWithin7Yr} USING [FCRA];

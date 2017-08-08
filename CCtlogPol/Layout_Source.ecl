@@ -1,0 +1,20 @@
+﻿EXPORT Layout_Source := RECORD
+  string20 transaction_id;
+  string4 sequence;
+  string1 status;
+  string2 state;
+  string6 am_best;
+  string20 policy_number;
+  string2 policy_type;
+  string10 policy_inception_date;
+  string10 policy_begin_date;
+  string10 policy_cancel_date;
+  string10 policy_end_date;
+  string4 last_cancel_reason;
+  string2 insurance_type;
+  string1 suppressed;
+  string5 naic;
+  string1 risk_type;
+  string30 carrier_name;
+  string20 date_added;
+ END;

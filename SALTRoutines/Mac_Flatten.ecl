@@ -1,4 +1,4 @@
-/* scroll down to see what this macro does
+﻿/* scroll down to see what this macro does
                       _
                      | |
                      | |
