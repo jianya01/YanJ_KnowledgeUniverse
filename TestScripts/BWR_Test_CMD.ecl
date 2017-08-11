@@ -7,14 +7,14 @@ OUTPUT(KELGlobal.Q_Medical_Provider_Dump_Porto.Res0, NAMED('MedicalProviderDump'
 OUTPUT(KELGlobal.Q_Claim_Dump_Porto.Res0, NAMED('ClaimDump'));
 OUTPUT(KELGlobal.Q_Phone_Dump_Porto.Res0, NAMED('PhoneDump'));
 OUTPUT(KELGlobal.Q_Address_Dump_Porto.Res0, NAMED('AddressDump'));
-OUTPUT(KELGlobal.Q_Policy_Dump_Porto.Res0, NAMED('PolicyDump'));
+// OUTPUT(KELGlobal.Q_Policy_Dump_Porto.Res0, NAMED('PolicyDump'));
 OUTPUT(KELGlobal.Q_Policy_Holder_Dump_Porto.Res0, NAMED('PolicyHolderDump'));
 OUTPUT(KELGlobal.Q_Patient_Phone_Dump_Porto.Res0, NAMED('PatientPhoneDump'));
 OUTPUT(KELGlobal.Q_Patient_Policy_Holder_Relation_Dump_Porto.Res0, NAMED('PatientPolicyHolderRelationDump'));
 OUTPUT(KELGlobal.Q_Patient_Address_Dump_Porto.Res0, NAMED('PatientAddressDump'));
 OUTPUT(KELGlobal.Q_Policy_Holder_Claim_Dump_Porto.Res0, NAMED('PolicyHolderClaimDump'));
 OUTPUT(KELGlobal.Q_Patient_Claim_Dump_Porto.Res0, NAMED('PatientClaimDump'));
-OUTPUT(KELGlobal.Q_Policy_Claim_Dump_Porto.Res0, NAMED('PolicyClaimDump'));
+// OUTPUT(KELGlobal.Q_Policy_Claim_Dump_Porto.Res0, NAMED('PolicyClaimDump'));
 OUTPUT(KELGlobal.Q_Provider_Facility_Address_Dump_Porto.Res0, NAMED('ProviderFacilityAddressDump'));
 OUTPUT(KELGlobal.Q_Medical_Provider_Address_Dump_Porto.Res0, NAMED('MedicalProviderAddressDump'));
 OUTPUT(KELGlobal.Q_Provider_Facility_Claim_Dump_Porto.Res0, NAMED('ProviderFacilityClaimDump'));

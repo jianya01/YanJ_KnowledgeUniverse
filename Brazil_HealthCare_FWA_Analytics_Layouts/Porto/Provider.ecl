@@ -55,8 +55,4 @@ LayoutProvider := RECORD
 fileName := '~thor::base::health::brazil::test::full::version::20170807::provider';//~thor::base::global::health::brazil::test::full::20170721::provider'; //testdata - thor::base::global::health::brazil::201770606::provider
 EXPORT Provider := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutProvider, THOR),
-	DATASET(fileName, LayoutProvider, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
-	// EXPORT ProviderPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
-	// DATASET(fileName, LayoutProvider, THOR),
-	// JOIN(DATASET(fileName, LayoutProvider, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutProvider,self:=left)));
-	
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutProvider, THOR), HASH64(generatedkey)), DISTRIBUTE(_Control.GeneratedKeyFilterSet(generatedkey != ''), HASH64(generatedkey)), LEFT.generatedkey = RIGHT.generatedkey, TRANSFORM(LEFT), LOCAL));

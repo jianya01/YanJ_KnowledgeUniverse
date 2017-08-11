@@ -44,7 +44,4 @@ LayoutUD := RECORD
 fileName := '~thor::base::health::brazil::test::full::version::20170807::miscellaneous';
 EXPORT UserDefinitions := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutUD, THOR),
-	DATASET(fileName, LayoutUD, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
-// EXPORT LineItemPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
-	// DATASET(fileName, LayoutLine, THOR),
-	// JOIN(DATASET(fileName, LayoutLine, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutLine,self:=left)));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutUD, THOR), HASH64(generatedkey)), DISTRIBUTE(_Control.GeneratedKeyFilterSet(generatedkey != ''), HASH64(generatedkey)), LEFT.generatedkey = RIGHT.generatedkey, TRANSFORM(LEFT), LOCAL));

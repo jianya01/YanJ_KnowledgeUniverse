@@ -8,5 +8,5 @@
 // EXPORT GeneratedKeyFilterSet := DATASET([], UniqueKeyLayout);
 
 
-// EXPORT GeneratedKeyFilterSet := ['0000001246425909', '0000001526308662', '0000000575166557']; // Include every single LexID in the base files (Full File Runs)
-EXPORT GeneratedKeyFilterSet := []; // Include every single LexID in the base files (Full File Runs)
+// EXPORT GeneratedKeyFilterSet := ['0000001246425909', '0000001526308662', '0000000575166557'];
+EXPORT GeneratedKeyFilterSet := DATASET([], {string200 generatedkey});
