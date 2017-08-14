@@ -33,7 +33,4 @@ LayoutPolicy := RECORD
 fileName := '~thor::base::health::brazil::test::full::version::20170807::claimpolicy';//~thor::base::global::health::brazil::test::full::20170721::claimpolicy'; //testdata - thor::base::global::health::brazil::201770606::claimpolicy
 EXPORT Policy := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutPolicy, THOR),
-	DATASET(fileName, LayoutPolicy, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
-// EXPORT PolicyPorto :=  IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
-	// DATASET(fileName, LayoutPolicy, THOR),
-	// JOIN(DATASET(fileName, LayoutPolicy, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutPolicy,self:=left)));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutPolicy, THOR), HASH64(generatedkey)), DISTRIBUTE(_Control.GeneratedKeyFilterSet(generatedkey != ''), HASH64(generatedkey)), LEFT.generatedkey = RIGHT.generatedkey, TRANSFORM(LEFT), LOCAL));

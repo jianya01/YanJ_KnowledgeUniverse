@@ -73,7 +73,4 @@ LayoutPatient := RECORD
 fileName := '~thor::base::health::brazil::test::full::version::20170807::patient';//~thor::base::global::health::brazil::test::full::20170721::patient';
 EXPORT Patient := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutPatient, THOR),
-	DATASET(fileName, LayoutPatient, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
-// EXPORT PatientPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
-	// DATASET(fileName, LayoutPatient, THOR),
-	// JOIN(DATASET(fileName, LayoutPatient, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutPatient,self:=left)));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutPatient, THOR), HASH64(generatedkey)), DISTRIBUTE(_Control.GeneratedKeyFilterSet(generatedkey != ''), HASH64(generatedkey)), LEFT.generatedkey = RIGHT.generatedkey, TRANSFORM(LEFT), LOCAL));

@@ -27,7 +27,4 @@ LayoutAuthorization := RECORD
 fileName := '~thor::base::health::brazil::test::full::version::20170807::authorisationdetails';//~thor::base::global::health::brazil::test::full::20170721::auhtorisationdetails';
 EXPORT Authorisation := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutAuthorization, THOR),
-	DATASET(fileName, LayoutAuthorization, THOR) (generatedkey IN _Control.GeneratedKeyFilterSet));
-// EXPORT AuthorisationPorto := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
-	// DATASET(fileName, LayoutAuthorization, THOR),
-	// DATASET(fileName, LayoutAuthorization, THOR), _Control.GeneratedKeyFilterSet, LEFT.insurerirdacode = RIGHT.insurerirdacode AND LEFT.generatedkey = RIGHT.generatedkey AND LEFT.claimtype = RIGHT.claimtype, transform(LayoutAuthorization,self:=left)));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutAuthorization, THOR), HASH64(generatedkey)), DISTRIBUTE(_Control.GeneratedKeyFilterSet(generatedkey != ''), HASH64(generatedkey)), LEFT.generatedkey = RIGHT.generatedkey, TRANSFORM(LEFT), LOCAL));

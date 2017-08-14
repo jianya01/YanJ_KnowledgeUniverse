@@ -1,5 +1,5 @@
 ﻿// KEL Compiler Options and Configurations
-#OPTION(persist, 0) //Change 0 to 2 for persisting. 0 is only for debugging
+#OPTION(persist, 2) //Change 0 to 2 for persisting. 0 is only for debugging
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
 
@@ -128,7 +128,7 @@ ProviderFacility := ENTITY(FLAT(UID(ProviderKey),
 			DrugEnforcementAdministrationNumber, Taxanomy, ProviderFacilityNumber, WatchCode, 
 		SpecialityDetails{SpecialityCode}));
 	 
-
+/*
 Policy := ENTITY(FLAT(UID = PolicyNumber,
 		STRING ApplicationNumber,
 		STRING Status,
@@ -153,7 +153,7 @@ Policy := ENTITY(FLAT(UID = PolicyNumber,
 		ApplicationNumber, Status, GroupNumber, DivisionNumber, Classification, GroupPolicyClassification, PlanType, IRDAProductType, CoverageType,
 		CoverageStatus, StartDate, EndDate, CancellationTerminationDate, InsuredEffectiveEligibilityDate, InsuredExpirationEligibilityDate, InsuredEligibilityStatus,
 		PolicyHolderIdentificationNumber, PolicyHolderPolicyNumber, PolicyHolderEmployerGroupNumber));
-
+*/
 // NationalIdentificationNumber := ENTITY(FLAT(UID = NIN), 
 	// MODEL(UID));
 
@@ -234,8 +234,26 @@ Claim := ENTITY(FLAT(UID(GeneratedKey),
 		STRING DateAndTimeStamp,
 		STRING SecurityCode,
 		//ClaimPolicy fields
+		STRING PolicyNumber,
+		STRING ApplicationNumber,
+		STRING PolicyStatus,
+		INTEGER GroupNumber,			//EmployerGroupNumber
+		INTEGER DivisionNumber,			//PrimaryInsuredDivisionNumber
+		STRING Classification,			// I = Individual, G = Group or M = Mass
+		STRING GroupPolicyClassification, 		// E = Employer, N = Non-Employer
+		STRING PlanType,
+		INTEGER IRDAProductType,		// 01-11, 99
+		STRING CoverageType,
+		STRING CoverageStatus,
+		DATE StartDate,
+		DATE EndDate,
+		DATE CancellationTerminationDate,
 		DATE InsuredEffectiveEligibilityDate,
 		DATE InsuredExpirationEligibilityDate,
+		STRING InsuredEligibilityStatus,
+		STRING PolicyHolderIdentificationNumber, //PrimaryInsuredSubscriberIdentificationNumber 
+		STRING PolicyHolderPolicyNumber,	//PrimaryInsuredSubscriberPolicyNumber
+		STRING PolicyHolderEmployerGroupNumber,
 		//Authorization fields
 		STRING AuthorizationTranReferenceNumber,
 		DATE AuthorizationRequestReceivedDate,
@@ -342,6 +360,7 @@ Claim := ENTITY(FLAT(UID(GeneratedKey),
 		STRING InjuryCause,
 		STRING InjuryCauseDescription,
 		STRING MedicolegalIndicator,
+		//UserDefinitions
 		INTEGER MedicalDefinitionCounter,
 		STRING MedicalUserDefinitions,
 		INTEGER PatientDefinitionCounter, 
@@ -353,7 +372,9 @@ Claim := ENTITY(FLAT(UID(GeneratedKey),
 	ClaimNumber, InsurerName, ThirdPartyAdministratorCode, ThirdPartyAdministratorName, ClaimProviderNumber, ClaimInsurerNumber,IntimationNumber, IntimationDate, Status, Nature,
 	ThirdPartyAdministratorRemarks, PolicySumInsured,	PolicyBalanceSumInsured, MemberSumInsured, MemberBalanceSumInsured, CorporateFloaterSumInsured,
 	CorporateFloaterBalanceSumInsured, OPDSumInsured, OPDBalanceSumInsured, BirthRegistration, DeathRegistration, ReceivedDate, DateAndTimeStamp, SecurityCode, BenefitPlan, TypeOfPlan,
-	ClaimPolicy{InsuredEffectiveEligibilityDate, InsuredExpirationEligibilityDate},
+	ClaimPolicy{PolicyNumber, ApplicationNumber, PolicyStatus, GroupNumber, DivisionNumber, Classification, GroupPolicyClassification, PlanType, IRDAProductType, CoverageType,
+		CoverageStatus, StartDate, EndDate, CancellationTerminationDate, InsuredEffectiveEligibilityDate, InsuredExpirationEligibilityDate, InsuredEligibilityStatus,
+		PolicyHolderIdentificationNumber, PolicyHolderPolicyNumber, PolicyHolderEmployerGroupNumber},
 	LineItem{ClaimLineNumber, TransactionID, ReopenDate, ReopenRemarks,AuthorizationRequestedIndicator, DomiciliaryHospitalisationIndicator, TransactionType, DataContributorType,
 		TransactionCreationDateTime, AuthorizationNumber,	AdmittanceDate, DischargeDate, DayCareTreatmentIndicator, ExtendedCareInpatientRehabilitationIndicator, RejectReasonCode,
 		RejectionReductionReasonDescription, ReopenIndicator, AdjustmentCode, AdjustmentNumber, Source, DataSource, ExpenseType, OtherExpenseTypeDescription, HospitalizationExpensesDetails,
@@ -384,7 +405,7 @@ PatientPolicyHolderRelation := ASSOCIATION(FLAT(Patient First, PolicyHolder Seco
 PatientAddress := ASSOCIATION(FLAT(Patient Subject, Address Location=UID(Address1, Address2, ZipCode)));
 PatientClaim := ASSOCIATION(FLAT(Patient Subject, Claim MedicalClaim=UID(GeneratedKey)));
 PolicyHolderClaim := ASSOCIATION(FLAT(PolicyHolder Insured, Claim MedicalClaim=UID(GeneratedKey)));
-PolicyClaim := ASSOCIATION(FLAT(Policy Insurance, Claim MedicalClaim=UID(GeneratedKey)));
+// PolicyClaim := ASSOCIATION(FLAT(Policy Insurance, Claim MedicalClaim=UID(GeneratedKey)));
 DiagnosisCentre := ASSOCIATION(FLAT(Claim MedicalClaim=UID(GeneratedKey), Address Location=UID(Address1, Address2, ZipCode)));
 ProviderFacilityAddress := ASSOCIATION(FLAT(ProviderFacility Facility=UID(ProviderKey), Address Location=UID(Address1, Address2, ZipCode)));
 MedicalProviderAddress := ASSOCIATION(FLAT(MedicalProvider Professional=UID(ProviderKey), Address Location=UID(Address1, Address2, ZipCode)));
@@ -458,32 +479,6 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Patient(FLAT,
 		GeneratedKey = generatedkey),
 	PolicyHolderClaim(
 		Insured = primaryinsuredmemberkey,
-		GeneratedKey = generatedkey),
-	PERMITS([Porto]));
-
-USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Policy(FLAT,
-	Policy(UID = policynumber,
-		ApplicationNumber = applicationnumber,
-		Status = policystatus,
-		GroupNumber = employergroupnumber,
-		DivisionNumber = primaryinsureddivisionnumber,
-		Classification = policyclassification,
-		GroupPolicyClassification = grouppolicyclassification,
-		PlanType = plantype,
-		IRDAProductType = irdaproducttype,
-		CoverageType = coveragetype,
-		CoverageStatus = coveragestatus,
-		StartDate = policystartdate,
-		EndDate = policyenddate,
-		CancellationTerminationDate = policycancellationterminationdate,
-		InsuredEffectiveEligibilityDate = insuredeffectiveeligibilitydate,
-		InsuredEffectiveEligibilityDate = insuredexpirationeligibilitydate,
-		InsuredEligibilityStatus = insuredeligibilitystatus,
-		PolicyHolderIdentificationNumber = primaryinsuredsubscriberidentificationnumber,
-		PolicyHolderPolicyNumber = primaryinsuredsubscriberpolicynumber,
-		PolicyHolderEmployerGroupNumber = primaryinsuredsubscriberempgrpnumber),
-	PolicyClaim(
-		Insurance = policynumber,
 		GeneratedKey = generatedkey),
 	PERMITS([Porto]));
 
@@ -644,13 +639,7 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Claims(FLAT,
 		GeneratedKey = generatedkey),
 	PERMITS([Porto]));
 
-USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Policy(FLAT,
-	Claim(
-		GeneratedKey = generatedkey,
-		InsuredEffectiveEligibilityDate = insuredeffectiveeligibilitydate,
-		InsuredEffectiveEligibilityDate = insuredexpirationeligibilitydate),
-	PERMITS([Porto]));
-	
+
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.LineItem(FLAT,
 	Claim(
 		GeneratedKey = generatedkey,
@@ -761,6 +750,54 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Diagnosis(FLAT,
 		Address2 = address.addresscomplementary,
 		ZipCode = address.zipcode),
 	PERMITS([Porto]));
+
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Policy(FLAT,
+	/*Policy(UID = policynumber,
+		ApplicationNumber = applicationnumber,
+		Status = policystatus,
+		GroupNumber = employergroupnumber,
+		DivisionNumber = primaryinsureddivisionnumber,
+		Classification = policyclassification,
+		GroupPolicyClassification = grouppolicyclassification,
+		PlanType = plantype,
+		IRDAProductType = irdaproducttype,
+		CoverageType = coveragetype,
+		CoverageStatus = coveragestatus,
+		StartDate = policystartdate,
+		EndDate = policyenddate,
+		CancellationTerminationDate = policycancellationterminationdate,
+		InsuredEffectiveEligibilityDate = insuredeffectiveeligibilitydate,
+		InsuredEffectiveEligibilityDate = insuredexpirationeligibilitydate,
+		InsuredEligibilityStatus = insuredeligibilitystatus,
+		PolicyHolderIdentificationNumber = primaryinsuredsubscriberidentificationnumber,
+		PolicyHolderPolicyNumber = primaryinsuredsubscriberpolicynumber,
+		PolicyHolderEmployerGroupNumber = primaryinsuredsubscriberempgrpnumber),
+	PolicyClaim(
+		Insurance = policynumber,
+		GeneratedKey = generatedkey),*/
+	Claim(
+		GeneratedKey = generatedkey,
+		PolicyNumber = policynumber,
+		ApplicationNumber = applicationnumber,
+		PolicyStatus = policystatus,
+		GroupNumber = employergroupnumber,
+		DivisionNumber = primaryinsureddivisionnumber,
+		Classification = policyclassification,
+		GroupPolicyClassification = grouppolicyclassification,
+		PlanType = plantype,
+		IRDAProductType = irdaproducttype,
+		CoverageType = coveragetype,
+		CoverageStatus = coveragestatus,
+		StartDate = policystartdate,
+		EndDate = policyenddate,
+		CancellationTerminationDate = policycancellationterminationdate,
+		InsuredEffectiveEligibilityDate = insuredeffectiveeligibilitydate,
+		InsuredEffectiveEligibilityDate = insuredexpirationeligibilitydate,
+		InsuredEligibilityStatus = insuredeligibilitystatus,
+		PolicyHolderIdentificationNumber = primaryinsuredsubscriberidentificationnumber,
+		PolicyHolderPolicyNumber = primaryinsuredsubscriberpolicynumber,
+		PolicyHolderEmployerGroupNumber = primaryinsuredsubscriberempgrpnumber),
+	PERMITS([Porto]));
 		
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Authorisation(FLAT,
 	Claim(
@@ -814,14 +851,14 @@ QUERY: MedicalProviderDumpPorto <= MedicalProvider USING [Porto];
 QUERY: ClaimDumpPorto <= Claim USING [Porto];
 QUERY: PhoneDumpPorto <= Phone USING [Porto];
 QUERY: AddressDumpPorto <= Address USING [Porto];
-QUERY: PolicyDumpPorto <= Policy USING [Porto];
+// QUERY: PolicyDumpPorto <= Policy USING [Porto];
 QUERY: PolicyHolderDumpPorto <= PolicyHolder USING [Porto];
 QUERY: PatientPhoneDumpPorto <= PatientPhone USING [Porto];
 QUERY: PatientPolicyHolderRelationDumpPorto <= PatientPolicyHolderRelation USING [Porto];
 QUERY: PatientAddressDumpPorto <= PatientAddress USING [Porto];
 QUERY: PatientClaimDumpPorto <= PatientClaim USING [Porto];
 QUERY: PolicyHolderClaimDumpPorto <= PolicyHolderClaim USING [Porto];
-QUERY: PolicyClaimDumpPorto <= PolicyClaim USING [Porto];
+// QUERY: PolicyClaimDumpPorto <= PolicyClaim USING [Porto];
 QUERY: ProviderFacilityAddressDumpPorto <= ProviderFacilityAddress USING [Porto];
 QUERY: MedicalProviderAddressDumpPorto <= MedicalProviderAddress USING [Porto];
 QUERY: ProviderFacilityClaimDumpPorto <= ProviderFacilityClaim USING [Porto];
