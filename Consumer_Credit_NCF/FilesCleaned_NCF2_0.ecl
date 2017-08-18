@@ -215,8 +215,8 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.LexID						:= 1514226899;
 		SELF.Date_Reported				:= 20170201;
 		SELF.RecordTypeCounter			:= 1;
-		SELF.MonthCounter				:= COUNTER;
-		SELF.TrendedDataDate			:= '201702';
+		SELF.MonthCounter := IF(ABS(STD.Date.DaysBetween(LEFT.Date_Reported,STD.Date.FromStringToDate(LEFT.TrendedDataDate + (STRING)LEFT.Date_Reported[7..8], '%Y%m%d'))) = 0, 0, ABS(STD.Date.DaysBetween(LEFT.Date_Reported,STD.Date.FromStringToDate(LEFT.TrendedDataDate + (STRING)LEFT.Date_Reported[7..8], '%Y%m%d')))/30);
+		SELF.TrendedDataDate			:= '201602';
 		SELF.BalanceAmount				:= CASE(COUNTER,
 											1 => 12345,
 											2 => 222,
