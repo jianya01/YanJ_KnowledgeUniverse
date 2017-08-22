@@ -1069,6 +1069,39 @@ ClaimsAuto: => AvgClmAmtWithin3Yr := MAP(NumNZNonClosedClmWithin3Yr = 0 => 99999
 																					NumClmWithin3Yr = 0 => 9999999.99, 
 																					TotalClmAmtWithin3YrTmp / NumNZNonClosedClmWithin3Yr);
 
+																					
+//FOR FDN ATTRIBUTES: AVGPRV1, CP_PR1, CO_PR1, PD_PR1, AND CLMSPRV1;
+
+ClaimsAuto: => IsValidReport := ProcessingCompletionStatus = 'C';
+
+// IsValidClaimV2 is built for FDN Claim Discovery project.
+ClaimsAutoClaim: => IsValidClaimV2 := ISVALIDDATE(DateOfClaim) AND ISVALIDDATE(rClaimsAuto.DateOfOrder) AND DateOfClaim < rClaimsAuto.DateOfOrder AND SectionIdentifier IN CLSUB_CODE_LIST; 										
+ClaimsAutoClaim: =>	YrBetweenClaimDateAndOrderDate := YEARSBETWEEN(AdjustedClaimDate, rClaimsAuto.DateOfOrder);
+
+
+//CLMSPRV1
+// NumClmWithin1YrV2 is built for FDN Claim Discovery project.
+ClaimsAuto: => NumClmWithin1YrV2 := IF(IsValidReport, COUNT(ClaimsAutoClaim(IsValidClaimV2 = TRUE AND YrBetweenClaimDateAndOrderDate < 1)), -1); 
+
+//AVGPRV1
+ClaimsAutoClaim: => ClaimAmountPRV1 := IF(IsValidClaimV2 = TRUE AND YrBetweenClaimDateAndOrderDate < 1, TotalClaimAmount, 0);
+ClaimsAuto: => TotalClmAmtWithin1Yr := SUM(ClaimsAutoClaim, ClaimAmountPRV1);
+ClaimsAuto: => AvgClmAmtWithin1Yr := MAP(NOT IsValidReport => -1, 
+                                         NumClmWithin1YrV2 = 0 => -1,
+                                         ROUND(TotalClmAmtWithin1Yr/NumClmWithin1YrV2));
+
+//CP_PR1
+ClaimsAuto: => NumCPClmWithin1YrTemp := COUNT(ClaimsAutoClaim(IsCPClaim = TRUE AND IsValidClaimV2 = TRUE AND YrBetweenClaimDateAndOrderDate < 1));
+ClaimsAuto: => ExistCPClmWithin1Yr := IF(IsValidReport, MIN(NumCPClmWithin1YrTemp, 1), -1);
+
+//PD_PR1
+ClaimsAuto: => NumPDClmWithin1YrTemp := COUNT(ClaimsAutoClaim(IsPDClaim = TRUE AND IsValidClaimV2 = TRUE AND YrBetweenClaimDateAndOrderDate < 1));
+ClaimsAuto: => ExistPDClmWithin1Yr := IF(IsValidReport, MIN(NumPDClmWithin1YrTemp, 1), -1);
+
+//CO_PR1
+ClaimsAuto: => NumCOClmWithin1YrTemp := COUNT(ClaimsAutoClaim(IsCOClaim = TRUE AND IsValidClaimV2 = TRUE AND YrBetweenClaimDateAndOrderDate < 1));
+ClaimsAuto: => ExistCOClmWithin1Yr := IF(IsValidReport, MIN(NumCOClmWithin1YrTemp, 1), -1);
+
 
 // Non-FCRA: Claims Discovery
 // Debugging QUERY's
