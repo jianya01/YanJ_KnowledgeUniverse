@@ -10,4 +10,3 @@ EXPORT BOOLEAN WordBagsEqual(StrType wb1, StrType wb2) :=
 			Fn_WordBagsEqual_Str(wb1,wb2);
 #END
  
-
