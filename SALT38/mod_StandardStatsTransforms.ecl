@@ -1,6 +1,5 @@
 ﻿// functions/transforms to take different types of statistics outputs and convert them to Layout_Stats_Standard
 EXPORT mod_StandardStatsTransforms := MODULE
-
 	EXPORT mac_hygieneSummaryTransform(mymod, fieldsAttr, inLayout, hasSourceField, outputECLText = FALSE) := MACRO
 		IMPORT mymod;
 		#DECLARE(outECL);
@@ -242,7 +241,6 @@ EXPORT mod_StandardStatsTransforms := MODULE
 		#SET(fieldnameECL, '');
 		#SET(statvalECL, '');
 		#SET(nField, 1);
-
 		#APPEND(outECL, 'SALT38.Layout_Stats_Standard.Main xByRIDFieldChanges(' + inLayout + 'le, INTEGER cnt, UNSIGNED useTimestamp, STRING suffixIn = \'\', STRING statCategoryMoreIn = \'\') := TRANSFORM\n');
 		#APPEND(outECL, '  SELF.dateTimeStamp := useTimeStamp;\n');
 		#APPEND(outECL, '  SELF.wuid := WORKUNIT;\n');
@@ -290,7 +288,6 @@ EXPORT mod_StandardStatsTransforms := MODULE
 		#SET(fieldnameECL, '');
 		#SET(statvalECL, '');
 		#SET(nField, 1);
-
 		#APPEND(outECL, 'SALT38.Layout_Stats_Standard.Main xBySrcRIDFieldChanges(' + inLayout + 'le, INTEGER cnt, UNSIGNED useTimestamp, STRING suffixIn = \'\', STRING statCategoryMoreIn = \'\') := TRANSFORM\n');
 		#APPEND(outECL, '  SELF.dateTimeStamp := useTimeStamp;\n');
 		#APPEND(outECL, '  SELF.wuid := WORKUNIT;\n');
@@ -326,5 +323,4 @@ EXPORT mod_StandardStatsTransforms := MODULE
 			%outECL%;
 		#END
 	ENDMACRO;
-
 END;
