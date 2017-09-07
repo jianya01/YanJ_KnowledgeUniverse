@@ -1,6 +1,6 @@
 ﻿//This is the code to execute in a builder window
 #OPTION('multiplePersistInstances', FALSE);
-#workunit('name','I_Bankruptcy_Search.BWR_Ingest - Ingest - SALT V3.8.0-PV5');
+#workunit('name','I_Bankruptcy_Search.BWR_Ingest - Ingest - SALT V3.8.1');
 IMPORT I_Bankruptcy_Search,SALT38;
 //If you are not ingesting as part of a header build you can use the below;
 //Set CloseOlds to TRUE to ensure that all 'Old' open records will be closed
