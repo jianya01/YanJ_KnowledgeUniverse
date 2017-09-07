@@ -98,6 +98,10 @@ Provider := ENTITY(FLAT(UID(ProviderKey),
 		TaxID, TaxIDSuffix, NetworkCode, FirstName, MiddleName, LastName,RecentBirthIndicator, RegimeOfHospitalisation, CPFOrCNPJ, AuthorizationCode,
 		DrugEnforcementAdministrationNumber, Taxanomy, ProviderFacilityNumber, WatchCode, 
 		SpecialityDetails{SpecialityCode}));
+
+Segment := ENTITY(FLAT(UID = SegmentID,
+		STRING Description), 
+	MODEL(UID, Description));
 		 
 /*
 Policy := ENTITY(FLAT(UID = PolicyNumber,
@@ -378,6 +382,9 @@ PolicyHolderClaim := ASSOCIATION(FLAT(PolicyHolder Insured, Claim MedicalClaim=U
 DiagnosisCentre := ASSOCIATION(FLAT(Claim MedicalClaim=UID(GeneratedKey), Address Location=UID(Address1, Address2, ZipCode)));
 ProviderAddress := ASSOCIATION(FLAT(Provider Provider=UID(ProviderKey), Address Location=UID(Address1, Address2, ZipCode)));
 ProviderClaim := ASSOCIATION(FLAT(Provider Provider=UID(ProviderKey), Claim MedicalClaim=UID(GeneratedKey)));
+ProviderSegment := ASSOCIATION(FLAT(Provider Provider=UID(ProviderKey), Segment Speciality));
+ClaimSegment := ASSOCIATION(FLAT(Claim MedicalClaim=UID(GeneratedKey), Segment Speciality));
+PatientSegment := ASSOCIATION(FLAT(Patient Subject, Segment Speciality));
 
 USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Patient(FLAT,
 	Patient(
@@ -782,6 +789,27 @@ USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.FileCMDCleaned.UserDefinition(
 		PatientUserDefinitions = PatientUserDefinition),
 	PERMITS([Porto]));
 
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.SegmentMaster(FLAT,
+	Segment(
+		UID = segmentid,
+		Description = segmentdesc),
+	PERMITS([Porto]));
+		
+USE Brazil_HealthCare_FWA_Analytics_Layouts.Porto.SegmentLink(FLAT,
+	ProviderSegment(FILTER(entitytype = 'Provider'),
+		Speciality = segmentid,
+		ProviderKey = providerkey),
+	ClaimSegment(FILTER(entitytype = 'Claim'),
+		Speciality = segmentid,
+		GeneratedKey = providerkey),
+	PatientSegment(FILTER(entitytype = 'Patient'),
+		Speciality = segmentid,
+		Subject = providerkey),
+	PERMITS([Porto]));
+
+
+Provider: => NumberOfSegments := COUNT(ProviderSegment.Speciality);			//Test Attribute
+Segment: => NumberOfProviders := COUNT(ProviderSegment.Provider);				//Test Attribute
 
 // QUERY: PatientDump <= Patient USING [Intermedica];
 // QUERY: ProviderFacilityDump <= ProviderFacility USING [Intermedica];
@@ -817,3 +845,7 @@ QUERY: PolicyHolderClaimDumpPorto <= PolicyHolderClaim USING [Porto];
 // QUERY: PolicyClaimDumpPorto <= PolicyClaim USING [Porto];
 QUERY: ProviderAddressDumpPorto <= ProviderAddress USING [Porto];
 QUERY: ProviderClaimDumpPorto <= ProviderClaim USING [Porto];
+QUERY: ProviderSegmentDumpPorto <= ProviderSegment USING [Porto];
+QUERY: SegmentDumpPorto <= Segment USING [Porto];
+QUERY: PatientSegmentDumpPorto <= PatientSegment USING [Porto];
+QUERY: ClaimSegmentDumpPorto <= ClaimSegment USING [Porto];
