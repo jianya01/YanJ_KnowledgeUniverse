@@ -12,8 +12,8 @@ EXPORT FileUtil := MODULE
    	
 	EXPORT FN_OutputFile(DATASET Dset, STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION
 
-   		FileNameNewLogical := TRIM(IF(Append = '', FileNamePrefix + '::' +  Suffix + '::' + WORKUNIT[2..9], 
-																		FileNamePrefix + '::' + Suffix + '::' + Append), ALL);
+   		FileNameNewLogical := TRIM(IF(Append = '', FileNamePrefix + '::' + WORKUNIT[2..9] + '::' + Suffix, 
+																		FileNamePrefix + '::' + Append + '::' + Suffix), ALL);
 
 		  RETURN OUTPUT(Dset, , FileNameNewLogical, OVERWRITE, __COMPRESSED__);	
 					 
@@ -21,13 +21,13 @@ EXPORT FileUtil := MODULE
    
   EXPORT FN_PromoteFile(STRING FileNamePrefix, STRING Suffix, STRING Append = '') := FUNCTION   	
    
-   		FileNameNewLogical 				:= TRIM(IF(TRIM(Append,LEFT,RIGHT) = '', FileNamePrefix +  '::' +  Suffix + '::' + WORKUNIT[2..9], 
-																				FileNamePrefix + '::' + Suffix + '::' + Append ), ALL);
-   		FileNameProd	 						:= TRIM(FileNamePrefix + '::' + Suffix + '::prod' , ALL);
-   		FileNameFather 						:= TRIM(FileNamePrefix + '::' + Suffix + '::father' , ALL);
-   		FileNameGrandFather 			:= TRIM(FileNamePrefix + '::' + Suffix + '::grandfather' , ALL);
+   		FileNameNewLogical 				:= TRIM(IF(TRIM(Append,LEFT,RIGHT) = '', FileNamePrefix + '::' + WORKUNIT[2..9] + '::' + Suffix, 
+																				FileNamePrefix + '::' + Append + '::' + Suffix), ALL);
+   		FileNameProd	 						:= TRIM(FileNamePrefix + '::prod::' + Suffix, ALL);
+   		FileNameFather 						:= TRIM(FileNamePrefix + '::father::' + Suffix, ALL);
+   		FileNameGrandFather 			:= TRIM(FileNamePrefix + '::grandfather::' + Suffix, ALL);
    
-   		PromotionList := STD.File.PromoteSuperFileList([FileNameProd,
+   		PromotionList := FileServices.PromoteSuperFileList([FileNameProd,
    																												FileNameFather,
    																												FileNameGrandFather],
    																											  FileNameNewLogical, TRUE);
@@ -131,7 +131,7 @@ EXPORT FileUtil := MODULE
 													FileServices.DeSpray('~'+dset_fname.name, 
 						              destinationIP, 
 													destinationpath+TRIM(date)+'_P'+TRIM(dset_fname.name[StringLib.stringfind(dset_fname.name, '_inputdata_p', 1) + 12 ..], ALL)+'.dat',,,,TRUE)));										 
-	END;	
+	END;
 
 	SHARED FileStats := RECORD
 		STRING File_Name;
