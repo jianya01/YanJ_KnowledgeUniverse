@@ -1,5 +1,5 @@
 ﻿EXPORT Layout_Source := RECORD
-  string16 transaction_id;
+  string transaction_id;
   string11 product_id;
   string19 date_added;
   string4 process_type;

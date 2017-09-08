@@ -27,7 +27,7 @@ EXPORT GenerationMod := MODULE
     + 'INGESTMODE:NONCONTIGUOUS(vault_date_first_seen,vault_date_last_seen)\n'
     + '\n'
     + 'FIELD:vault_uid_hash:TYPE(INTEGER8):0,0\n'
-    + 'FIELD:transaction_id:TYPE(STRING16):0,0\n'
+    + 'FIELD:transaction_id:TYPE(STRING):0,0\n'
     + 'FIELD:product_id:TYPE(STRING11):0,0\n'
     + 'FIELD:date_added:TYPE(STRING19):0,0\n'
     + 'FIELD:process_type:TYPE(STRING4):0,0\n'
@@ -40,7 +40,7 @@ EXPORT GenerationMod := MODULE
     + '// CONCEPT statements should be used to group together interellated fields; such as address\n'
     + '// RELATIONSHIP is used to find non-obvious relationships between the clusters\n'
     + '// SOURCEFIELD is used if a field of the file denotes a source of the records in that file\n'
-    + '// LINKPATH is used to define access paths for external linking\n'
+    + '// LINKPATH is used to define access paths for external linking'
     ;
  
   // Structured values
