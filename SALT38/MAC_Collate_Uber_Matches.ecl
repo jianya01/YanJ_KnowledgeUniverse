@@ -7,39 +7,47 @@ indexOutputRecord %into%(Key le,UNSIGNED2 s) := TRANSFORM
   SELF.Weight := (s+50) / 100;
   SELF := le;
   END;	
-doIndexRead(UNSIGNED4 id,UNSIGNED2 fld,UNSIGNED2 spc) := STEPPED( PROJECT( key( word_id = id, field=fld 
-#IF ( #TEXT(in_dt_first_field) <> '' AND #TEXT(in_dt_last_field) <> '' AND #TEXT(in_inc_dt_last_field) = '')
- ,((asofdate >= in_dt_first_field OR in_dt_first_field = 0) AND (asofdate <= in_dt_last_field OR in_dt_last_field = 0))
-#END	
-#IF ( #TEXT(in_dt_first_field) <> '' AND #TEXT(in_dt_last_field) <> '' AND #TEXT(in_inc_dt_last_field) <> '')
- ,((asofdate >= in_dt_first_field OR in_dt_first_field = 0) AND (asofdate <= in_dt_last_field OR in_dt_last_field = 0 OR IsIncremental) )
-#END	
-#IF ( #TEXT(in_partition_field) <> '' )
- , in_partition_field = in_partition OR in_partition_field = ''
-#END	
-#IF ( #TEXT(in_efr_bmap_field) <> '' )
- ,( in_efr_bmap=0 OR (in_efr_bmap_field & (UNSIGNED4)in_efr_bmap) >0 )
-#END	
-), %into%(LEFT,spc)), uid, PRIORITY(4000-spc));
+doIndexRead(UNSIGNED4 id,UNSIGNED2 fld,UNSIGNED2 spc) := FUNCTION
+	result0 := STEPPED( PROJECT( key( word_id = id, field=fld 
+	#IF ( #TEXT(in_dt_first_field) <> '' AND #TEXT(in_dt_last_field) <> '' AND #TEXT(in_inc_dt_last_field) = '')
+	 ,((asofdate >= in_dt_first_field OR in_dt_first_field = 0) AND (asofdate <= in_dt_last_field OR in_dt_last_field = 0))
+	#END	
+	#IF ( #TEXT(in_dt_first_field) <> '' AND #TEXT(in_dt_last_field) <> '' AND #TEXT(in_inc_dt_last_field) <> '')
+	 ,((asofdate >= in_dt_first_field OR in_dt_first_field = 0) AND (asofdate <= in_dt_last_field OR in_dt_last_field = 0 OR IsIncremental) )
+	#END	
+	#IF ( #TEXT(in_partition_field) <> '' )
+	 , in_partition_field = in_partition OR in_partition_field = ''
+	#END	
+	#IF ( #TEXT(in_efr_bmap_field) <> '' )
+	 ,( in_efr_bmap=0 OR (in_efr_bmap_field & (UNSIGNED4)in_efr_bmap) >0 )
+	#END	
+	), %into%(LEFT,spc)), uid, PRIORITY(4000-spc));
+	
+	#IF ( #TEXT(in_inc_dt_last_field) <> '' )
+		result1 := ROLLUP(result0,
+		                  LEFT.uid = RIGHT.uid,
+											TRANSFORM(RECORDOF(LEFT),
+	#IF ( #TEXT(in_dt_first_field) <> '' AND #TEXT(in_dt_last_field) <> '' )
+	                              isLeftPoison := asofdate > LEFT.in_dt_last_field AND LEFT.IsIncremental AND LEFT.in_inc_dt_last_field<>0;
+																isRightPoison := asofdate > RIGHT.in_dt_last_field AND RIGHT.IsIncremental AND RIGHT.in_inc_dt_last_field<>0;
+  #ELSE
+											          isLeftPoison := LEFT.IsIncremental AND LEFT.in_inc_dt_last_field<>0;
+																isRightPoison := RIGHT.IsIncremental AND RIGHT.in_inc_dt_last_field<>0;
+	#END
+											          SELF.Weight := IF(isLeftPoison OR isRightPoison, 0, LEFT.Weight),
+																SELF := LEFT));
+		result := result1(Weight > 0);
+	#ELSE
+		result := result0;
+	#END
+	
+	RETURN result;
+END;
+
 doJoin(SET OF DATASET(indexOutputRecord) inputs) := FUNCTION
     indexOutputRecord createMatchRecord(indexOutputRecord firstMatch, DATASET(indexOutputRecord) allMatches) := TRANSFORM
-		//eliminate poisoned uids
-#UNIQUENAME(poisoned_matches)
-#UNIQUENAME(good_matches)
-#UNIQUENAME(no_dups)
-#IF ( #TEXT(in_inc_dt_last_field) <> '' )
-		    %poisoned_matches% := allmatches(IsIncremental=TRUE AND in_inc_dt_last_field<>0);          
-				%good_matches% := JOIN(allmatches,%poisoned_matches%,LEFT.uid=RIGHT.uid,LEFT ONLY);
-#ELSE
-				%good_matches% := allmatches;
-#END
-#IF ( (#TEXT(in_dt_first_field) <> '' AND #TEXT(in_dt_last_field) <> '') OR #TEXT(in_inc_dt_last_field) <> ''OR #TEXT(in_partition_field) <> '' OR #TEXT(in_efr_bmap_field) <> '' )
-		    %no_dups% := DEDUP(GROUP(%good_matches%,field),field);
-#ELSE
-				%no_dups% := allmatches;
-#END				
-		    SELF.weight := SUM(%no_dups%,weight);
-        SELF := firstMatch;
+			SELF.weight := SUM(allmatches,weight);
+			SELF := firstMatch;
     END;
     RETURN JOIN(inputs, STEPPED(LEFT.uid = RIGHT.uid), createMatchRecord(LEFT, ROWS(LEFT)), SORTED(uid));
 END;
@@ -58,3 +66,4 @@ END;
 nullInput := DATASET([], indexOutputRecord);
 s := GRAPH(nullInput, COUNT(wds)+1, doAction(ROWSET(LEFT), wds, COUNTER), PARALLEL);
 ENDMACRO;
+

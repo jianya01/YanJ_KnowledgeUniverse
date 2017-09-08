@@ -3,6 +3,7 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
 , DATASET(RECORDOF(Source))  infile = Source
 ) := MODULE
   SHARED NullFile := DATASET([],Layout_Vault); // Use to replace files you wish to remove
+ 
   SHARED FilesToIngest := infile;
   // Now need to discover which records are old / new / updated
   EXPORT RecordType := ENUM(UNSIGNED1,Unknown,Ancient,Old,Unchanged,Updated,New);
@@ -11,13 +12,16 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
     Layout_Vault;
     __Tpe := RecordType.Unknown;
   END;
+ 
   // Base recs start out Old, Ingest recs start out New -- matched records will become Unchanged or Updated below
   SHARED FilesToIngest0 := PROJECT(FilesToIngest,TRANSFORM(WithRT,SELF.__Tpe:=RecordType.New,SELF:=LEFT));
   SHARED Base0 := PROJECT(dsBase,TRANSFORM(WithRT,SELF.__Tpe:=RecordType.Old,SELF:=LEFT));
+ 
   WithRT MergeData(WithRT le, WithRT ri) := TRANSFORM // Old,Unchanged,New
     SELF.__Tpe := MAP (le.__Tpe = 0 => ri.__Tpe,ri.__Tpe = 0 => le.__Tpe,RecordType.Unchanged);
     SELF := IF( le.__Tpe=0,ri,le);
   END;
+ 
   // Ingest0: Merge Base with IngestFiles to get old, new and unchanged
   Ingest0 := JOIN( Base0,FilesToIngest0,LEFT.vault_uid_hash=RIGHT.vault_uid_hash AND LEFT.process_date=RIGHT.process_date AND LEFT.caseid=RIGHT.caseid AND LEFT.defendantid=RIGHT.defendantid AND LEFT.recid=RIGHT.recid AND LEFT.tmsid=RIGHT.tmsid AND LEFT.seq_number=RIGHT.seq_number
               AND LEFT.court_code=RIGHT.court_code AND LEFT.case_number=RIGHT.case_number AND LEFT.orig_case_number=RIGHT.orig_case_number AND LEFT.chapter=RIGHT.chapter AND LEFT.filing_type=RIGHT.filing_type AND LEFT.business_flag=RIGHT.business_flag AND LEFT.corp_flag=RIGHT.corp_flag AND LEFT.discharged=RIGHT.discharged AND LEFT.disposition=RIGHT.disposition AND LEFT.pro_se_ind=RIGHT.pro_se_ind
@@ -37,6 +41,7 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
     SELF.__Tpe := MAP (le.__Tpe = 0 => ri.__Tpe,ri.__Tpe = 0 => le.__Tpe,RecordType.Updated);
     SELF := IF( le.__Tpe=0,ri,le);
   END;
+ 
   // Ingest1: Merge Open Old with Open New to get old, updated, new
   Ingest1 := JOIN( Ingest0(__Tpe=RecordType.Old),Ingest0(__Tpe=RecordType.New),LEFT.vault_uid_hash=RIGHT.vault_uid_hash AND LEFT.process_date=RIGHT.process_date AND LEFT.caseid=RIGHT.caseid AND LEFT.defendantid=RIGHT.defendantid AND LEFT.recid=RIGHT.recid AND LEFT.tmsid=RIGHT.tmsid AND LEFT.seq_number=RIGHT.seq_number
               AND LEFT.court_code=RIGHT.court_code AND LEFT.case_number=RIGHT.case_number AND LEFT.orig_case_number=RIGHT.orig_case_number AND LEFT.chapter=RIGHT.chapter AND LEFT.filing_type=RIGHT.filing_type AND LEFT.business_flag=RIGHT.business_flag AND LEFT.corp_flag=RIGHT.corp_flag AND LEFT.discharged=RIGHT.discharged AND LEFT.disposition=RIGHT.disposition AND LEFT.pro_se_ind=RIGHT.pro_se_ind
@@ -82,6 +87,7 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
   SHARED AllRecs := ORe+NR1+NR(vault_rid<>0) : PERSIST('~temp::I_Bankruptcy_Search::Ingest_Cache',EXPIRE(I_Bankruptcy_Search.Config.PersistExpire));
   EXPORT UpdateStats := SORT(TABLE(AllRecs, {__Tpe,SALT38.StrType INGESTSTATUS:=RTToText(AllRecs.__Tpe),UNSIGNED Cnt:=COUNT(GROUP)}, __Tpe, FEW),__Tpe, FEW);
   SHARED S0 := OUTPUT(UpdateStats, {{UpdateStats} AND NOT __Tpe}, ALL, NAMED('UpdateStats'));
+ 
   SHARED NoFlagsRec := WithRT;
   SHARED emptyDS := DATASET([], NoFlagsRec);
   EXPORT NewRecords := PROJECT(AllRecs(__Tpe=RecordType.New), NoFlagsRec);
@@ -92,5 +98,7 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
   EXPORT UpdatedRecords_NoTag := PROJECT(UpdatedRecords,Layout_Vault);
   EXPORT AllRecords := PROJECT(AllRecs, NoFlagsRec);
   EXPORT AllRecords_NoTag := PROJECT(AllRecords,Layout_Vault); // Records in 'pure' format
+ 
   EXPORT DoStats := S0;
+ 
 END;
