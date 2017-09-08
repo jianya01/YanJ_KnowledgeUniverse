@@ -1,5 +1,5 @@
 ﻿// KEL Compiler Options and Configurations
-
+#OPTION(persist, 2)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
   
@@ -189,7 +189,8 @@ CreditReportInquiry := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, Rec
 		STRING Abbreviation, // v2+ Name: IQAbbreviation
 		STRING Terms, // v2+ Name: IQTerms
 		STRING IndustryID,
-		STRING IndustryIDFull),
+		STRING IndustryIDFull,
+		BOOLEAN GDropInquiry), // This attribute is currently coded in ECL as it relys on an ECL ITERATE structure to compute
 	MODEL(*));
 
 CreditReportJudgement := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
@@ -292,7 +293,7 @@ CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, R
 		INTEGER ScheduledPayment, // v2+ Trended Name: TDScheduledPaymentM##
 		INTEGER ActualPayment, // v2+ Trended Name: TDActualPaymentM##
 		DATE TDLastPaymentDate, // v2+ Trended Name: TDLastPaymentDateM##
-		BOOLEAN TDActualPaymentNullInd), // v2+ Trended Name: TDActualPaymentNullIndM##
+		BOOLEAN TDActualPaymentNullInd), // v2+ Trended Name: TDLastPaymentDateM##
 	MODEL(UID, rCreditReport,
 		BureauCode, TradeKey, KOB, DateReported, TRDateReported, DateAccountOpened, DateOfLastActivity, IndustryCode, ReportingMemberNumber, MemberName, 
 		AutoLenderMemberName, TapeSupplierIndicator, HighestCreditAmount, CreditLimit, ChargeOffAmount, Terms, AccountNumber,
@@ -798,7 +799,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.Bankruptcy_Data(FLAT,
 		DateReported = Date_Reported,
 		DateFiled = DateFiled,
 		BureauCode = BureauCode,
-		StatusCode = StatusCode,
+		StatusCode = BankStatusCode,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
 		BankruptcyStatus = BankruptcyStatus,
 		AssetsReported = AssetsReported,
@@ -819,13 +820,13 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.Collection_Data(FLAT,
 		DateAssigned = DateAssigned,
 		BureauCode = BureauCode,
 		KOB = KOB,
-		AccountNumber = AccountNumber,
+		AccountNumber = AccountSerialNumber,
 		PastDueAmount = PastDueAmount,
-		ClassificationCode = ClassificationCode,
+		ClassificationCode = Classification,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
 		AccountPurposeType = AccountPurposeType,
-		ConsumerInfoIndicator = ConsumerInfoIndicator,
-		DateOfFirstDelinquency = DateOfFirstDelinquency,
+		ConsumerInfoIndicator = ConsumerInformationIndicator,
+		DateOfFirstDelinquency = FirstDelinquencyDateYYYYMMDD,
 		IndustryCode = IndustryCode,
 		ReportingMemberAgencyNumber = ReportingMemberAgencyNumber,
 		ClientNameOrNumber = ClientNameOrNumber,
@@ -833,7 +834,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.Collection_Data(FLAT,
 		IsMedicalCollectionClientName = MedicalCollectionClientName,
 		ECOACode = ECOACode,
 		DateOfLastActivity = DateOfLastActivity,
-		LastPaymentDate = LastPaymentDate,
+		LastPaymentDate = LastPaymentDateYYYYMMDD,
 		OriginalAmount = OriginalAmount,
 		DateOfBalance = DateOfBalance,
 		BalanceAmount = BalanceAmount,
@@ -869,7 +870,8 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.InquiryHistory_Data(FLAT,
 		InquirerName = InquirerName,
 		InquirerID = InquirerID,
 		IndustryID = IndustryID,
-		IndustryIDFull = IndustryIDFull),
+		IndustryIDFull = IndustryIDFull,
+		GDropInquiry = GDropInquiry),
 	PERMITS([v2]));
 
 USE Consumer_Credit.FilesCleaned_NCF2_0.Judgement_Data(FLAT,
@@ -934,7 +936,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Data(FLAT,
 		AdditionalPaymentHistory = AdditionalPaymentHistory,
 		PaymentHistory84Months = PaymentHistory84Months,
 		ConsumerDisputeFlag = ConsumerDisputeFlag,
-		ConsumerInfoIndicator = ConsumerInfoIndicator,
+		ConsumerInfoIndicator = ConsumerInformationIndicator,
 		PaymentFrequency = PaymentFrequency,
 		ActivityDesignatorCode = ActivityDesignatorCode,
 		MortgageID = MortgageID,
@@ -989,7 +991,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.TradeLine_Trended_Data(FLAT,
 		ScheduledPayment = ScheduledPayment,
 		ActualPayment = ActualPayment,
 		TDLastPaymentDate = LastPaymentDate,
-		TDActualPaymentNullInd = TDActualPaymentNullInd),
+		TDActualPaymentNullInd = ActualPaymentNullInd),
 	PERMITS([v2]));
 
 USE Consumer_Credit.FilesCleaned_NCF2_0.NarrativeA_Data(FLAT,
@@ -4101,7 +4103,8 @@ QUERY: CreditReportJudgementV2(SearchForTransactionID) <= CreditReportJudgement(
 QUERY: CreditReportLienV2(SearchForTransactionID) <= CreditReportLien(rCreditReport.TransactionID = SearchForTransactionID) USING [v2];
 QUERY: CreditReportNarrativeRemarksV2(SearchForTransactionID) <= CreditReportNarrativeRemarks(rCreditReport.TransactionID = SearchForTransactionID) USING [v2];
 QUERY: CreditReportTradelineV2(SearchForTransactionID) <= CreditReportTradeline(rCreditReport.TransactionID = SearchForTransactionID) USING [v2];
-   
+QUERY: CreditReportV2(SearchForTransactionID) <= CreditReport(TransactionID = SearchForTransactionID) USING [v2];
+
 // Final KEL Outputs
 SHELL: CreditReportV1 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, StatementLength, ConsumerStatement, LexIDs, ROWS, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies, LienJudgementSource} USING [v1];
 SHELL: CreditReportV2 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, Version, PaymentHistoryType, FileSinceDate, DateOfBirth, DateOfDeath, ConsumerStatementOnFileFlag, ContentType, StatementLength, ConsumerStatement, LexIDs, ROWS, DateReported, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies} USING [v2];

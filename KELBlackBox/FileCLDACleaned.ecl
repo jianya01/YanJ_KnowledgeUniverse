@@ -485,6 +485,7 @@ SHARED cdautot_claimpaymentrecordreport := RECORD
      UNSIGNED8 RecordIdentifier;
 		 UNSIGNED8 ClaimIDRecordCounter;
 		 UNSIGNED8 PaymentRecordCounter;
+		STRING5 SectionIdentifier;
 		 string3 unitnumber{xpath('UnitNumber')};
      string3 groupsequencenumber{xpath('GroupSequenceNumber')};
      string4 recordcode{xpath('RecordCode')};
@@ -510,6 +511,7 @@ SHARED cdautot_claimpaymentrecordreport := RECORD
 SHARED cdautot_claimsetclaimsdiscoveryautoreport := RECORD
     UNSIGNED8 RecordIdentifier;
 		UNSIGNED8 ClaimIDRecordCounter;
+		STRING5 SectionIdentifier;
 		cdautot_claiminforecordreport claiminfo{xpath('ClaimInfo')};
     cdautot_policyrecordreport policy{xpath('Policy')};
     cdautot_personrecordreport policyholder{xpath('PolicyHolder')};
@@ -581,9 +583,10 @@ SHARED cdautot_claimhistory_subjectsectionclaimsdiscoveryautoreport := RECORD
 		SELF := le;
 	END;
 	
-	cdautot_claimsetclaimsdiscoveryautoreport cleanClaimHistorySection(RECORDOF(KELBlackBox.FileCDAuto.claimhistorysubjectsection.claimset) le, UNSIGNED8 recIdentifier, UNSIGNED8 cntr) := TRANSFORM
+	cdautot_claimsetclaimsdiscoveryautoreport cleanClaimHistorySection(RECORDOF(KELBlackBox.FileCDAuto.claimhistorysubjectsection.claimset) le, UNSIGNED8 recIdentifier, UNSIGNED8 cntr, STRING5 secIdentifier) := TRANSFORM
 		SELF.RecordIdentifier := recIdentifier;
 		SELF.ClaimIDRecordCounter := cntr;
+		SELF.SectionIdentifier := secIdentifier;
 		SELF.claiminfo.claimdate := CleanDate(iESP2Date(le.claiminfo.claimdate.Year, le.claiminfo.claimdate.Month, le.claiminfo.claimdate.Day));
 		SELF.claiminfo.firstclaimpaymentdate := CleanDate(iESP2Date(le.claiminfo.firstclaimpaymentdate.Year, le.claiminfo.firstclaimpaymentdate.Month, le.claiminfo.firstclaimpaymentdate.Day));
 		SELF.claiminfo.latestclaimpaymentdate := CleanDate(iESP2Date(le.claiminfo.latestclaimpaymentdate.Year, le.claiminfo.latestclaimpaymentdate.Month, le.claiminfo.latestclaimpaymentdate.Day));
@@ -609,7 +612,7 @@ SHARED cdautot_claimhistory_subjectsectionclaimsdiscoveryautoreport := RECORD
 		SELF.driverslicense.dataassodatev := CleanDate(iESP2Date(le.driverslicense.dataassodatev.Year, le.driverslicense.dataassodatev.Month, le.driverslicense.dataassodatev.Day));
 		SELF.driverslicense._type := le.driverslicense._type;
 		SELF.vehicle.type := le.vehicle._type;
-		SELF.Payments := PROJECT(le.Payments, TRANSFORM(cdautot_claimpaymentrecordreport, SELF.RecordIdentifier := recIdentifier; SELF.ClaimIDRecordCounter := cntr; SELF.PaymentRecordCounter := COUNTER; SELF := LEFT));
+		SELF.Payments := PROJECT(le.Payments, TRANSFORM(cdautot_claimpaymentrecordreport, SELF.RecordIdentifier := recIdentifier; SELF.ClaimIDRecordCounter := cntr; SELF.PaymentRecordCounter := COUNTER; SELF.SectionIdentifier := secIdentifier; SELF := LEFT));
 		
 		SELF := le;
 	END;
@@ -624,7 +627,7 @@ SHARED cdautot_claimhistory_subjectsectionclaimsdiscoveryautoreport := RECORD
 		SELF.recapprocessingsection.unitrecap := PROJECT(le.recapprocessingsection.unitrecap, cleanRecapProcessingSection(LEFT, le.RecID, COUNTER));
 		SELF.recapprocessingsection.inquiryrecap.RecordIdentifier := le.RecID;
 		SELF.recapprocessingsection.inquiryrecap.RecapRecordCounter := 1;
-		SELF.claimhistorysubjectsection.claimset := PROJECT(le.claimhistorysubjectsection.claimset, cleanClaimHistorySection(LEFT, le.RecID, COUNTER));
+		SELF.claimhistorysubjectsection.claimset := PROJECT(le.claimhistorysubjectsection.claimset, cleanClaimHistorySection(LEFT, le.RecID, COUNTER, le.claimhistorysubjectsection.reportsectionheader.sectionidentifier));
 		SELF.groupsearchidsection.groupcurrentaddress.datefirstseen := CleanDate(iESP2Date(le.groupsearchidsection.groupcurrentaddress.datefirstseen.Year, le.groupsearchidsection.groupcurrentaddress.datefirstseen.Month, le.groupsearchidsection.groupcurrentaddress.datefirstseen.Day));
 		SELF.groupsearchidsection.groupcurrentaddress.datelastseen := CleanDate(iESP2Date(le.groupsearchidsection.groupcurrentaddress.datelastseen.Year, le.groupsearchidsection.groupcurrentaddress.datelastseen.Month, le.groupsearchidsection.groupcurrentaddress.datelastseen.Day));
 		SELF.groupsearchidsection.groupcurrentaddress.dataassodate := CleanDate(iESP2Date(le.groupsearchidsection.groupcurrentaddress.dataassodate.Year, le.groupsearchidsection.groupcurrentaddress.dataassodate.Month, le.groupsearchidsection.groupcurrentaddress.dataassodate.Day));
@@ -650,7 +653,7 @@ SHARED cdautot_claimhistory_subjectsectionclaimsdiscoveryautoreport := RECORD
 	
 	EXPORT FileCDAutoClaim := NORMALIZE(FileCDAutoCleaned, LEFT.claimhistorysubjectsection.claimset, TRANSFORM(cdautot_claimsetclaimsdiscoveryautoreport, SELF := RIGHT));
 	EXPORT FileCDAutoPayments := NORMALIZE(FileCDAutoClaim, LEFT.Payments, TRANSFORM(cdautot_claimpaymentrecordreport, SELF := RIGHT));
-	EXPORT FileCDAutoPaymentsFlat := NORMALIZE(FileCDAutoPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
+	EXPORT FileCDAutoPaymentsFlat := NORMALIZE(FileCDAutoPayments, 5, TRANSFORM({UNSIGNED8 RecordIdentifier, UNSIGNED8 ClaimIDRecordCounter, STRING5 SectionIdentifier, STRING4 RecordCode, STRING2 RecordOccurrA, STRING2 RecordOccurrB, STRING5 ClaimCatType, STRING9 ClaimCatAmount, STRING2 ClaimCatDisp},
               SELF.ClaimCatType := CASE(COUNTER,
                      1 => LEFT.ClaimCat1Type,
                      2 => LEFT.ClaimCat2Type,

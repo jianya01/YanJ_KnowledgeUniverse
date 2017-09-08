@@ -24,4 +24,4 @@ END;
 fileName := KELBlackBox.FileBlackBoxLocation + 'thor::base::ar::prod::maritalstatus';
 EXPORT FileBlackBoxMaritalStatus := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutMaritalStatus, THOR, __COMPRESSED__) (LexID NOT IN KELBlackBox.ProblematicLexIDs),
-	DATASET(fileName, LayoutMaritalStatus, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutMaritalStatus, THOR, __COMPRESSED__), HASH64((UNSIGNED8)LexID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.LexID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

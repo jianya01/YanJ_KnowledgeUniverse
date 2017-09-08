@@ -1,4 +1,4 @@
-﻿IMPORT _Control, KELBlackBox;
+﻿IMPORT _Control, KELBlackBox, STD;
 
 LayoutNewMover := RECORD
   string35 full_name;
@@ -128,5 +128,5 @@ LayoutNewMover := RECORD
 
 fileName := KELBlackBox.FileBlackBoxLocation + 'out::newmover::20170120::final';
 EXPORT FileNewMover := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
-	DATASET(fileName, LayoutNewMover, THOR, __COMPRESSED__),
-	DATASET(fileName, LayoutNewMover, THOR, __COMPRESSED__) ((UNSIGNED8)LexID IN _Control.LexIDFilterSet));
+	DATASET(fileName, LayoutNewMover, THOR, __COMPRESSED__)((UNSIGNED8)LexID > 0 AND STD.Date.IsValidDate(STD.Date.FromStringToDate(date_on_file[1..6] + '01', '%Y%m%d'))),
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutNewMover, THOR, __COMPRESSED__)((UNSIGNED8)LexID > 0 AND STD.Date.IsValidDate(STD.Date.FromStringToDate(date_on_file[1..6] + '01', '%Y%m%d'))), HASH64((UNSIGNED8)LexID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.LexID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

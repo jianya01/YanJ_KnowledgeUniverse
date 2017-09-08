@@ -1,2 +1,0 @@
-﻿fileName := '~thor::base::healthcare::sprayed::test::brazil_ii-mbs_dummy_id-unimed_fulldata-d20160524::provider1';
-EXPORT Provider := DATASET(fileName, Brazil_HealthCare_FWA_Analytics_Layouts.ICD10_Layouts.Provider_Layout, THOR);

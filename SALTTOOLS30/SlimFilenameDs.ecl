@@ -94,5 +94,3 @@ module
 		return decision;
 	end;
 end;
-
-

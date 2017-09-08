@@ -244,4 +244,4 @@ cleaned := project(combo,
 fileName := '~thor_data400::key::relatives_v3_qa';
 EXPORT key_relatives_v3 := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	INDEX(cleaned, {did1}, {cleaned}, fileName),
-	INDEX(cleaned, {did1}, {cleaned}, fileName) (KEYED((UNSIGNED8)DID1 IN _Control.LexIDFilterSet)));
+	JOIN(DISTRIBUTE(INDEX(cleaned, {did1}, {cleaned}, fileName), HASH64((UNSIGNED8)DID1)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID1 = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));
