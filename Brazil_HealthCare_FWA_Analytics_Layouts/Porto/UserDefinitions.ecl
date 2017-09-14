@@ -41,7 +41,7 @@ LayoutUD := RECORD
   string prov_user_def_09;
  END;
 
-fileName := '~thor::base::health::brazil::test::full::version::20170807::miscellaneous';
+fileName := '~thor::base::health::brazil::test::full::version::20170914::miscellaneous';
 EXPORT UserDefinitions := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutUD, THOR),
 	JOIN(DISTRIBUTE(DATASET(fileName, LayoutUD, THOR), HASH64(generatedkey)), DISTRIBUTE(_Control.GeneratedKeyFilterSet(generatedkey != ''), HASH64(generatedkey)), LEFT.generatedkey = RIGHT.generatedkey, TRANSFORM(LEFT), LOCAL));

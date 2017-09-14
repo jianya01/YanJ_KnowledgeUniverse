@@ -30,7 +30,7 @@ LayoutPolicy := RECORD
   string primaryinsuredsubscriberempgrpnumber;
  END;
  
-fileName := '~thor::base::health::brazil::test::full::version::20170807::claimpolicy';//~thor::base::global::health::brazil::test::full::20170721::claimpolicy'; //testdata - thor::base::global::health::brazil::201770606::claimpolicy
+fileName := '~thor::base::health::brazil::test::full::version::20170914::claimpolicy';//~thor::base::global::health::brazil::test::full::20170721::claimpolicy'; //testdata - thor::base::global::health::brazil::201770606::claimpolicy
 EXPORT Policy := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutPolicy, THOR),
 	JOIN(DISTRIBUTE(DATASET(fileName, LayoutPolicy, THOR), HASH64(generatedkey)), DISTRIBUTE(_Control.GeneratedKeyFilterSet(generatedkey != ''), HASH64(generatedkey)), LEFT.generatedkey = RIGHT.generatedkey, TRANSFORM(LEFT), LOCAL));
