@@ -1,6 +1,6 @@
 ﻿IMPORT ut;
 
-EXPORT Build_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoinFields, pCompareLeftFields, pCompareRightFields, pBaseprefix, pBaseSuffix, pBuildDate, pStrataBase, pStrataFrequency, pDataSource, pEmailSource) := FUNCTIONMACRO
+EXPORT Build_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoinFields, pCompareLeftFields, pCompareRightFields, pBaseprefix, pBaseSuffix, pBuildDate, pDataSource, pEmailSource) := FUNCTIONMACRO
 	
 	BOOLEAN IsActive := pVaultFile.vault_active_flag = 'Y';
 	pOldFile := pVaultFile(IsActive);
@@ -43,9 +43,9 @@ EXPORT Build_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoi
 										 'ErrorMessage is ' + FAILMESSAGE + '\n\n';		
 	
 	CreateFile := SEQUENTIAL(Vault.FileUtil.FN_OutputAndPromoteFile(CombineFile, pBaseprefix, pBaseSuffix, WORKUNIT[2..9] + WORKUNIT[11..16]),
-													 STD.File.SetFileDescription(Vault.Files(pDataSource,pBaseSuffix).base_prod_vault_file, STD.Str.FilterOut(pProdFilename, '~')),
-													 Vault.Strata_Automation(pVaultFile, Current_Date, Yesterday, pBaseSuffix, pStrataBase, pStrataFrequency),
-													 Vault.Build_LogFile(pVaultFile, Current_Date, Yesterday, pBaseprefix, pBaseSuffix,pDataSource),
+													 STD.File.SetFileDescription(Vault.Files(pDataSource,pBaseSuffix).base_prod_vault_file, pProdFilename),
+													 // Vault.Strata_Automation(pVaultFile, Current_Date, Yesterday, pBaseSuffix, pStrataBase, pStrataFrequency),
+													 Vault.Build_LogFile(pVaultFile, Current_Date, Yesterday, pBaseprefix, pBaseSuffix,pDataSource,pProdFilename),
 													 Fileservices.Sendemail(Vault.EmailAddresses.Vault_EmailAddresses, Successsubject, Successbody))
 												 : FAILURE(Fileservices.Sendemail(Vault.EmailAddresses.Vault_EmailAddresses, Failuresubject, Failurebody));
 									

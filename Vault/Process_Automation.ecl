@@ -1,6 +1,6 @@
 ﻿IMPORT ut, Vault_Layout;
 
-EXPORT Process_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoinFields, pCompareLeftFields, pCompareRightFields, pBaseprefix, pBaseSuffix, pBuildDate, pStrataBase, pStrataFrequency, pDataSource, pEmailSourceIn, pPkgVar, pRoxieIP) := FUNCTIONMACRO
+EXPORT Process_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoinFields, pCompareLeftFields, pCompareRightFields, pBaseprefix, pBaseSuffix, pBuildDate, pDataSource, pEmailSourceIn, pPkgVar, pRoxieIP) := FUNCTIONMACRO
 	
 	VersionFileName := Vault.Files(pDataSource).base_prefix + '::' + pBaseSuffix + '::VersionFile';
 	VersionFile := DATASET(VersionFileName, Vault_Layout.Layout_Version, THOR, OPT);
@@ -18,7 +18,7 @@ EXPORT Process_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJ
 															 'ErrorMessage is ' + FAILMESSAGE + '\n\n';		
 								 
   ProcessBuild := IF(NewVersionDate != VersionFile(PkgVariable = pPkgVar)[1].VersionDate,
-									SEQUENTIAL(Vault.Build_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoinFields, pCompareLeftFields, pCompareRightFields, pBaseprefix, pBaseSuffix, pBuildDate, pStrataBase, pStrataFrequency, pDataSource, pEmailSourceIn), 
+									SEQUENTIAL(Vault.Build_Automation(pVaultFile, pProdFile, pProdFilename, pVaultLayout, pJoinFields, pCompareLeftFields, pCompareRightFields, pBaseprefix, pBaseSuffix, pBuildDate, pDataSource, pEmailSourceIn), 
 														 CreateVersionDs))
 									: FAILURE(Fileservices.Sendemail(Vault.EmailAddresses.Vault_EmailAddresses, FailureAutomationsubject, FailureAutomationbody));
 

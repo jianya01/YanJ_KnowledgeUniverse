@@ -1,8 +1,8 @@
 ﻿IMPORT Vault_layout;
 
-EXPORT Build_LogFile(pVaultFile, pCurrent_Date, pYesterday, pBaseprefix, pBaseSuffix, pDataSource) := FUNCTIONMACRO
+EXPORT Build_LogFile(pVaultFile, pCurrent_Date, pYesterday, pBaseprefix, pBaseSuffix, pDataSource,pProdFilename) := FUNCTIONMACRO
 	
-		LogFile_Existing := pBaseprefix + '::' + pBaseSuffix + '::LogFile::prod';
+		LogFile_Existing := pBaseprefix + '::prod::' + pBaseSuffix + '::LogFile';
 		
 		LogFile_Existing_DS := DATASET(LogFile_Existing, Vault_Layout.LogFile_Layout, THOR, OPT);
 		
@@ -13,7 +13,9 @@ EXPORT Build_LogFile(pVaultFile, pCurrent_Date, pYesterday, pBaseprefix, pBaseSu
 														COUNT(pVaultFile(Vault_Active_Flag = 'Y')),
 														COUNT(pVaultFile(Vault_Active_Flag = 'N' AND vault_date_last_seen = pYesterday)), 
 														COUNT(pVaultFile(Vault_Active_Flag = 'Y' AND vault_date_first_seen = pCurrent_Date AND vault_date_last_seen = pCurrent_Date)),
-														COUNT(pVaultFile(Vault_Active_Flag = 'Y' AND vault_date_first_seen <> pCurrent_Date AND vault_date_last_seen = pCurrent_Date))}],
+														COUNT(pVaultFile(Vault_Active_Flag = 'Y' AND vault_date_first_seen <> pCurrent_Date AND vault_date_last_seen = pCurrent_Date)),
+														pProdFilename,
+														WORKUNIT}],
 														Vault_Layout.LogFile_Layout);
 														
 		Update_LogFile := New_Log_DS + LogFile_Existing_DS;
