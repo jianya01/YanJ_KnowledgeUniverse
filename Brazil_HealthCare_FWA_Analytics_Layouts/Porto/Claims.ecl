@@ -96,7 +96,7 @@ LayoutClaim := RECORD
  END;
 
  
-fileName := '~thor::base::health::brazil::test::full::version::20170807::claims';//~thor::base::global::health::brazil::test::full::20170721::claims'; //testdata - thor::base::global::health::brazil::201770606::claims
+fileName := '~thor::base::health::brazil::test::full::version::20170914::claims';//~thor::base::global::health::brazil::test::full::20170721::claims'; //testdata - thor::base::global::health::brazil::201770606::claims
 EXPORT Claims := IF(COUNT(_Control.GeneratedKeyFilterSet) <= 0, 
 	DATASET(fileName, LayoutClaim, THOR),
 	JOIN(DISTRIBUTE(DATASET(fileName, LayoutClaim, THOR), HASH64(generatedkey)), DISTRIBUTE(_Control.GeneratedKeyFilterSet(generatedkey != ''), HASH64(generatedkey)), LEFT.generatedkey = RIGHT.generatedkey, TRANSFORM(LEFT), LOCAL));
