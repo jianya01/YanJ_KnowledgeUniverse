@@ -69,20 +69,34 @@ EXPORT Build_Records(DATASET(Consumer_Credit_Layout.Layout_EditsArchive_Append) 
 								SELF := EditsToXml.AssignPI51(LEFT.Edits),
 								SELF := LEFT));
 								
-	BuildFiles := SEQUENTIAL(FileUtil.FN_OutputAndPromoteFile(Files.ReportRequest_Data + ReportRequest, Files.base_prefix, 'reportrequest', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.ReportIdSupplement_Data + ReportIdSupplement, Files.base_prefix, 'reportidsupplement', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.CreditReportSummary_Data + CreditReportSummary, Files.base_prefix, 'creditreportsummary', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.Bankruptcy_Data + BankRuptcy, Files.base_prefix, 'bankruptcy', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.Collection_Data + Collection, Files.base_prefix, 'collection', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.Employment_Data + Employment, Files.base_prefix, 'employment', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.TaxLien_Data + TaxLien, Files.base_prefix, 'taxlien', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.TradeLine_Data + TradeLine, Files.base_prefix, 'tradeline', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.InquiryHistory_Data + InquiryHistory, Files.base_prefix, 'inquiryhistory', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.Address_Data + Address, Files.base_prefix, 'address', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.Judgement_Data + Judgement, Files.base_prefix, 'judgement', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.NarrativeA_Data + NarrativeA, Files.base_prefix, 'narrativea', WORKUNIT[2..9]  + WORKUNIT[11..16]),
-													 FileUtil.FN_OutputAndPromoteFile(Files.Person_Data + Person, Files.base_prefix, 'person', WORKUNIT[2..9]  + WORKUNIT[11..16]));
-												 
+	// BuildFiles := SEQUENTIAL(FileUtil.FN_OutputAndPromoteFile(Files.ReportRequest_Data + ReportRequest, Files.base_prefix, 'reportrequest', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.ReportIdSupplement_Data + ReportIdSupplement, Files.base_prefix, 'reportidsupplement', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.CreditReportSummary_Data + CreditReportSummary, Files.base_prefix, 'creditreportsummary', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.Bankruptcy_Data + BankRuptcy, Files.base_prefix, 'bankruptcy', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.Collection_Data + Collection, Files.base_prefix, 'collection', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.Employment_Data + Employment, Files.base_prefix, 'employment', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.TaxLien_Data + TaxLien, Files.base_prefix, 'taxlien', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.TradeLine_Data + TradeLine, Files.base_prefix, 'tradeline', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.InquiryHistory_Data + InquiryHistory, Files.base_prefix, 'inquiryhistory', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.Address_Data + Address, Files.base_prefix, 'address', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.Judgement_Data + Judgement, Files.base_prefix, 'judgement', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.NarrativeA_Data + NarrativeA, Files.base_prefix, 'narrativea', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 // FileUtil.FN_OutputAndPromoteFile(Files.Person_Data + Person, Files.base_prefix, 'person', WORKUNIT[2..9]  + WORKUNIT[11..16]));
+		
+	BuildFiles := SEQUENTIAL(FileUtil.FN_OutputAndPromoteFile(ReportRequest, '~thor::base::consumercredit::Sample', 'reportrequest', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(ReportIdSupplement, '~thor::base::consumercredit::Sample', 'reportidsupplement', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(CreditReportSummary, '~thor::base::consumercredit::Sample', 'creditreportsummary', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(BankRuptcy, '~thor::base::consumercredit::Sample', 'bankruptcy', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(Collection, '~thor::base::consumercredit::Sample', 'collection', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(Employment, '~thor::base::consumercredit::Sample', 'employment', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(TaxLien, '~thor::base::consumercredit::Sample', 'taxlien', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(TradeLine, '~thor::base::consumercredit::Sample', 'tradeline', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(InquiryHistory, '~thor::base::consumercredit::Sample', 'inquiryhistory', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(Address, '~thor::base::consumercredit::Sample', 'address', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(Judgement, '~thor::base::consumercredit::Sample', 'judgement', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(NarrativeA, '~thor::base::consumercredit::Sample', 'narrativea', WORKUNIT[2..9]  + WORKUNIT[11..16]),
+													 FileUtil.FN_OutputAndPromoteFile(Person, '~thor::base::consumercredit::Sample', 'person', WORKUNIT[2..9]  + WORKUNIT[11..16]));
+
   RETURN BuildFiles;										
 					 
 END;
