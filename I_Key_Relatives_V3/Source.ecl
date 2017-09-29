@@ -1,0 +1,11 @@
+﻿
+ EXPORT Source :=  project(I_Key_Relatives_V3.constants.Sourcefile, transform(I_Key_Relatives_V3.Layout_Vault, 
+   																																								SELF.vault_date_first_seen := (UNSIGNED4)WORKUNIT[2..9];
+   																																								SELF.vault_date_last_seen := 	0;
+   																																								SELF.vault_rid := 	0;
+																																									SELF.vault_UID_Hash := HASHMD5(left.did1,left.type,left.confidence,left.did2,left.cohabit_score,left.cohabit_cnt,left.coapt_score,left.coapt_cnt,left.copobox_score,left.copobox_cnt,left.cossn_score,left.cossn_cnt,left.copolicy_score,left.copolicy_cnt,left.coclaim_score,left.coclaim_cnt,left.coproperty_score,left.coproperty_cnt,left.bcoproperty_score,left.bcoproperty_cnt,left.coforeclosure_score,left.coforeclosure_cnt,left.bcoforeclosure_score,left.bcoforeclosure_cnt,left.colien_score,left.colien_cnt,left.bcolien_score,left.bcolien_cnt,left.cobankruptcy_score,left.cobankruptcy_cnt,left.bcobankruptcy_score,left.bcobankruptcy_cnt,left.covehicle_score,left.covehicle_cnt,left.coexperian_score,left.coexperian_cnt,left.cotransunion_score,left.cotransunion_cnt,left.coenclarity_score,left.coenclarity_cnt,left.coecrash_score,left.coecrash_cnt,left.bcoecrash_score,left.bcoecrash_cnt,left.cowatercraft_score,left.cowatercraft_cnt,left.coaircraft_score,left.coaircraft_cnt,left.comarriagedivorce_score,left.comarriagedivorce_cnt,left.coucc_score,left.coucc_cnt,left.lname_score,left.phone_score,left.dl_nbr_score,left.total_cnt,left.total_score,left.cluster,left.generation,left.gender,left.lname_cnt,left.rel_dt_first_seen,left.rel_dt_last_seen,left.overlap_months,left.hdr_dt_first_seen,left.hdr_dt_last_seen,left.age_first_seen,left.isanylnamematch,left.isanyphonematch,left.isearlylnamematch,left.iscurrlnamematch,left.ismixedlnamematch,left.ssn1,left.ssn2,left.dob1,left.dob2,left.current_lname1,left.current_lname2,left.early_lname1,left.early_lname2,left.addr_ind1,left.addr_ind2,left.r2rdid,left.r2cnt,left.personal,left.business,left.other,left.title
+);
+   																																								SELF := LEFT;
+   																																								SELF:=[];
+   																																								));
+																																									
