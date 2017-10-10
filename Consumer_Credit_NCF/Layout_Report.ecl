@@ -3,7 +3,7 @@
 EXPORT Layout_Report := MODULE
 
 	EXPORT Common_Data := RECORD
-		Consumer_Credit_Layout.Layout_EditsArchive_Append - Edits;
+		Consumer_Credit_Layout.Layout_EditsArchive_Append_2 - Edits;
 	END;
 
 	EXPORT Layout_ReportRequestIdRecord := RECORD //RecordCode[RI51]
