@@ -1,2 +1,2 @@
 // For referencing Prod THORs in Alpharetta (Insurance)
-EXPORT foreign_production_alpha := '~foreign::10.194.12.1::';
+EXPORT foreign_production_alpha := '~foreign::alpha_prod_thor_dali.risk.regn.net::';
