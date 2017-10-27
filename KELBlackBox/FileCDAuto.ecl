@@ -713,7 +713,7 @@ finalCLDA := RECORD
 END;
 
 // Run this file for a 1,000,000 record sample during development
-EXPORT FileCDAuto := PROJECT(DATASET('~thor::sv::cdscauto_poc::response::file1', CD_Auto_Response, THOR), TRANSFORM(finalCLDA, SELF.RecID := COUNTER; SELF := LEFT));
+EXPORT FileCDAuto := DATASET('~thor::sv::cdscauto_poc::response::file1_new', finalCLDA, THOR);
 
 // Run this for the full file (Roughly 280 logical files in this superfile for ~280,000,000 records)
 // EXPORT FileCDAuto := DATASET('~thor::sv::cdscauto_poc::response::final_recid', finalCLUE, THOR);
