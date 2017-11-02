@@ -1,0 +1,20 @@
+﻿EXPORT Layout_Source := RECORD
+  integer4 verification_id;
+  string50 defendant_name;
+  string200 defendant_address;
+  string20 defendant_ssn;
+  string50 plaintiff;
+  string40 case_number;
+  integer1 judgement_type;
+  string50 other_judgement_type;
+  string19 judgement_date;
+  decimal15_2 amount;
+  string50 disposition;
+  string150 case_status;
+  string19 satisfied_date;
+  string50 satisfaction_document_number;
+  string19 date_added;
+  string30 user_added;
+  string19 date_changed;
+  string30 user_changed;
+ END;
