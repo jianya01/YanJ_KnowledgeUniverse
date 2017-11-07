@@ -90,4 +90,4 @@ LayoutPolicy := RECORD
 	
 	
 	EXPORT PolicyFile := DEDUP(SORT(DATASET(fileName, LayoutPolicy, THOR), generatedkey, insurerirdacode, -sequenceid), generatedkey, insurerirdacode);
-			// The line above sorts by descending sequenceid (per India team this will give us the most recent record) and dedups on claim number, contributor.						
+			// The line above sorts by descending sequenceid (per India team this will give us the most recent record) and dedups on claim number, contributor.
