@@ -37,11 +37,12 @@ Claim := ENTITY(FLAT(UID(Generatedkey, Insurerirdacode),
 			INTEGER FinalReserveAmount=NULL(0),
 			INTEGER TotalSettlementAmount=NULL(0),
 			STRING 	ClaimantState=NULL(''),
-			INTEGER LossDescriptionBinValue),
+			INTEGER LossDescriptionBinValue=NULL(0),
+			STRING	SellerCategory=NULL('')),    //This comes from seller file but there is no UID for a seller so making an attribute of a claim.
 MODEL(UID, GeneratedKey, SequenceId, BatchId, RecordNumber, ClaimGroupNumber, ContributorId, InsurerIrdAcode, ClaimNumber, ClaimSettlementType,
 					 ClaimIntimationDate, ClaimIntimationDay, ClaimIntimationMon, ClaimIntimationYear, RelationshipWithInsured, PolicyNumber, AccidentDateTime, 
 					 AccidentDate, AccidentDay, AccidentMon, AccidentYear, City, State, LossImpactDesc, LossCategory, LossDescription, BranchName, GarageId, TotalClaimedAmount, 
-					 FinalReserveAmount, TotalSettlementAmount, ClaimantState, LossDescriptionBinValue));
+					 FinalReserveAmount, TotalSettlementAmount, ClaimantState, LossDescriptionBinValue, SellerCategory));
 
 
 Policy := ENTITY(FLAT(UID(PolicyNumber, InsurerIrdAcode),
@@ -62,10 +63,11 @@ Policy := ENTITY(FLAT(UID(PolicyNumber, InsurerIrdAcode),
 			DATE 		BreakinInspectionDate=NULL(''),
 			INTEGER BreakinInspectionDay=NULL(0),
 			INTEGER BreakinInspectionMonth=NULL(0),
-			INTEGER BreakinInspectionYear=NULL(0)),
+			INTEGER BreakinInspectionYear=NULL(0),
+			INTEGER	PrevCountOfClaims=NULL(0)),
 MODEL(UID, GeneratedKey, SequenceId, BatchId, RecordNumber, ClaimGroupNumber, ContributorId, InsurerIrdAcode, ClaimNumber,
 					 PolicyNumber, PolicyStartDate, PolicyStartDay, PolicyStartMonth, PolicyStartYear, PolicyStartDateTime, 
-					 BreakinInspectionDate, BreakinInspectionDay, BreakinInspectionMonth, BreakinInspectionYear));
+					 BreakinInspectionDate, BreakinInspectionDay, BreakinInspectionMonth, BreakinInspectionYear, PrevCountOfClaims));
 
 
 Vehicle := ENTITY(FLAT(UID(VinNumber),
@@ -82,13 +84,12 @@ Vehicle := ENTITY(FLAT(UID(VinNumber),
 			STRING 	TypeOfBody=NULL('')),
 MODEL(UID, GeneratedKey, SequenceId, BatchId, RecordNumber, ClaimGroupNumber, ContributorId, InsurerIrdAcode, ClaimNumber,
 					 VehicleRegistrationNumber, VinNumber, TypeOfBody));
-
-
+					 
+					 
 ClaimPolicy 	:= ASSOCIATION(FLAT(Claim AutoClaim=UID(GeneratedKey, InsurerIrdAcode), Policy AutoPolicy=UID(PolicyNumber, InsurerIrdAcode), 
 											STRING PolicyNumber, STRING ClaimNumber)); 
 ClaimVehicle 	:= ASSOCIATION(FLAT(Claim AutoClaim=UID(GeneratedKey, InsurerIrdAcode), Vehicle Auto=UID(VinNumber), 
 											STRING GeneratedKey, STRING ClaimNumber, STRING VehicleRegistrationNumber, STRING VinNumber,  STRING TypeOfBody)); 
-
 
 USE IndiaCholaMotorFraud.CleanedClaimsFile(FLAT,
 		Claim(
@@ -109,7 +110,7 @@ USE IndiaCholaMotorFraud.CleanedClaimsFile(FLAT,
 					AccidentDateTime = accidentdatetime,
 					AccidentDate = AccidentDate,
 					AccidentDay = accident_day,
-					AccidentMon = accident_mon,
+					AccidentMon = accident_mon, 
 					AccidentYear = accident_year,
 					City = city,
 					State = state,
@@ -150,10 +151,22 @@ USE IndiaCholaMotorFraud.CleanedPolicyFile(FLAT,
 					BreakinInspectionDay = breakininspectionday,
 					BreakinInspectionMonth = breakininspectionmonth,
 					BreakinInspectionYear = breakininspectionyear));
+
+USE IndiaCholaMotorFraud.PolicyHistoryFile(FLAT,
+		Policy(
+					InsurerIrdAcode = insurerirdacode,
+					PolicyNumber = policynumber,
+					PrevCountOfClaims = countofclaims));
   
+USE IndiaCholaMotorFraud.SellerFile(FLAT,
+		Claim(
+					GeneratedKey = Generatedkey,
+					InsurerIrdAcode = Insurerirdacode,
+					SellerCategory = sellercategory));
+
    
 USE IndiaCholaMotorFraud.VehicleFile(FLAT,  
-		Vehicle(
+		Vehicle( 
 					SequenceId = sequenceid,
 					BatchId = batch_id,
 					RecordNumber = recordnumber,
@@ -161,7 +174,7 @@ USE IndiaCholaMotorFraud.VehicleFile(FLAT,
 					ContributorId = contributor_id,
 					GeneratedKey = generatedkey,
 					InsurerIrdAcode = insurerirdacode,
-					ClaimNumber = claimnumber,
+					ClaimNumber = claimnumber, 
 					VehicleRegistrationNumber = vehicleregistrationnumber,
 					VinNumber = vinnumber,
 					TypeOfBody = typeofbody),
