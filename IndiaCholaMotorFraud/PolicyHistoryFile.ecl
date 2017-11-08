@@ -35,4 +35,3 @@ LayoutPolicyHistory := RECORD
  EXPORT PolicyHistoryFile := DEDUP(SORT(DATASET(fileName, LayoutPolicyHistory, THOR), generatedkey, insurerirdacode, -sequenceid), generatedkey, insurerirdacode);
 			
 
-rFile := DEDUP(SORT(DATASET(fileName, LayoutSeller, THOR), generatedkey, insurerirdacode, -sequenceid), generatedkey, insurerirdacode);
