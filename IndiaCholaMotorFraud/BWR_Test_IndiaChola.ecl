@@ -5,11 +5,11 @@ IMPORT * FROM KEL09.Null;
 
 
 
-OUTPUT(IndiaCholaMotorFraud.ClaimsFile(claimnumber='1100000064'), NAMED('RawClaimFile'));
-OUTPUT(IndiaCholaMotorFraud.PolicyFile(claimnumber='1100000064'), NAMED('RawPolicyFile'));
-OUTPUT(IndiaCholaMotorFraud.VehicleFile(claimnumber='1100000064'), NAMED('RawVehicleFile'));
-OUTPUT(IndiaCholaMotorFraud.PolicyHistoryFile(claimnumber='1100000064'), NAMED('RawPolicyHistoryFile'));
-OUTPUT(IndiaCholaMotorFraud.SellerFile(claimnumber='1100000064'), NAMED('RawSellerFile'));
+OUTPUT(IndiaCholaMotorFraud.ClaimsFile, NAMED('RawClaimFile'));
+OUTPUT(IndiaCholaMotorFraud.PolicyFile, NAMED('RawPolicyFile'));
+OUTPUT(IndiaCholaMotorFraud.VehicleFile, NAMED('RawVehicleFile'));
+OUTPUT(IndiaCholaMotorFraud.PolicyHistoryFile, NAMED('RawPolicyHistoryFile'));
+OUTPUT(IndiaCholaMotorFraud.SellerFile, NAMED('RawSellerFile'));
 OUTPUT(Q_Dump_Claims.Res0, NAMED('ClaimsDump'));
 OUTPUT(Q_Dump_Policies.Res0, NAMED('PolicyDump'));
 OUTPUT(Q_Dump_Vehicles.Res0, NAMED('VehiclesDump'));

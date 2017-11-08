@@ -218,4 +218,3 @@ END;
 	fileName := '~thor::qc::base::motor::qa::claim';
 		
 	EXPORT ClaimsFile := DATASET(fileName, LayoutClaim, THOR);
-																																											
