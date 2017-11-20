@@ -48,6 +48,7 @@ EXPORT GenerationMod := MODULE(SALT38.iGenerationMod)
     + '\n'
     + '\n'
     + '\n'
+    + '\n'
     ;
  
   // Structured values
