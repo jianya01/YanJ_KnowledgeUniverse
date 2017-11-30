@@ -55,11 +55,6 @@ LayoutSSN := RECORD
 
 blankDataset := dataset([], LayoutSSN);
 
- fileName := '~thor_data400::key::death_master::fcra::qa::ssn_table_v4_filtered';
+fileName := '~thor_data400::key::death_master::fcra::qa::ssn_table_v4_filtered';
 
-
-EXPORT Key_SSN_Table_v4_filtered_FCRA := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
-	 INDEX(blankDataset, {ssn}, {blankDataset}, fileName),
-	 INDEX(blankDataset, {ssn}, {blankDataset}, fileName) ((unsigned6)ssn IN _Control.LexIDFilterSet));// changed from (string9)ssn to (unsigned6)ssn
-
-
+EXPORT Key_SSN_Table_v4_filtered_FCRA := INDEX(blankDataset, {ssn}, {blankDataset}, fileName);

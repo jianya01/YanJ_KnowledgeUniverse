@@ -1,4 +1,4 @@
-import _Control;
+﻿import _Control;
 layout_clean_name := RECORD
    string5 title;
    string20 fname;

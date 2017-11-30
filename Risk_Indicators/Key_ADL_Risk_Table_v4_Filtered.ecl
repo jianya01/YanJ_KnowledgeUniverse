@@ -60,9 +60,4 @@ fileName := '~thor_data400::key::death_master::qa::adl_risk_table_v4_filtered ';
 
 EXPORT Key_ADL_Risk_Table_v4_Filtered := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	   INDEX(blankDataset, {did}, {blankDataset}, fileName),
-	   INDEX(blankDataset, {did}, {blankDataset}, fileName) ((unsigned8)did IN _Control.LexIDFilterSet));
-
-
-
-
-
+	   JOIN(DISTRIBUTE(INDEX(blankDataset, {did}, {blankDataset}, fileName), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

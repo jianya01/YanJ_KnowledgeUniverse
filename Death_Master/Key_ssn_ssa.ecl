@@ -34,9 +34,4 @@ fileName := '~thor_data400::key::fcra::death_master_ssa::ssn_qa';
 
 EXPORT Key_ssn_ssa := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	 INDEX(blankDataset, {ssn}, {blankDataset}, fileName),
-	 INDEX(blankDataset, {ssn}, {blankDataset}, fileName) ((unsigned6)did IN _Control.LexIDFilterSet)); //changed from (string9)ssn to (unsigned6)ssn
- 
-
-
-
-
+	 JOIN(DISTRIBUTE(INDEX(blankDataset, {ssn}, {blankDataset}, fileName), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));
