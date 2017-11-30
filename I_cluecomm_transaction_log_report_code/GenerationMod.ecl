@@ -43,6 +43,7 @@ EXPORT GenerationMod := MODULE(SALT38.iGenerationMod)
     + 'FIELD:report_code:TYPE(STRING4):0,0\n'
     + 'FIELD:cost_center:TYPE(INTEGER4):0,0\n'
     + 'FIELD:date_set:TYPE(STRING19):0,0\n'
+    + '\n'
     ;
  
   // Structured values

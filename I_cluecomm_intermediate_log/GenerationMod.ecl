@@ -8,7 +8,7 @@ EXPORT GenerationMod := MODULE(SALT38.iGenerationMod)
   EXPORT salt_TOOLSMODULE := 'SALTTOOLS30'; // Optional override by HACK:SALTTOOLSMODULE
  
   // Core module configuration values
-  EXPORT spc_MODULE := 'I_cluecomm_transaction_log_online';
+  EXPORT spc_MODULE := 'I_cluecomm_intermediate_log';
   EXPORT spc_NAMESCOPE := '';
   EXPORT spc_PROCESS := '';
   EXPORT spc_IDNAME := ''; // cluster id (input)
@@ -29,7 +29,7 @@ EXPORT GenerationMod := MODULE(SALT38.iGenerationMod)
   // The entire spec file
   EXPORT spcString :=
     'OPTIONS:-gn\n'
-    + 'MODULE:I_cluecomm_transaction_log_online\n'
+    + 'MODULE:I_cluecomm_intermediate_log\n'
     + 'FILENAME:Vault\n'
     + 'INGESTFILE:OFPU:NAMED(Source)\n'
     + 'RIDFIELD:vault_rid\n'
@@ -39,14 +39,15 @@ EXPORT GenerationMod := MODULE(SALT38.iGenerationMod)
     + 'INGESTMODE:NONCONTIGUOUS(vault_date_first_seen,vault_date_last_seen)\n'
     + '\n'
     + 'FIELD:vault_uid_hash:TYPE(DATA16):0,0\n'
-    + 'FIELD:transaction_id:TYPE(STRING20):0,0\n'
+    + 'FIELD:transaction_id:TYPE(STRING):0,0\n'
+    + 'FIELD:product_id:TYPE(STRING11):0,0\n'
+    + 'FIELD:reference_number:TYPE(STRING20):0,0\n'
     + 'FIELD:date_added:TYPE(STRING19):0,0\n'
-    + 'FIELD:compression_type:TYPE(INTEGER1):0,0\n'
-    + 'FIELD:request_data:TYPE(STRING):0,0\n'
-    + 'FIELD:response_data:TYPE(STRING):0,0\n'
-    + 'FIELD:request_format:TYPE(STRING9):0,0\n'
-    + 'FIELD:response_format:TYPE(STRING9):0,0\n'
-    + '\n'
+    + 'FIELD:process_type:TYPE(STRING4):0,0\n'
+    + 'FIELD:processing_time:TYPE(STRING8):0,0\n'
+    + 'FIELD:source_code:TYPE(STRING10):0,0\n'
+    + 'FIELD:content_type:TYPE(STRING20):0,0\n'
+    + 'FIELD:content_data:TYPE(STRING):0,0\n'
     ;
  
   // Structured values

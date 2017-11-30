@@ -50,6 +50,7 @@ EXPORT GenerationMod := MODULE(SALT38.iGenerationMod)
     + 'FIELD:no_hits:TYPE(INTEGER4):0,0\n'
     + 'FIELD:errors:TYPE(INTEGER4):0,0\n'
     + 'FIELD:date_added:TYPE(STRING19):0,0\n'
+    + '\n'
     ;
  
   // Structured values
