@@ -60,6 +60,4 @@ fileName := '~thor_data400::key::fcra::header_qa';
 
 EXPORT Key_FCRA_Header := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	  INDEX(blankDataset, {s_did}, {blankDataset}, fileName),
-	  INDEX(blankDataset, {s_did}, {blankDataset}, fileName) ((unsigned6)s_did IN _Control.LexIDFilterSet));
-
-
+	  JOIN(DISTRIBUTE(INDEX(blankDataset, {s_did}, {blankDataset}, fileName), HASH64((UNSIGNED8)S_DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.S_DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));
