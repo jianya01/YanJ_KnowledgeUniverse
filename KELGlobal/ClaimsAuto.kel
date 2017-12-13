@@ -715,12 +715,12 @@ ClaimsAuto: => NumAtFaultClmWithin3YrTmp := COUNT(ClaimsAutoClaim(IsMultiCarClai
 ClaimsAutoClaim: => ClaimAmount5YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5, TotalClaimAmount, 0);
 
 //Used in AVGPRV2 and AVGPRV3
-ClaimsAutoClaim: => ClaimAmount2YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2, TotalClaimAmount, 0);
-ClaimsAuto: => TotalClmAmtWithin2YrTmp := SUM(ClaimsAutoClaim, ClaimAmount2YrTmp);
-ClaimsAuto: => NumNZNonClosedClmWithin2Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));
-ClaimsAutoClaim: => ClaimAmount3YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3, TotalClaimAmount, 0);
-ClaimsAuto: => TotalClmAmtWithin3YrTmp := SUM(ClaimsAutoClaim, ClaimAmount3YrTmp);
-ClaimsAuto: => NumNZNonClosedClmWithin3Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));
+// ClaimsAutoClaim: => ClaimAmount2YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2, TotalClaimAmount, 0);
+// ClaimsAuto: => TotalClmAmtWithin2YrTmp := SUM(ClaimsAutoClaim, ClaimAmount2YrTmp);
+// ClaimsAuto: => NumNZNonClosedClmWithin2Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));
+// ClaimsAutoClaim: => ClaimAmount3YrTmp := IF(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3, TotalClaimAmount, 0);
+// ClaimsAuto: => TotalClmAmtWithin3YrTmp := SUM(ClaimsAutoClaim, ClaimAmount3YrTmp);
+// ClaimsAuto: => NumNZNonClosedClmWithin3Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaim = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));
 
 ClaimsAuto: => LatestClaimDate := MAX(ClaimsAutoClaim(IsValidClaim AND TotalClaimAmount > 0), DateOfClaim);
 ClaimsAuto: => LatestClaimDateAF := MAX(ClaimsAutoClaim(IsAtFaultClaim AND IsValidClaim), DateOfClaim);
@@ -1066,15 +1066,19 @@ ClaimsAuto: => NumBodilyInjOtherDispClmWithin1Yr := MIN(COUNT(ClaimsAutoClaim(Is
 
 
 //AVGPRV2 AVGPRV3
+ClaimsAuto: => TotalClmAmtWithin2YrTmp := SUM(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2), TotalClaimAmount);
+ClaimsAuto: => NumNZNonClosedClmWithin2Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaimV2 = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2));
+ClaimsAuto: => TotalClmAmtWithin3YrTmp := SUM(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), TotalClaimAmount);
+ClaimsAuto: => NumNZNonClosedClmWithin3Yr := COUNT(ClaimsAutoClaim(IsZeroClosedClaimV2 = FALSE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3));
+
+
 ClaimsAuto: => AvgClmAmtWithin2Yr := MAP(NumNZNonClosedClmWithin2Yr = 0 => 9999999.99,
 																				NumClmWithin2Yr = 0 => 9999999.99, 
-																				TotalClmAmtWithin2YrTmp / NumNZNonClosedClmWithin2Yr);
+																				MIN(TotalClmAmtWithin2YrTmp / NumClmWithin2Yr, 9999992));
 
 ClaimsAuto: => AvgClmAmtWithin3Yr := MAP(NumNZNonClosedClmWithin3Yr = 0 => 9999999.99, 
 																					NumClmWithin3Yr = 0 => 9999999.99, 
-																					TotalClmAmtWithin3YrTmp / NumNZNonClosedClmWithin3Yr);
-
-
+																					MIN(ROUND(TotalClmAmtWithin3YrTmp / NumClmWithin3Yr), 9999992));
 
 //CLAIMAMT
 ClaimsAutoClaim: => IsZeroClosedClaimV2 := ALL(Payments,cClaimCatAmount = 0 AND cClaimCatDisp IN CLOSED_DISPOSITION_LIST) AND (COUNT(Payments)/5 = COUNT(Payments) DIV 5);
