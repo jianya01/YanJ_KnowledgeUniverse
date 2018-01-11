@@ -1,4 +1,4 @@
-﻿IMPORT Brazil_HealthCare_FWA_Analytics_Layouts;
+﻿IMPORT Brazil_HealthCare_FWA_Analytics_KEL_Layouts;
 
 EXPORT FileCMDCleaned := MODULE
 	EXPORT UserDefinition := NORMALIZE(Brazil_HealthCare_FWA_Analytics_KEL_Layouts.Porto.UserDefinitions, 11, TRANSFORM({STRING GeneratedKey, UNSIGNED PatientDefinitionCounter, STRING100 PatientUserDefinition, UNSIGNED ProviderDefinitionCounter, STRING100 ProviderUserDefinition, UNSIGNED MedicalDefinitionCounter, STRING100 MedicalUserDefinition, STRING5 customernumber},
@@ -47,7 +47,7 @@ EXPORT FileCMDCleaned := MODULE
 			SELF.customernumber := LEFT.customernumber;
 			SELF := RIGHT));
 			
-	EXPORT AuthorizationRejectionCode := NORMALIZE(Brazil_HealthCare_FWA_Analytics_KEL_Layouts.Porto.Authorisation, LEFT.requestrejectioncode, TRANSFORM({RECORDOF(Brazil_HealthCare_FWA_Analytics_Layouts.Porto.Authorisation)-requestrejectioncode, STRING requestrejectioncode}, 
+	EXPORT AuthorizationRejectionCode := NORMALIZE(Brazil_HealthCare_FWA_Analytics_KEL_Layouts.Porto.Authorisation, LEFT.requestrejectioncode, TRANSFORM({RECORDOF(Brazil_HealthCare_FWA_Analytics_KEL_Layouts.Porto.Authorisation)-requestrejectioncode, STRING requestrejectioncode}, 
 			SELF.requestrejectioncode := RIGHT.requestrejectioncode;
 			SELF.customernumber := LEFT.customernumber;
 			SELF := LEFT));
