@@ -1,5 +1,5 @@
-﻿IMPORT STD,SALT39;
-EXPORT Ingest(BOOLEAN CloseOlds = FALSE, STRING EndDate='',DATASET(Layout_Vault) dsBase = In_Vault // Change IN_Vault to change input to ingest process
+﻿IMPORT STD,SALT38;
+EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault // Change IN_Vault to change input to ingest process
 , DATASET(RECORDOF(Source))  infile = Source
 ) := MODULE
   SHARED NullFile := DATASET([],Layout_Vault); // Use to replace files you wish to remove
@@ -41,14 +41,13 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, STRING EndDate='',DATASET(Layout_Vault)
               AND LEFT.city=RIGHT.city AND LEFT.st=RIGHT.st AND LEFT.zip=RIGHT.zip AND LEFT.zip4=RIGHT.zip4 AND LEFT.cart=RIGHT.cart AND LEFT.cr_sort_sz=RIGHT.cr_sort_sz AND LEFT.lot=RIGHT.lot AND LEFT.lot_order=RIGHT.lot_order AND LEFT.dbpc=RIGHT.dbpc AND LEFT.chk_digit=RIGHT.chk_digit
               AND LEFT.rec_type=RIGHT.rec_type AND LEFT.fips_state=RIGHT.fips_state AND LEFT.fips_county=RIGHT.fips_county AND LEFT.geo_lat=RIGHT.geo_lat AND LEFT.geo_long=RIGHT.geo_long AND LEFT.msa=RIGHT.msa AND LEFT.geo_blk=RIGHT.geo_blk AND LEFT.geo_match=RIGHT.geo_match AND LEFT.error_code=RIGHT.error_code AND LEFT.vault_date_last_seen=0 AND RIGHT.vault_date_last_seen=0,MergeData1(LEFT,RIGHT),FULL OUTER,HASH);
   WithRT CloseRecords(WithRT le, WithRT ri) := TRANSFORM
-    SELF.vault_date_last_seen := IF(ri.__Tpe=0,le.vault_date_last_seen,(TYPEOF(ri.vault_date_first_seen))SALT39.Fn_DecrementDate(ri.vault_date_first_seen,'YYYYMMDD'));
+    SELF.vault_date_last_seen := IF(ri.__Tpe=0,le.vault_date_last_seen,(TYPEOF(ri.vault_date_first_seen))SALT38.Fn_DecrementDate(ri.vault_date_first_seen,'YYYYMMDD'));
     SELF.__Tpe := IF(ri.__Tpe=0,le.__Tpe,RecordType.Updated);
     SELF := le;
   END;
   // Ingest2: Close Open Old to get old, updated
   Ingest2 := JOIN( Ingest1(__Tpe=RecordType.Old),Ingest1(__Tpe=RecordType.New), LEFT.vault_uid_hash=RIGHT.vault_uid_hash AND LEFT.vault_date_last_seen=0,CloseRecords(LEFT,RIGHT),LEFT OUTER,HASH);
-  TimeStamp0 := SALT39.Fn_DecrementDate((UNSIGNED6)SALT39.Fn_Now('YYYYMMDD'),'YYYYMMDD') : INDEPENDENT;
-  TimeStamp := IF(EndDate<>'',EndDate,TimeStamp0);
+  TimeStamp := SALT38.Fn_DecrementDate((UNSIGNED6)SALT38.Fn_Now('YYYYMMDD'),'YYYYMMDD') : INDEPENDENT;
   WithRT CloseOldRecords(WithRT le) := TRANSFORM
     SELF.vault_date_last_seen := IF(le.vault_date_last_seen>0,le.vault_date_last_seen,(TYPEOF(le.vault_date_last_seen))TimeStamp);
     SELF.__Tpe := IF(le.vault_date_last_seen>0,le.__Tpe,RecordType.Updated);
@@ -59,7 +58,7 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, STRING EndDate='',DATASET(Layout_Vault)
   Ingest2_new := Ingest3 & Ingest2(__Tpe=RecordType.Updated);
   AllRecs0 := IF(CloseOlds,Ingest2_New,Ingest2) & Ingest1(__Tpe=RecordType.New OR __Tpe=RecordType.updated) & Ingest0(__Tpe=RecordType.Unchanged);
   //Now need to update 'rid' numbers on new records
-  //Base upon SALT39.utMac_Sequence_Records
+  //Base upon SALT38.utMac_Sequence_Records
   // Do not use PROJECT,COUNTER because it is very slow if any of the fields are not fixed length
   NR := AllRecs0(__Tpe=RecordType.New);
   ORe := AllRecs0(__Tpe<>RecordType.New);
@@ -70,7 +69,7 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, STRING EndDate='',DATASET(Layout_Vault)
   END;
   NR1 := ITERATE(NR(vault_rid=0),AddNewRid(LEFT,RIGHT),LOCAL);
   SHARED AllRecs := ORe+NR1+NR(vault_rid<>0) : PERSIST('~temp::I_Tobacco_Vente::Ingest_Cache',EXPIRE(I_Tobacco_Vente.Config.PersistExpire));
-  EXPORT UpdateStats := SORT(TABLE(AllRecs, {__Tpe,SALT39.StrType INGESTSTATUS:=RTToText(AllRecs.__Tpe),UNSIGNED Cnt:=COUNT(GROUP)}, __Tpe, FEW),__Tpe, FEW);
+  EXPORT UpdateStats := SORT(TABLE(AllRecs, {__Tpe,SALT38.StrType INGESTSTATUS:=RTToText(AllRecs.__Tpe),UNSIGNED Cnt:=COUNT(GROUP)}, __Tpe, FEW),__Tpe, FEW);
   SHARED S0 := OUTPUT(UpdateStats, {{UpdateStats} AND NOT __Tpe}, ALL, NAMED('UpdateStats'));
  
   SHARED NoFlagsRec := WithRT;
@@ -86,12 +85,4 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, STRING EndDate='',DATASET(Layout_Vault)
  
   EXPORT DoStats := S0;
  
-  EXPORT StandardStats(BOOLEAN doInfileOverallCnt = TRUE, BOOLEAN doStatusOverallCnt = TRUE) := FUNCTION
-    myTimeStamp := (UNSIGNED6)SALT39.Fn_Now('YYYYMMDDHHMMSS') : INDEPENDENT;
-    infileCntOverall := IF(doInfileOverallCnt, SALT39.mod_StandardStatsTransforms.MAC_ingestInfileOverallCount(COUNT(FilesToIngest), 'Infile', myTimeStamp));
-    basefileCntOverall := IF(doInfileOverallCnt, SALT39.mod_StandardStatsTransforms.MAC_ingestInfileOverallCount(COUNT(dsBase), 'Basefile', myTimeStamp));
-    ingestStatusOverall := IF(doStatusOverallCnt, SALT39.mod_StandardStatsTransforms.MAC_ingestStatus(UpdateStats,, myTimeStamp));
-    standardStats := infileCntOverall & basefileCntOverall & ingestStatusOverall;
-    RETURN standardStats;
-  END;
 END;
