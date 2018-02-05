@@ -10,8 +10,11 @@
   string2 drivers_license_state;
   string8 dob;
   string20 date_added;
+  string1 subject_type;
+  integer8 lexid;
   string1 potentialcorruption;
  END;
+
  
  
  

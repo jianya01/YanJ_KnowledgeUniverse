@@ -50,11 +50,9 @@ EXPORT GenerationMod := MODULE(SALT38.iGenerationMod)
     + 'FIELD:drivers_license_state:TYPE(STRING2):0,0\n'
     + 'FIELD:dob:TYPE(STRING8):0,0\n'
     + 'FIELD:date_added:TYPE(STRING20):0,0\n'
+    + 'FIELD:subject_type:TYPE(STRING1):0,0\n'
+    + 'FIELD:lexid:TYPE(INTEGER8):0,0\n'
     + 'FIELD:potentialcorruption:TYPE(STRING1):0,0\n'
-    + '\n'
-    + '\n'
-    + '\n'
-    + '\n'
     ;
  
   // Structured values
