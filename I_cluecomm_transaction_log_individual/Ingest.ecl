@@ -24,7 +24,7 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
  
   // Ingest0: Merge Base with IngestFiles to get old, new and unchanged
   Ingest0 := JOIN( Base0,FilesToIngest0,LEFT.vault_uid_hash=RIGHT.vault_uid_hash AND LEFT.transaction_id=RIGHT.transaction_id AND LEFT.sequence=RIGHT.sequence AND LEFT.last_name=RIGHT.last_name AND LEFT.first_name=RIGHT.first_name AND LEFT.middle_name=RIGHT.middle_name AND LEFT.suffix_name=RIGHT.suffix_name
-              AND LEFT.phone=RIGHT.phone AND LEFT.drivers_license_number=RIGHT.drivers_license_number AND LEFT.drivers_license_state=RIGHT.drivers_license_state AND LEFT.dob=RIGHT.dob AND LEFT.date_added=RIGHT.date_added AND LEFT.potentialcorruption=RIGHT.potentialcorruption AND LEFT.vault_date_first_seen=RIGHT.vault_date_first_seen AND LEFT.vault_date_last_seen=RIGHT.vault_date_last_seen,MergeData(LEFT,RIGHT),FULL OUTER,HASH);
+              AND LEFT.phone=RIGHT.phone AND LEFT.drivers_license_number=RIGHT.drivers_license_number AND LEFT.drivers_license_state=RIGHT.drivers_license_state AND LEFT.dob=RIGHT.dob AND LEFT.date_added=RIGHT.date_added AND LEFT.subject_type=RIGHT.subject_type AND LEFT.lexid=RIGHT.lexid AND LEFT.potentialcorruption=RIGHT.potentialcorruption AND LEFT.vault_date_first_seen=RIGHT.vault_date_first_seen AND LEFT.vault_date_last_seen=RIGHT.vault_date_last_seen,MergeData(LEFT,RIGHT),FULL OUTER,HASH);
   WithRT MergeData1(WithRT le, WithRT ri) := TRANSFORM // old, updated, new
     SELF.vault_date_first_seen := MAP (le.__Tpe = 0 => ri.vault_date_first_seen,ri.__Tpe = 0 => le.vault_date_first_seen,le.vault_date_first_seen<ri.vault_date_first_seen => le.vault_date_first_seen,ri.vault_date_first_seen);
     SELF.__Tpe := MAP (le.__Tpe = 0 => ri.__Tpe,ri.__Tpe = 0 => le.__Tpe,RecordType.Updated);
@@ -33,7 +33,7 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
  
   // Ingest1: Merge Open Old with Open New to get old, updated, new
   Ingest1 := JOIN( Ingest0(__Tpe=RecordType.Old),Ingest0(__Tpe=RecordType.New),LEFT.vault_uid_hash=RIGHT.vault_uid_hash AND LEFT.transaction_id=RIGHT.transaction_id AND LEFT.sequence=RIGHT.sequence AND LEFT.last_name=RIGHT.last_name AND LEFT.first_name=RIGHT.first_name AND LEFT.middle_name=RIGHT.middle_name AND LEFT.suffix_name=RIGHT.suffix_name
-              AND LEFT.phone=RIGHT.phone AND LEFT.drivers_license_number=RIGHT.drivers_license_number AND LEFT.drivers_license_state=RIGHT.drivers_license_state AND LEFT.dob=RIGHT.dob AND LEFT.date_added=RIGHT.date_added AND LEFT.potentialcorruption=RIGHT.potentialcorruption AND LEFT.vault_date_last_seen=0 AND RIGHT.vault_date_last_seen=0,MergeData1(LEFT,RIGHT),FULL OUTER,HASH);
+              AND LEFT.phone=RIGHT.phone AND LEFT.drivers_license_number=RIGHT.drivers_license_number AND LEFT.drivers_license_state=RIGHT.drivers_license_state AND LEFT.dob=RIGHT.dob AND LEFT.date_added=RIGHT.date_added AND LEFT.subject_type=RIGHT.subject_type AND LEFT.lexid=RIGHT.lexid AND LEFT.potentialcorruption=RIGHT.potentialcorruption AND LEFT.vault_date_last_seen=0 AND RIGHT.vault_date_last_seen=0,MergeData1(LEFT,RIGHT),FULL OUTER,HASH);
   WithRT CloseRecords(WithRT le, WithRT ri) := TRANSFORM
     SELF.vault_date_last_seen := IF(ri.__Tpe=0,le.vault_date_last_seen,(TYPEOF(ri.vault_date_first_seen))SALT38.Fn_DecrementDate(ri.vault_date_first_seen,'YYYYMMDD'));
     SELF.__Tpe := IF(ri.__Tpe=0,le.__Tpe,RecordType.Updated);
@@ -80,5 +80,3 @@ EXPORT Ingest(BOOLEAN CloseOlds = FALSE, DATASET(Layout_Vault) dsBase = In_Vault
   EXPORT DoStats := S0;
  
 END;
-
-
