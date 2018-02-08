@@ -1,7 +1,6 @@
-//IMPORT _Control;
 
 LayoutVehicle := RECORD
-unsigned8 sequenceid;
+  unsigned8 sequenceid;
   string9 batch_id;
   unsigned8 recordnumber;
   unsigned8 claimgroupnumber;
@@ -57,10 +56,11 @@ unsigned8 sequenceid;
  END;
  
 	
-	fileName := '~thor::qc::base::motor::qa::vehicle';
+fileName := '~thor::chola::base::motor::sept::masked::vehicle';
 	
 
-	EXPORT VehicleFile := DEDUP(SORT(DATASET(fileName, LayoutVehicle, THOR), generatedkey, insurerirdacode, -sequenceid), generatedkey, insurerirdacode);
-	// The line above sorts by descending sequenceid (per India team this will give us the most recent record) and dedups on claim number, contributor.
+EXPORT VehicleFile := DATASET(fileName, LayoutVehicle, THOR);
+
 			
+	
 	
