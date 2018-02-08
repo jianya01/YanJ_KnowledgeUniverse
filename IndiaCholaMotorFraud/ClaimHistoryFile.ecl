@@ -1,8 +1,4 @@
-
-//IMPORT _Control;
-
-
-LayoutClaim := RECORD
+LayoutClaimHistory := RECORD
   unsigned8 sequenceid;
   string9 batch_id;
   unsigned8 recordnumber;
@@ -213,8 +209,9 @@ LayoutClaim := RECORD
   string12 lossimpacttype;
   string200 lossimpactdesc;
   string50 catestrophy;
-END;	
+ END;
+
 			
-fileName := '~thor::qc::base::motor::qa::claim';
+fileName := '~Thor::Chola::Claim_history::All_masked';
 		
-EXPORT ClaimsFile := DATASET(fileName, LayoutClaim, THOR);
+EXPORT ClaimHistoryFile := DATASET(fileName, LayoutClaimHistory, THOR);	

@@ -1,7 +1,4 @@
-﻿//EXPORT CleanedVehiclesFile := 'todo';
-
-
-IMPORT STD, IndiaCholaMotorFraud;
+﻿IMPORT STD, IndiaCholaMotorFraud;
 
 
 STRING8 ParseDateFields(STRING4 Year, STRING2 Month, STRING2 Day) := INTFORMAT((INTEGER)Year, 4, 1) + INTFORMAT((INTEGER)Month, 2, 1) + INTFORMAT((INTEGER)Day, 2, 1);
@@ -21,6 +18,5 @@ EXPORT CleanedVehiclesFile := PROJECT(IndiaCholaMotorFraud.VehicleFile, TRANSFOR
 																							 (LEFT.month_of_registration = 'NOV') => '11',
 																							 (LEFT.month_of_registration = 'DEC') => '12',
 																							 '00'),
-																							  LEFT.day_of_registration);
+																							LEFT.day_of_registration);
        SELF := LEFT));
-
