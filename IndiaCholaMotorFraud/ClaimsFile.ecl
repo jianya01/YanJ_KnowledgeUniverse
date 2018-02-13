@@ -1,4 +1,3 @@
-
 //IMPORT _Control;
 
 
@@ -215,6 +214,6 @@ LayoutClaim := RECORD
   string50 catestrophy;
 END;	
 			
-fileName := '~thor::qc::base::motor::qa::claim';
+fileName := '~thor::chola::base::motor::sept::masked::claim';
 		
 EXPORT ClaimsFile := DATASET(fileName, LayoutClaim, THOR);
