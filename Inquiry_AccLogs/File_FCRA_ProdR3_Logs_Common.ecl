@@ -1,1 +1,1 @@
-﻿EXPORT File_FCRA_ProdR3_Logs_Common := dataset('~analyt_thor400_90_dev::thor10_231::base::prodr3_acclogs_common', inquiry_acclogs.CommonLayout, thor);
+﻿EXPORT File_FCRA_ProdR3_Logs_Common := dataset('~thor10_231::base::prodr3_acclogs_common', inquiry_acclogs.CommonLayout, thor);

@@ -55,7 +55,9 @@ LayoutPolicyHeader := RECORD
   string20 policy_number;
   string2 insurance_type;
   string20 claim_number;
-END;
+  unsigned4 dt_effective_first;
+  unsigned4 dt_effective_last;
+ END;
 
 fileName := '~thor::base::insuranceheader::idl_policy_header';
 EXPORT header_ins := IF(COUNT(_Control.LexIDFilterSet) <= 0, 

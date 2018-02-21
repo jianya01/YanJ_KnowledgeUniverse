@@ -1,6 +1,11 @@
 ﻿IMPORT _Control;
 
 LayoutOffense := RECORD
+  unsigned8 vault_rid;
+  unsigned4 vault_date_first_seen;
+  unsigned4 vault_date_last_seen;
+  unsigned1 vault_record_status;
+  data16 vault_uid_hash;
   unsigned6 did;
   unsigned1 criminal_count;
   unsigned4 last_criminal_date;
@@ -25,9 +30,7 @@ LayoutOffense := RECORD
   unsigned1 arrests_count60;
  END;
 
-blankDataset := dataset([], LayoutOffense);
-
-fileName := '~thor_data400::key::corrections_offenders_risk::20160929::bocashell_did';
+fileName := '~vault::thor::key::corrections_offenders_risk::prod::bocashell_did_qa';
 EXPORT Key_BocaShell_Crim2 := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
-	INDEX(blankDataset, {did}, {blankDataset}, fileName),
-	JOIN(DISTRIBUTE(INDEX(blankDataset, {did}, {blankDataset}, fileName), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));
+	DATASET(fileName, LayoutOffense, THOR),
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutOffense, THOR), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

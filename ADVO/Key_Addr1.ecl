@@ -1,4 +1,9 @@
-Base_Layout := RECORD
+﻿Base_Layout := RECORD
+  unsigned8 vault_rid;
+  unsigned4 vault_date_first_seen;
+  unsigned4 vault_date_last_seen;
+  unsigned1 vault_record_status;
+  data16 vault_uid_hash;
   string5 zip;
   string10 prim_range;
   string28 prim_name;
@@ -76,10 +81,7 @@ Base_Layout := RECORD
   string1 geo_match;
   string4 err_stat;
   string2 src;
+  unsigned8 __internal_fpos__;
 END;
 
-ADVO_Base := DATASET([], Base_Layout); // Currently we don't have the base file in the Vault, only the KEY file.  As such we can't rebuild this index in the Vault - setting the base dataset to blank
-
-EXPORT Key_Addr1 := INDEX(ADVO_Base, 
-							 {zip, prim_range, prim_name, addr_suffix, predir, postdir, sec_range},
-							 {ADVO_Base}, '~thor::base::key::advo::qa::addr_search1') (Prim_Name != '');
+EXPORT Key_Addr1 := DATASET('~vault::thor::key::advo::prod::addr_search1', Base_Layout, THOR) (Prim_Name != '');
