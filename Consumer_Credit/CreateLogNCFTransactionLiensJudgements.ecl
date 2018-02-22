@@ -8,7 +8,7 @@
 		File_Date := IF(Input_File_Date ='',(STRING)std.date.today(),Input_File_Date);
 		Source_IP := '10.194.64.250';
 		Source_Path := '/data/orbitprod/Vault/NCF/LienJudgement/process/'+File_Date+'/transaction_log_lien_judgment.txt';
-		Destination_Group := 'analyt_thor400_90_b';
+		Destination_Group := 'analyt_thor400_90_a';
 		
 		SprayFile  := FileServices.SprayVariable(Source_IP ,Source_Path,,
 																						 '' ,, '' ,
