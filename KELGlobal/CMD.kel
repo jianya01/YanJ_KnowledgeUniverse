@@ -815,14 +815,21 @@ USE Brazil_HealthCare_FWA_Analytics_KEL_Layouts.Porto.SegmentLink(FLAT,
 	PERMITS([Porto]));
 
 
+// FUNCTION: ROUND4(REAL inReal) <= ROUND(inReal * POWER(10, 4)) / POWER(10, 4); //Function for rounding
+// FUNCTION: ROUND4(REAL Value) <= ECL(ROUND(Value, 4)) RETURNS REAL;
+// FUNCTION: ROUND4(REAL inReal) <= ECL(ROUND(inReal,4)) RETURNS REAL;
+FUNCTION: ROUND4(REAL var) <= ECL(TRIM(REALFORMAT(ROUND(var, 4), 32, 4), LEFT)) RETURNS STRING;
+
 Provider: => NumberOfSegments := COUNT(ProviderSegment.Speciality);			//Test Attribute
 Segment: => NumberOfProviders := COUNT(ProviderSegment.Provider);				//Test Attlribute
 
 Claim: USER_CODE_LIST := ['00010103', '00010987', '00010413', '00010391', '00010456', '00010405', '00010383', '00010685', '00010278', '00010014', '00010448', '00010146', '00010677', '00010367', '00010464', '00010162', '00010227', '00010243', '00010340', '00010235', '00010197', '00010138', '00010740', '00010286', '00010430', '00010332', '00010570', '00010910', '81096640', '81096666', '81094450', '81090501', '81096623', '81096631'];
 Claim: FRAUDABLE_CODE_LIST := ['42030137', '42020069', '42020140', '42020050', '42020093', '42030056', '42030218'];
 Claim: OTHERS_CODE_LIST := ['00010103', '00010987', '00010413', '00010391', '00010456', '00010405', '00010383', '00010685', '00010278', '00010014', '00010448', '00010146', '00010677', '00010367', '00010464', '00010162', '00010227', '00010243', '00010340', '00010235', '00010197', '00010138', '00010740', '00010286', '00010430', '00010332', '00010570', '00010910',  '42030137', '42020069', '42020140', '42020050', '42020093', '42030056', '42030218',  '42030072', '42030102', '42020107'];
+  
  
-Provider: => ProviderTotalPaid := ROUND(SUM(ProviderClaim.MedicalClaim, TotalPaidAmount) * 1000000000)/1000000000;
+// Provider: => ProviderTotalPaid := ROUND(SUM(ProviderClaim.MedicalClaim, TotalPaidAmount) * 10000)/10000;
+Provider: => ProviderTotalPaid := ROUND4(SUM(ProviderClaim.MedicalClaim, TotalPaidAmount));
 Provider: => TotalNumOfClaims := COUNT(ProviderClaim.MedicalClaim(TotalPaidAmount >= 0){ClaimNumber});
 Provider: => TotalNumOfPatients := COUNT(ProviderClaim.MedicalClaim(TotalPaidAmount >= 0){ClaimInsurerNumber});
 Claim: => MedicalUserDefinition1 := ONLY(UserDefinitions(MedicalDefinitionCounter = 1), MedicalUserDefinitions);
@@ -832,76 +839,82 @@ Provider: => NumOfUnitsOfService := SUM(ProviderClaim.MedicalClaim(MedicalUserDe
 
 //AvgPaidConsultPerConsult
 Provider: => TotalPaidConsultPerConsult := SUM(ProviderClaim.MedicalClaim(MedicalUserDefinition1 IN USER_CODE_LIST AND (TotalPaidAmount >= 0)), TotalPaidAmount);
-Provider: => AvgPaidConsultPerConsult := ROUND(TotalPaidConsultPerConsult * 1000000000/NumOfUnitsOfService)/1000000000;
+// Provider: => AvgPaidConsultPerConsult := ROUND(TotalPaidConsultPerConsult * 10000/NumOfUnitsOfService)/10000;
+Provider: => AvgPaidConsultPerConsult := ROUND4(TotalPaidConsultPerConsult / NumOfUnitsOfService);
+Provider: => AvgPaidConsultPerConsultTemp := ROUND(TotalPaidConsultPerConsult * 10000000/NumOfUnitsOfService)/10000000;
 
 //AvgPaidFraudablePerConsult
 Provider: => TotalPaidFraudablePerConsult := SUM(ProviderClaim.MedicalClaim(MedicalUserDefinition1 IN FRAUDABLE_CODE_LIST AND (TotalPaidAmount >= 0)), TotalPaidAmount);
-Provider: => AvgPaidFraudablePerConsult := ROUND(TotalPaidFraudablePerConsult * 1000000000/NumOfUnitsOfService)/1000000000;
+// Provider: => AvgPaidFraudablePerConsult := ROUND(TotalPaidFraudablePerConsult * 10000/NumOfUnitsOfService)/10000;
+Provider: => AvgPaidFraudablePerConsult := ROUND4(TotalPaidFraudablePerConsult /NumOfUnitsOfService);
+Provider: => AvgPaidFraudablePerConsultTemp := ROUND(TotalPaidFraudablePerConsult * 10000000/NumOfUnitsOfService)/10000000;
 
 //AvgPaidMaterialPerConsult
 Provider: => TotalPaidMaterialPerConsult := SUM(ProviderClaim.MedicalClaim(STARTSWITH(MedicalUserDefinition1, '8201') AND (TotalPaidAmount >= 0)), TotalPaidAmount);
-Provider: => AvgPaidMaterialPerConsult := ROUND(TotalPaidMaterialPerConsult * 1000000000/NumOfUnitsOfService)/1000000000;
+// Provider: => AvgPaidMaterialPerConsult := ROUND(TotalPaidMaterialPerConsult * 10000/NumOfUnitsOfService)/10000;
+Provider: => AvgPaidMaterialPerConsult := ROUND4(TotalPaidMaterialPerConsult /NumOfUnitsOfService);
+Provider: => AvgPaidMaterialPerConsultTemp := ROUND(TotalPaidMaterialPerConsult * 10000000/NumOfUnitsOfService)/10000000;
 
 //AvgPaidMedicationPerConsult
 Provider: => TotalPaidMedicationPerConsult := SUM(ProviderClaim.MedicalClaim(ProviderClaim.MedicalClaim(STARTSWITH(MedicalUserDefinition1, '8202') OR STARTSWITH(MedicalUserDefinition1, '8203') AND (TotalPaidAmount >= 0))), TotalPaidAmount);
-Provider: => AvgPaidMedicationPerConsult := ROUND(TotalPaidMedicationPerConsult * 1000000000 / NumOfUnitsOfService)/1000000000;
-
+// Provider: => AvgPaidMedicationPerConsult := ROUND(TotalPaidMedicationPerConsult * 10000 / NumOfUnitsOfService)/10000;
+Provider: => AvgPaidMedicationPerConsult := ROUND4(TotalPaidMedicationPerConsult  / NumOfUnitsOfService);
+Provider: => AvgPaidMedicationPerConsultTemp := ROUND(TotalPaidMedicationPerConsult * 10000000 / NumOfUnitsOfService)/10000000;
+ 
 //AvgPaidFeesPerConsult
 Provider: => TotalPaidFeesPerConsult := SUM(ProviderClaim.MedicalClaim(STARTSWITH(MedicalUserDefinition1, '81') AND (NOT STARTSWITH(MedicalUserDefinition1, '8106')) AND (TotalPaidAmount >= 0)), TotalPaidAmount);
-Provider: => AvgPaidFeesPerConsult := ROUND(TotalPaidFeesPerConsult * 1000000000 / NumOfUnitsOfService)/1000000000;
+// Provider: => AvgPaidFeesPerConsult := ROUND(TotalPaidFeesPerConsult * 10000 / NumOfUnitsOfService)/10000;
+Provider: => AvgPaidFeesPerConsult := ROUND4(TotalPaidFeesPerConsult / NumOfUnitsOfService);
+Provider: => AvgPaidFeesPerConsultTemp := ROUND(TotalPaidFeesPerConsult * 10000000 / NumOfUnitsOfService)/10000000;
 
 //AvgPaid42030072PerConsult (Electrocoagulation of skin and mucosal lesions - with or without curettage)
 Provider: => TotalPaid42030072PerConsult := SUM(ProviderClaim.MedicalClaim(MedicalUserDefinition1 = '42030072' AND (TotalPaidAmount >= 0)), TotalPaidAmount);
-Provider: => AvgPaid42030072PerConsult := ROUND(TotalPaid42030072PerConsult * 1000000000 / NumOfUnitsOfService)/1000000000;
+// Provider: => AvgPaid42030072PerConsult := ROUND(TotalPaid42030072PerConsult * 10000 / NumOfUnitsOfService)/10000;
+Provider: => AvgPaid42030072PerConsult := ROUND4(TotalPaid42030072PerConsult  / NumOfUnitsOfService);
+Provider: => AvgPaid42030072PerConsultTemp := ROUND(TotalPaid42030072PerConsult * 10000000 / NumOfUnitsOfService)/10000000;
 
 //AvgPaid42030102PerConsult
 Provider: => TotalPaid42030102PerConsult := SUM(ProviderClaim.MedicalClaim(MedicalUserDefinition1 = '42030102' AND (TotalPaidAmount >= 0)), TotalPaidAmount);
-Provider: => AvgPaid42030102PerConsult := ROUND(TotalPaid42030102PerConsult * 1000000000 / NumOfUnitsOfService)/1000000000;
+// Provider: => AvgPaid42030102PerConsult := ROUND(TotalPaid42030102PerConsult * 10000 / NumOfUnitsOfService)/10000;
+Provider: => AvgPaid42030102PerConsult := ROUND4(TotalPaid42030102PerConsult / NumOfUnitsOfService);
+Provider: => AvgPaid42030102PerConsultTemp := ROUND(TotalPaid42030102PerConsult * 10000000 / NumOfUnitsOfService)/10000000;
 
 //AvgPaid42020107PerConsult
 Provider: => TotalPaid42020107PerConsult := SUM(ProviderClaim.MedicalClaim(MedicalUserDefinition1 = '42020107' AND (TotalPaidAmount >= 0)), TotalPaidAmount);
-Provider: => AvgPaid42020107PerConsult := ROUND(TotalPaid42020107PerConsult * 1000000000 / NumOfUnitsOfService)/1000000000;
+// Provider: => AvgPaid42020107PerConsult := ROUND(TotalPaid42020107PerConsult * 10000 / NumOfUnitsOfService)/10000;
+Provider: => AvgPaid42020107PerConsult := ROUND4(TotalPaid42020107PerConsult / NumOfUnitsOfService);
+Provider: => AvgPaid42020107PerConsultTemp := ROUND(TotalPaid42020107PerConsult * 10000000 / NumOfUnitsOfService)/10000000;
 
 //AvgPaidOthersPerConsult
 Claim: => IsOther := NOT (MedicalUserDefinition1 IN OTHERS_CODE_LIST OR STARTSWITH(MedicalUserDefinition1, '8201') OR STARTSWITH(MedicalUserDefinition1, '8202') OR STARTSWITH(MedicalUserDefinition1, '8203') OR STARTSWITH(MedicalUserDefinition1, '81')) AND (TotalPaidAmount >= 0);
 
 Provider: => TotalPaidOthersPerConsult := SUM(ProviderClaim.MedicalClaim(UserDefinitions(IsOther)), TotalPaidAmount);
-Provider: => AvgPaidOthersPerConsult := ROUND(TotalPaidOthersPerConsult * 1000000000 / NumOfUnitsOfService)/1000000000;
+// Provider: => AvgPaidOthersPerConsult := ROUND(TotalPaidOthersPerConsult * 10000 / NumOfUnitsOfService)/10000;
+Provider: => AvgPaidOthersPerConsult := ROUND4(TotalPaidOthersPerConsult / NumOfUnitsOfService);
+Provider: => AvgPaidOthersPerConsultTemp := ROUND(TotalPaidOthersPerConsult * 10000000 / NumOfUnitsOfService)/10000000;
  
 //Average in segment level
 Provider: => CountableProvider := TotalNumOfPatients >= 10 AND TotalNumOfClaims >= 20;
 
-Segment: => AvgPaidConsultPerConsultAve :=  AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidConsultPerConsult);
-Segment: => AvgPaidFraudablePerConsultAve :=  AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidFraudablePerConsult);
-Segment: => AvgPaidMaterialPerConsultAve :=  AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidMaterialPerConsult);
-Segment: => AvgPaidMedicationPerConsultAve :=  AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidMedicationPerConsult);
-Segment: => AvgPaidFeesPerConsultAve :=  AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidFeesPerConsult);
-Segment: => AvgPaid42030072PerConsultAve :=  AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaid42030072PerConsult);
-Segment: => AvgPaid42030102PerConsultAve :=  AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaid42030102PerConsult);
-Segment: => AvgPaid42020107PerConsultAve :=  AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaid42020107PerConsult);
-Segment: => AvgPaidOthersPerConsultAve :=  AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidOthersPerConsult);
+Segment: => AvgPaidConsultPerConsultAve :=  ROUND4(AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidConsultPerConsultTemp) );
+Segment: => AvgPaidFraudablePerConsultAve :=  ROUND4(AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidFraudablePerConsultTemp));
+Segment: => AvgPaidMaterialPerConsultAve :=  ROUND4(AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidMaterialPerConsultTemp) );
+Segment: => AvgPaidMedicationPerConsultAve :=  ROUND4(AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidMedicationPerConsultTemp));
+Segment: => AvgPaidFeesPerConsultAve :=  ROUND4(AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidFeesPerConsultTemp));
+Segment: => AvgPaid42030072PerConsultAve :=  ROUND4(AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaid42030072PerConsultTemp));
+Segment: => AvgPaid42030102PerConsultAve :=  ROUND4(AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaid42030102PerConsultTemp));
+Segment: => AvgPaid42020107PerConsultAve :=  ROUND4(AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaid42020107PerConsultTemp));
+Segment: => AvgPaidOthersPerConsultAve :=  ROUND4(AVE(ProviderSegment.Provider(CountableProvider = TRUE), AvgPaidOthersPerConsultTemp));
 
 //Final Segment query
 QUERY: CheckSeg <= Segment(UID = 030315){UID, AvgPaidConsultPerConsultAve, AvgPaidFraudablePerConsultAve, AvgPaidMaterialPerConsultAve, AvgPaidMedicationPerConsultAve, AvgPaidFeesPerConsultAve,AvgPaid42030072PerConsultAve, AvgPaid42030102PerConsultAve, AvgPaid42020107PerConsultAve, AvgPaidOthersPerConsultAve};
-
-
+ 
+ 
 //Final
-// QUERY: ProviderClaims <= Provider{UID, ProviderKey, ProviderTotalPaid, TotalNumOfClaims, TotalNumOfPatients, AvgPaidConsultPerConsult, AvgPaidFraudablePerConsult, AvgPaidMaterialPerConsult, AvgPaidMedicationPerConsult, AvgPaidFeesPerConsult, AvgPaid42030072PerConsult, AvgPaid42030102PerConsult, AvgPaid42020107PerConsult, AvgPaidOthersPerConsult} USING [Porto];
+QUERY: ProviderClaims <= Provider{UID, ProviderKey, ProviderTotalPaid, TotalNumOfClaims, TotalNumOfPatients, AvgPaidConsultPerConsult, AvgPaidFraudablePerConsult, AvgPaidMaterialPerConsult, AvgPaidMedicationPerConsult, AvgPaidFeesPerConsult, AvgPaid42030072PerConsult, AvgPaid42030102PerConsult, AvgPaid42020107PerConsult, AvgPaidOthersPerConsult} USING [Porto];
 
  
-// Claim: => TestPaidConsultFilter := MedicalUserDefinition1 IN USER_CODE_LIST; 
-
-// QUERY: ProviderClaims <= Provider(ProviderKey = '42300009_030315'){UID, TotalPaidConsultPerConsult, ProviderClaim.MedicalClaim{UID, TotalPaidAmount, TestPaidConsultFilter, MedicalUserDefinition1}, NumOfConsult,AvgPaidConsultPerConsult} USING [Porto];
-		
-//QUERY: ProviderClaims <= Provider(ProviderKey IN TEST_CODE_LIST){UID, ProviderKey, ProviderTotalPaid,TotalNumOfClaims, NumOfConsult, TotalNumOfPatients, AvgPaidConsultPerConsult, AvgPaidFraudablePerConsult, AvgPaidMaterialPerConsult, AvgPaidMedicationPerConsult, AvgPaidFeesPerConsult, AvgPaid42030072PerConsult, AvgPaid42030102PerConsult, AvgPaid42020107PerConsult, AvgPaidOthersPerConsult} USING [Porto];
  
-// QUERY: ProviderClaims <= Provider(ProviderKey IN ['00107285_030315', '00065286_030315', '00128626_030315', '00065404_030315', '00061184_030315', '00091099_030315']){UID, ProviderKey, ProviderTotalPaid, TotalPaidOthersPerConsult, TotalNumOfClaims, NumOfConsult, TotalNumOfPatients, AvgPaidConsultPerConsult, AvgPaidFraudablePerConsult, AvgPaidMaterialPerConsult, AvgPaidMedicationPerConsult, AvgPaidFeesPerConsult, AvgPaid42030072PerConsult, AvgPaid42030102PerConsult, AvgPaid42020107PerConsult, AvgPaidOthersPerConsult} USING [Porto];
-// QUERY: CheckClaims <= Claim(ClaimProviderNumber IN ['42300009_030315']){UID, TotalPaidAmount, TestPaidConsultFilter, MedicalUserDefinition1} USING [Porto];
-// QUERY: ProviderClaimstest <= Provider(ProviderKey IN ['00000167_030315','00001176_030315','00003790_030315','00005798_030315','00006600_030315','00006651_030315','00007259_030315']){UID, ProviderKey, ProviderTotalPaid,TotalPaidOthersPerConsult, TotalNumOfClaims, NumOfConsult, AvgPaidOthersPerConsult} USING [Porto];
-
-
-//QUERY: ClaimTest5 <= Claim(ClaimProviderNumber IN ['00058537_030315']) {UID, {ClaimInsurerNumber}} USING [Porto];
-
  
 
 
