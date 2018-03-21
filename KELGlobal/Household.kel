@@ -1,0 +1,224 @@
+﻿﻿// KEL Compiler Options and Configurations
+#OPTION(persist, 2)
+#OPTION(persistexpire, 30)
+#OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
+
+// Defining the ERA to allow for ASOF functionality
+ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
+ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
+
+// Global Person Entity Definition
+Person := ENTITY(FLAT(UID=LexID,
+		STRING Title=NULL(),
+		STRING FirstName=NULL(),
+		STRING MiddleName=NULL(),  
+		STRING LastName=NULL(),
+		STRING NameSuffix=NULL(),
+		STRING LexIDSegment,
+		DATE DateOfBirth,
+		DATE DateOfDeath,
+		STRING Gender),
+	MODEL(UID, 
+		Gender, LexIDSegment,
+		FullName{Title, FirstName, MiddleName, LastName, NameSuffix}, 
+		ReportedDatesOfBirth{DateOfBirth},
+		ReportedDatesOfDeath{DateOfDeath}));
+
+Bankruptcy := ENTITY(FLAT(UID(TMSID, Court_Code, Case_Number),
+		STRING TMSID=NULL(),
+		STRING CourtCode=NULL(),
+		STRING CaseNumber=NULL(),
+		STRING OriginalCaseNumber,
+		STRING Source, // Main File
+		STRING SourceDescription, // Search File
+		STRING OriginalChapter,
+		STRING FilingType,
+		STRING BusinessFlag, // Search File
+		STRING CorporateFlag, // Search File
+		DATE DischargedDate, // Search File
+		STRING Disposition, // Search File
+		STRING DebtorType, // Search File
+		INTEGER DebtorSequence, // Search File
+		INTEGER DispositionType, // Search File
+		INTEGER DispositionReason, // Search File
+		STRING DispositionTypeDescription, // Search File
+		STRING NameType, // Search File
+		STRING ScreenDescription, // Search File
+		STRING DecodedDescription, // Search File
+		DATE DateFiled,
+		STRING RecordType, // Search File
+		DATE DateVendorFirstReported,
+		DATE DateVendorLastReported,
+		DATE DateCreated, // Main File
+		DATE CaseClosingDate, // Main File
+		DATE ReopenDate, // Main File
+		INTEGER CaseID, // Search File
+		INTEGER DefendantID, // Search File
+		STRING CourtName, // Main File
+		STRING CourtLocation, // Main File 
+		STRING JudgeName, // Main File
+		STRING JudgeIdentification, // Main File
+		STRING FilingJurisdiction, // Main File
+		REAL AssetsValue, // Main File
+		REAL LiabilitiesValue, // Main File
+		DATE MeetingDate, // Main File
+		INTEGER MeetingTime, // Main File
+		DATE ClaimsDeadline, // Main File
+		DATE ComplaintDeadline, // Main File
+		STRING CaseType, // Main File
+		BOOLEAN SplitCase, // Main File
+		BOOLEAN FiledInError, // Main File
+		DATE StatusDate, // Main File
+		STRING StatusType, // Main File
+		DATE CommentsFilingDate, // Main File
+		STRING CommentsDescription), // Main File
+	MODEL(UID, TMSID, CourtCode, CaseNumber, OriginalCaseNumber, 
+		Records{Source, SourceDescription, OriginalChapter, FilingType, BusinessFlag, CorporateFlag, DischargedDate, Disposition, DebtorType, DebtorSequence, 
+			DispositionType, DispositionReason, DispositionTypeDescription,	NameType, ScreenDescription, DecodedDescription, DateFiled, DateCreated, DateVendorFirstReported, DateVendorLastReported, RecordType},
+		Deadlines{ClaimsDeadline, ComplaintDeadline, DateVendorFirstReported, DateVendorLastReported},
+		CaseDetails{CaseID, DefendantID, CaseType, CaseClosingDate, ReopenDate, SplitCase, FiledInError, DateVendorFirstReported, DateVendorLastReported},
+		CourtInformation{CourtName, CourtLocation, JudgeName, JudgeIdentification, FilingJurisdiction, MeetingDate, MeetingTime, DateVendorFirstReported, DateVendorLastReported},
+		MonetaryValue{AssetsValue, LiabilitiesValue, DateVendorFirstReported, DateVendorLastReported},
+		Status{StatusDate, StatusType},
+		Comments{CommentsFilingDate, CommentsDescription}));
+
+CriminalOffense := ENTITY(FLAT(UID(offender_key), 
+		STRING OffenderKey=NULL(),
+		STRING CaseNumber,
+		STRING OffenseScore,
+		INTEGER OffenderLevel,
+		DATE EarliestOffenseDate,
+		INTEGER DataType,
+		STRING TrafficFlag,
+		STRING ConvictionFlag),
+	MODEL(UID, 
+		OffenderKey, 
+		OffenseCharges{CaseNumber, OffenseScore, OffenderLevel, EarliestOffenseDate, DataType, TrafficFlag, ConvictionFlag}));
+
+PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number)));
+PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
+
+// Global Constant Definitions
+Bankruptcy: ONE_MONTH_IN_DAYS := 30;
+Bankruptcy: THREE_MONTHS_IN_DAYS := 90;
+Bankruptcy: SIX_MONTHS_IN_DAYS := 180;
+Bankruptcy: ONE_YEAR_IN_DAYS := 365;
+Bankruptcy: TWO_YEARS_IN_DAYS := 730;
+Bankruptcy: THREE_YEARS_IN_DAYS := 1095;
+Bankruptcy: FOUR_YEARS_IN_DAYS := 1461;
+Bankruptcy: FIVE_YEARS_IN_DAYS := 1826;
+Bankruptcy: SIX_YEARS_IN_DAYS := 2191;
+Bankruptcy: SEVEN_YEARS_IN_DAYS := 2556;
+Bankruptcy: TEN_YEARS_IN_DAYS := 3652;
+
+CriminalOffense: ONE_MONTH_IN_DAYS := 30;
+CriminalOffense: THREE_MONTHS_IN_DAYS := 90;
+CriminalOffense: SIX_MONTHS_IN_DAYS := 180;
+CriminalOffense: ONE_YEAR_IN_DAYS := 365;
+CriminalOffense: TWO_YEARS_IN_DAYS := 730;
+CriminalOffense: THREE_YEARS_IN_DAYS := 1095;
+CriminalOffense: FOUR_YEARS_IN_DAYS := 1461;
+CriminalOffense: FIVE_YEARS_IN_DAYS := 1826;
+CriminalOffense: SIX_YEARS_IN_DAYS := 2191;
+CriminalOffense: SEVEN_YEARS_IN_DAYS := 2556;
+CriminalOffense: TEN_YEARS_IN_DAYS := 3652;
+
+Bankruptcy: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
+Bankruptcy: => HasCaseNumber := NOT TRIMALL(CaseNumber) IN ['', '0'] AND NOT CaseNumber:Null;
+Bankruptcy.Records: => ValidDate := ISVALIDDATE(DateFiled);
+Bankruptcy.Records: => LastSeenDischargedDate := IF(DischargedDate <= Bankruptcy.BocaShellHistoryDate, DischargedDate, DATEFROMPARTS(0, 0, 0));
+Bankruptcy.Records: => LastSeenRecordDate := MAP(LastSeenDischargedDate:Null AND NOT DateFiled:Null => DateFiled,
+												 NOT LastSeenDischargedDate:Null AND DateFiled:Null => LastSeenDischargedDate,
+																									   MAX(LastSeenDischargedDate, DateFiled));
+Bankruptcy.Records: => FilingAgeInDays := ABS(DAYSBETWEEN(LastSeenRecordDate, Bankruptcy.BocaShellHistoryDate));
+Bankruptcy.Records: => IsDebtor := NameType IN ['D'];
+CriminalOffense.OffenseCharges: => IsFelony := OffenderLevel = 4 AND OffenseScore = 'F';
+Person: => BankruptcyCount := COUNT(PersonBankruptcy.Bankrupt(Records.IsDebtor = TRUE AND Records.FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)); 
+Person: => FelonyCount := COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE)); 
+
+Household := ENTITY(FLAT(UID = HHid),
+	MODEL(*));
+
+HouseholdMember := ASSOCIATION(FLAT(Person Subject, Household Household, INTEGER Version));
+
+USE doxie.Key_HHID_Did(FLAT, 
+	Household(
+		UID = hhid_relat),
+	HouseholdMember(
+		Subject = did,
+		Household = hhid_relat,
+		Version = ver),
+	Person(
+		UID = did));
+
+Person: => Age := YEARSBETWEEN(ONLY(ReportedDatesOfBirth, DateOfBirth), CURRENTDATE());
+Household: => MembersCount :=  COUNT(HouseholdMember(Version = 1).Subject);// hh_members_ct
+Household: => Age65PlusCount := COUNT(HouseholdMember(Version = 1).Subject(Age > 65)); // hh_age_65_plus
+Household: => Age31To65Count := COUNT(HouseholdMember(Version = 1).Subject(30 < Age AND Age <= 65)); // hh_age_31_to_65
+Household: => Age18To30Count := COUNT(HouseholdMember(Version = 1).Subject(18 <= Age AND Age <= 30)); // hh_age_18_to_30
+Household: => AgeMinorCount := COUNT(HouseholdMember(Version = 1).Subject(Age < 18)); // hh_age_lt18
+Household: => MembersWithBankruptcyCount := COUNT(HouseholdMember(Version = 1).Subject.PersonBankruptcy.Bankrupt); // hh_bankruptcies
+Household: => CriminalMembersCount := COUNT(HouseholdMember(Version = 1).Subject.PersonOffenses.Offense); // hh_criminals
+
+// QUERY: DumpHouseholdMembers(hhid) <= HouseholdMember(Version = 1 AND Household = hhid);
+QUERY: HouseholdMembersDump <= HouseholdMember(Version = 1 AND (Subject.BankruptcyCount > 0 OR Subject.FelonyCount > 0)){Household, Subject{UID, ONLY(ReportedDatesOfBirth, DateOfBirth), Age, BankruptcyCount, FelonyCount}};
+
+// QUERY: HouseholdDump <= Household;
+
+USE BankruptcyV3.Key_BankruptcyV3_Main_Full(FLAT,
+	Person(
+		UID = did,
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
+		Title = title,
+		FirstName = fname,
+		MiddleName = mname,  
+		LastName = lname,
+		NameSuffix = name_suffix),
+	PersonBankruptcy(
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
+		Subject = did),
+	Bankruptcy(
+		TMSID = TMSID,
+		CourtCode = Court_Code,
+		CaseNumber = Case_Number,
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
+		OriginalCaseNumber = orig_case_number,
+		Source = source,
+		OriginalChapter = orig_chapter,
+		FilingType = filer_type,
+		DateFiled = date_filed,
+		DateVendorFirstReported = date_vendor_first_reported,
+		DateVendorLastReported = date_vendor_last_reported,
+		DateCreated = date_created,
+		CaseClosingDate = case_closing_date,
+		ReopenDate = reopen_date,
+		CourtName = court_name,
+		CourtLocation = court_location, 
+		JudgeName = judge_name,
+		JudgeIdentification = judges_identification,
+		FilingJurisdiction = filing_jurisdiction,
+		AssetsValue = assets,
+		LiabilitiesValue = liabilities,
+		MeetingDate = meeting_date,
+		MeetingTime = meeting_time,
+		ClaimsDeadline = claims_deadline,
+		ComplaintDeadline = complaint_deadline,
+		CaseType = casetype,
+		SplitCase = splitcase,
+		FiledInError = filedinerror,
+		StatusDate = status_date,
+		StatusType = status_type,
+		CommentsFilingDate = comment_filing_date,
+		CommentsDescription = comment_description));
+
+USE doxie_files.Key_Offenders_Risk(FLAT, // This file doesn't contain Dates First/Last Seen, excluding those ASOF fields from the USE below
+	CriminalOffense(
+		OffenderKey = offender_key,
+		OffenseScore = offense_score,
+		OffenderLevel = criminal_offender_level,
+		CaseNumber = case_num),
+	PersonOffenses(FILTER((UNSIGNED)sdid != 0),
+		Offender = sdid));
