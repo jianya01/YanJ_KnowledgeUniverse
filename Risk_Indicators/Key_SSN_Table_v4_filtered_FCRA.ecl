@@ -55,6 +55,6 @@ LayoutSSN := RECORD
 
 blankDataset := dataset([], LayoutSSN);
 
-fileName := '~thor_data400::key::death_master::fcra::qa::ssn_table_v4_filtered';
+fileName := '~thor_data400::key::death_master::fcra::20171119a::ssn_table_v4_filtered_vaultriskviewkeys';
 
 EXPORT Key_SSN_Table_v4_filtered_FCRA := INDEX(blankDataset, {ssn}, {blankDataset}, fileName);
