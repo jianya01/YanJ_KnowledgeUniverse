@@ -21,7 +21,11 @@ offense_fields := RECORD
   END;
 
 LayoutOffenses := RECORD
-  // unsigned6 sdid;
+  unsigned8 vault_rid;
+  unsigned4 vault_date_first_seen;
+  unsigned4 vault_date_last_seen;
+  string1 vault_active_flag;
+  unsigned6 sdid;
   string1 traffic_flag;
   string1 conviction_flag;
   string1 offense_score;
@@ -119,13 +123,12 @@ LayoutOffenses := RECORD
   string8 src_upload_date;
   string3 age;
   string150 image_link;
-  offense_fields offense;
+  DATASET(offense_fields) offense;
   string8 earliest_offense_date;
+  unsigned8 __internal_fpos__;
  END;
 
-blankDataset := dataset([], LayoutOffenses);
-
-fileName := '~thor_data400::key::corrections_offenders_risk::did_public_qa';
+fileName := '~vault::thor::corrections_offenders_risk::prod::did_public_qa';
 EXPORT Key_Offenders_Risk := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
-	INDEX(blankDataset, {unsigned6 sdid := (integer)did}, {blankDataset}, fileName),
-	JOIN(DISTRIBUTE(INDEX(blankDataset, {unsigned6 sdid := (integer)did}, {blankDataset}, fileName), HASH64((UNSIGNED8)SDID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.SDID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));
+	DATASET(fileName, LayoutOffenses, THOR),
+	JOIN(DISTRIBUTE(DATASET(fileName, LayoutOffenses, THOR), HASH64((UNSIGNED8)SDID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.SDID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

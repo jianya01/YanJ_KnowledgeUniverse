@@ -3,14 +3,18 @@
 layout_status := RECORD,maxlength(10000)
    string8 status_date;
    string30 status_type;
-END;
+  END;
 
 layout_comments := RECORD,maxlength(10000)
    string8 filing_date;
    string30 description;
-END;
+  END;
 
 LayoutBankruptcy := RECORD,maxlength(32766)
+  unsigned8 vault_rid;
+  unsigned4 vault_date_first_seen;
+  unsigned4 vault_date_last_seen;
+  string1 vault_active_flag;
   string8 process_date;
   string50 tmsid;
   string1 source;
@@ -104,9 +108,9 @@ LayoutBankruptcy := RECORD,maxlength(32766)
   DATASET(layout_status) status;
   DATASET(layout_comments) comments;
   unsigned8 scrubsbits1;
-END;
+ END;
  
-fileName := '~thor::base::bankruptcy::main_v3';
+fileName := '~vault::thor::bankruptcy::prod::main_v3';
 Key_BankruptcyV3_Main_Full_input := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutBankruptcy, THOR),
 	JOIN(DISTRIBUTE(DATASET(fileName, LayoutBankruptcy, THOR), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

@@ -30,8 +30,10 @@ LayoutPolicyHistory := RECORD
   string8 totalamountclaimed;
  END;
 			
- fileName := '~thor::qc::base::motor::qa::policyhistory';
+ fileName := '~thor::chola::base::motor::sept::masked::policyhistory';
 		
- EXPORT PolicyHistoryFile := DEDUP(SORT(DATASET(fileName, LayoutPolicyHistory, THOR), generatedkey, insurerirdacode, -sequenceid), generatedkey, insurerirdacode);
+ EXPORT PolicyHistoryFile := DATASET(fileName, LayoutPolicyHistory, THOR);
 			
+
+
 

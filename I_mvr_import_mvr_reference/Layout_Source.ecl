@@ -9,6 +9,11 @@
   string100 data_translation3;
   string100 data_translation4;
   string100 data_translation5;
+  string100 data_translation6;
+  string100 data_translation7;
+  string100 data_translation8;
+  string100 data_translation9;
+  string100 data_translation10;
   string19 date_added;
   string40 user_added;
   string1 process_status;

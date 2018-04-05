@@ -86,8 +86,7 @@ LayoutPolicy := RECORD
  END;
 	
 			
-	fileName := '~thor::qc::base::motor::qa::policy';
+fileName := '~thor::chola::base::motor::sept::masked::policy';
 	
 	
-	EXPORT PolicyFile := DEDUP(SORT(DATASET(fileName, LayoutPolicy, THOR), generatedkey, insurerirdacode, -sequenceid), generatedkey, insurerirdacode);
-			// The line above sorts by descending sequenceid (per India team this will give us the most recent record) and dedups on claim number, contributor.
+EXPORT PolicyFile := DATASET(fileName, LayoutPolicy, THOR);

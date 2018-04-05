@@ -1,6 +1,11 @@
 ﻿IMPORT _Control;
 
 LayoutBankruptcySearch := RECORD
+  unsigned8 vault_rid;
+  unsigned4 vault_date_first_seen;
+  unsigned4 vault_date_last_seen;
+  unsigned1 vault_record_status;
+  data16 vault_uid_hash;
   string8 process_date;
   string12 caseid;
   string12 defendantid;
@@ -125,7 +130,7 @@ LayoutBankruptcySearch := RECORD
   unsigned8 scrubsbits1;
 END;
 
-fileName := '~thor::base::bankruptcy::search_v3';
+fileName := '~vault::thor::base::bankruptcy::prod::search_v3';
 EXPORT Key_BankruptcyV3_Search_Full := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	DATASET(fileName, LayoutBankruptcySearch, THOR),
 	JOIN(DISTRIBUTE(DATASET(fileName, LayoutBankruptcySearch, THOR), HASH64((UNSIGNED8)DID)), DISTRIBUTE(_Control.LexIDFilterSet(LexID > 0), HASH64(LexID)), (UNSIGNED8)LEFT.DID = RIGHT.LexID, TRANSFORM(LEFT), LOCAL));

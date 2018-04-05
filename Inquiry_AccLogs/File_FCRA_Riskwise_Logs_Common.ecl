@@ -1,1 +1,1 @@
-﻿EXPORT File_FCRA_Riskwise_Logs_Common := dataset('~analyt_thor400_90_dev::thor10_231::base::riskwise_acclogs_common', inquiry_acclogs.CommonLayout, thor);
+﻿EXPORT File_FCRA_Riskwise_Logs_Common := dataset('~thor10_231::base::riskwise_acclogs_common', inquiry_acclogs.CommonLayout, thor);

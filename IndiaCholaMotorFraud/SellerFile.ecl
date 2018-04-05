@@ -1,6 +1,3 @@
-
-
-
 LayoutSeller := RECORD
   unsigned8 sequenceid;
   string9 batch_id;
@@ -23,7 +20,7 @@ LayoutSeller := RECORD
   string25 sellercategory;
  END;
 			
-	fileName := '~thor::qc::base::motor::qa::seller';
+fileName := '~thor::chola::base::motor::sept::masked::seller';
 		
 	
-	EXPORT SellerFile := DEDUP(SORT(DATASET(fileName, LayoutSeller, THOR), generatedkey, insurerirdacode, -sequenceid), generatedkey, insurerirdacode);
+EXPORT SellerFile := DATASET(fileName, LayoutSeller, THOR);

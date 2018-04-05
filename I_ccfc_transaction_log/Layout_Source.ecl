@@ -62,7 +62,7 @@
   integer3 batch_seq_number;
   string30 user_added;
   string22 date_added;
-  integer3 is_active;
   string30 user_changed;
   string30 date_changed;
+  integer3 is_active;
  END;
