@@ -1,4 +1,6 @@
-﻿Base_Layout:= RECORD
+﻿IMPORT STD;
+
+Base_Layout:= RECORD
  string12 ln_fares_id;
   string1 which_orig;
   string1 source_code_2;
@@ -86,10 +88,32 @@
   unsigned8 __internal_fpos__;
 END;	
 
+SourceCodeExpanded := RECORD
+  Base_Layout;
+  BOOLEAN PartyIsBuyerOrOwner;
+	BOOLEAN PartyIsBorrower;
+	BOOLEAN PartyIsSeller;
+	BOOLEAN PartyIsCareOf;
+	BOOLEAN OwnerAddress;
+	BOOLEAN SellerAddress;
+	BOOLEAN PropertyAddress;
+	BOOLEAN BorrowerAddress;
+END;
 
+SourceCodeExpanded FillFields(Base_Layout l) := TRANSFORM
+  SELF.PartyIsBuyerOrOwner := IF(STD.Str.ToUpperCase(l.source_code[1]) = 'O', TRUE, FALSE);
+	SELF.PartyIsBorrower := IF(STD.Str.ToUpperCase(l.source_code[1]) = 'B', TRUE, FALSE);
+	SELF.PartyIsSeller := IF(STD.Str.ToUpperCase(l.source_code[1]) = 'S', TRUE, FALSE);
+	SELF.PartyIsCareOf := IF(STD.Str.ToUpperCase(l.source_code[1]) = 'C', TRUE, FALSE);
+	SELF.OwnerAddress := IF(STD.Str.ToUpperCase(l.source_code[1]) = 'O', TRUE, FALSE);
+	SELF.SellerAddress := IF(STD.Str.ToUpperCase(l.source_code[2]) = 'S', TRUE, FALSE);
+	SELF.PropertyAddress := IF(STD.Str.ToUpperCase(l.source_code[2]) = 'P', TRUE, FALSE);
+	SELF.BorrowerAddress := IF(STD.Str.ToUpperCase(l.source_code[2]) = 'B', TRUE, FALSE);
+  SELF := l;
+END;
 
 File_Base := DATASET([], Base_Layout); // Currently we don't have the base file in the Vault, only the KEY file.  As such we can't rebuild this index in the Vault - setting the base dataset to blank
 
-EXPORT SearchFID := INDEX(File_Base, 
+EXPORT SearchFID := PROJECT(INDEX(File_Base, 
 							 {ln_fares_id, which_orig, source_code_2, source_code_1},
-							 {File_Base}, '~thor_data400::key::ln_propertyv2::fcra::qa::search.fid');
+							 {File_Base}, '~thor_data400::key::ln_propertyv2::fcra::qa::search.fid'),FillFields(LEFT));

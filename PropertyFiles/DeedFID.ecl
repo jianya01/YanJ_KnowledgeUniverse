@@ -1,4 +1,6 @@
-﻿Base_Layout:= RECORD
+﻿IMPORT STD;
+
+Base_Layout:= RECORD
 	string12 ln_fares_id;
   unsigned6 proc_date;
   string8 process_date;
@@ -122,9 +124,18 @@
 END;	
 
 
+SourceCodeExpanded := RECORD
+  Base_Layout;
+END;
+
+SourceCodeExpanded FillFields(Base_Layout l) := TRANSFORM
+  SELF.document_number := STD.Str.Filter(l.document_number, '1234567890');
+  SELF := l;
+END;
+
 
 File_Base := DATASET([], Base_Layout); // Currently we don't have the base file in the Vault, only the KEY file.  As such we can't rebuild this index in the Vault - setting the base dataset to blank
 
-EXPORT DeedFID := INDEX(File_Base, 
+EXPORT DeedFID := PROJECT(INDEX(File_Base, 
 							 {ln_fares_id, proc_date},
-							 {File_Base}, '~thor_data400::key::ln_propertyv2::fcra::qa::deed.fid');
+							 {File_Base}, '~thor_data400::key::ln_propertyv2::fcra::qa::deed.fid'), FillFields(LEFT));

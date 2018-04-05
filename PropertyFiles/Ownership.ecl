@@ -1,4 +1,5 @@
-﻿layout_fares := RECORD
+﻿IMPORT STD;
+layout_fares := RECORD
    string12 ln_fare_id;
   END;
 
@@ -102,10 +103,26 @@ Base_Layout:= RECORD
   unsigned8 __internal_fpos__;
 END;	
 
-
-
 File_Base := DATASET([], Base_Layout); // Currently we don't have the base file in the Vault, only the KEY file.  As such we can't rebuild this index in the Vault - setting the base dataset to blank
 
-EXPORT Ownership := INDEX(File_Base, 
+ds1 := INDEX(File_Base, 
 							 {did},
 							 {File_Base}, '~thor_data400::key::ln_propertyv2::fcra::qa::did.ownership_v4');
+							 
+SourceCodeExpanded := RECORD
+  Base_Layout - fares;
+	string12 ln_fare_id;
+  Boolean IsAssessment;
+	Boolean IsDeed;
+END;
+
+SourceCodeExpanded FillFields(RECORDOF(ds1) l, layout_fares r) := TRANSFORM
+  SELF.IsAssessment := IF(STD.Str.ToUpperCase(l.AD) = 'A', TRUE, FALSE);
+	SELF.IsDeed := IF(STD.Str.ToUpperCase(l.AD) = 'D' OR STD.Str.ToUpperCase(l.AD) = 'M', TRUE, FALSE);
+	SELF.ln_fare_id := r.ln_fare_id;
+  SELF := l;
+END;
+
+
+
+EXPORT Ownership := NORMALIZE(ds1, LEFT.fares, FillFields(LEFT, RIGHT));
