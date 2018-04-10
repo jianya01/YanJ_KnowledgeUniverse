@@ -1,4 +1,4 @@
-﻿IMPORT STD;
+﻿IMPORT STD, _Control;
 
 Base_Layout:= RECORD
   string28 prim_name;
@@ -47,6 +47,9 @@ END;
 
 File_Base := DATASET([], Base_Layout); // Currently we don't have the base file in the Vault, only the KEY file.  As such we can't rebuild this index in the Vault - setting the base dataset to blank
 
-EXPORT AddressSearchFID := PROJECT(INDEX(File_Base, 
+ds := PROJECT(INDEX(File_Base, 
 							 {prim_name, prim_range, zip, predir, postdir, suffix, sec_range, source_code_2, ln_owner, owner, nofares_owner, source_code_1},
 							 {File_Base}, '~thor_data400::key::ln_propertyv2::fcra::qa::addr_search.fid'),FillFields(LEFT));
+
+EXPORT AddressSearchFID := IF(COUNT(_Control.FaresFilterSet) <= 0, ds,
+							 JOIN(DISTRIBUTE(ds, HASH64(ln_fares_id)), DISTRIBUTE(_Control.FaresFilterSet, HASH64(LNFaresID)), LEFT.ln_fares_id = RIGHT.LNFaresID, TRANSFORM(LEFT), LOCAL));

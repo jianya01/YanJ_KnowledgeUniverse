@@ -1,4 +1,6 @@
-﻿Base_Layout:= RECORD
+﻿IMPORT _Control;
+
+Base_Layout:= RECORD
 	string12 ln_fares_id;
   unsigned6 proc_date;
   string8 process_date;
@@ -399,4 +401,7 @@ ds1 := INDEX(File_Base,
 		SELF := L;
 	END;
 
-EXPORT AssessorFID := NORMALIZE(tmp7PropertyAssessor, 5, NormOtherImpBuildings(LEFT, COUNTER));
+ds := NORMALIZE(tmp7PropertyAssessor, 5, NormOtherImpBuildings(LEFT, COUNTER));
+
+EXPORT AssessorFID := IF(COUNT(_Control.FaresFilterSet) <= 0, ds,
+							 JOIN(DISTRIBUTE(ds, HASH64(ln_fares_id)), DISTRIBUTE(_Control.FaresFilterSet, HASH64(LNFaresID)), LEFT.ln_fares_id = RIGHT.LNFaresID, TRANSFORM(LEFT), LOCAL));

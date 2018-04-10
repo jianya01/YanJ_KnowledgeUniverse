@@ -1,4 +1,4 @@
-﻿IMPORT STD;
+﻿IMPORT STD, _Control;
 unsigned2 MAX_EMBEDDED := 100;
 
 layout_name := record
@@ -86,4 +86,7 @@ SourceCodeExpanded FillFields(RECORDOF(ds1) l, layout_fares r) := TRANSFORM
   SELF := l;
 END;
 
-EXPORT AddressFull := NORMALIZE(ds1, LEFT.fares, FillFields(LEFT, RIGHT));
+ds2 := NORMALIZE(ds1, LEFT.fares, FillFields(LEFT, RIGHT));
+
+EXPORT AddressFull := IF(COUNT(_Control.FaresFilterSet) <= 0, ds2,
+							 JOIN(DISTRIBUTE(ds2, HASH64(ln_fare_id)), DISTRIBUTE(_Control.FaresFilterSet, HASH64(LNFaresID)), LEFT.ln_fare_id = RIGHT.LNFaresID, TRANSFORM(LEFT), LOCAL));

@@ -1,4 +1,4 @@
-﻿IMPORT STD;
+﻿IMPORT STD, _Control;
 
 Base_Layout:= RECORD
 	string12 ln_fares_id;
@@ -136,6 +136,9 @@ END;
 
 File_Base := DATASET([], Base_Layout); // Currently we don't have the base file in the Vault, only the KEY file.  As such we can't rebuild this index in the Vault - setting the base dataset to blank
 
-EXPORT DeedFID := PROJECT(INDEX(File_Base, 
+ds := PROJECT(INDEX(File_Base, 
 							 {ln_fares_id, proc_date},
 							 {File_Base}, '~thor_data400::key::ln_propertyv2::fcra::qa::deed.fid'), FillFields(LEFT));
+
+EXPORT DeedFID := IF(COUNT(_Control.FaresFilterSet) <= 0, ds,
+							 JOIN(DISTRIBUTE(ds, HASH64(ln_fares_id)), DISTRIBUTE(_Control.FaresFilterSet, HASH64(LNFaresID)), LEFT.ln_fares_id = RIGHT.LNFaresID, TRANSFORM(LEFT), LOCAL));

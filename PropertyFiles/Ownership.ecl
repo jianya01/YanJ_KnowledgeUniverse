@@ -1,4 +1,5 @@
-﻿IMPORT STD;
+﻿IMPORT STD, _Control;
+
 layout_fares := RECORD
    string12 ln_fare_id;
   END;
@@ -123,6 +124,7 @@ SourceCodeExpanded FillFields(RECORDOF(ds1) l, layout_fares r) := TRANSFORM
   SELF := l;
 END;
 
+ds2 := NORMALIZE(ds1, LEFT.fares, FillFields(LEFT, RIGHT));
 
-
-EXPORT Ownership := NORMALIZE(ds1, LEFT.fares, FillFields(LEFT, RIGHT));
+EXPORT Ownership := IF(COUNT(_Control.FaresFilterSet) <= 0, ds2,
+							 JOIN(DISTRIBUTE(ds2, HASH64(ln_fare_id)), DISTRIBUTE(_Control.FaresFilterSet, HASH64(LNFaresID)), LEFT.ln_fare_id = RIGHT.LNFaresID, TRANSFORM(LEFT), LOCAL));
