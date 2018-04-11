@@ -2437,18 +2437,28 @@ Person: => SSNMultipleNonRelativeLexIDsCount := COUNT(SSNMultipleNonRelativeLexI
 Person: => SSNCreatedInLast6MonthsInvalidCount := COUNT(PersonSSN(NOT Social.IsValid AND ABS(DAYSBETWEEN(Social.HeaderFirstSeen, Person.BocaShellHistoryDate)) < 183));
 
 //Property Attributes for a Person
-
-Person: => PropertyCount := COUNT(PersonProperty(IsBuyerOrOwner OR IsSeller).Transaction);
+ 
+Property: => PropertyCounts := COUNT(PersonProperty(IsBuyerOrOwner OR IsSeller).Subject);
 Person: => PropertyTotal := COUNT(PersonProperty(IsBuyerOrOwner OR IsSeller).Transaction);
+
 Person: => PropertyOwnedPurchaseAmount := SUM(PersonProperty(IsBuyerOrOwner).Transaction, PurchaseAmount);
 Person: => PropertySoldSaleAmount := SUM(PersonProperty(IsSeller).Transaction, SalePrice);
 Person: => PropertyOwnedPurchaseTotal := PropertyOwnedPurchaseAmount + PropertySoldSaleAmount;
+
+Property: => PropertyOwnedCount := COUNT(PersonProperty(IsBuyerOrOwner).Transaction(PurchaseAmount > 0));
+Property: => PropertySoldCount := COUNT(PersonProperty(IsSeller).Transaction(SalePrice > 0));
+Property: => PropertyOwnedPurchaseCounts := PropertyOwnedCount + PropertySoldCount;
+
+
+Person: => PropertyOwnedAssessedTotal := SUM(PersonProperty(IsBuyerOrOwner OR IsSeller).Transaction, AssessedTotalValue);
+Property: => PropertyOwnedAssessedCounts := COUNT(PersonProperty(IsBuyerOrOwner OR IsSeller).Transaction(AssessedTotalValue > 0));
+
 
 Phone: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
 Phone: => IsValid := Phone10 != 0 AND LENGTH(TRIMALL(Phone10)) = 10 AND NOT STARTSWITH(Phone10, '555') AND NOT SUBSTR(Phone10, 4, 10) IN ['0000000', '1234567'] AND SUBSTR(Phone10, 7, 10) != '9999' AND NOT Phone10 IN REPEATING_NUMBERS;
 
 
-
+ 
 SocialSecurityNumber: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
 SocialSecurityNumber: => AddressCount := COUNT(SSNAddress.Location); //	(Addrs_per_ssn)	ECL attribute name
 SocialSecurityNumber: => IsValid := SSN != 0 AND 
