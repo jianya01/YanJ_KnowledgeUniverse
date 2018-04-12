@@ -254,7 +254,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	
 	TradeLineWithEnhanced_Raw := JOIN(DISTRIBUTE(TradeLine_Data_Raw, HASH64(Transaction_ID, LexID, Date_Reported, RecordTypeCounter)), DISTRIBUTE(TradeLine_EnhancedData_Raw, HASH64(Transaction_ID, LexID, Date_Reported, RecordTypeCounter)),
 			LEFT.Transaction_ID = RIGHT.Transaction_ID AND LEFT.LexID = RIGHT.LexID  AND LEFT.Date_Reported = RIGHT.Date_Reported  AND LEFT.RecordTypeCounter = RIGHT.RecordTypeCounter, 
-		TRANSFORM({RECORDOF(LEFT), RECORDOF(RIGHT) - Transaction_id - LexID - Date_Reported - JulianDate - RemainingRefNo - ReportSource - LineNumber - OriginalRefNo - ReportTypeCounter - RecordTypeCounter - NarrativeRemarkCounter - SH51Type - SH51TypeSeq - UnitNumber - GroupSequenceNumber - RecordCode - RecordOccurrA - RecordOccurrB - Classification},
+		TRANSFORM({RECORDOF(LEFT), RECORDOF(RIGHT) - Transaction_id - BureauCode - LexID - Date_Reported - JulianDate - RemainingRefNo - ReportSource - LineNumber - OriginalRefNo - ReportTypeCounter - RecordTypeCounter - NarrativeRemarkCounter - FI90Seq - FI93Seq - SH51Type - SH51TypeSeq - UnitNumber - GroupSequenceNumber - RecordCode - RecordOccurrA - RecordOccurrB - Classification},
 			SELF							:= RIGHT;
 			SELF							:= LEFT), LOCAL);
 	
