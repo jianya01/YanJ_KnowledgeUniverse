@@ -22,7 +22,7 @@ EXPORT FileTypes := ['consumercredit' //1
 										 ,'clueauto_poc'//12
 										 ,'prospectsurvival'
 										 ,'temp::i_'];//13
-EXPORT EmailGroup := 'sheetal.garud@lexisnexisrisk.com';// Vault.Logistics@risk.lexisnexis.com';
+EXPORT EmailGroup := 'Vault.Logistics@risk.lexisnexis.com';
 
 EXPORT VaultThorSize := 500;
 EXPORT ActualUsedSpaceThr := 450; //threshold
