@@ -38,20 +38,21 @@ EXPORT dCountsUsers	:=	sort(table(dCountsRaw, rCountsUsers, Action, UserName), -
    end;
 EXPORT dCountsFiles	:=	sort(table(dCountsRaw, rCountsFiles, Action, FileName), -Total);
 
- DeletedFileTable:= table(dFileAccess(action='DELETED'), {string10 DateDeleted := dFileAccess.AuditDate;
-   																		string20 Username := dFileAccess.UserName;
-   																		string100 Filename := dFileAccess.FileName;});
-   																		
-   EXPORT Deleted_FileTable := SORT(DeletedFileTable,-DateDeleted);
+/*  DeletedFileTable:= table(dFileAccess(action='DELETED'), {string10 DateDeleted := dFileAccess.AuditDate;
+      																		string20 Username := dFileAccess.UserName;
+      																		string100 Filename := dFileAccess.FileName;});
+      																		
+      EXPORT Deleted_FileTable := SORT(DeletedFileTable,-DateDeleted);
+   
+*/
 
-
-/*  shared DeletedFileTable:= table(dFileAccess(action='DELETED'), {string10 DateDeleted := dFileAccess.AuditDate;//time;
+ DeletedFileTable:= table(dFileAccess(action='DELETED'), {string10 DateDeleted := dFileAccess.AuditDate;//time;
       																		string20 Username := dFileAccess.UserName;
       																		string100 Filename := dFileAccess.FileName;//});
       																		unsigned8	Total		:=	COUNT(group)},dFileAccess.AuditDate,dFileAccess.Username,dFileAccess.Filename);
-      EXPORT Deleted_FileTable := SORT(GROUP(DeletedFileTable,Filename),-DateDeleted);
-      EXPORT Deleted_FileTable2 := SORT(DeletedFileTable,-DateDeleted);
-*/
+EXPORT Deleted_FileTable := SORT(DeletedFileTable,-DateDeleted);
+     
+
 
 
 END;

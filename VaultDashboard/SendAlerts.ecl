@@ -29,7 +29,7 @@ DeletedFileList:= DeletedFiles(DeletedFiles.DateDeleted > from_date);
 //generate string for deleted files email message
 OutRec1 := {recordof(DeletedFileList), string body};
 getDS_Dnamestring := project(DeletedFileList, transform(OutRec1,
-																self.body := Trim(left.DateDeleted) + '\t'+Trim((STRING)left.Username)  + '\t'+ left.Filename ;
+																self.body := Trim(left.DateDeleted) + '\t'+Trim((STRING)left.Username)  + '\t'+ Trim(left.Filename )+ ' -- '+ (string2)left.Total;
 																self:=left;));
   
 OutRec1 GenerateBody(OutRec1 L, OutRec1 R) := TRANSFORM
@@ -79,6 +79,8 @@ STRING Uspace_body      := 'Vault Storage Utilization:'  +'\n\n'+
 													'*******************************************' 
 												 	+ '\n\n'+
 													'Deleted files in last 7 days:'  
+													 +'\n'
+													 +'DateDeleted '+' \t '+'Username '+'\t '+'Filename '+'\t'+' Total' 
 													 +'\n'+
 													 GetDelList[cnt1].body;
 
