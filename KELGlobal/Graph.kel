@@ -2,7 +2,7 @@
 #OPTION(persist, 0)
 #OPTION(persistexpire, 30)
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
- 
+
 // Defining the ERA to allow for ASOF functionality
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
@@ -149,10 +149,72 @@ CriminalOffense := ENTITY(FLAT(UID(offender_key),
 		DATE EarliestOffenseDate,
 		INTEGER DataType,
 		STRING TrafficFlag,
-		STRING ConvictionFlag),
+		STRING ConvictionFlag,
+		STRING SourceState,
+		STRING DataSource,	//OH-PutnamCounty
+		DATE DateOfArrest,
+		STRING AgencyCode,
+		STRING AgencyName,
+		INTEGER AgencyCaseNumber,
+		STRING TrafficTicketNumber,
+		STRING ArrestOffenseCode,
+		STRING ArrestInitialChargeDescription,
+		STRING ArrestAmendedChargeDescription,
+		STRING ArrestOffenseLevel,
+		DATE DateOfDispositionForInitialCharge,
+		STRING InitialChargeDispositionDescription,
+		STRING AdditionalDispositionDescription,
+		STRING CourtCode,
+		STRING CourtDescription,
+		STRING CourtFinalPlea,
+		STRING CourtOffenseCode,
+		STRING CourtOffenseDescription,
+		STRING CourtStatute,
+		DATE CourtDispositionDate,
+		STRING CourtDispositionDescription,
+		STRING CourtAdditionalDispositionDescription,
+		DATE DateOfAppeal,
+		DATE DateofVerdict,
+		STRING OffenseTown,
+		DATE CourtDate,
+		STRING CourtCounty,
+		STRING ArrestOffenseLevelMapped,
+		STRING CourtOffenseLevelMapped,
+		STRING OffenseKey,
+		DATE FCRADate,
+		STRING FCRADateType,
+		DATE ConvictionOverrideDate,
+		STRING ConvictionOverrideDateType),
 	MODEL(UID, 
 		OffenderKey, 
-		OffenseCharges{CaseNumber, OffenseScore, OffenderLevel, EarliestOffenseDate, DataType, TrafficFlag, ConvictionFlag}));
+		OffenseCharges{CaseNumber, OffenseScore, OffenderLevel, EarliestOffenseDate, DataType, TrafficFlag, ConvictionFlag},
+		SourceState, DataSource, DateOfArrest, AgencyCode, AgencyName, AgencyCaseNumber, TrafficTicketNumber,
+		ArrestOffenseCode, ArrestInitialChargeDescription, ArrestAmendedChargeDescription, ArrestOffenseLevel, DateOfDispositionForInitialCharge,
+		InitialChargeDispositionDescription, AdditionalDispositionDescription, CourtCode, CourtDescription,
+		CourtFinalPlea, CourtOffenseCode, CourtOffenseDescription, CourtStatute, CourtDispositionDate, 
+		CourtDispositionDescription, CourtAdditionalDispositionDescription, DateOfAppeal, DateofVerdict, OffenseTown,
+		CourtDate, CourtCounty, ArrestOffenseLevelMapped, CourtOffenseLevelMapped, OffenseKey, FCRADate, FCRADateType,
+		ConvictionOverrideDate, ConvictionOverrideDateType));
+
+CriminalPunishment := ENTITY(FLAT(UID(offender_key),
+		STRING OffenderKey,
+		DATE DateOfSentence,
+		STRING JailTime,
+		STRING CurrentStatus, //Time Remaining for the sentence, sent_susp_time
+		INTEGER CourtCost,
+		INTEGER CourtFine,
+		INTEGER SuspendedCourtFine,
+		STRING ProbationTimePeriod,
+		STRING AdditionalProvisions,
+		STRING ConsecutiveAndConcurrentInformation,
+		STRING InstituitonName,	//sent_agency_rec_cust
+		REAL Restitution,
+		STRING CommunityService,
+		STRING AdditionalSentenceDates,
+		STRING ProbationDescription),
+	MODEL(UID,
+		OffenderKey, DateOfSentence, JailTime, CurrentStatus, CourtCost, CourtFine, SuspendedCourtFine, ProbationTimePeriod, AdditionalProvisions,
+		ConsecutiveAndConcurrentInformation, InstituitonName, Restitution, CommunityService, AdditionalSentenceDates, ProbationDescription));
 
 Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), // For now we are using a hashed UID, eventually this will be replaced with the upcoming Location ID
 		STRING PrimaryRange=NULL(),
@@ -325,12 +387,12 @@ Property := ENTITY(FLAT(UID(LnFaresId),
 		REAL MarketTotalValue,
 		INTEGER MarketValueYear,
 		//PropertyAttributes
-		INTEGER PropertyCount,
+		/*INTEGER PropertyCount,
 		INTEGER PropertyTotal,
 		INTEGER PropertyOwnedPurchaseTotal,
 		INTEGER PropertyOwnedPurchaseCount,
 		INTEGER PropertyOwnedAssessedTotal,
-		INTEGER PropertyOwnedAssessedCount,
+		INTEGER PropertyOwnedAssessedCount,*/
 		//Property Details
 		INTEGER StandardizedLandUseCode,
 		STRING PropertyUseCode,
@@ -453,7 +515,7 @@ Property := ENTITY(FLAT(UID(LnFaresId),
 		PrepaymentRider, OneFourFamilyRider, SecondHomeRider, TypeOfDeedCode, LoanNumber, PartialInterestTransferred,	LoanTermMonths, LoanTermYears, LenderIdCode,
 		BuyerOrBorrowerOrAssessee, Name1IdCode, Name2IdCode, BuyerBorrowerVestingCode, BuyerBorrowerAddendumFlag, Seller1IdCode, Seller2IdCode, SellerAddendumFlag,
 		AssessedAmount, AssessedLandValue, AssessedImprovementValue, AssessedTotalValue, AssessedValueYear, MarketLandValue, MarketImprovementValue, MarketTotalValue, MarketValueYear,
-		PropertyCount, PropertyTotal, PropertyOwnedPurchaseTotal, PropertyOwnedPurchaseCount,	PropertyOwnedAssessedTotal, PropertyOwnedAssessedCount,
+		//PropertyCount, PropertyTotal, PropertyOwnedPurchaseTotal, PropertyOwnedPurchaseCount,	PropertyOwnedAssessedTotal, PropertyOwnedAssessedCount,
 		StandardizedLandUseCode, PropertyUseCode, StateLandUseCode,	CountyLandUseCode, CountyLandUseDescription, TimeshareCode, Zoning, CondoCode,
 		NumberOfBuildings, NumberOfStories, NumberOfUnits, NumberOfRooms, NumberOfBedrooms, NumberOfBaths, NumberOfPartialBaths,
 		NumberOfPlumbingFixtures,	GarageTypeCode, ParkingNumberOfCars, PoolCode, StyleCode, TypeConstructionCode,
@@ -548,9 +610,12 @@ Household := ENTITY(FLAT(UID = HHid),
 
 PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange))); // Connects a Person to an Address
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number)));
-PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key)));
+PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key), INTEGER OffenseCounts));
 PersonPhone := ASSOCIATION(FLAT(Person Subject, Phone PhoneNumber, INTEGER ConfidenceScore, INTEGER PersonScore, INTEGER NameScore, INTEGER BestNameMatchFlag, INTEGER LatestPhoneOwnerFlag, INTEGER ActivePhoneFlag));
 AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), INTEGER BestAddressMatchFlag)); 
+
+DrivingViolation := ASSOCIATION(FLAT(DriversLicense LicenseInformation=UID(DLNumber, DLState), CriminalOffense Offense=UID(offender_key)));
+
 
 PersonSSN := ASSOCIATION(FLAT(Person Subject, SocialSecurityNumber Social, BOOLEAN TempLegacySSN), MODEL(Subject, Social, {TempLegacySSN}));
 PersonSSN: => LegacySSN := EXISTS(TempLegacySSN);
@@ -1182,6 +1247,68 @@ USE doxie_files.Key_Offenders_Risk(FLAT, // This file doesn't contain Dates Firs
 		ZIP5 = zip5,
 		SecondaryRange = sec_range));
 
+USE CriminalPunishmentFiles.court_offenses_public(FLAT,
+	CriminalOffense(
+		OffenderKey = offender_key,
+		CaseNumber = court_case_number,
+		OffenseScore = offense_score,
+		OffenderLevel = court_off_lev,
+		EarliestOffenseDate = off_date,
+		DataType = data_type,
+		TrafficFlag = fcra_traffic_flag,
+		ConvictionFlag = fcra_conviction_flag,
+		SourceState = state_origin,
+		DataSource = source_file,
+		DateOfArrest = arr_date,
+		AgencyCode = le_agency_cd,
+		AgencyName = le_agency_desc,
+		AgencyCaseNumber = le_agency_case_number,
+		TrafficTicketNumber = traffic_ticket_number,
+		ArrestOffenseCode = arr_off_code,
+		ArrestInitialChargeDescription = arr_off_desc_1,
+		ArrestAmendedChargeDescription = arr_off_desc_2,
+		ArrestOffenseLevel = arr_off_lev,
+		DateOfDispositionForInitialCharge = arr_disp_date,
+		InitialChargeDispositionDescription = arr_disp_desc_1,
+		AdditionalDispositionDescription = arr_disp_desc_2,
+		CourtCode = court_cd,
+		CourtDescription = court_desc,
+		CourtFinalPlea = court_final_plea,
+		CourtOffenseCode = court_off_code,
+		CourtOffenseDescription = court_off_type_desc,
+		CourtStatute = court_statute,
+		CourtDispositionDate = court_disp_date,
+		CourtDispositionDescription = court_disp_desc_1,
+		CourtAdditionalDispositionDescription = court_disp_desc_2,
+		DateOfAppeal = appeal_date,
+		DateofVerdict = convict_dt,
+		OffenseTown = offense_town,
+		CourtDate = court_dt,
+		CourtCounty = court_county,
+		ArrestOffenseLevelMapped = arr_off_lev_mapped,
+		CourtOffenseLevelMapped = court_off_lev_mapped,
+		OffenseKey = fcra_offense_key,
+		FCRADate = fcra_date,
+		FCRADateType = fcra_date_type,
+		ConvictionOverrideDate = conviction_override_date,
+		ConvictionOverrideDateType = conviction_override_date_type),
+	CriminalPunishment(
+		OffenderKey = offender_key,
+		DateOfSentence = sent_date,
+		JailTime = sent_jail,
+		CurrentStatus = sent_susp_time, 
+		CourtCost = sent_court_cost,
+		CourtFine = sent_court_fine,
+		SuspendedCourtFine = sent_susp_court_fine,
+		ProbationTimePeriod = sent_probation,
+		AdditionalProvisions = sent_addl_prov_desc_1,
+		ConsecutiveAndConcurrentInformation = sent_consec,
+		InstituitonName = sent_agency_rec_cust,
+		Restitution = restitution,
+		CommunityService = community_service,
+		AdditionalSentenceDates = addl_sent_dates,
+		ProbationDescription = probation_desc2));
+
 USE BankruptcyV3.Key_BankruptcyV3_Main_Full(FLAT,
 	Person(
 		UID = did,
@@ -1697,12 +1824,12 @@ USE PropertyFiles.Ownership(FLAT,
 		AssessedAmount = assessed_amount,
 		AssessedTotalValue = assessed_total_value,
 		AssessedValueYear = assessed_value_year,
-		PropertyCount = property_count,
+		/*PropertyCount = property_count,
 		PropertyTotal = property_total,
 		PropertyOwnedPurchaseTotal = property_owned_purchase_total,
 		PropertyOwnedPurchaseCount = property_owned_purchase_count,
 		PropertyOwnedAssessedTotal = property_owned_assessed_total,
-		PropertyOwnedAssessedCount = property_owned_assessed_count,
+		PropertyOwnedAssessedCount = property_owned_assessed_count,*/
 		StandardizedLandUseCode = standardized_land_use_code,
 		BuildingAreaCounter = 1,
 		BuildingArea = building_area,
@@ -1850,12 +1977,12 @@ USE PropertyFiles.AddressFull(FLAT,
 		AssessedAmount = assessed_amount,
 		AssessedTotalValue = assessed_total_value,
 		AssessedValueYear = assessed_value_year,
-		PropertyCount = property_count,
+		/*PropertyCount = property_count,
 		PropertyTotal = property_total,
 		PropertyOwnedPurchaseTotal = property_owned_purchase_total,
 		PropertyOwnedPurchaseCount = property_owned_purchase_count,
 		PropertyOwnedAssessedTotal = property_owned_assessed_total,
-		PropertyOwnedAssessedCount = property_owned_assessed_count,
+		PropertyOwnedAssessedCount = property_owned_assessed_count,*/
 		StandardizedLandUseCode = standardized_land_use_code,
 		BuildingAreaCounter = 1,
 		BuildingArea = building_area,
@@ -2654,6 +2781,7 @@ QUERY: SSNPropertyDump <= SSNProperty;
 QUERY: PropertyCountAttributes(SearchForLexID, ArchiveDate) <= Person(UID = SearchForLexID) {UID, PropertyCounts.SnapshotDateFirstSeen, PropertyCounts.SnapshotDateLastSeen, PropertyCounts.PropertyCount, PropertyCounts.PropertyTotal, PropertyCounts.PropertyOwnedPurchaseTotal, PropertyCounts.PropertyOwnedPurchaseCount, PropertyCounts.PropertyOwnedAssessedTotal, PropertyCounts.PropertyOwnedAssessedCount} ASOF reportedby(ArchiveDate);
 QUERY: PropertyCountSnapshots(SearchForLexID, ArchiveDate) <= Person(UID = SearchForLexID).PropertyCounts.Snapshot ASOF reportedby(ArchiveDate);
 QUERY: AllPropertyCountSnapshots(ArchiveDate) <= Person.PropertyCounts.Snapshot ASOF reportedby(ArchiveDate);
+QUERY: AllPropertyCountAttributes(ArchiveDate) <= Person {UID, PropertyCounts.SnapshotDateFirstSeen, PropertyCounts.SnapshotDateLastSeen, PropertyCounts.PropertyCount, PropertyCounts.PropertyTotal, PropertyCounts.PropertyOwnedPurchaseTotal, PropertyCounts.PropertyOwnedPurchaseCount, PropertyCounts.PropertyOwnedAssessedTotal, PropertyCounts.PropertyOwnedAssessedCount} ASOF reportedby(ArchiveDate);
 
 
 // SHELLs
