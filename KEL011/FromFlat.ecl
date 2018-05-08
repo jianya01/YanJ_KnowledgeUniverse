@@ -134,7 +134,7 @@
             #WARNING('KEL program used no fields from this input')
         #END
         #IF(%duplicate%)
-            #ERROR('Can not map '+%'property'% +' to multiple fields of one dataset');
+            #ERROR('Can not map '+%'dupproperty'% +' to multiple fields of one dataset');
         #END
         RETURN %'f'%;
 
