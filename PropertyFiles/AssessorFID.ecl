@@ -230,9 +230,10 @@ ds1 := INDEX(File_Base,
 							 {File_Base}, '~thor_data400::key::ln_propertyv2::fcra::qa::assessor.fid '); 
 
 	OutTaxExemptionAssessor := RECORD
-		RECORDOF(ds1) - tax_exemption1_code - tax_exemption2_code - tax_exemption3_code - tax_exemption4_code;
+		RECORDOF(ds1) - tax_exemption1_code - tax_exemption2_code - tax_exemption3_code - tax_exemption4_code - owner_occupied;
 		unsigned tax_exemption_code_counter;
 		string1 tax_exemption_code;
+		boolean owner_occupied;
 	END;
 	
 	OutTaxExemptionAssessor NormTaxExemption(RECORDOF(ds1) L, C) := TRANSFORM
@@ -242,6 +243,9 @@ ds1 := INDEX(File_Base,
               2 => L.tax_exemption2_code,
 							3 => L.tax_exemption3_code,
 							4 => L.tax_exemption4_code, '');
+		SELF.owner_occupied := IF(L.owner_occupied = 'Y', TRUE, FALSE);
+		SELF.land_acres := REGEXFIND('^[0-9]*.?[0-9]*',L.land_acres,0);
+		SELF.land_square_footage := REGEXFIND('^[0-9]*.?[0-9]*',L.land_square_footage,0);
 		SELF := L;
 	END;
 	
@@ -400,7 +404,7 @@ ds1 := INDEX(File_Base,
 							5 => L.other_impr_building_area5, '');
 		SELF := L;
 	END;
-
+	
 ds := NORMALIZE(tmp7PropertyAssessor, 5, NormOtherImpBuildings(LEFT, COUNTER));
 
 EXPORT AssessorFID := IF(COUNT(_Control.FaresFilterSet) <= 0, ds,
