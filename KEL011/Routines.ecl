@@ -384,6 +384,10 @@ EXPORT Routines := MODULE
       RETURN STD.DATE.FromStringToDate(pstr, format);
       END;
 
+  EXPORT CastStringToDate(pstr) := FUNCTIONMACRO
+      RETURN KEL.Routines.FromStringToDate(pstr, __CN('%Y%m%d'));
+      ENDMACRO;
+
     // TODO - this currently doesn't work - the compiler wants all inputs and outputs of a
     // function to be nullable or non-nullable (all the same) but is not able to boost
     // a set of strings literal to nullable -- so it takes the all-non-nullable template
