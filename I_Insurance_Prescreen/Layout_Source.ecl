@@ -57,6 +57,7 @@
   string1 lot_order;
   string28 extraneous;
   string10 addr_numerics;
+  string9 ssn9;
   string4 fna_date;
   string8 dob;
   string2 lor;
@@ -147,6 +148,19 @@
   string4 fico_auto_standard;
   string4 fico_property;
   string4 fico_auto_non_standard;
+  string4 fico_v3_base;
+  string4 fico_v3_auto;
+  string4 fico_v3_bankcard;
+  string4 fico_v3_installment;
+  string4 fico_v3_personal_finance;
+  string4 fico_classic_v8;
+  string4 fico_classic_v8_auto;
+  string4 fico_classic_v8_bankcard;
+  string4 fico_classic_v9;
+  string4 fico_classic_v9_auto;
+  string4 fico_classic_v9_bankcard;
+  string4 vantage_v3;
+  string4 vantage_v2;
   string4 ppm_automotive;
   string4 ppm_personal_finance;
   string4 ppm_retail;
@@ -1503,4 +1517,5 @@
   string3 ta_ps_dlp046;
   string9 ta_ps_dlp047;
   string3 ta_ps_dlp048;
+  string4 bankruptcy_plus;
  END;
