@@ -1,4 +1,6 @@
-﻿#workunit('name', 'BWR_ProcessAutomation-  I_Insurance_Prescreen');
+﻿#OPTION('multiplePersistInstances', FALSE);
+
+#workunit('name', 'BWR_ProcessAutomation-  I_Insurance_Prescreen');
    
 IMPORT STD,I_Insurance_Prescreen, VaultIngest, Vault_layout;
    
