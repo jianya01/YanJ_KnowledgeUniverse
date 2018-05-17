@@ -1,0 +1,124 @@
+﻿IMPORT PublicRecords_KEL.Entities;
+IMPORT PublicRecords_KEL.Uses;
+IMPORT PublicRecords_KEL.Attributes;
+IMPORT PropertyCounts FROM KELBlackBox.PropertyCounts;
+
+QUERY: HouseholdMembersDump <= HouseholdMember(Version = 1 AND HasDerog){Household, Subject{UID, ONLY(ReportedDatesOfBirth, DateOfBirth), Age, BankruptcyCount, FelonyCount}};
+// QUERY: HouseholdMembersDump <= HouseholdMember(Version = 1 AND (Subject.BankruptcyCount > 0 OR Subject.FelonyCount > 0)){Household, Subject{UID, ONLY(ReportedDatesOfBirth, DateOfBirth), Age, BankruptcyCount, FelonyCount}};
+
+
+// Query to grab the entire Person Entity for a specific LexID
+QUERY: PersonEntityData(SearchForLexID, ArchiveDate) <= Person(UID = SearchForLexID) ASOF reportedby(ArchiveDate); 
+
+// Query to grab all of a LexID's Relatives and First Degree Associations 
+QUERY: FirstDegreeRelativesAndAssociates(SearchForLexID, ArchiveDate) <= FirstDegreeAssociations(Subject.UID = SearchForLexID) {Subject, FirstDegreeAssociation, Title, TitleDescription, RelationshipType, RelationshipConfidence, RelationshipScore, Generation, RelationshipDateFirstSeen, RelationshipDateLastSeen} ASOF reportedby(ArchiveDate);
+  
+// Query to grab the entire Person Entity
+QUERY: AllPersonEntityData(ArchiveDate) <= Person ASOF reportedby(ArchiveDate);
+
+// Query to grab all Relatives and First Degree Associations
+QUERY: AllFirstDegreeRelativesAndAssociates(ArchiveDate) <= FirstDegreeAssociations {Subject, FirstDegreeAssociation, Title, TitleDescription, RelationshipType, RelationshipConfidence, RelationshipScore, Generation, RelationshipDateFirstSeen, RelationshipDateLastSeen} ASOF reportedby(ArchiveDate);
+
+QUERY: PersonByLexID(SearchForLexID) <= Person(UID=SearchForLexID);
+
+//Offenses Based Queries
+QUERY: CriminalOffenses(SearchForOffenderKey) <= CriminalOffense(OffenderKey = SearchForOffenderKey);
+
+QUERY: SuspectFirstDegreeRelativesAssociates(SearchForLexID) <= Person(UID=SearchForLexID).FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation;
+
+QUERY: PersonsOffenses(SearchForLexID) <= Person(UID = SearchForLexID).PersonOffenses.Offense;   
+  
+// Address Based Queries
+QUERY: PersonsAddresses(SearchForLexID) <= Person(UID = SearchForLexID).PersonAddress.Location;
+
+QUERY: AddressDump(ArchiveDate) <= Address; // ASOF reportedby(ArchiveDate);
+
+QUERY: AddressAttributes(Prim_Range, Predir, Prim_Name, Suffix, Postdir, Sec_Range, ZIP, ArchiveDate) <= Address(PrimaryRange = Prim_Range AND Predirectional = Predir AND PrimaryName = Prim_Name AND Suffix = Suffix AND Postdirectional = Postdir AND SecondaryRange = Sec_Range AND ZIP5 = ZIP); // ASOF reportedby(ArchiveDate);
+
+// Aircraft Based Queries
+QUERY: AircraftDump <= Aircraft;
+
+// Watercraft Queries
+QUERY: WatercraftDump <= Watercraft;
+
+QUERY: PhoneDump <= Phone;
+QUERY: PersonPhoneDump <= PersonPhone;
+QUERY: AddressPhoneDump <= AddressPhone;
+
+QUERY: InquiryDump <= Inquiry;
+// QUERY: LimitedPersonDump <= Person(PersonInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+// QUERY: LimitedAddressDump <= Address(AddressInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+// QUERY: LimitedPhoneDump <= Phone(PhoneInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+// QUERY: LimitedDriversLicenseDump <= DriversLicense(DriversLicenseInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+// QUERY: LimitedSocialSecurityNumberDump <= SocialSecurityNumber(SSNInquiry.Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+// QUERY: PersonInquiryDump <= PersonInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+// QUERY: AddressInquiryDump <= AddressInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+// QUERY: SSNInquiryDump <= SSNInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+// QUERY: PhoneInquiryDump <= PhoneInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+// QUERY: DriversLicenseInquiryDump <= DriversLicenseInquiry(Inquiry.TransactionID IN ['9134-5851462', '1051037095R2', '1503747541R168', '4057-4149415', '4057-4122575', '477907723R18999', '478655983B636726', '62530120194']);
+
+// Bankruptcy Based Queries
+QUERY: Bankruptcy(SearchForTMSID) <= Bankruptcy(TMSID = SearchForTMSID); 
+
+QUERY: PersonBankruptcyTest <= PersonBankruptcy;
+
+QUERY: SuspectFirstDegreeRelativesAssociatesBankruptcyCount(SearchForLexID) <= Person(UID=SearchForLexID){SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount};
+
+// Email Queries
+QUERY: EmailDump <=  Email;
+QUERY: PersonEmailTest <= PersonEmail;
+
+QUERY: SSNDump <= SocialSecurityNumber;
+
+//Property Queries
+QUERY: PropertyDump <= Property;
+QUERY: AddressPropertyDump <= AddressProperty;
+QUERY: PersonPropertyDump <= PersonProperty;
+QUERY: BusinessPropertyDump <= BusinessProperty;
+QUERY: SSNPropertyDump <= SSNProperty;
+
+QUERY: PropertyCountAttributes(SearchForLexID, ArchiveDate) <= Person(UID = SearchForLexID) {UID, PropertyCounts.SnapshotDateFirstSeen, PropertyCounts.SnapshotDateLastSeen, PropertyCounts.PropertyCount, PropertyCounts.PropertyTotal, PropertyCounts.PropertyOwnedPurchaseTotal, PropertyCounts.PropertyOwnedPurchaseCount, PropertyCounts.PropertyOwnedAssessedTotal, PropertyCounts.PropertyOwnedAssessedCount} ASOF reportedby(ArchiveDate);
+QUERY: PropertyCountSnapshots(SearchForLexID, ArchiveDate) <= Person(UID = SearchForLexID).PropertyCounts.Snapshot ASOF reportedby(ArchiveDate);
+QUERY: AllPropertyCountSnapshots(ArchiveDate) <= Person.PropertyCounts.Snapshot ASOF reportedby(ArchiveDate);
+QUERY: AllPropertyCountAttributes(ArchiveDate) <= Person {UID, PropertyCounts.SnapshotDateFirstSeen, PropertyCounts.SnapshotDateLastSeen, PropertyCounts.PropertyCount, PropertyCounts.PropertyTotal, PropertyCounts.PropertyOwnedPurchaseTotal, PropertyCounts.PropertyOwnedPurchaseCount, PropertyCounts.PropertyOwnedAssessedTotal, PropertyCounts.PropertyOwnedAssessedCount} ASOF reportedby(ArchiveDate);
+
+
+// SHELLs
+SHELL: ConsumerShell(ArchiveDate) <= Person{UID, // The logic below "caps" each attribute at specific values
+		BankruptcyCountInLast1Month := MIN(BankruptcyCountInLast1Month, 255),
+		BankruptcyCountInLast3Months := MIN(BankruptcyCountInLast3Months, 255), 
+		BankruptcyCountInLast6Months := MIN(BankruptcyCountInLast6Months, 255), 
+		BankruptcyCountInLast1Year := MIN(BankruptcyCountInLast1Year, 255), 
+		BankruptcyCountInLast2Years := MIN(BankruptcyCountInLast2Years, 255),
+		BankruptcyCountInLast5Years := MIN(BankruptcyCountInLast5Years, 255), 
+		BankruptcyCount := MIN(BankruptcyCount, 255), 
+		LastBankruptcyDate, BankruptcyFilingType, BankruptcyDisposition, BankruptcyAge,
+		FelonyCountInLast1Month := MIN(FelonyCountInLast1Month, 255), 
+		FelonyCountInLast3Months := MIN(FelonyCountInLast3Months, 255), 
+		FelonyCountInLast6Months := MIN(FelonyCountInLast6Months, 255), 
+		FelonyCountInLast1Year := MIN(FelonyCountInLast1Year, 255), 
+		FelonyCountInLast2Years := MIN(FelonyCountInLast2Years, 255), 
+		FelonyCountInLast5Years := MIN(FelonyCountInLast5Years, 255), 
+		FelonyCount := MIN(FelonyCount, 255), 
+		FirstDeceasedDate, SuspectFirstDegreeRelativesAndAssociatesCount,
+		SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount, SuspectFirstDegreeRelativesAndAssociatesFelonyCount} ASOF reportedby(ArchiveDate); 
+
+SHELL: AddressShell <= Address{UID,
+		// UID Fields
+		PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange,				
+		// ADVO
+		ADVOHit, ADVOVacancyIndicator, ADVOThrowBackIndicator, ADVOSeasonalDeliveryIndicator, ADVOSeasonalStartSuppressionDate, ADVOSeasonalEndSuppressionDate,
+		ADVODoNotDeliverIndicator, ADVOCollegeIndicator, ADVOCollegeStartSuppressionDate, ADVOCollegeEndSuppressionDate, ADVOStyleCode, ADVOSimplifyCount, 
+		ADVODropIndicator, ADVOResidentialOrBusinessIndicator, ADVOOnlyWayToGetMailIndicator, ADVORecordTypeCode, ADVOAddressTypeCode, ADVOMixedUsageCode,
+		ADVODateFirstSeen, ADVODateLastSeen, ADVODateVendorFirstReported, ADVODateVendorLastReported, ADVOVacationBeginDate, ADVOVacationEndDate, 
+		ADVONumberOfVacationMonths, ADVOMaxVacationMonths, ADVOVacationPeriodsCount};
+
+QUERY: AddressShellInputParmaters(_PrimaryRange, _Predirectional, _PrimaryName, _Suffix, _Postdirectional, _ZIP5, _SecondaryRange) <= Address(_PrimaryRange, _Predirectional, _PrimaryName, _Suffix, _Postdirectional, _ZIP5, _SecondaryRange){UID,
+		// UID Fields
+		PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange,				
+		// ADVO
+		ADVOHit, ADVOVacancyIndicator, ADVOThrowBackIndicator, ADVOSeasonalDeliveryIndicator, ADVOSeasonalStartSuppressionDate, ADVOSeasonalEndSuppressionDate,
+		ADVODoNotDeliverIndicator, ADVOCollegeIndicator, ADVOCollegeStartSuppressionDate, ADVOCollegeEndSuppressionDate, ADVOStyleCode, ADVOSimplifyCount, 
+		ADVODropIndicator, ADVOResidentialOrBusinessIndicator, ADVOOnlyWayToGetMailIndicator, ADVORecordTypeCode, ADVOAddressTypeCode, ADVOMixedUsageCode,
+		ADVODateFirstSeen, ADVODateLastSeen, ADVODateVendorFirstReported, ADVODateVendorLastReported, ADVOVacationBeginDate, ADVOVacationEndDate, 
+		ADVONumberOfVacationMonths, ADVOMaxVacationMonths, ADVOVacationPeriodsCount};
