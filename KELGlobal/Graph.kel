@@ -440,13 +440,16 @@ DriversLicenseInquiry := ASSOCIATION(FLAT(DriversLicense LicenseInformation=UID(
 // Define a first degree and second degree associations
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
 SecondDegreeAssociations := ASSOCIATION(FLAT(Person FirstDegreeAssociation=LexID, Person SecondDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
+FirstDegreeRelative := ASSOCIATION(FLAT(Person Subject=LexID, Person Relative=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
 // Now make sure that I am not my own second degree relative (For example: I am my dad's relative)
 GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree), 
 		FirstDegreeAssociations(#FirstDegree, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2), 
 		#Subj<>#SecondDegree,
 		NOT FirstDegreeAssociations(#Subj, #SecondDegree) => 
 			SecondDegreeAssociations(#Subj, #SecondDegree, #Title2, #RelationshipType2, #RelationshipConfidence2, #RelationshipScore2, #Generation2, #RelationshipDateFirstSeen2, #RelationshipDateLastSeen2);
-
+GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree, #Title, #RelationshipType, #RelationshipConfidence, #RelationshipScore, #Generation, #RelationshipDateFirstSeen, #RelationshipDateLastSeen), 
+		#Title >= 1 AND #Title <= 45 =>
+		FirstDegreeRelative(#Subj, #FirstDegree, #Title, #RelationshipType, #RelationshipConfidence, #RelationshipScore, #Generation, #RelationshipDateFirstSeen, #RelationshipDateLastSeen);
 
 AircraftOwner := ASSOCIATION(FLAT(Aircraft Plane = UID(NNumber), Person Owner, INTEGER RegistrantType, DATE CertificateIssueDate, STRING Certification));
 AircraftAddress := ASSOCIATION(FLAT(Aircraft Plane = UID(NNumber), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
@@ -1749,13 +1752,13 @@ USE Vehicle_Data.party_key(FLAT,
 		VehicleKey = vehicle_key), PERMITS([FCRA]));
 
 // Imported PACKAGEs
-IMPORT BocaShell FROM KELBlackBox.BocaShell;
-IMPORT InsuranceHeader FROM KELBlackBox.InsuranceHeader;
-IMPORT InsurView FROM KELBlackBox.InsurView;
-IMPORT LengthOfResidency FROM KELBlackBox.LengthOfResidency;
-IMPORT MaritalStatus FROM KELBlackBox.MaritalStatus;
-IMPORT MarketMagnifier FROM KELBlackBox.MarketMagnifier;
-IMPORT RiskView FROM KELBlackBox.RiskView;
+// IMPORT BocaShell FROM KELBlackBox.BocaShell;
+// IMPORT InsuranceHeader FROM KELBlackBox.InsuranceHeader;
+// IMPORT InsurView FROM KELBlackBox.InsurView;
+// IMPORT LengthOfResidency FROM KELBlackBox.LengthOfResidency;
+// IMPORT MaritalStatus FROM KELBlackBox.MaritalStatus;
+// IMPORT MarketMagnifier FROM KELBlackBox.MarketMagnifier;
+// IMPORT RiskView FROM KELBlackBox.RiskView;
 IMPORT VehicleCounts FROM Vehicle_Data.VehicleCounts;
 
 // Global Constant Definitions
@@ -2028,12 +2031,15 @@ Person: => SSNMultipleNonRelativeLexIDsSet := SSNMultipleLexIDsSet(NOT LexID IN 
 Person: => SSNMultipleNonRelativeLexIDsCount := COUNT(SSNMultipleNonRelativeLexIDsSet{SSN}(SSN:Weight > 1));
 Person: => SSNCreatedInLast6MonthsInvalidCount := COUNT(PersonSSN(NOT Social.IsValid AND ABS(DAYSBETWEEN(Social.HeaderFirstSeen, Person.BocaShellHistoryDate)) < 183));
 
+Person: MAX_VEHICLES := 100;
+
 Person: => VehicleCurrentCountImport := VehicleCounts.CurrentCount;
 Person: => VehicleHistoricalCountImport := VehicleCounts.HistoricalCount;
 PersonVehicle: => Current := EXISTS(CountsModel(HistorySource AND NOT SequenceKey:Null AND History:Null));
 PersonVehicle: => Historical := EXISTS(CountsModel(HistorySource AND NOT SequenceKey:Null AND (History='H' OR History:Null)));
-Person: => VehicleCurrentCount := COUNT(PersonVehicle(Current){Automobile.OriginalVin});
-Person: => VehicleHistoricalCount := COUNT(PersonVehicle(Historical){Automobile.OriginalVin});
+Person: => VehicleCurrentCount := BOUNDSFOLD(COUNT(PersonVehicle(Current){Automobile.OriginalVin}),0,MAX_VEHICLES);
+Person: => VehicleHistoricalCount := BOUNDSFOLD(COUNT(PersonVehicle(Historical){Automobile.OriginalVin}),0,MAX_VEHICLES);
+Person: => RelativeVehicleCount := COUNT(FirstDegreeRelative.Relative(VehicleCurrentCount>0));
 
 Phone: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
 Phone: => IsValid := Phone10 != 0 AND LENGTH(TRIMALL(Phone10)) = 10 AND NOT STARTSWITH(Phone10, '555') AND NOT SUBSTR(Phone10, 4, 10) IN ['0000000', '1234567'] AND SUBSTR(Phone10, 7, 10) != '9999' AND NOT Phone10 IN REPEATING_NUMBERS;
@@ -2066,7 +2072,7 @@ Household: => AgeMinorCount := COUNT(HouseholdMember(Version = 1).Subject(Age < 
 Household: => MembersWithBankruptcyCount := COUNT(HouseholdMember(Version = 1).Subject.PersonBankruptcy.Bankrupt); // hh_bankruptcies
 Household: => CriminalMembersCount := COUNT(HouseholdMember(Version = 1).Subject.PersonOffenses.Offense); // hh_criminals
 HouseholdMember: => HasDerog := Subject.BankruptcyCount > 0 OR Subject.FelonyCount > 0;
-
+/*
 // QUERY: DumpHouseholdMembers(hhid) <= HouseholdMember(Version = 1 AND Household = hhid);
 QUERY: HouseholdMembersDump <= HouseholdMember(Version = 1 AND HasDerog){Household, Subject{UID, ONLY(ReportedDatesOfBirth, DateOfBirth), Age, BankruptcyCount, FelonyCount}};
 // QUERY: HouseholdMembersDump <= HouseholdMember(Version = 1 AND (Subject.BankruptcyCount > 0 OR Subject.FelonyCount > 0)){Household, Subject{UID, ONLY(ReportedDatesOfBirth, DateOfBirth), Age, BankruptcyCount, FelonyCount}};
@@ -2219,12 +2225,12 @@ QUERY: EmailDump <=  Email;
 QUERY: PersonEmailTest <= PersonEmail;
 
 QUERY: SSNDump <= SocialSecurityNumber;
-
+*/
 //Vehicle Queries
 // QUERY: VehicleDump <= Vehicle;
 // QUERY: VehicleAssocTest <= PersonVehicle, AddressVehicle;
-QUERY: VehicleCountFCRA <= Person{UID,VehicleCurrentCount,VehicleHistoricalCount,VehicleCurrentCountImport,VehicleHistoricalCountImport} USING [FCRA];
-
+QUERY: VehicleCountFCRA <= Person{UID,VehicleCurrentCount,VehicleHistoricalCount,VehicleCurrentCountImport,VehicleHistoricalCountImport, RelativeVehicleCount} USING [FCRA];
+/*
 // SHELLs
 SHELL: ConsumerShell(ArchiveDate) <= Person{UID, // The logic below "caps" each attribute at specific values
 		BankruptcyCountInLast1Month := MIN(BankruptcyCountInLast1Month, 255),
@@ -2264,3 +2270,4 @@ QUERY: AddressShellInputParmaters(_PrimaryRange, _Predirectional, _PrimaryName, 
 		ADVODropIndicator, ADVOResidentialOrBusinessIndicator, ADVOOnlyWayToGetMailIndicator, ADVORecordTypeCode, ADVOAddressTypeCode, ADVOMixedUsageCode,
 		ADVODateFirstSeen, ADVODateLastSeen, ADVODateVendorFirstReported, ADVODateVendorLastReported, ADVOVacationBeginDate, ADVOVacationEndDate, 
 		ADVONumberOfVacationMonths, ADVOMaxVacationMonths, ADVOVacationPeriodsCount};
+*/
