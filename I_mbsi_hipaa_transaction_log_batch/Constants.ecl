@@ -8,7 +8,8 @@
    EXPORT SourcefileName:= 'thor::base::log_mbsi_hipaa::qa::transaction_log_batch';
    EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix, I_mbsi_hipaa_transaction_log_batch.Layout_Vault, thor, opt);
    EXPORT SourceKey := 'batch_job_id,batch_seq_number,type,date_added';
-
+   EXPORT ModuleName := 'I_mbsi_hipaa_transaction_log_batch';
+   
    END;
    
    

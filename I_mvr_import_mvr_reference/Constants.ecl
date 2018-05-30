@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'thor::base::fcra::log_m
 EXPORT SourcefileName:= 'thor::base::fcra::log_mvr::qa::import_mvr_reference';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_mvr_import_mvr_reference.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'import_ref_value_id';
+EXPORT ModuleName := 'I_mvr_import_mvr_reference';
 
 END;
 

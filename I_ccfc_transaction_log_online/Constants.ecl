@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::ccfc_trano::trans
 EXPORT SourcefileName:= 'base::ccfc_trano::transaction_log_online::qa::trans_online_id';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_CCFC_transaction_log_online.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,type,date_added';
+EXPORT ModuleName := 'I_ccfc_transaction_log_online';
 
 END;
 

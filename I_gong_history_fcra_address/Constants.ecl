@@ -12,5 +12,7 @@ EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix ,I_gong_history_fcr
 EXPORT SourceKey := 'persistent_record_id';
 EXPORT vault_File_Name := '~vault::thor::key::gong_history::fcra::prod::address';
 // EXPORT Pkgvar := '';
+EXPORT ModuleName := 'I_gong_history_fcra_address';
+
 END;
 

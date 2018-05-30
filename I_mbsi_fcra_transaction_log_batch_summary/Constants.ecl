@@ -8,7 +8,8 @@
    EXPORT SourcefileName:= 'thor::base::fcra::log_mbsi_fcra::qa::transaction_log_batch_summary';
    EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix, I_mbsi_fcra_transaction_log_batch_summary.Layout_Vault, thor, opt);
    EXPORT SourceKey := 'batch_job_id';
-
+   EXPORT ModuleName := 'I_mbsi_fcra_transaction_log_batch_summary';
+   
    END;
    
    

@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::ncf_transr::trans
 EXPORT SourcefileName:= 'base::ncf_transr::transaction_log_billing_reporting::qa::trans_log_id';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_ncf_transaction_log_billing_reporting.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,date_added,vendor_to_bill';
+EXPORT ModuleName := 'I_ncf_transaction_log_billing_reporting';
 
 END;
 

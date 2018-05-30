@@ -8,7 +8,8 @@
    EXPORT SourcefileName:= 'thor::base::log_mbsi_hipaa::qa::transaction_log_billing_tracking';
    EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix, I_mbsi_hipaa_transaction_log_billing_tracking.Layout_Vault, thor, opt);
    EXPORT SourceKey := 'request_id';
-
+   EXPORT ModuleName := 'I_mbsi_hipaa_transaction_log_billing_tracking';
+   
    END;
    
    

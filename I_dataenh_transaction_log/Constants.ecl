@@ -8,6 +8,7 @@
    EXPORT SourcefileName:= 'base::fcra_de_tranl::transaction_log::qa::trans_log_id';
    EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix, I_dataenh_transaction_log.Layout_Vault, thor, opt);
    EXPORT SourceKey := 'transaction_id, date_added';
-
+   EXPORT ModuleName := 'I_dataenh_transaction_log';
+   
    END;
    

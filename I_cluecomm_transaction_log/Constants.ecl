@@ -8,6 +8,7 @@
    EXPORT SourcefileName:= 'thor::base::cclue::qa::transaction_log.txt';
    EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix, I_cluecomm_transaction_log.Layout_Vault, thor, opt);
    EXPORT SourceKey := 'transaction_id';
+   EXPORT ModuleName := 'I_cluecomm_transaction_log';
 
    END;
    

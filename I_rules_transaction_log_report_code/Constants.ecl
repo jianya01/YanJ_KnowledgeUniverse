@@ -8,5 +8,6 @@
    EXPORT SourcefileName:= 'thor::base::log_rules::qa::transaction_log_report_code';
    EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix, I_rules_transaction_log_report_code.Layout_Vault, thor, opt);
    EXPORT SourceKey := 'transaction_id,report_code';
+   EXPORT ModuleName := 'I_rules_transaction_log_report_code';
    
    END;

@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::cc_tranlpolicylie
 EXPORT SourcefileName:= '~base::cc_tranlpolicylien::transaction_log_policylien::qa::trans_log_id';
 EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix , I_cc_transaction_log_policy_lien.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,policy_sequence,vehicle_or_property_sequence,sequence,date_added';
+EXPORT ModuleName := 'I_cc_transaction_log_policy_lien';
 
 END;
 

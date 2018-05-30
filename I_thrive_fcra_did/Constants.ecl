@@ -12,5 +12,7 @@ EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix ,I_thrive_fcra_did.
 EXPORT SourceKey := 'persistent_record_id';
 EXPORT vault_File_Name := '~vault::thor::key::thrive::fcra::prod::did';
 // EXPORT Pkgvar := '';
+EXPORT ModuleName := 'I_thrive_fcra_did';
+
 END;
 

@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::fcra_cc_tranl::tr
 EXPORT SourcefileName:= 'base::fcra_cc_tranl::transaction_log::qa::trans_log_id';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_cc_transaction_log.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,date_added';
+EXPORT ModuleName := 'I_cc_transaction_log';
 
 END;
 

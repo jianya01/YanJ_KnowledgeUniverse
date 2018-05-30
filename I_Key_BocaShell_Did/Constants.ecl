@@ -12,5 +12,7 @@ EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix ,I_Key_BocaShell_Di
 EXPORT SourceKey := 'RECORD';
 EXPORT vault_File_Name := '~vault::thor::key::corrections_offenders_risk::prod::bocashell_did_qa';
 EXPORT Pkgvar := 'Corrections_Build_Version';
+EXPORT ModuleName := 'I_Key_BocaShell_Did';
+
 END;
 

@@ -12,5 +12,7 @@ EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_Key_Relatives_V
 EXPORT SourceKey := 'RECORD';
 EXPORT vault_File_Name := '~vault::thor::key::prod::relatives_v3_qa';
 EXPORT Pkgvar := 'RelativesV3Keys';
+EXPORT ModuleName := 'I_Key_Relatives_V3';
+
 END;
 

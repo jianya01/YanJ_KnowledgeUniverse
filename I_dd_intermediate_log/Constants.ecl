@@ -8,6 +8,7 @@ EXPORT Constants := MODULE
 		EXPORT SourcefileName:= 'base::dd::inquiry_history::qa::id';
 		EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_dd_intermediate_log.Layout_Vault, thor, opt);
 		EXPORT SourceKey := 'transaction_id,product_id,date_added,process_type,processing_time,vendor_code,request_type,product_version,reference_number,content_data';
-
+		EXPORT ModuleName := 'I_dd_intermediate_log';
+		
 END;
 
