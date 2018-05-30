@@ -12,5 +12,7 @@ EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix ,I_In_propertyv2_fc
 EXPORT SourceKey := 'ln_fares_id';
 EXPORT vault_File_Name := '~vault::thor::key::ln_propertyv2::fcra::prod::assessor.fid';
 // EXPORT Pkgvar := '';
+EXPORT ModuleName := 'I_In_propertyv2_fcra_assessor_fid';
+
 END;
 

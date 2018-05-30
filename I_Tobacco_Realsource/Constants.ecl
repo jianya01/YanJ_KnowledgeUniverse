@@ -11,6 +11,7 @@ EXPORT SourceFileName := '~thor::base::tobacco::realsource::qa::vendor';
 // EXPORT Pkgvar := 'TobaccoRealsourceKeys';
 EXPORT SourceKey := 'RECORD';
 EXPORT vault_File_Name := '~vault::thor::base::tobacco::prod::realsource::vendor';
+EXPORT ModuleName := 'I_Tobacco_Realsource';
 
 END;
 

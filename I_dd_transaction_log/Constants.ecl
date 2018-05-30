@@ -8,6 +8,7 @@ EXPORT Constants := MODULE
 		EXPORT SourcefileName:= 'base::dd_tranl::transaction_log::qa::trans_log_id';
 		EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_dd_transaction_log.Layout_Vault, thor, opt);
 		EXPORT SourceKey := 'transaction_id, date_added';
-
+		EXPORT ModuleName := 'I_dd_transaction_log';
+		
 END;
 

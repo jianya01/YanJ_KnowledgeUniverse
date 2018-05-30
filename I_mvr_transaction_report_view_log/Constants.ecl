@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::mvr_tranrv::trans
 EXPORT SourcefileName:= 'base::mvr_tranrv::transaction_log_rv::qa::trans_reportview_id ';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_mvr_transaction_report_view_log.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'report_view_log_id,date_added';
+EXPORT ModuleName := 'I_mvr_transaction_report_view_log';
 
 END;
 

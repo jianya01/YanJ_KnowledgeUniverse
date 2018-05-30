@@ -11,7 +11,9 @@ EXPORT SourcefileName:= 'thor_data400::key::gong_history::fcra::qa::did';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix ,I_gong_history_fcra_did.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'persistent_record_id';
 EXPORT vault_File_Name := '~vault::thor::key::gong_history::fcra::prod::did';
- EXPORT Pkgvar := '';
+EXPORT Pkgvar := '';
+EXPORT ModuleName := 'I_gong_history_fcra_did';
+ 
 END;
 
 

@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::clue_trano::trans
 EXPORT SourcefileName:= 'base::clue_trano::transaction_log_online::qa::trans_online_id';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_clue_transaction_log_online.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,transaction_type,date_added';
+EXPORT ModuleName := 'I_clue_transaction_log_online';
 
 END;
 

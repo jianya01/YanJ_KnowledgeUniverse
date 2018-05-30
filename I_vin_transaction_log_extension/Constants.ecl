@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'thor::base::log_vin::qa
 EXPORT SourcefileName:= 'thor::base::log_vin::qa::transaction_log_extension';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_vin_transaction_log_extension.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,extension_type,sequence,date_added';
+EXPORT ModuleName := 'I_vin_transaction_log_extension';
 
 END;
 

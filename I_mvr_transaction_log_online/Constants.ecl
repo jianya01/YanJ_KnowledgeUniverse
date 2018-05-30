@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::mvr_trano::transa
 EXPORT SourcefileName:= 'base::mvr_trano::transaction_log_online::qa::trans_online_id';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_mvr_transaction_log_online.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,type,date_added';
+EXPORT ModuleName := 'I_mvr_transaction_log_online';
 
 END;
 

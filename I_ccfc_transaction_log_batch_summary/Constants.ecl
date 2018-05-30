@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'thor::base::log_ccfc::q
 EXPORT SourcefileName:= 'thor::base::log_ccfc::qa::transaction_log_batch_summary';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_CCFC_transaction_log_batch_summary.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'batch_job_id';
+EXPORT ModuleName := 'I_ccfc_transaction_log_batch_summary';
 
 END;
 

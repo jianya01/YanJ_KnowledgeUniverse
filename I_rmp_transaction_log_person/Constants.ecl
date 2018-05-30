@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'thor::base::log_rmp::qa
 EXPORT SourcefileName:= 'thor::base::log_rmp::qa::transaction_log_person';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_rmp_transaction_log_person.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,sequence,date_added';
+EXPORT ModuleName := 'I_rmp_transaction_log_person';
 
 END;
 

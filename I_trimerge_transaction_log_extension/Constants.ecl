@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'thor::base::log_trimerg
 EXPORT SourcefileName:= 'thor::base::log_trimerge::qa::transaction_log_extension';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_trimerge_transaction_log_extension.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'extension_type,sequence,date_added,transaction_id,sequence_smd,person_type';
+EXPORT ModuleName := 'I_trimerge_transaction_log_extension';
 
 END;
 
