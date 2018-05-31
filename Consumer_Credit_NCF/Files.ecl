@@ -12,7 +12,10 @@ EXPORT Files := MODULE
 	
 	EXPORT Layout_Report := Consumer_Credit_Layout.Layout_Report;	
 
-	EXPORT NCF_Transaction_Log := DATASET(ut.foreign_production_alpha + 'thor::base::ncf::qa::transaction_log.txt', Consumer_Credit_Layout.LayoutTransactionLogs.transaction_log, THOR);
+	// EXPORT NCF_Transaction_Log := DATASET(ut.foreign_production_alpha + 'thor::base::ncf::qa::transaction_log.txt', Consumer_Credit_Layout.LayoutTransactionLogs.transaction_log, THOR);
+	
+	EXPORT NCF_Transaction_Log := DATASET( '~thor::base::ncf_tst::20180417::transaction_log.txt', Consumer_Credit_Layout.LayoutTransactionLogs.transaction_log_new, THOR);
+
 	
 	EXPORT NCF_Master_Archive := DATASET(Inprefix + 'thor::base::ncf::qa::master_archive_report', Consumer_Credit_Layout.Layout_EditsArchive, THOR);
 
