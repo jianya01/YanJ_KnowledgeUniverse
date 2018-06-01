@@ -1,0 +1,228 @@
+﻿// Defining the ERA to allow for ASOF functionality
+ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
+ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
+
+// Defined to support the Person/CreditReport ASSOCIATIONS
+Person := ENTITY(FLAT(UID=LexID));
+
+// Top level NCF Credit Report ENTITY
+/* ----------------
+Code Comment Legend
+-------------------
+v2 Name - Indicates this field has a new name in NCF Enhanced/V2, however it is reusing a Version 1 field
+v2+ Name - Indicates this field is exclusively used in NCF Enhanced/V2 and didn't exist in Version 1
+Cleaned Date - Indicates this field has some ECL Date manipulation happening to clean the date to YYYYMMDD prior to KEL ingest
+*/
+CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
+		STRING BureauCode, // v2+ Name: BureauCode
+		STRING TransactionID,
+		BOOLEAN SubjectRecord,
+		INTEGER SubjectRecordCode,
+		INTEGER LexID,
+		DATE HDDateOfReport,
+		DATE DateOfOrder,
+		DATE DateOfReceipt,
+		DATE DateOfCompletion,
+		STRING TimeOfReport,
+		STRING Quoteback,
+		STRING ReportCode,
+		STRING ReportCodeDescription,
+		STRING ReportType,
+		STRING AccountNumber,
+		STRING ProcessingCompletionStatus,
+		STRING ReportUsage,
+		STRING ReferenceNumber, // v2 Name: ReferenceNumber
+		DATE DateCreditFileEstbed,
+		BOOLEAN ReportIncludesConsumerStatements,
+		INTEGER LienJudgementSource=NULL('')),
+	MODEL(UID, 
+		TransactionID, 
+		ReferenceNumber,
+		BureauCode,
+		LexIDs{SubjectRecordCode, LexID}, 
+		ROWS{SubjectRecord, DateCreditFileEstbed, ReportIncludesConsumerStatements}, 
+		HDDateOfReport, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, 
+		ProcessingCompletionStatus, ReportUsage, LienJudgementSource));
+
+
+// Credit Report Sub-Section ENTITYs (Bankruptcy, Collection, Employment, Inquiry, Judgement, Lien, Narrative Remarks, Tradeline)
+CreditReportBankruptcy := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		CreditReport rCreditReport=UID(Transaction_ID, LexID),
+		STRING TransactionID,
+		STRING BureauCode, // v2+ Name: BureauCode
+		DATE HDDateOfReport, // v2 Name: HDDateOfReport
+		STRING PRStatusCode, // v2+ Name: PRStatusCode
+		STRING PRConsumerDisputeFlag, // v2+ Name: PRConsumerDisputeFlag
+		DATE PRDateFiled, // v2 Name: PRDateFiled, Cleaned Date
+		DATE PRSatisfiedDischargeDate, // v2 Name: PRSatisfiedDischargeDate
+		STRING PRCourtNumber, // v2 Name: PRCourtNumber
+		STRING PRCaseNumber, // v2 Name: PRCaseNumber
+		STRING PRFilingType), // v2 Name: PRFilingType
+	MODEL(*));
+
+CreditReportCollection := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		CreditReport rCreditReport=UID(Transaction_ID, LexID),
+		STRING TransactionID,
+		STRING BureauCode, // v2+ Name: BureauCode
+		DATE HDDateOfReport, // v2 Name: HDDateOfReport
+		STRING COKOB, // v2+ Name: COKOB - KindOfBusiness
+		DATE CODateReported, // v2 Name: CODateReported
+		DATE CODateAssigned, // v2 Name: CODateAssigned
+		STRING COReportingMemberNumber, // v2 Name: COReportingMemberNumber
+		STRING COMemberName, // v2+ Name: COMemberName
+		STRING COClientNameOrNumber, // v2 Name: COClientNameOrNumber
+		STRING COECOACode, // v2 Name: COECOACode
+		DATE COLastPaymentDate, // v2+ Name: COLastPaymentDate, Cleaned Date
+		INTEGER COOriginalAmount, // v2 Name: COOriginalAmount
+		INTEGER COBalanceAmount, // v2 Name: COBalanceAmount
+		INTEGER COPastDueAmount, // v2+ Name: COPastDueAmount
+		STRING COCollectionItemStatus, // v2 Name: COCollectionItemStatus
+		STRING COClassificationCode, // v2+ Name: COClassificationCode
+		STRING COConsumerDisputeFlag, // v2+ Name: COConsumerDisputeFlag
+		STRING COAccountPurposeType, // v2+ Name: COAccountPurposeType
+		STRING COConsumerInfoIndicator, // v2+ Name: COConsumerInfoIndicator
+		DATE CODateOfFirstDelinquency), // v2+ Name: CODateOfFirstDelinquency
+	MODEL(*));
+
+CreditReportInquiry := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter, LineNumber),
+		CreditReport rCreditReport=UID(Transaction_ID, LexID),
+		STRING TransactionID,
+		STRING BureauCode, // v2+ Name: BureauCode
+		STRING IQKOB, // v2+ Name: IQKOB - KindOfBusiness
+		DATE HDDateOfReport, // v2 Name: HDDateOfReport
+		DATE IQDateOfInquiry, // v2 Name: IQDateOfInquiry
+		STRING IQInquirerName, // v2 Name: IQInquirerName
+		STRING IQInquirerID, // v2 Name: IQInquirerID
+		INTEGER IQAmount, // v2+ Name: IQAmount
+		STRING IQType, // v2+ Name: IQType
+		STRING IQTerms), // v2+ Name: IQTerms
+	MODEL(*));
+
+CreditReportJudgment := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		CreditReport rCreditReport=UID(Transaction_ID, LexID),
+		STRING TransactionID,
+		STRING BureauCode, // v2+ Name: BureauCode
+		STRING ReferenceNumber, // From spreadsheet
+		STRING PRConsumerDisputeFlag, // v2+ Name: PRConsumerDisputeFlag
+		DATE HDDateOfReport, // v2 Name: HDDateOfReport
+		DATE PRDateFiled, // v2 Name: PRDateFiled
+		STRING PRReportingCourtNumber, // v2 Name: PRReportingCourtNumber
+		STRING PRCaseNumber, // v2 Name: PRCaseNumber
+		INTEGER PRAmountInvolved, // v2 Name: PRAmountInvolved
+		//STRING PRType,
+		STRING PRJudgmentType, // v2+ Name: PRJudgementType
+		DATE PRDateSatisfied, // v2 Name: PRDateSatisfied
+		//STRING PRStatus,
+		STRING PRDefendant, // v2 Name: PRDefendant
+		STRING PRPlaintiff, // v2 Name: PRPlaintiff
+		STRING PRState),
+	MODEL(*));
+
+CreditReportLien := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		CreditReport rCreditReport=UID(Transaction_ID, LexID),
+		STRING TransactionID,
+		STRING BureauCode, // v2+ Name: BureauCode
+		DATE HDDateOfReport, // v2 Name: HDDateOfReport
+		STRING PRConsumerDisputeFlag, // v2+ Name: PRConsumerDisputeFlag
+		DATE PRDateFiled, // v2 Name: PRDateFiled
+		STRING PRReportingCourtNumber, // v2 Name: PRReportingCourtNumber
+		STRING PRCaseNumber, // v2 Name: PRCaseNumber
+		INTEGER PRAmountOfLien, // v2 Name: PRAmountOfLien
+		STRING PRACBCreditorClass, // v2 Name: PRACBCreditorClass
+		DATE PRDateReleased, // v2 Name: PRDateReleased
+		STRING PRState),
+	MODEL(*));
+ 
+CreditReportTradeline := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		CreditReport rCreditReport=UID(Transaction_ID, LexID),
+		STRING TransactionID,
+		STRING BureauCode, // v2+ Name: BureauCode
+		INTEGER TradeKey, // v2+ Name: TradeKey
+		DATE HDDateOfReport, // v2+ Name: HDDateReported
+		STRING TRKOB, // v2+ Name: TRKOB - KindOfBusiness
+		DATE TRDateReported, // v2+ Name: TRDateReported
+		DATE TRDateAccountOpened, // v2 Name: TRDateAccountOpened
+		DATE TRDateLastActivity, // v2 Name: TRDateLastActivity, Cleaned Date
+		STRING TRReportingMemberNumber, // v2 Name: TRReportingMemberNumber
+		STRING TRMemberName, // v2 Name: TRMemberName
+		INTEGER TRHighestCreditAmount, // v2 Name: TRHighestCreditAmount
+		INTEGER TRCreditLimit, // v2+ Name: TRCreditLimit
+		INTEGER TRChargeOffAmount, // v2+ Name: TRChargeOffAmount
+		STRING TRTerms, // v2 Name: TRTerms
+		STRING TRAccountNumber, // v2+ Name: TRAccountNumber
+		INTEGER TRAccountBalance, // v2 Name: TRAccountBalance
+		INTEGER TRScheduledPaymentAmount, // v2+ Name: TRScheduledPaymentAmount
+		INTEGER TRActualPaymentAmount, // v2+ Name: TRActualPaymentAmount
+		BOOLEAN TRActualPaymentNullInd, // v2+ Name: TRActualPaymentNullInd
+		STRING TRMonthlyPaymentType, // v2+ Name: TRMonthlyPaymentType
+		INTEGER TRPastDueAmount, // v2 Name: TRPastDueAmount
+		STRING TRAccountType, // v2 Name: TRAccountType
+		STRING TRAccountPurposeType, // v2+ Name: TRAccountPurposeType
+		STRING TRCurrentRateCode, // v2 Name: TRCurrentRateCode
+		STRING TRStatusCode, // v2+ Name: TRStatusCode
+		STRING TRAccountConditionCode, // v2+ Name: TRAccountConditionCode
+		INTEGER TRMonthsReviewed, // v2 Name: TRMonthsReviewed
+		STRING TRAccountDesignatorCode, // v2 Name: TRAccountDesignatorCode
+		DATE TRClosedDate, // v2 Name: TRClosedDate
+		INTEGER TRThirtyDayCounter, // v2 Name: TRThirtyDayCounter
+		INTEGER TRSixtyDayCounter, // v2 Name: TRSixtyDayCounter
+		INTEGER TRNinetyDayCounter, // v2 Name: TRNinetyDayCounter
+		INTEGER TRDerogCounter, // v2+ Name: TRDerogCounter
+		STRING TROldHistoricalWorstRatingCode, // v2+ Name: TROldHistoricalWorstRatingCode
+		DATE TROldHistoricalWorstRatingDate, // v2+ Name: TROldHistoricalWorstRatingDate, Cleaned Date
+		DATE TRStatusDate, // v2+ Name: TRStatusDate
+		DATE TRLastPaymentDate, // v2+ Name: TRLastPaymentDate, Cleaned Date
+		STRING TR48MonthsPaymentHistory, // v2+ Name: TR48MonthsPaymentHistory
+		STRING TRMonthsPaymentHistory, // v2+ Name: TR84MonthsPaymentHistory (for future use)
+		INTEGER PaymentMonth, // v2+ Name: TR84MonthsPaymentHistory - Helper Field
+		STRING PaymentCode, // v2+ Name: TR84MonthsPaymentHistory - Helper Field
+		STRING TRConsumerDisputeFlag, // v2+ Name: TRConsumerDisputeFlag
+		STRING TRConsumerInfoIndicator, // v2+ Name: TRConsumerInfoIndicator
+		STRING TRPaymentFrequency, // v2+ Name: TRPaymentFrequency
+		STRING TRActivityDesignatorCode, // v2+ Name: TRActivityDesignatorCode
+		STRING TRMortgageID, // v2+ Name: TRMortgageID
+		DATE TRDeferredPaymentStartDate, // v2+ Name: TRDeferredPaymentStartDate
+		INTEGER TRDeferredPaymentAmount, // v2+ Name: TRDeferredPaymentAmount
+		INTEGER TRBalloonPaymentAmount, // v2+ Name: TRBalloonPaymentAmount
+		DATE TRBalloonPaymentDueDate, // v2+ Name: TRBalloonPaymentDueDate, Cleaned Date
+		DATE TRPaymentPatternStartDate, // v2+ Name: TRPaymentPatternStartDate
+		INTEGER MonthCounter, // v2+ Trended Name: M01/M02/M03/.../M24 - Helper Field
+		DATE TDTrendedDataDate=FORMAT('YYYYMM01'), // v2+ Trended Name: TDTrendedDataDateM##
+		INTEGER TDBalanceAmount, // v2+ Trended Name: TDBalanceAmountM##
+		INTEGER TDLoanAmountCreditLimit, // v2+ Trended Name: TDLoanAmountCreditLimitM##
+		INTEGER TDScheduledPayment, // v2+ Trended Name: TDScheduledPaymentM##
+		INTEGER TDActualPayment, // v2+ Trended Name: TDActualPaymentM##
+		DATE TDLastPaymentDate, // v2+ Trended Name: TDLastPaymentDateM##
+		BOOLEAN TDActualPaymentNullInd,
+		STRING TRMaximumDelinquencyCode,
+		DATE TRMaximumDelinquencyDate),
+	MODEL(UID, rCreditReport,
+		TransactionID, BureauCode, TradeKey, HDDateOfReport, TRKOB, TRDateReported, TRDateAccountOpened, TRDateLastActivity, TRReportingMemberNumber, TRMemberName,
+		TRHighestCreditAmount, TRCreditLimit, TRChargeOffAmount, TRTerms, TRAccountNumber, TRAccountBalance, TRScheduledPaymentAmount, TRActualPaymentAmount,
+		TRActualPaymentNullInd, TRMonthlyPaymentType, TRPastDueAmount, TRAccountType, TRAccountPurposeType, TRCurrentRateCode, TRStatusCode, TRAccountConditionCode,
+		TRMonthsReviewed, TRAccountDesignatorCode, TRClosedDate, TRThirtyDayCounter, TRSixtyDayCounter, TRNinetyDayCounter, TRDerogCounter, TROldHistoricalWorstRatingCode,
+		TROldHistoricalWorstRatingDate, TRStatusDate, TRLastPaymentDate, TR48MonthsPaymentHistory, TRMonthsPaymentHistory,
+		TRConsumerDisputeFlag, TRConsumerInfoIndicator, TRPaymentFrequency, TRActivityDesignatorCode, TRMortgageID, TRDeferredPaymentStartDate, TRDeferredPaymentAmount, TRBalloonPaymentAmount,
+		TRBalloonPaymentDueDate, TRPaymentPatternStartDate,
+		Trended{MonthCounter, TDTrendedDataDate, TDBalanceAmount, TDLoanAmountCreditLimit, TDScheduledPayment, TDActualPayment, TDLastPaymentDate, TDActualPaymentNullInd},
+		TRMaximumDelinquencyCode, TRMaximumDelinquencyDate, TR84MonthsPaymentHistorySM{PaymentMonth, PaymentCode}));
+
+CreditReportNarrativeRemarks := ENTITY(FLAT(UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter, NarrativeRemarkCounter),
+		CreditReport rCreditReport=UID(Transaction_ID, LexID),
+		CreditReportBankruptcy rCreditReportBankruptcy=UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		CreditReportCollection rCreditReportCollection=UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		// The Employment and Inquiries sections don't contain Narrative Remarks, thus no need to include them in this Entity definition
+		CreditReportJudgment rCreditReportJudgement=UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		CreditReportLien rCreditReportLien=UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		CreditReportTradeline rCreditReportTradeline=UID(Transaction_ID, LexID, Date_Reported, RecordTypeCounter),
+		STRING TransactionID,
+		STRING BureauCode,
+		STRING NarrativeCode), // v2+ Field
+	MODEL(UID, rCreditReport, rCreditReportBankruptcy, rCreditReportCollection,
+	      rCreditReportJudgement, rCreditReportLien, rCreditReportTradeline,
+				TransactionID, BureauCode, NarrativeCodes{NarrativeCode}));
+
+
+// NCF Association definitions
+PersonCreditReport := ASSOCIATION(FLAT(Person Subject=LexID, CreditReport Report=UID(TransactionID, LexID))); // Connects a Person to a Credit Report
+JointCreditReport := ASSOCIATION(FLAT(CreditReport SubjectReport=UID(TransactionID, LexID), CreditReport JointReport=UID(TransactionID, LexID))); // Connects a Credit Report for a Subject to the Credit Report for the joint applicant
