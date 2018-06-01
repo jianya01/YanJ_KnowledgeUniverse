@@ -3,13 +3,14 @@
 													pEmailSourceIn
 													// SourceDSKey = ''
 													) := FUNCTIONMACRO
-															
+											
 															
 	// Define the components required for Build
 	pSourcefile := pModule.Constants.Sourcefile;
 	pBaseprefix:= pModule.Constants.BasePrefix;
 	pBaseSuffix:= pModule.Constants.BaseSuffix;
 	pVaultFileDS:= pModule.Constants.VaultFile;
+	pModuleName := pModule.Constants.ModuleName;
 	SourceDSKey := pModule.Constants.SourceKey;
 	
 	// Verify the source file for duplicates
@@ -28,9 +29,9 @@
 										 'Vault Ingest build was NOT processed for ' + (STRING8)STD.Date.Today() + '.'+'\n';		
 	
 	ProcessBuild := IF (VerifyUniqueCount, 
-   											SEQUENTIAL(VaultIngest.BuildAutomation(pModule,pBaseprefix,pBaseSuffix,pVaultFileDS,pEmailSourceIn)),
-												Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_DataDev_EmailAddresses, FailureProcessSubject, FailureProcessBody)); //failure email
-	
+		SEQUENTIAL(VaultIngest.BuildAutomation(pModule,pBaseprefix,pBaseSuffix,pVaultFileDS,pEmailSourceIn), VaultIngest.mac_Delete_Temp_File(pModuleName)),
+			Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_DataDev_EmailAddresses, FailureProcessSubject, FailureProcessBody)); //failure email
+
 	RETURN ProcessBuild;				
 	
 ENDMACRO;
