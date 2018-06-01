@@ -1,0 +1,47 @@
+﻿PACKAGE PropertyCounts;
+ 
+// Entity Definition 
+pPropertyCounts := ENTITY(FLAT(Person rPerson=LexID,
+		INTEGER PropertyCount,
+		INTEGER PropertyTotal,
+		INTEGER PropertyOwnedPurchaseTotal,
+		INTEGER PropertyOwnedPurchaseCount,
+		INTEGER PropertyOwnedAssessedTotal,
+		INTEGER PropertyOwnedAssessedCount,
+		DATE SnapshotDateFirstSeen=NULL(''),
+		DATE SnapshotDateLastSeen=NULL('')));
+		
+USE PropertyFiles.Ownership(FLAT,
+	pPropertyCounts(
+		DateFirstSeen = date_first_seen, // Contains information for ASOF
+		DateLastSeen = date_last_seen, // Contains information for ASOF
+		SnapshotDateFirstSeen = date_first_seen,
+		SnapshotDateLastSeen = date_last_seen,
+		PropertyCount = property_count,
+		PropertyTotal = property_total,
+		PropertyOwnedPurchaseTotal = property_owned_purchase_total,
+		PropertyOwnedPurchaseCount = property_owned_purchase_count,
+		PropertyOwnedAssessedTotal = property_owned_assessed_total,
+		PropertyOwnedAssessedCount = property_owned_assessed_count));
+
+// Pick out the most recently seen snapshot for each set of BlackBox Attributes	
+Person: => PropertyCountsCurrentDate := pPropertyCounts.SnapshotDateLastSeen$Max;
+Person: => PropertyCountsCurrentSnapshot := pPropertyCounts(SnapshotDateLastSeen=Person.PropertyCountsCurrentDate);
+
+// Snapshot containing all attributes in black box entity
+Person: => Snapshot := pPropertyCounts{rPerson, SnapshotDateFirstSeen, SnapshotDateLastSeen, PropertyCount, PropertyTotal, PropertyOwnedPurchaseTotal,
+		PropertyOwnedPurchaseCount, PropertyOwnedAssessedTotal, PropertyOwnedAssessedCount};
+  
+// Define the single value most recent current snapshot for each attribute	
+Person: => SnapshotDateFirstSeen := ONLY(PropertyCountsCurrentSnapshot, SnapshotDateFirstSeen);
+Person: => SnapshotDateLastSeen := ONLY(PropertyCountsCurrentSnapshot, SnapshotDateLastSeen);
+Person: => PropertyCount := ONLY(PropertyCountsCurrentSnapshot, PropertyCount);
+Person: => PropertyTotal := ONLY(PropertyCountsCurrentSnapshot, PropertyTotal);
+Person: => PropertyOwnedPurchaseTotal := ONLY(PropertyCountsCurrentSnapshot, PropertyOwnedPurchaseTotal);
+Person: => PropertyOwnedPurchaseCount := ONLY(PropertyCountsCurrentSnapshot, PropertyOwnedPurchaseCount);
+Person: => PropertyOwnedAssessedTotal := ONLY(PropertyCountsCurrentSnapshot, PropertyOwnedAssessedTotal);
+Person: => PropertyOwnedAssessedCount := ONLY(PropertyCountsCurrentSnapshot, PropertyOwnedAssessedCount);
+
+// Shell should include Snapshot, followed by each attribute name	
+SHELL: PropertyCounts <= Person{UID, Snapshot, SnapshotDateFirstSeen, SnapshotDateLastSeen, PropertyCount, PropertyTotal, PropertyOwnedPurchaseTotal, PropertyOwnedPurchaseCount, PropertyOwnedAssessedTotal, PropertyOwnedAssessedCount};
+END;

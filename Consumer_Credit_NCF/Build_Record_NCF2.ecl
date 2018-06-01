@@ -2,7 +2,7 @@
 
 EXPORT Build_Record_NCF2 := MODULE
 
-	EXPORT Report_Data := DATASET('~thor::base::consumercredit::complete_report',Consumer_Credit_Layout.Layout_EditsArchive_Append_2,thor);
+	EXPORT Report_Data := DATASET('~thor::base::consumercredit::complete_report_new',Consumer_Credit_Layout.Layout_EditsArchive_Append_2,thor);
 
 	EXPORT ReportRequest := PROJECT(Report_Data(Edits[7..10]='RI51'),
 									 TRANSFORM(Layout_Report.Layout_ReportRequestIdRecord,	

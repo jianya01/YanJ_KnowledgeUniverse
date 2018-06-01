@@ -11,6 +11,7 @@ EXPORT SourceFileName := '~thor::base::tobacco::vente::qa::vendor';
 // EXPORT Pkgvar := 'TobaccoVenteKeys';
 EXPORT SourceKey := 'RECORD';
 EXPORT vault_File_Name := '~vault::thor::base::tobacco::prod::vente::vendor';
+EXPORT ModuleName := 'I_Tobacco_Vente';
 
 END;
 

@@ -11,5 +11,6 @@ EXPORT SourcefileName:= 'thor_data400::key::advo::fcra::qa::addr_search1';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_Addr_Search.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'RECORD';
 EXPORT vault_File_Name := '~vault::thor::key::advo::prod::addr_search1';
+EXPORT ModuleName := 'I_Addr_Search';
 END;
 

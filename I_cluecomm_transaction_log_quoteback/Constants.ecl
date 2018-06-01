@@ -8,7 +8,8 @@
    EXPORT SourcefileName:= 'thor::base::cclue::qa::transaction_log_quoteback.txt';
    EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix, I_cluecomm_transaction_log_quoteback.Layout_Vault, thor, opt);
    EXPORT SourceKey := 'transaction_id,sequence';
-
+   EXPORT ModuleName := 'I_cluecomm_transaction_log_quoteback';
+   
    END;
    
    

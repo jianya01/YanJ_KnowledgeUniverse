@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::fcra_mbsi_trano::
 EXPORT SourcefileName:= 'base::fcra_mbsi_trano::transaction_log_online::qa::trans_online_id';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_mbsi_fcra_translog_online.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,transaction_type,request_data,response_data,request_format,response_format,date_added';
+EXPORT ModuleName := 'I_mbsi_fcra_translog_online';
 
 END;
 

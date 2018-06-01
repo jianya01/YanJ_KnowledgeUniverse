@@ -8,6 +8,7 @@
    EXPORT SourcefileName:= 'thor::base::log_mbsi_hipaa::qa::intermediate_log';
    EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix, I_mbsi_hipaa_intermediate_log.Layout_Vault, thor, opt);
    EXPORT SourceKey := 'transaction_id,product_id,date_added,process_type,processing_time,source_code,content_type,version,reference_number,content_data';
+   EXPORT ModuleName := 'I_mbsi_hipaa_intermediate_log';
 
    END;
    

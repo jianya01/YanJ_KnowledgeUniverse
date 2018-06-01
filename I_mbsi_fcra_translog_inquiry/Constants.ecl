@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::fcra_mbsi::inquir
 EXPORT SourcefileName:= 'base::fcra_mbsi::inquiry_history::qa::id';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_mbsi_fcra_translog_inquiry.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'RECORD';
+EXPORT ModuleName := 'I_mbsi_fcra_translog_inquiry';
 
 END;
 

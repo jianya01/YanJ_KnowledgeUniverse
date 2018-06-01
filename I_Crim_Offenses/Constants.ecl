@@ -12,5 +12,7 @@ EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_Crim_Offenses.L
 EXPORT SourceKey := 'RECORD';
 EXPORT vault_File_Name := '~vault::thor::base::prod::corrections_court_offenses_public';
 EXPORT Pkgvar := 'Corrections_Build_Version';
+EXPORT ModuleName := 'I_Crim_Offenses';
+
 END;
 

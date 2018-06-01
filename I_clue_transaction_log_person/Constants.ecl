@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'thor::base::clue::qa::t
 EXPORT SourcefileName:= 'thor::base::clue::qa::transaction_log_person.txt';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_clue_transaction_log_person.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,sequence,date_added';
+EXPORT ModuleName := 'I_clue_transaction_log_person';
 
 END;
 
