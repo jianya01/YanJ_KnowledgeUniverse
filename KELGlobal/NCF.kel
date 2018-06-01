@@ -243,7 +243,6 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.CreditReportSummary_Data(FLAT,
 		TransactionID = Transaction_ID,
 		SubjectRecord = TRUE,
 		SubjectRecordCode = ReportTypeCounter,
-		LexID = LexID,
 		DateCreditFileEstbed = DateCreditFileEstbed,
 		ReportIncludesConsumerStatements = ReportIncludesConsumerStatementsBool),
 	CreditReport(FILTER(ReportTypeCounter = 2), // Grab the records for the Joint Applicant on this CreditReport
@@ -253,7 +252,6 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.CreditReportSummary_Data(FLAT,
 		TransactionID = Transaction_ID,
 		SubjectRecord = FALSE,
 		SubjectRecordCode = ReportTypeCounter,
-		LexID = LexID,
 		DateCreditFileEstbed = DateCreditFileEstbed,
 		ReportIncludesConsumerStatements = ReportIncludesConsumerStatementsBool),
 	PersonCreditReport(
@@ -263,10 +261,12 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.CreditReportSummary_Data(FLAT,
 		TransactionID = Transaction_ID),
 	JointCreditReport(FILTER(ReportTypeCounter = 1), // Grab the records for the Subject on this JointCreditReport
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
-		DateLastSeen = Date_Reported), // Contains information for ASOF
+		DateLastSeen = Date_Reported,  // Contains information for ASOF
+		TransactionID = Transaction_ID),
 	JointCreditReport(FILTER(ReportTypeCounter = 2), // Grab the records for the Joint Applicant on this JointCreditReport
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
-		DateLastSeen = Date_Reported)  // Contains information for ASOF
+		DateLastSeen = Date_Reported,  // Contains information for ASOF
+		TransactionID = Transaction_ID)
 	);
 
 USE Consumer_Credit.FilesCleaned_NCF2_0.ReportRequest_Data(FLAT,
@@ -274,7 +274,7 @@ USE Consumer_Credit.FilesCleaned_NCF2_0.ReportRequest_Data(FLAT,
 		DateFirstSeen = Date_Reported, // Contains information for ASOF
 		DateLastSeen = Date_Reported, // Contains information for ASOF
 		SubjectRecordCode = ReportTypeCounter,
-		LexID = LexID,
+		TransactionID = Transaction_ID,
 		DateOfOrder = DateOfOrder,
 		DateOfReceipt = DateOfReceipt,
 		DateOfCompletion = DateOfCompletion,
@@ -3565,9 +3565,10 @@ CreditReportTradeline: => GTDMax60PBalance6 := MAX(MAX(Trended((MonthCounter >= 
 CreditReportTradeline: => GTDMax90PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_90DPD) OR (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), TDBalanceAmount), -9999);
 CreditReportTradeline: => GTDMax120PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), TDBalanceAmount), -9999);
 CreditReportTradeline: => GTDMaxDerogBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND GTDRatingM IN GRID_DEROG), TDBalanceAmount), -9999);
- 
+
 
 // Testing/Debug KEL Outputs
+QUERY: testTradeLines <= CreditReport{UID, TransactionID, ReportType, CreditReportTradeline{UID,TransactionID}};
 QUERY: CreditReportBankruptcyV2(SearchForTransactionID) <= CreditReportBankruptcy(rCreditReport.TransactionID = SearchForTransactionID);
 QUERY: CreditReportCollectionV2(SearchForTransactionID) <= CreditReportCollection(rCreditReport.TransactionID = SearchForTransactionID);
 QUERY: CreditReportInquiryV2(SearchForTransactionID) <= CreditReportInquiry(rCreditReport.TransactionID = SearchForTransactionID);
