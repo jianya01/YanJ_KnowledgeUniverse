@@ -1,4 +1,6 @@
-﻿LayoutOffenses := RECORD
+﻿IMPORT _Control;
+
+LayoutOffenses := RECORD
   string60 ofk;
   string8 process_date;
   string60 offender_key;
@@ -102,4 +104,6 @@
 blankDataset := DATASET([], LayoutOffenses);
 
 fileName := '~thor_data400::key::corrections::fcra::court_offenses_public_qa';
-EXPORT court_offenses_public := INDEX(blankDataset, {ofk}, {blankDataset}, fileName);
+EXPORT court_offenses_public := IF(COUNT(_Control.OffenderKeyFilterSet) <= 0, 
+	INDEX(blankDataset, {ofk}, {blankDataset}, fileName),
+	JOIN(DISTRIBUTE(INDEX(blankDataset, {ofk}, {blankDataset}, fileName), HASH64((STRING60)ofk)), DISTRIBUTE(_Control.OffenderKeyFilterSet(ofk != ''), HASH64((STRING60)ofk)), LEFT.ofk = RIGHT.ofk, TRANSFORM(LEFT), LOCAL));
