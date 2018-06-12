@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'thor::base::fcra::log_c
 EXPORT SourcefileName:= 'thor::base::fcra::log_clue::qa::transaction_log_report_code';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_clue_transaction_log_report_code.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,report_code';
+EXPORT ModuleName := 'I_clue_transaction_log_report_code';
 
 END;
 

@@ -1,4 +1,4 @@
-IMPORT Consumer_Credit_Layout;
+﻿IMPORT Consumer_Credit_Layout;
 
 EXPORT Layout_Report := MODULE
 
@@ -131,4 +131,4 @@ EXPORT Layout_Report := MODULE
 		Consumer_Credit_Layout.EDITSReport2.t_NarrativeBRecordReport;
 	END;	
 	
-END;	
+END;

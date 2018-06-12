@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'thor::base::log_tlmxmbl
 EXPORT SourcefileName:= 'thor::base::log_tlmxmbl::qa::transaction_log';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_Telematics_translog.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,date_added';
+EXPORT ModuleName := 'I_Telematics_translog';
 
 END;
 

@@ -8,7 +8,8 @@
    EXPORT SourcefileName:= 'thor::base::log_cluecomm::qa::transaction_log_batch_summary';
    EXPORT VaultFile := DATASET(BasePrefix +'::prod::'+BaseSuffix, I_cluecomm_transaction_log_batch_summary.Layout_Vault, thor, opt);
    EXPORT SourceKey := 'batch_job_id';
-
+   EXPORT ModuleName := 'I_cluecomm_transaction_log_batch_summary';
+   
    END;
    
    

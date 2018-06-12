@@ -11,6 +11,6 @@ EXPORT SourcefileName:= 'thor_data400::key::aca_institutions_addr_qa';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_ACA_Addr.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'RECORD';
 EXPORT vault_File_Name := '~vault::thor::key::prod::aca_institutions_addr_qa';
-
+EXPORT ModuleName := 'I_ACA_Addr';
 END;
 

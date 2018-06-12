@@ -7,6 +7,7 @@ EXPORT ProcessAutomation_V2(pModule,pEmailSourcein ,pPkgVar = ' ',pRoxieIP = ' '
 	pBaseprefix:= pModule.Constants.BasePrefix;
 	pBaseSuffix:= pModule.Constants.BaseSuffix;
 	pVaultFileDS:= pModule.Constants.VaultFile;
+	pModuleName := pModule.Constants.ModuleName;
 	SourceDSKey := pModule.Constants.SourceKey;
 		
 	//Check for source key duplicates
@@ -39,10 +40,10 @@ EXPORT ProcessAutomation_V2(pModule,pEmailSourcein ,pPkgVar = ' ',pRoxieIP = ' '
 	
 	
 	Action1 := IF(NewVersionDate != VersionFile(PkgVariable = pPkgVar)[1].VersionDate AND Key_Dedup = TRUE,
-								  SEQUENTIAL(VaultIngest.BuildAutomation(pModule,pBaseprefix,pBaseSuffix,pVaultFileDS,pEmailSourceIn),CreateVersionDs)
+								  SEQUENTIAL(VaultIngest.BuildAutomation(pModule,pBaseprefix,pBaseSuffix,pVaultFileDS,pEmailSourceIn), VaultIngest.mac_Delete_Temp_File(pModuleName) ,CreateVersionDs)
 									):FAILURE(Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_EmailAddresses, FailureAutomationsubject, FailureAutomationbody)); //failure email
 												
-	Action2 := IF(Key_Dedup = TRUE,SEQUENTIAL(VaultIngest.BuildAutomation(pModule,pBaseprefix,pBaseSuffix,pVaultFileDS,pEmailSourceIn)),	
+	Action2 := IF(Key_Dedup = TRUE,SEQUENTIAL(VaultIngest.BuildAutomation(pModule,pBaseprefix,pBaseSuffix,pVaultFileDS,pEmailSourceIn), VaultIngest.mac_Delete_Temp_File(pModuleName)),	
 							Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_EmailAddresses, SourceDedupFailureAutomationsubject, SourceDedupFailureAutomationbody))
 						 :FAILURE(Fileservices.Sendemail(VaultIngest.EmailAddresses.Vault_EmailAddresses, FailureAutomationsubject, FailureAutomationbody));
 

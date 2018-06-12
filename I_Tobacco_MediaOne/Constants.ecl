@@ -11,6 +11,7 @@ EXPORT SourceFileName := '~thor::base::tobacco::mediaone::qa::vendor';
 // EXPORT Pkgvar := 'Bankruptcy_daily';
 EXPORT SourceKey := 'RECORD';
 EXPORT vault_File_Name := '~vault::thor::base::tobacco::prod::mediaone::vendor';
+EXPORT ModuleName := 'I_Tobacco_MediaOne';
 
 END;
 

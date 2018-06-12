@@ -8,6 +8,7 @@ EXPORT Sourcefile:= DATASET(UT.foreign_production_Alpha+'base::acctreview_tranl_
 EXPORT SourcefileName:= 'base::acctreview_tranl_smd::transaction_log_smd::qa::trans_log_id';
 EXPORT VaultFile := DATASET(BasePrefix+'::prod::'+BaseSuffix , I_acctreview_transaction_log_smd.Layout_Vault, thor, opt);
 EXPORT SourceKey := 'transaction_id,sequence,date_added';
+EXPORT ModuleName := 'I_acctreview_transaction_log_smd';
 
 END;
 

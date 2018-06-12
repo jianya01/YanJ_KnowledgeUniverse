@@ -5,7 +5,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	// SHARED FilterDate := 20160101; // If you want to run faster for quick iterative development set this to a recent date. Otherwise 99999999 runs everything.
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	Bankruptcy_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.Bankruptcy (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode},
+	Bankruptcy_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.Bankruptcy (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM(RECORDOF(LEFT),
 		SELF.DateFiled					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateFiled);
 		SELF.SatisfiedDischargeDate		:= Consumer_Credit.Utilities.CleanDate(LEFT.SatisfiedDischargeDate);
 		// These are all new 2.0 fields, need to re-map these once we have the finalized EDITs layout
@@ -15,7 +15,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	EXPORT Bankruptcy_Data := IF(COUNT(_Control.TransactionIDFilterSet) <= 0, Bankruptcy_Data_Raw, JOIN(DISTRIBUTE(Bankruptcy_Data_Raw, HASH64((STRING75)Transaction_ID)), DISTRIBUTE(_Control.TransactionIDFilterSet(TRIM(TransactionID) != ''), HASH64(TransactionID)), (STRING75)LEFT.Transaction_ID = RIGHT.TransactionID, TRANSFORM(LEFT), LOCAL));
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	Collection_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.Collection (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), BOOLEAN MedicalClientName, BOOLEAN MedicalCollectionClientName, STRING2 IndustryCode, STRING BureauCode, STRING8 FirstDelinquencyDateYYYYMMDD, STRING8 LastPaymentDateYYYYMMDD, STRING CODateReported},
+	Collection_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.Collection (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), BOOLEAN MedicalClientName, BOOLEAN MedicalCollectionClientName, STRING2 IndustryCode, STRING8 FirstDelinquencyDateYYYYMMDD, STRING8 LastPaymentDateYYYYMMDD, STRING CODateReported},
 		SELF.MedicalClientName				:= STD.Str.Find(STD.Str.ToUpperCase(LEFT.ClientNameOrNumber), 'MEDICAL PAYMENT', 1) > 0;
 		SELF.MedicalCollectionClientName	:= REGEXFIND('AMBU|ANATOM|ANESTH|ARTHRIT|ASTHMA|BREAST|CHIRO|CLINIC|CARDIAC|CARDIOL|DDS|DENTA|DERMA|DIAGNOST|DOCTOR|DR |DR\\.|DRS|EMERG|GASTRO|GYNEC|HEALTH|HOSP|HLTH|IMAGING|LAB|MAXILLOF|MD |MEDIC|MEDSTAR|MEMORI|MERCY|NEURO|OB/GY|OBGYN|OBSTET|OPTHALM|OPTOM|ORAL|ORTHO|OSTEO|OTOLARYN|PATHO|PEDIAT|PHARM|PHY|RADI| ST |ST\\.|SURG|SAINT|UROLOG', STD.Str.ToUpperCase(LEFT.ClientNameOrNumber));
 		SELF.DateReported					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateReported);
@@ -34,7 +34,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	EXPORT Collection_Data := IF(COUNT(_Control.TransactionIDFilterSet) <= 0, Collection_Data_Raw, JOIN(DISTRIBUTE(Collection_Data_Raw, HASH64((STRING75)Transaction_ID)), DISTRIBUTE(_Control.TransactionIDFilterSet(TRIM(TransactionID) != ''), HASH64(TransactionID)), (STRING75)LEFT.Transaction_ID = RIGHT.TransactionID, TRANSFORM(LEFT), LOCAL));
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	CreditReportSummary_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.CreditReportSummary (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), BOOLEAN ReportIncludesBankruptciesBool, BOOLEAN ReportIncludesPublicRecordsBool, BOOLEAN ReportIncludesCollectionItemsBool, BOOLEAN ReportIncludesConsumerStatementsBool, STRING BureauCode, STRING Version, STRING PaymentHistoryType, STRING FileSinceDate, STRING BirthDate, STRING DeathDate, STRING ConsumerStatementOnFile, STRING ContentType, STRING StatementLength, STRING ConsumerStatement},
+	CreditReportSummary_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.CreditReportSummary (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), BOOLEAN ReportIncludesBankruptciesBool, BOOLEAN ReportIncludesPublicRecordsBool, BOOLEAN ReportIncludesCollectionItemsBool, BOOLEAN ReportIncludesConsumerStatementsBool, STRING Version, STRING PaymentHistoryType, STRING FileSinceDate, STRING BirthDate, STRING DeathDate, STRING ConsumerStatementOnFile, STRING ContentType, STRING StatementLength, STRING ConsumerStatement},
 		SELF.DateCreditFileEstbed					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateCreditFileEstbed);
 		SELF.OldestOpeningDateOfTrade				:= Consumer_Credit.Utilities.CleanDate(LEFT.OldestOpeningDateOfTrade);
 		SELF.LatestReportingDateOfTrade				:= Consumer_Credit.Utilities.CleanDate(LEFT.LatestReportingDateOfTrade);
@@ -68,7 +68,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	
 	EXPORT Employment_Data := IF(COUNT(_Control.TransactionIDFilterSet) <= 0, Employment_Data_Raw, JOIN(DISTRIBUTE(Employment_Data_Raw, HASH64((STRING75)Transaction_ID)), DISTRIBUTE(_Control.TransactionIDFilterSet(TRIM(TransactionID) != ''), HASH64(TransactionID)), (STRING75)LEFT.Transaction_ID = RIGHT.TransactionID, TRANSFORM(LEFT), LOCAL));
 
-	EXPORT InquiryHistory_Data_Step1 := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.InquiryHistory, TRANSFORM({RECORDOF(LEFT), BOOLEAN GDropInquiry, BOOLEAN GAutoFinanceInquiry, BOOLEAN GMortgageInquiry, BOOLEAN GUtilityInquiry, BOOLEAN GStudentLoanInquiry, INTEGER8 GDaysSinceInquiry, STRING2 IndustryID, STRING5 IndustryIDFull, STRING BureauCode, STRING IQType},
+	EXPORT InquiryHistory_Data_Step1 := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.InquiryHistory, TRANSFORM({RECORDOF(LEFT), BOOLEAN GDropInquiry, BOOLEAN GAutoFinanceInquiry, BOOLEAN GMortgageInquiry, BOOLEAN GUtilityInquiry, BOOLEAN GStudentLoanInquiry, INTEGER8 GDaysSinceInquiry, STRING2 IndustryID, STRING5 IndustryIDFull, STRING IQType},
 	// EXPORT InquiryHistory_Data_Step1 := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.InquiryHistory_Data (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), BOOLEAN GDropInquiry, BOOLEAN GAutoFinanceInquiry, BOOLEAN GMortgageInquiry, BOOLEAN GUtilityInquiry, BOOLEAN GStudentLoanInquiry, INTEGER8 GDaysSinceInquiry, STRING2 IndustryID, STRING5 IndustryIDFull, STRING BureauCode, STRING KOB, STRING Amount, STRING IQType, STRING Abbreviation, STRING Terms},
 		SELF.DateOfInquiry				:= LEFT.DateOfInquiry; // Don't want to do any cleaning or DD append process for Inquiries - it's either a valid date, or it's not.
 		SELF.IndustryID					:= STD.Str.ToUpperCase(LEFT.InquirerID[4..5]);
@@ -156,7 +156,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	EXPORT InquiryHistory_Data := IF(COUNT(_Control.TransactionIDFilterSet) <= 0, UNGROUP(InquiryHistory_Data_Raw), JOIN(DISTRIBUTE(UNGROUP(InquiryHistory_Data_Raw), HASH64((STRING75)Transaction_ID)), DISTRIBUTE(_Control.TransactionIDFilterSet(TRIM(TransactionID) != ''), HASH64(TransactionID)), (STRING75)LEFT.Transaction_ID = RIGHT.TransactionID, TRANSFORM(LEFT), LOCAL));
 	
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	Judgement_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.Judgement (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode},
+	Judgement_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.Judgement (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM(RECORDOF(LEFT),
 		SELF.DateFiled					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateFiled);
 		SELF.DateSatisfied				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateSatisfied);
 		SELF.DateVerified				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateVerified); // Not well populated
@@ -200,7 +200,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	EXPORT ReportRequest_Data := IF(COUNT(_Control.TransactionIDFilterSet) <= 0, ReportRequest_Data_Raw, JOIN(DISTRIBUTE(ReportRequest_Data_Raw, HASH64((STRING75)Transaction_ID)), DISTRIBUTE(_Control.TransactionIDFilterSet(TRIM(TransactionID) != ''), HASH64(TransactionID)), (STRING75)LEFT.Transaction_ID = RIGHT.TransactionID, TRANSFORM(LEFT), LOCAL));
 
 	// TODO: This will need to be re-worked once we have the actual file layout, for now I am populating potential test cases
-	TaxLien_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.TaxLien (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode},
+	TaxLien_Data_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.TaxLien (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM(RECORDOF(LEFT),
 		SELF.DateFiled					:= Consumer_Credit.Utilities.CleanDate(LEFT.DateFiled);
 		SELF.DateReleased				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateReleased);
 		SELF.DateVerified				:= Consumer_Credit.Utilities.CleanDate(LEFT.DateVerified); // Not well populated
@@ -242,7 +242,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 		SELF.IndustryCode				:= STD.Str.ToUpperCase(LEFT.ReportingMemberNumber[4..5]);
 		SELF							:= LEFT));
 	
-	TradeLine_EnhancedData_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.EnhancedCreditTrade_FI91 (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING BureauCode, STRING TradeKey, STRING ECOA, STRING PortfolioTypeCode, BOOLEAN ActualPaymentNullInd, STRING TRDateReported},
+	TradeLine_EnhancedData_Raw := PROJECT(Consumer_Credit_NCF.Build_Record_NCF2.EnhancedCreditTrade_FI91 (FilterDate = 99999999 OR (INTEGER)Date_Reported >= FilterDate), TRANSFORM({RECORDOF(LEFT), STRING TradeKey, STRING ECOA, STRING PortfolioTypeCode, BOOLEAN ActualPaymentNullInd, STRING TRDateReported},
 		// These are all new 2.0 fields, need to re-map these once we have the finalized EDITs layout
 		SELF.BureauCode					:= IF(LEFT.Transaction_ID[1] = '8', 'XPN', 'EFX');
 		SELF.TradeKey					:= IF(LEFT.Transaction_ID[1] = '8', '1', '1');
@@ -254,7 +254,7 @@ EXPORT FilesCleaned_NCF2_0 := MODULE
 	
 	TradeLineWithEnhanced_Raw := JOIN(DISTRIBUTE(TradeLine_Data_Raw, HASH64(Transaction_ID, LexID, Date_Reported, RecordTypeCounter)), DISTRIBUTE(TradeLine_EnhancedData_Raw, HASH64(Transaction_ID, LexID, Date_Reported, RecordTypeCounter)),
 			LEFT.Transaction_ID = RIGHT.Transaction_ID AND LEFT.LexID = RIGHT.LexID  AND LEFT.Date_Reported = RIGHT.Date_Reported  AND LEFT.RecordTypeCounter = RIGHT.RecordTypeCounter, 
-		TRANSFORM({RECORDOF(LEFT), RECORDOF(RIGHT) - Transaction_id - LexID - Date_Reported - JulianDate - RemainingRefNo - ReportSource - LineNumber - OriginalRefNo - ReportTypeCounter - RecordTypeCounter - NarrativeRemarkCounter - SH51Type - SH51TypeSeq - UnitNumber - GroupSequenceNumber - RecordCode - RecordOccurrA - RecordOccurrB - Classification},
+		TRANSFORM({RECORDOF(LEFT), RECORDOF(RIGHT) - Transaction_id - BureauCode - LexID - Date_Reported - JulianDate - RemainingRefNo - ReportSource - LineNumber - OriginalRefNo - ReportTypeCounter - RecordTypeCounter - NarrativeRemarkCounter - FI90Seq - FI93Seq - SH51Type - SH51TypeSeq - UnitNumber - GroupSequenceNumber - RecordCode - RecordOccurrA - RecordOccurrB - Classification},
 			SELF							:= RIGHT;
 			SELF							:= LEFT), LOCAL);
 	
