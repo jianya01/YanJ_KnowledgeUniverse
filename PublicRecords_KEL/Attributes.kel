@@ -198,9 +198,9 @@ Person: => WatercraftCount60 := COUNT(WatercraftOwner.WCraft(DaysOld <= 5*365){W
 
 Person: => FirstDeceasedDate := ReportedDatesOfDeath.DateOfDeath$Min; 
 
-Person: => SuspectFirstDegreeRelativesAndAssociatesCount := COUNT(FirstDegreeAssociations(Title >= 1 AND Title <= 45));
-Person: => SuspectFirstDegreeRelativesAndAssociatesFelonyCount := COUNT(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation(FelonyCount > 0));
-Person: => SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount := COUNT(Person.FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation(BankruptcyCount > 0));
+Person: => SuspectFirstDegreeRelativesAndAssociatesCount := COUNT(FirstDegreeRelative);
+Person: => SuspectFirstDegreeRelativesAndAssociatesFelonyCount := COUNT(Person.FirstDegreeRelative.Relative(FelonyCount > 0));
+Person: => SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount := COUNT(Person.FirstDegreeRelative.Relative(BankruptcyCount > 0));
 
 Person: => LastBankruptcyDischargeDate := IF(MAX(PersonBankruptcy.Bankrupt, Records.DischargedDate) <= BocaShellHistoryDate, 
 										MAX(PersonBankruptcy.Bankrupt, Records.DischargedDate), 
@@ -266,7 +266,7 @@ Person: => SSNInvalidCount := COUNT(PersonSSN.Social(NOT IsValid)); // (Invalid_
 Person: => SSNMultipleLexIDsCount := COUNT(PersonSSN.Social(LexIDCount > 1)); // (Ssns_per_adl_multiple_use) ECL attribute name
 Person: => SSNSeenInLast6MonthsCount := COUNT(PersonSSN(ABS(DAYSBETWEEN(Social.HeaderFirstSeen, Person.BocaShellHistoryDate)) <= 183)); //(Ssns_per_adl_created_6months) ECL attribute name
 Person: => SSNSeenInLast18MonthsCount := COUNT(PersonSSN(ABS(DAYSBETWEEN(Social.HeaderFirstSeen, Person.BocaShellHistoryDate)) <= 540)); //(Ssns_per_adl_created_18months) ECL attribute name
-Person: => FirstDegreeRelativeLexIDs := FirstDegreeAssociations(Title >= 1 AND Title <= 45).FirstDegreeAssociation{UID};
+Person: => FirstDegreeRelativeLexIDs := FirstDegreeRelative.Relative{UID};
 Person: => SSNMultipleLexIDsSet := PersonSSN.Social(LexIDCount > 1){SSN := UID, LexID := PersonSSN.Subject.UID};
 Person: => SSNMultipleNonRelativeLexIDsSet := SSNMultipleLexIDsSet(NOT LexID IN Person.FirstDegreeRelativeLexIDs);
 Person: => SSNMultipleNonRelativeLexIDsCount := COUNT(SSNMultipleNonRelativeLexIDsSet{SSN}(SSN:Weight > 1));
@@ -326,3 +326,16 @@ Household: => AgeMinorCount := COUNT(HouseholdMember(Version = 1).Subject(Age < 
 Household: => MembersWithBankruptcyCount := COUNT(HouseholdMember(Version = 1).Subject.PersonBankruptcy.Bankrupt); // hh_bankruptcies
 Household: => CriminalMembersCount := COUNT(HouseholdMember(Version = 1).Subject.PersonOffenses.Offense); // hh_criminals
 HouseholdMember: => HasDerog := Subject.BankruptcyCount > 0 OR Subject.FelonyCount > 0;
+
+Person: MAX_VEHICLES := 100;
+
+// For teseting against imported Boca Shell results
+// IMPORT VehicleCounts FROM Vehicle_Data.VehicleCounts;
+// Person: => VehicleCurrentCountImport := VehicleCounts.CurrentCount;
+// Person: => VehicleHistoricalCountImport := VehicleCounts.HistoricalCount;
+
+PersonVehicle: => Current := EXISTS(CountsModel(HistorySource AND NOT SequenceKey:Null AND History:Null));
+PersonVehicle: => Historical := EXISTS(CountsModel(HistorySource AND NOT SequenceKey:Null AND (History='H' OR History:Null)));
+Person: => VehicleCurrentCount := BOUNDSFOLD(COUNT(PersonVehicle(Current){Automobile.OriginalVin}),0,MAX_VEHICLES);
+Person: => VehicleHistoricalCount := BOUNDSFOLD(COUNT(PersonVehicle(Historical){Automobile.OriginalVin}),0,MAX_VEHICLES);
+Person: => RelativeVehicleCount := COUNT(FirstDegreeRelative.Relative(VehicleCurrentCount>0));
