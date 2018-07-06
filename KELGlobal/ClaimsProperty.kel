@@ -932,6 +932,7 @@ ClaimsPropertyClaim: SP_CAT_CODE_LIST := ['WATER', 'MOVE', 'MOLD'];
 ClaimsPropertyClaim: SP_NONCAT_CODE_LIST := ['WATER', 'MOVE', 'MOLD', 'ACCDL', 'APPL'];
 ClaimsPropertyClaim: IGNORE_CODE_LIST := ['LAE', 'COLL', 'FOROB', 'LIVES'];
 ClaimsPropertyClaim: IGNORE_TN_CODE_LIST := ['LAE', 'COLL', 'FOROB', 'LIVES', 'MEDIC'];
+ClaimsPropertyClaim: LAE_CODE_LIST := ['LAE'];
 ClaimsPropertyClaim: CRAFT_CODE_LIST := ['CRAFT'];
 ClaimsPropertyClaim: CREDT_CODE_LIST := ['CREDT'];
 ClaimsPropertyClaim: DOG_CODE_LIST := ['DOG'];
@@ -957,7 +958,9 @@ ClaimsPropertyClaim: WATER_CODE_LIST := ['WATER'];
 ClaimsPropertyClaim: WIND_CODE_LIST := ['WIND'];
 ClaimsPropertyClaim: FULL_SCOPE_CODE_LIST := ['F'];
 ClaimsPropertyClaim: RISK_INSRD_CODE_LIST := ['RISK', 'INSRD'];
+ClaimsPropertyClaim: WATER_FREEZ_CODE_LIST := ['WATER', 'FREEZ', 'ACCDL', 'APPL', 'MOLD', 'WEATH'];
 
+ClaimsPropertyClaim: SUBROGATION_CODE_LIST := ['S'];
 // Adjusted the ClaimDate to fit the requirement: 
 // Assume CLUE Report date is 01/18/2017, 
 // If 01/18/2016 <= claim_date < 01/18/2017 then this claim falls into the past one year.
@@ -971,11 +974,15 @@ ClaimsPropertyClaim.Payments: => cClaimCatAmount := IF(cClaimCatType IN ClaimsPr
 ClaimsPropertyClaim.Payments: => cClaimCatAmountTN := IF(cClaimCatType IN ClaimsPropertyClaim.IGNORE_TN_CODE_LIST, 0, ClaimCatAmountTmp);
 ClaimsPropertyClaim: => cAtFaultIndicator := IF(AtFaultIndicator:Null, '', AtFaultIndicator);
 
+
+ClaimsPropertyClaim: => ClaimantMatchApplicant := NOT ClaimantClassification:Null AND NOT ClaimantIndividualAddressAssociationInd:Null AND ClaimantClassification = 'CT' AND ClaimantIndividualAddressAssociationInd = '*';
+
 //VPMD SAS code did not consider full or limited scope
-//ClaimsPropertyClaim: => IsValidClaim := ISVALIDDATE(ClaimDate) AND ISVALIDDATE(rClaimsProperty.DateOfOrder) AND ClaimDate < rClaimsProperty.DateOfOrder AND rClaimsProperty.ProcessingCompletionStatus = 1 AND SectionIdentifier IN RISK_INSRD_CODE_LIST; 
+// ClaimsPropertyClaim: => IsValidClaim := ISVALIDDATE(ClaimDate) AND ISVALIDDATE(rClaimsProperty.DateOfOrder) AND ClaimDate < rClaimsProperty.DateOfOrder AND rClaimsProperty.ProcessingCompletionStatus = 1 AND SectionIdentifier IN RISK_INSRD_CODE_LIST AND NOT ClaimantMatchApplicant; 
 
 //StateFarm only needs full scope
-ClaimsPropertyClaim: => IsValidClaim := ISVALIDDATE(ClaimDate) AND ISVALIDDATE(rClaimsProperty.DateOfOrder) AND ClaimDate < rClaimsProperty.DateOfOrder AND rClaimsProperty.ProcessingCompletionStatus = 1 AND SectionIdentifier IN RISK_INSRD_CODE_LIST AND ScopeOfClaim IN FULL_SCOPE_CODE_LIST;  
+ClaimsPropertyClaim: => IsValidClaim := ISVALIDDATE(ClaimDate) AND ISVALIDDATE(rClaimsProperty.DateOfOrder) AND ClaimDate < rClaimsProperty.DateOfOrder AND rClaimsProperty.ProcessingCompletionStatus = 1 AND SectionIdentifier IN RISK_INSRD_CODE_LIST AND ScopeOfClaim IN FULL_SCOPE_CODE_LIST AND NOT ClaimantMatchApplicant;  
+
 
 
 //Claims in groups
@@ -983,6 +990,7 @@ ClaimsPropertyClaim: => IsValidClaim := ISVALIDDATE(ClaimDate) AND ISVALIDDATE(r
 ClaimsPropertyClaim: => IsCOLLAClaim := EXISTS(Payments(cClaimCatType IN COLA_CODE_LIST));
 ClaimsPropertyClaim: => IsCOLLBClaim := EXISTS(Payments(cClaimCatType IN COLB_CODE_LIST));
 ClaimsPropertyClaim: => IsCOLLCClaim := EXISTS(Payments(cClaimCatType IN COLC_CODE_LIST));
+ClaimsPropertyClaim: => IsWaterFreezClaim := EXISTS(Payments(cClaimCatType IN WATER_FREEZ_CODE_LIST));
 
 ClaimsPropertyClaim: => IsCOLLAClaimCat := EXISTS(Payments(cClaimCatType IN COLA_CODE_LIST)) AND cAtFaultIndicator = 'Y';
 ClaimsPropertyClaim: => IsCOLLBClaimCat := EXISTS(Payments(cClaimCatType IN COLB_CODE_LIST)) AND cAtFaultIndicator = 'Y';
@@ -1072,6 +1080,7 @@ ClaimsPropertyClaim: => IsCrimeClaimNonCat := IsCrimeClaim AND (cAtFaultIndicato
 ClaimsPropertyClaim: => IsCrimeNZClaim := IsCrimeClaim AND TotalClaimAmt > 0;
 ClaimsPropertyClaim: => IsCrimeNZClaimCat := IsCrimeClaimCat AND TotalClaimAmt > 0;
 ClaimsPropertyClaim: => IsCrimeNZClaimNonCat := IsCrimeClaimNonCat AND TotalClaimAmt > 0;
+
 
 //GROUP1: SF691 to SF780
 //SF691 SF692 SF693 SF694 SF695
@@ -1400,11 +1409,21 @@ ClaimsProperty: => NumNZColBNonCatClmWithin3Yr := COUNT(ClaimsPropertyClaim (IsC
 ClaimsProperty: => NumNZColBNonCatClmWithin4Yr := COUNT(ClaimsPropertyClaim (IsCOLLAClaim = TRUE AND IsExclusionClaim = FALSE AND IsCOLLBNZClaimNonCat = TRUE AND IsCOLLCClaim = FALSE AND IsValidClaim = TRUE AND YrBtwClaimDtAndOrderDt < 4));
 ClaimsProperty: => NumNZColBNonCatClmWithin5Yr := COUNT(ClaimsPropertyClaim (IsCOLLAClaim = TRUE AND IsExclusionClaim = FALSE AND IsCOLLBNZClaimNonCat = TRUE AND IsCOLLCClaim = FALSE AND IsValidClaim = TRUE AND YrBtwClaimDtAndOrderDt < 5));
 
-//SF896_TN, to SF899_TN
+//SF896_TN, to SF900_TN
 ClaimsProperty: => NumNZColBNonCatClmWithin1YrTN := COUNT(ClaimsPropertyClaim (IsCOLLAClaim = TRUE AND IsExclusionClaim = FALSE AND IsCOLLBNZClaimNonCatTN = TRUE AND IsCOLLCClaim = FALSE AND IsValidClaim = TRUE AND YrBtwClaimDtAndOrderDt < 1));
 ClaimsProperty: => NumNZColBNonCatClmWithin2YrTN := COUNT(ClaimsPropertyClaim (IsCOLLAClaim = TRUE AND IsExclusionClaim = FALSE AND IsCOLLBNZClaimNonCatTN = TRUE AND IsCOLLCClaim = FALSE AND IsValidClaim = TRUE AND YrBtwClaimDtAndOrderDt < 2));
 ClaimsProperty: => NumNZColBNonCatClmWithin3YrTN := COUNT(ClaimsPropertyClaim (IsCOLLAClaim = TRUE AND IsExclusionClaim = FALSE AND IsCOLLBNZClaimNonCatTN = TRUE AND IsCOLLCClaim = FALSE AND IsValidClaim = TRUE AND YrBtwClaimDtAndOrderDt < 3));
 ClaimsProperty: => NumNZColBNonCatClmWithin4YrTN := COUNT(ClaimsPropertyClaim (IsCOLLAClaim = TRUE AND IsExclusionClaim = FALSE AND IsCOLLBNZClaimNonCatTN = TRUE AND IsCOLLCClaim = FALSE AND IsValidClaim = TRUE AND YrBtwClaimDtAndOrderDt < 4));
+ClaimsProperty: => NumNZColBNonCatClmWithin5YrTN := COUNT(ClaimsPropertyClaim (IsCOLLAClaim = TRUE AND IsExclusionClaim = FALSE AND IsCOLLBNZClaimNonCatTN = TRUE AND IsCOLLCClaim = FALSE AND IsValidClaim = TRUE AND YrBtwClaimDtAndOrderDt < 5));
+
+//SF1375_TN
+ClaimsProperty: => NumColBGE5000NonCatClmWithin5YrTN := COUNT(ClaimsPropertyClaim (IsCOLLAClaim = TRUE AND IsExclusionClaim = FALSE AND IsCOLLBNZClaimNonCatTN = TRUE AND IsCOLLCClaim = FALSE AND TotalClaimAmtTN >= 5000 AND IsValidClaim AND YrBtwClaimDtAndOrderDt < 5));
+
+//SF1495_TN
+ClaimsProperty: => NumColBGE3000NonCatClmWithin5YrTN := COUNT(ClaimsPropertyClaim (IsCOLLAClaim = TRUE AND IsExclusionClaim = FALSE AND IsCOLLBNZClaimNonCatTN = TRUE AND IsCOLLCClaim = FALSE AND TotalClaimAmtTN >= 3000 AND IsValidClaim AND YrBtwClaimDtAndOrderDt < 5));
+
+//WAFZP5NZ
+ClaimsProperty: => ExistNZWaterFreezClmWithin5Yr := IF(EXISTS(ClaimsPropertyClaim (IsWaterFreezClaim = TRUE AND IsExclusionClaim = FALSE AND TotalClaimAmt > 0 AND IsValidClaim = TRUE AND YrBtwClaimDtAndOrderDt < 5)), 1, 0);
 
 //SF901 to 905
 ClaimsProperty: => ExistColBClmWithin1Yr := IF(NumColBClmWithin1Yr >= 1, 1, 0);
