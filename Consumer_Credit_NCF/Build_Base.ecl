@@ -58,6 +58,12 @@ EXPORT Build_Base(STRING8 InputStartDate = '', STRING8 InputEndDate = '', STRING
 		 SELF.FI93Seq 					 := MAP((LEFT.JulianDate = 0 AND LEFT.RemainingRefNo = 0) OR (LEFT.JulianDate <> RIGHT.JulianDate) OR (LEFT.RemainingRefNo <> RIGHT.RemainingRefNo) OR (LEFT.ReportSource <> RIGHT.ReportSource) OR (LEFT.OriginalRefNo <> RIGHT.OriginalRefNo) => 0,
 													(LEFT.JulianDate = RIGHT.JulianDate AND LEFT.RemainingRefNo = RIGHT.RemainingRefNo AND RIGHT.Edits[7..10] = 'FI93') => LEFT.FI93Seq + 1,
 													LEFT.FI93Seq),
+		 // Added logic to meet the Modeling requirement of setting the Date_Reported with the report header DateOfReceipt value
+		 SELF.Date_Reported  		 := MAP(((LEFT.JulianDate = 0 AND LEFT.RemainingRefNo = 0) OR (LEFT.JulianDate <> RIGHT.JulianDate) OR (LEFT.RemainingRefNo <> RIGHT.RemainingRefNo) OR 
+																		 (LEFT.ReportSource <> RIGHT.ReportSource) OR (LEFT.OriginalRefNo <> RIGHT.OriginalRefNo) AND 
+																			RIGHT.Edits[7..10] = 'RI51') => EditsToXml.FormatDate(RIGHT.Edits[127..134]),
+																		(LEFT.JulianDate = RIGHT.JulianDate AND LEFT.RemainingRefNo = RIGHT.RemainingRefNo) => LEFT.Date_Reported,
+																		LEFT.Date_Reported),
 		 SELF := RIGHT), LOCAL);															 
 																	 
 		DuplicateReports := DEDUP(SORT(DISTRIBUTE(DS_BASE_MST_ARCHIVE_REPORT_ITER(Edits[7..10] = 'NR52' AND Edits[15..16] = 'GM' AND STD.Str.Find(Edits, 'DUPLICATE REPORT', 1) > 0), HASH32(OriginalRefNo)), 
@@ -97,7 +103,7 @@ EXPORT Build_Base(STRING8 InputStartDate = '', STRING8 InputEndDate = '', STRING
 											 TRANSFORM(Layout_EditsArchive_Append_2,
 											 SELF.Transaction_Id := RIGHT.Transaction_Id,
 											 SELF.LexID := IF(LEFT.ReportTypeCounter = 2, RIGHT.spouse_lex_id, RIGHT.individual_lex_id),
-											 SELF.Date_Reported := RIGHT.date_added[1..4] + RIGHT.date_added[6..7] + RIGHT.date_added[9..10],
+											 // SELF.Date_Reported := RIGHT.date_added[1..4] + RIGHT.date_added[6..7] + RIGHT.date_added[9..10],
 											 SELF := LEFT), HASH) : INDEPENDENT;
 										 
 		WeeklyData := WeeklyTotalData(LexID != 0);										 
