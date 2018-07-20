@@ -1,5 +1,5 @@
 ﻿IMPORT _Control;
-
+ 
 LayoutSSN_SSA := RECORD
   string9 ssn;
   string12 did;
@@ -30,7 +30,7 @@ LayoutSSN_SSA := RECORD
 
 blankDataset := dataset([], LayoutSSN_SSA);
 
-fileName := '~thor_data400::key::fcra::death_master_ssa::ssn_vaultriskviewkeys';
+fileName := '~thor_data400::key::fcra::death_master_ssa::ssn_qa';
 
 EXPORT Key_ssn_ssa := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	 INDEX(blankDataset, {ssn}, {blankDataset}, fileName),
