@@ -1,7 +1,7 @@
 ﻿EXPORT Layout_EditsArchive_Append_2 := RECORD
 	STRING16    Transaction_id;
 	UNSIGNED8   LexID;
-	STRING8     Date_Reported;
+	STRING8     HDDateOfReport;
 	UNSIGNED2	JulianDate;				// yyddd format
 	UNSIGNED4	RemainingRefNo;			// Remaining 9 bytes of reference number
 	UNSIGNED1	ReportSource;			// 0 = HPCC, 1 = Mainframe (note: 400 offset removed from yydddd)
