@@ -22,7 +22,7 @@ Person := ENTITY(FLAT(UID=LexID,
 		ReportedDatesOfBirth{DateOfBirth},
 		ReportedDatesOfDeath{DateOfDeath}));
 
-Phone := ENTITY(FLAT(UID=Phone10,
+Phone := ENTITY(FLAT(UID = Phone10,
 		STRING Phone10,
 		INTEGER AreaCode,
 		INTEGER Phone7,
@@ -603,6 +603,20 @@ Email := ENTITY(FLAT(UID(EmailAddress),
 Household := ENTITY(FLAT(UID = HHid),
 	MODEL(*));
 	
+Education := ENTITY(FLAT(UID = Key,
+	STRING CollegeName,
+	STRING Tier,
+	STRING Tier2,
+	STRING SchoolSizeCode,
+	STRING FileType,
+	STRING CollegeMajor,
+	STRING CollegeClass,
+	STRING Class,
+	STRING Source,
+	STRING RecType),
+	MODEL(UID,
+		FileTypes{FileType},CollegeName,Tier,Tier2,SchoolSizeCode,CollegeMajor,CollegeClass,Class,Source,RecType));
+	
 Vehicle := ENTITY(FLAT(UID(VehicleKey),
 		STRING VehicleKey,
 		STRING OriginalVin,
@@ -725,6 +739,24 @@ Vehicle := ENTITY(FLAT(UID(VehicleKey),
 		SourceFirstDate,SourceLastDate
 		));
 
+Employment := ENTITY(FLAT(UID = contact_id,
+	STRING JobTitle,
+	STRING InternalSourceScore, //Internal source score
+	STRING FromHDR,
+	STRING OldInternalSourceScore, // the previous internal source score
+	STRING Source, 
+	STRING GLB), // subject to Gramm–Leach–Bliley Act. Y means yes, N means no
+	MODEL(UID,JobTitle,InternalSourceScore,FromHDR,OldInternalSourceScore,Source,GLB));
+	
+Utility := ENTITY(FLAT(UID = ID,
+	STRING UtilityID,
+	DATE DateAddedToExchange,
+	DATE ConnectDate,
+	STRING UtilityType,
+	DATE RecordDate),
+	MODEL(UID,UtilityID,DateAddedToExchange,ConnectDate,UtilityType,RecordDate));
+	
+
 PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange))); // Connects a Person to an Address
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number)));
 PersonOffenses := ASSOCIATION(FLAT(Person Offender, CriminalOffense Offense=UID(offender_key), INTEGER OffenseCounts));
@@ -776,6 +808,19 @@ PersonProperty := ASSOCIATION(FLAT(Person Subject, Property Transaction = UID(Ln
 AddressProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), BOOLEAN IsOwnerAddress, BOOLEAN IsSellerAddress, BOOLEAN IsPropertyAddress, BOOLEAN IsBorrowerAddress));
 BusinessProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), Business Company));
 SSNProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), SocialSecurityNumber Social));
+
+PersonEducation := ASSOCIATION(FLAT( Education Edu, Person Subject));
+EducationSSN := ASSOCIATION(FLAT( Education Edu, SocialSecurityNumber Social));
+EducationStudentAddress := ASSOCIATION(FLAT(Education Edu, Address UniLocation = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange)));
+
+EmploymentBusiness := ASSOCIATION(FLAT(Business Bus, Employment Emp));
+EmploymentPerson := ASSOCIATION(FLAT(Person Subject, Employment Emp));
+EmploymentSSN := ASSOCIATION(FLAT(SocialSecurityNumber Social, Employment Emp));
+EmploymentBusinessAddress := ASSOCIATION(FLAT(Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange),Employment Emp));
+
+UtilityHomeAddress := ASSOCIATION(FLAT(Utility Util, Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange)));
+UtilityPerson := ASSOCIATION(FLAT(Utility Util, Person Subject));
+UtilityPhone := ASSOCIATION(FLAT(Utility Util, Phone PhoneNumber));
 
 PersonVehicle := ASSOCIATION(FLAT(Person Subject, Vehicle Automobile=UID(VehicleKey), BOOLEAN IsMinor,
 		DATE RegistrationFirstDate, 
