@@ -83,7 +83,7 @@ LayoutOffense := RECORD
  
  blankDataset := DATASET([], LayoutOffense);
 
-fileName := '~thor_200::key::criminal_offenses::fcra::20180207::offender_key';
+fileName := '~thor_200::key::criminal_offenses::fcra::qa::offender_key';
 
 EXPORT CriminalOffensesOffenderKey := IF(COUNT(_Control.OffenderKeyFilterSet) <= 0, 
 	INDEX(blankDataset, {ok}, {blankDataset}, fileName),
