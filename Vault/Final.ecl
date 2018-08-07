@@ -180,6 +180,24 @@ EXPORT Key_corrections_offenders_fcra_bocashell_did  :=
 												  ' ' , // Package Variable
 												  ' ' //Roxie IP				 
 												  );				
+
+
+EXPORT Key_fcra_telcordia_tpm_slim := 
+												  Vault.ProcessAutomation_V2(Vault.Files('key','fcra::telcordia_tpm_slim_qa').Key_telcordia_tpm_slim_Vault, //Vault File
+												  Vault.Files().Key_telcordia_tpm_slim_Source, //Source File 
+												  Vault.Files().Key_fcra_telcordia_tpm_slim_qa, //Source File Name
+												  Vault_Layout.Layout_fcra_telcordia_tpm_slim,  //Current Vault Layout																			
+												  Vault.getJoinCondition(Vault.Files().Key_telcordia_tpm_slim_Source,[]), //Pass Source File & Exclusion Fields for join condition
+												  Vault.GetCompareCondition(Vault.Files().Key_telcordia_tpm_slim_Source,Vault_Layout.Layout_fcra_telcordia_tpm_slim,[]), //Pass Source File, Child Rec location if any & Exclusion Fields
+												  STD.Str.FindReplace(Vault.GetCompareCondition(Vault.Files().Key_telcordia_tpm_slim_Source,Vault_Layout.Layout_fcra_telcordia_tpm_slim,[]), 'vault_le.','vault_ri.'), //Pass Source File, Child Rec location if any & Exclusion Fields
+												  Vault.Files('key').base_prefix, //Vault base Prefix
+												  'fcra::telcordia_tpm_slim_qa', //Vault base Suffix
+												  (STRING)std.date.today(), // Current Date if building for today's date (or) Any previous date for catch up builds																			
+												  'key', //Source Vertical
+												  'fcra::telcordia_tpm_slim_qa', // Email Address Subject	
+												  ' ' , // Package Variable
+												  ' ' //Roxie IP				 
+												  );			
 	
 	
 END;
