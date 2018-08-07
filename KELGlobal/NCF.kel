@@ -44,7 +44,8 @@ CreditReport := ENTITY(FLAT(UID(Transaction_ID, LexID),
 		TransactionID, 
 		ReferenceNumber,
 		BureauCode,
-		LexIDs{SubjectRecordCode, LexID}, 
+		SubjectRecordCode,
+		LexID, 
 		ROWS{SubjectRecord, DateCreditFileEstbed, ReportIncludesConsumerStatements}, 
 		HDDateOfReport, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, 
 		ProcessingCompletionStatus, ReportUsage, LienJudgementSource));
@@ -3566,6 +3567,11 @@ CreditReportTradeline: => GTDMax90PBalance6 := MAX(MAX(Trended((MonthCounter >= 
 CreditReportTradeline: => GTDMax120PBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND (GTDRatingM IN GRID_120_180DPD) OR (GTDRatingM IN GRID_DEROG)), TDBalanceAmount), -9999);
 CreditReportTradeline: => GTDMaxDerogBalance6 := MAX(MAX(Trended((MonthCounter >= 1 AND MonthCounter <= 7) AND GTDRatingM IN GRID_DEROG), TDBalanceAmount), -9999);
 
+CreditReportTradeline.Trended: => PriorLimit := MIN(CreditReportTradeline.Trended(MonthCounter >= CreditReportTradeline.Trended.MonthCounter, NOT TDLoanAmountCreditLimit:Null), MonthCounter);
+CreditReportTradeline.Trended: => LaterLimit := MAX(CreditReportTradeline.Trended(MonthCounter <  CreditReportTradeline.Trended.MonthCounter, NOT TDLoanAmountCreditLimit:Null), MonthCounter);
+CreditReportTradeline.Trended: => ClosestLimit := IF(PriorLimit:Null, LaterLimit, PriorLimit);
+CreditReportTradeline.Trended: => GTDLoanAmountCreditLimit := MAX(CreditReportTradeline.Trended(MonthCounter = CreditReportTradeline.Trended.ClosestLimit), TDLoanAmountCreditLimit);
+
 
 // Testing/Debug KEL Outputs
 QUERY: testTradeLines <= CreditReport{UID, TransactionID, ReportType, CreditReportTradeline{UID,TransactionID}};
@@ -3576,6 +3582,7 @@ QUERY: CreditReportJudgementV2(SearchForTransactionID) <= CreditReportJudgment(r
 QUERY: CreditReportLienV2(SearchForTransactionID) <= CreditReportLien(rCreditReport.TransactionID = SearchForTransactionID);
 QUERY: CreditReportNarrativeRemarksV2(SearchForTransactionID) <= CreditReportNarrativeRemarks(rCreditReport.TransactionID = SearchForTransactionID);
 QUERY: CreditReportTradelineV2(SearchForTransactionID) <= CreditReportTradeline(rCreditReport.TransactionID = SearchForTransactionID);
+QUERY: CreditReportTradelineTrendedV2(SearchForTransactionID) <= CreditReportTradeline(rCreditReport.TransactionID = SearchForTransactionID).Trended{MonthCounter, TDLoanAmountCreditLimit, GTDLoanAmountCreditLimit, PriorLimit, LaterLimit, ClosestLimit};
 QUERY: CreditReportV2(SearchForTransactionID) <= CreditReport(TransactionID = SearchForTransactionID);
 
 QUERY: CreditReportBankruptcyAllV2 <= CreditReportBankruptcy;
@@ -3588,4 +3595,4 @@ QUERY: CreditReportTradelineAllV2 <= CreditReportTradeline;
 QUERY: CreditReportAllV2 <= CreditReport;
 
 // Final KEL Outputs
-SHELL: CreditReportV2 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, LexIDs, ROWS, HDDateOfReport, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate /*, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies */};
+SHELL: CreditReportV2 <= CreditReport{UID, TransactionID, ReferenceNumber, BureauCode, SubjectRecordCode, LexID, ROWS, HDDateOfReport, DateOfOrder, DateOfReceipt, DateOfCompletion, TimeOfReport, Quoteback, ReportCode, ReportCodeDescription, ReportType, AccountNumber, ProcessingCompletionStatus, ReportUsage, MostRecentBankruptcyAgeInMonths, TotalBankruptcies, TotalBankruptciesWithValidDate /*, TotalChapter7Bankruptcies, TotalChapter11Bankruptcies, TotalChapter12Bankruptcies, TotalChapter13Bankruptcies, TotalDischargedBankruptcies, TotalDischargedChapter7Bankruptcies, TotalDischargedChapter11Bankruptcies, TotalDischargedChapter12Bankruptcies, TotalDischargedChapter13Bankruptcies, TotalDismissedBankruptcies, TotalDismissedChapter7Bankruptcies, TotalDismissedChapter11Bankruptcies, TotalDismissedChapter12Bankruptcies, TotalDismissedChapter13Bankruptcies */};

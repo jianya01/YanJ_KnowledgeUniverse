@@ -445,7 +445,7 @@ export t_CreditTradeHistoryRecordReport := record //RecordCode[FI90]
 	string10 ReportingMemberNumber {xpath('ReportingMemberNumber')};
 	string50 MemberName {xpath('MemberName')};
 	string1 TapeSupplierIndicator {xpath('TapeSupplierIndicator')}; //values['*',' ','']
-	string8 DateReported {xpath('DateReported')};
+	string8 TRDateReported {xpath('DateReported')};
 	string8 DateAccountOpened {xpath('DateAccountOpened')};
 	string7 HighestCreditAmount {xpath('HighestCreditAmount')};
 	string4 Terms {xpath('Terms')};
