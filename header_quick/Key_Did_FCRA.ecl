@@ -48,7 +48,7 @@ LayoutHeaderQuick := RECORD
 
 blankDataset := dataset([], LayoutHeaderQuick);
 
-fileName := '~analyt_thor400_90_dev::thor_data400::key::headerquick::fcra::did_vaultriskviewkeys ';
+fileName := '~thor_data400::key::headerquick::fcra::did_qa';
  
 EXPORT Key_Did_FCRA := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	   INDEX(blankDataset, {did}, {blankDataset}, fileName),
