@@ -97,5 +97,14 @@ EXPORT Files(STRING DataSource = '', STRING FileSuffix = '') := MODULE
 	Vault_fileName := '~vault::thor::key::prod::corrections_offenders_fcra_bocashell_did';
 	EXPORT Key_corrections_offenders_bocashell_did_Vault :=  DATASET(base_prod_vault_file,  Vault_Layout.Layout_corrections_offenders_bocashell_did_vault, THOR, OPT); // vault file
 	
+	
+	EXPORT Key_fcra_telcordia_tpm_slim_qa := 'thor_data400::key::fcra::telcordia_tpm_slim_qa';	//sourcefilename
+	
+	blankDataset_Source := dataset([], Vault_Layout.Layout_fcra_telcordia_tpm_slim - Vault_Layout.Layout_ECLIngest_Prefix);
+	Source_fileName := UT.foreign_production_boca+Key_fcra_telcordia_tpm_slim_qa;
+	EXPORT Key_telcordia_tpm_slim_Source :=  INDEX(blankDataset_Source, {npa,nxx,tb}, {blankDataset_Source}, Source_fileName);
+	Vault_fileName := '~vault::thor::key::prod::fcra::telcordia_tpm_slim_qa';
+	EXPORT Key_telcordia_tpm_slim_Vault :=  DATASET(base_prod_vault_file,  Vault_Layout.Layout_fcra_telcordia_tpm_slim, THOR, OPT); // vault file
+	
  END;
 
