@@ -108,7 +108,7 @@ Bankruptcy: => LastSeenDate := TMSID:DateLastSeen;
 
 CriminalOffense.OffenseCharges: => IsFelony := OffenderLevel = 4 AND OffenseScore = 'F';
 CriminalOffense.OffenseCharges: => IsArrest := DataType = 5;
-CriminalOffense.OffenseCharges: => AgeInDays := ABSDAYSBETWEEN(EarliestOffenseDate, fBocaShellHistoryDate());
+CriminalOffense.OffenseCharges: => AgeInDays := ABSDAYSBETWEEN(OffenseDate, fBocaShellHistoryDate());
 
 
 
@@ -211,9 +211,10 @@ Person: => BankruptcyStatus := MostRecentBankruptcy.MostRecentBankruptcyStatus;
 Person: => BankruptcyFilingType := ONLY(MostRecentBankruptcy, Records.FilingType);
 Person: => BankruptcyDisposition := ONLY(MostRecentBankruptcy, Records.Disposition);
 
-Person: => LastCriminalDate := MAX(PersonOffenses.Offense, OffenseCharges.EarliestOffenseDate);
-Person: => LastArrestDate := MAX(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE), OffenseCharges.EarliestOffenseDate);
-Person: => LastFelonyDate := MAX(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE), OffenseCharges.EarliestOffenseDate);
+
+Person: => LastCriminalDate := MAX(PersonOffenses.Offense, OffenseCharges.OffenseDate);
+Person: => LastArrestDate := MAX(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE), OffenseCharges.OffenseDate);
+Person: => LastFelonyDate := MAX(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE), OffenseCharges.OffenseDate);
 Person: => FelonyCountInLast1Month := COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_MONTH_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null));
 Person: => FelonyCountInLast3Months := COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.THREE_MONTHS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null));
 Person: => FelonyCountInLast6Months := COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SIX_MONTHS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null));
@@ -305,6 +306,24 @@ Household: => MembersWithBankruptcyCount := COUNT(HouseholdMember(Version = 1).S
 Household: => CriminalMembersCount := COUNT(HouseholdMember(Version = 1).Subject.PersonOffenses.Offense); // hh_criminals
 HouseholdMember: => HasDerog := Subject.BankruptcyCount > 0 OR Subject.FelonyCount > 0;
 
+
+Person: => NumEducations := COUNT(PersonEducation.Edu);
+Person: => NumOfColleges := COUNT(PersonEducation.Edu{CollegeName});
+SocialSecurityNumber: => NumEducations := COUNT(EducationSSN.Edu);
+SocialSecurityNumber: => NumOfColleges := COUNT(EducationSSN.Edu{CollegeName});
+Education: => NumOfPeople := COUNT(PersonEducation.Subject);
+Address: => NumEducations := COUNT(EducationStudentAddress.Edu);
+Address: => NumOfColleges := COUNT(EducationStudentAddress.Edu{CollegeName});
+
+Business: =>NumOfJobs := COUNT(EmploymentBusiness.Emp);
+SocialSecurityNumber: =>NumOfJobs := COUNT(EmploymentSSN.Emp);
+Address: => NumOfJobs := COUNT(EmploymentBusinessAddress.Emp);
+Person: => NumOfJobs := COUNT(EmploymentPerson.Emp);
+
+Person: => NumOfUtils := COUNT(UtilityPerson.Util);
+Address: => NumOfUtils := COUNT(UtilityHomeAddress.Util);
+Phone: => NumOfUtils := COUNT(UtilityPhone.Util);
+
 Person: MAX_VEHICLES := 100;
 
 // For teseting against imported Boca Shell results
@@ -318,5 +337,8 @@ Person: => VehicleCurrentCount := BOUNDSFOLD(COUNT(PersonVehicle(Current){Automo
 Person: => VehicleHistoricalCount := BOUNDSFOLD(COUNT(PersonVehicle(Historical){Automobile.OriginalVin}),0,MAX_VEHICLES);
 Person: => RelativeVehicleCount := COUNT(FirstDegreeRelative.Relative(VehicleCurrentCount>0));
 
+
+
 Person: => DLCount := COUNT(PersonDriversLicense.License);
 Person: => HasDL := DLCount > 0;
+Person: => PII := ONLY(InputPII);

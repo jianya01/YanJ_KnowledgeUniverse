@@ -1,4 +1,4 @@
-﻿LayoutOffenses := RECORD
+﻿EXPORT Layout_Source := RECORD
   string60 ofk;
   string8 process_date;
   string60 offender_key;
@@ -98,8 +98,3 @@
   unsigned8 offense_persistent_id;
   unsigned8 offense_category;
  END;
-
-blankDataset := DATASET([], LayoutOffenses);
-
-fileName := '~thor_data400::key::corrections::fcra::court_offenses_public_qa';
-EXPORT court_offenses_public := INDEX(blankDataset, {ofk}, {blankDataset}, fileName);

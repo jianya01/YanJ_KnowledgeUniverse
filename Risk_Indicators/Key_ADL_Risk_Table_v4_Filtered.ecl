@@ -56,7 +56,7 @@ LayoutADL_Risk  := RECORD
 
 blankDataset := dataset([], LayoutADL_Risk);
 
-fileName := '~thor_data400::key::death_master::qa::adl_risk_table_v4_filtered ';
+fileName := '~thor_data400::key::death_master::qa::adl_risk_table_v4_filtered';
 
 EXPORT Key_ADL_Risk_Table_v4_Filtered := IF(COUNT(_Control.LexIDFilterSet) <= 0, 
 	   INDEX(blankDataset, {did}, {blankDataset}, fileName),

@@ -1,7 +1,27 @@
-﻿IMPORT PublicRecords_KEL.Entities;
+﻿#OPTION(persist, 2)
+#OPTION(persistexpire, 30)
+ 
+IMPORT PublicRecords_KEL.Entities;
 IMPORT PublicRecords_KEL.Uses;
 IMPORT PublicRecords_KEL.Attributes;
-IMPORT PropertyCounts FROM KELBlackBox.PropertyCounts;
+// IMPORT PropertyCounts FROM KELBlackBox.PropertyCounts;
+ 
+ 
+
+// Criminal Debug
+//QUERY: CriminalOffenderDump <= CriminalOffender;
+QUERY: CriminalPersons <= Person;
+// QUERY: CriminalOffenseDump <= CriminalOffense;
+// QUERY: CriminalPunishmentDump <= CriminalPunishment;
+QUERY: PersonOffensesDump <= PersonOffenses;
+// QUERY: OffenderOffenseDump <= OffenderOffense;
+// QUERY: OffensePunishmentDump <= OffensePunishment;
+// QUERY: OffenderPunishmentDump <= OffenderPunishment;
+// QUERY: DrivingViolationDump <= DrivingViolation;
+// QUERY: OffenderAddressDump <= OffenderAddress;
+// QUERY: OffenderSSNDump <= OffenderAddress;
+// QUERY: PersonOffenderDump <= PersonOffender;
+
 
 // Query to grab the entire Person Entity for a specific LexID
 // QUERY: PersonEntityData(SearchForLexID, ArchiveDate) <= Person(UID = SearchForLexID) ASOF reportedby(ArchiveDate); 
@@ -15,7 +35,7 @@ IMPORT PropertyCounts FROM KELBlackBox.PropertyCounts;
 // Query to grab all Relatives and First Degree Associations
 // QUERY: AllFirstDegreeRelativesAndAssociates(ArchiveDate) <= FirstDegreeAssociations {Subject, FirstDegreeAssociation, Title, TitleDescription, RelationshipType, RelationshipConfidence, RelationshipScore, Generation, RelationshipDateFirstSeen, RelationshipDateLastSeen} ASOF reportedby(ArchiveDate);
 
-//QUERY: PersonByLexID(SearchForLexID) <= Person(UID=SearchForLexID);
+// QUERY: PersonByLexID(SearchForLexID) <= Person(UID=SearchForLexID);
 
 //Offenses Based Queries
 // QUERY: CriminalOffenses(SearchForOffenderKey) <= CriminalOffense(OffenderKey = SearchForOffenderKey);
@@ -108,4 +128,16 @@ QUERY: AddressShellInputParmaters(_PrimaryRange, _Predirectional, _PrimaryName, 
 		ADVODoNotDeliverIndicator, ADVOCollegeIndicator, ADVOCollegeStartSuppressionDate, ADVOCollegeEndSuppressionDate, ADVOStyleCode, ADVOSimplifyCount, 
 		ADVODropIndicator, ADVOResidentialOrBusinessIndicator, ADVOOnlyWayToGetMailIndicator, ADVORecordTypeCode, ADVOAddressTypeCode, ADVOMixedUsageCode,
 		ADVODateFirstSeen, ADVODateLastSeen, ADVODateVendorFirstReported, ADVODateVendorLastReported, ADVOVacationBeginDate, ADVOVacationEndDate, 
-		ADVONumberOfVacationMonths, ADVOMaxVacationMonths, ADVOVacationPeriodsCount};*/
+		ADVONumberOfVacationMonths, ADVOMaxVacationMonths, ADVOVacationPeriodsCount};
+
+QUERY: EducationOutput <= Education, PersonEducation, EducationSSN, EducationStudentAddress, EducationSSN.Social{UID, NumOfColleges, NumEducations}, EducationStudentAddress.UniLocation USING [nonFCRA,FCRA];
+QUERY: EmploymentOutput <= Employment, EmploymentPerson, EmploymentSSN, EmploymentBusinessAddress,EmploymentBusiness,EmploymentSSN.Social{UID,NumOfJobs},EmploymentBusinessAddress.Location(NumOfJobs>0), EmploymentBusiness.Bus{UID, NumOfJobs},EmploymentBusinessAddress(Location.NumOfJobs > 0){Emp, Location}USING [nonFCRA,FCRA];
+QUERY: UtilityOutput <= Utility, UtilityPerson, UtilityHomeAddress.Location, UtilityPhone, Phone(NumOfUtils > 0){UID,NumOfUtils}USING [nonFCRA,FCRA];
+QUERY: PersonTestAttributes <= Person(NumOfUtils>0 OR NumOfColleges>0 OR NumOfJobs>0 OR NumOfUtils>0){UID, NumOfUtils,{UtilityPerson.Util.UID}, NumOfColleges,{PersonEducation.Edu.CollegeName}, NumEducations,{PersonEducation.Edu.UID}, NumOfJobs,{EmploymentPerson.Emp.UID}}USING [nonFCRA,FCRA];
+QUERY: TestFileType <= Education(COUNT(FileTypes)>1) USING [nonFCRA,FCRA];
+
+QUERY: InputPIITestQuery(DATASET OF PublicRecords_KEL.GLUE_FDC.InputPIIDataset InputPIIDataset, InputArchiveDate) <= Person{UID} ASOF reportedby(InputArchiveDate)
+	USE InputPIIDataset(FLAT,
+			InputPII( // Grab all of the single value input PII fields - the KEL Names should match the ECL Names inside of PublicRecords_KEL.GLUE_FDC.InputPIIDataset
+				UID = LexID,
+				Subject = LexID)); // We are linking the Input PII to the Person ENTITY via the LexID
