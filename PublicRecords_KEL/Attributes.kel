@@ -1,6 +1,10 @@
 ﻿IMPORT PublicRecords_KEL.Entities;
 IMPORT PublicRecords_KEL.Uses;
 
+IMPORT KELFunctionLibraries.KELGlobalFunctionLibrary;
+FUNCTION: fBocaShellHistoryDate <= IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
+
+
 // Global Constant Definitions
 Bankruptcy: ONE_MONTH_IN_DAYS := 30;
 Bankruptcy: THREE_MONTHS_IN_DAYS := 90;
@@ -31,9 +35,6 @@ Phone: REPEATING_NUMBERS := ['1111111111', '2222222222', '3333333333', '44444444
 SocialSecurityNumber: POCKETBOOK_SSN := ['123456789', '022281852', '042103580', '062360749', '062360794', '078051120', '095073645', '128036045', '135016629', '141186941', '165167999', '165187999', '165207999', '165227999', '165247999', '189092294', '212097694', '212099999', '219099998', '219099999', '306302348', '308125070', '468288779', '549241889', '987654320'];
 
 // Global Attribute Definitions
-
-Address: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
-
 Address: => ADVOHit := IF(EXISTS(ADVODateSummary), 'Y', 'N');
 Address: => MostRecentCollege := TOPN(College, 1, -CollegeIndicator:DateLastSeen, -CollegeIndicator:DateFirstSeen);
 Address: => ADVOCollegeIndicator := ONLY(MostRecentCollege, CollegeIndicator);
@@ -77,23 +78,15 @@ Address: => ADVODateVendorFirstReported := ADVODateSummary.ADVODateVendorFirstRe
 Address: => ADVODateVendorLastReported := ADVODateSummary.ADVODateVendorLastReported$Max;
 Address: => NumberOfSSNs := COUNT(SSNAddress.Social); // (Ssns_per_addr)ECL attribute name
 
+Aircraft: => DaysOld := ABSDAYSBETWEEN(NNumber:DateFirstSeen, fBocaShellHistoryDate());
 
-
-
-Aircraft: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
-Aircraft: => DaysOld := ABS(DAYSBETWEEN(NNumber:DateFirstSeen, BocaShellHistoryDate));
-
-
-
-
-Bankruptcy: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
 Bankruptcy: => HasCaseNumber := NOT TRIMALL(CaseNumber) IN ['', '0'] AND NOT CaseNumber:Null;
 Bankruptcy.Records: => ValidDate := ISVALIDDATE(DateFiled);
-Bankruptcy.Records: => LastSeenDischargedDate := IF(DischargedDate <= Bankruptcy.BocaShellHistoryDate, DischargedDate, DATEFROMPARTS(0, 0, 0));
+Bankruptcy.Records: => LastSeenDischargedDate := IF(DischargedDate <= fBocaShellHistoryDate(), DischargedDate, DATEFROMPARTS(0, 0, 0));
 Bankruptcy.Records: => LastSeenRecordDate := MAP(LastSeenDischargedDate:Null AND NOT DateFiled:Null => DateFiled,
 												 NOT LastSeenDischargedDate:Null AND DateFiled:Null => LastSeenDischargedDate,
 																									   MAX(LastSeenDischargedDate, DateFiled));
-Bankruptcy.Records: => FilingAgeInDays := ABS(DAYSBETWEEN(LastSeenRecordDate, Bankruptcy.BocaShellHistoryDate));
+Bankruptcy.Records: => FilingAgeInDays := ABSDAYSBETWEEN(LastSeenRecordDate, fBocaShellHistoryDate());
 Bankruptcy.Records: => IsDebtor := NameType IN ['D'];
 Bankruptcy.Records: => IsAttorney := NameType IN ['A1'];
 Bankruptcy.Records: => Chapter7 := OriginalChapter = '7';
@@ -102,10 +95,10 @@ Bankruptcy.Records: => Chapter12 := OriginalChapter = '12';
 Bankruptcy.Records: => Chapter13 := OriginalChapter = '13';
 Bankruptcy.Records: => DismissedDisposition := UPCASE(Disposition) = 'DISMISSED';
 Bankruptcy.Records: => DisposedDisposition := NOT TRIMALL(Disposition) = '' AND NOT Disposition:Null;
-Bankruptcy.Records: => DisposedLast2Years := DisposedDisposition AND ABS(DAYSBETWEEN(DischargedDate, Bankruptcy.BocaShellHistoryDate)) < (365 * 2 + 1);
-Bankruptcy.Records: => DisposedMoreThan2Years := DisposedDisposition AND ABS(DAYSBETWEEN(DischargedDate, Bankruptcy.BocaShellHistoryDate)) > (365 * 2);
-Bankruptcy.Records: => DismissedLast2Years := DismissedDisposition AND ABS(DAYSBETWEEN(DischargedDate, Bankruptcy.BocaShellHistoryDate)) < (365 * 2 + 1);
-Bankruptcy.Records: => DismissedMoreThan2Years := DismissedDisposition AND ABS(DAYSBETWEEN(DischargedDate, Bankruptcy.BocaShellHistoryDate)) > (365 * 2);
+Bankruptcy.Records: => DisposedLast2Years := DisposedDisposition AND ABSDAYSBETWEEN(DischargedDate, fBocaShellHistoryDate()) < (365 * 2 + 1);
+Bankruptcy.Records: => DisposedMoreThan2Years := DisposedDisposition AND ABSDAYSBETWEEN(DischargedDate, fBocaShellHistoryDate()) > (365 * 2);
+Bankruptcy.Records: => DismissedLast2Years := DismissedDisposition AND ABSDAYSBETWEEN(DischargedDate, fBocaShellHistoryDate()) < (365 * 2 + 1);
+Bankruptcy.Records: => DismissedMoreThan2Years := DismissedDisposition AND ABSDAYSBETWEEN(DischargedDate, fBocaShellHistoryDate()) > (365 * 2);
 Bankruptcy: => MostRecentStatusDetails := TOPN(Status, 1, -StatusDate, -StatusType:DateLastSeen, -StatusType:DateFirstSeen);
 Bankruptcy: => MostRecentBankruptcyStatus := IF(ONLY(MostRecentStatusDetails, StatusType) = '', 'Unknown', ONLY(MostRecentStatusDetails, StatusType));
 Bankruptcy: => DischargedStatus := EXISTS(Status(UPCASE(StatusType) = 'DISCHARGED'));
@@ -113,12 +106,9 @@ Bankruptcy: => DismissedStatus := EXISTS(Status(UPCASE(StatusType) = 'DISMISSED'
 Bankruptcy: => LastSeenDate := TMSID:DateLastSeen;
 
 
-
-
-CriminalOffense: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
 CriminalOffense.OffenseCharges: => IsFelony := OffenderLevel = 4 AND OffenseScore = 'F';
 CriminalOffense.OffenseCharges: => IsArrest := DataType = 5;
-CriminalOffense.OffenseCharges: => AgeInDays := ABS(DAYSBETWEEN(OffenseDate, CriminalOffense.BocaShellHistoryDate));
+CriminalOffense.OffenseCharges: => AgeInDays := ABSDAYSBETWEEN(OffenseDate, fBocaShellHistoryDate());
 
 
 
@@ -174,11 +164,6 @@ FirstDegreeAssociations: => TitleDescription := MAP(
 	Title = 9999=> '2nd-Degree-Associate',
 					'Transactional-Associate');
 
-
-
-
-Person: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
-
 Person: => AircraftCount := COUNT(AircraftOwner.Plane(NOT NNumber:Null){NNumber});
 Person: => AircraftCount30 := COUNT(AircraftOwner.Plane(DaysOld <= 30){NNumber});
 Person: => AircraftCount90 := COUNT(AircraftOwner.Plane(DaysOld <= 90){NNumber});
@@ -202,7 +187,7 @@ Person: => SuspectFirstDegreeRelativesAndAssociatesCount := COUNT(FirstDegreeRel
 Person: => SuspectFirstDegreeRelativesAndAssociatesFelonyCount := COUNT(Person.FirstDegreeRelative.Relative(FelonyCount > 0));
 Person: => SuspectFirstDegreeRelativesAndAssociatesBankruptcyCount := COUNT(Person.FirstDegreeRelative.Relative(BankruptcyCount > 0));
 
-Person: => LastBankruptcyDischargeDate := IF(MAX(PersonBankruptcy.Bankrupt, Records.DischargedDate) <= BocaShellHistoryDate, 
+Person: => LastBankruptcyDischargeDate := IF(MAX(PersonBankruptcy.Bankrupt, Records.DischargedDate) <= fBocaShellHistoryDate(), 
 										MAX(PersonBankruptcy.Bankrupt, Records.DischargedDate), 
 										DATEFROMPARTS(0, 0, 0));
 Person: => LastBankruptcyDateFiled := MAX(PersonBankruptcy.Bankrupt, Records.DateFiled);
@@ -221,7 +206,7 @@ Person: => BankruptcyCountInLast5Years := COUNT(PersonBankruptcy.Bankrupt(Record
 Person: => BankruptcyCountInLast6Years := COUNT(PersonBankruptcy.Bankrupt(Records.IsDebtor = TRUE AND Records.FilingAgeInDays <= Bankruptcy.SIX_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null));
 Person: => BankruptcyCountInLast7Years := COUNT(PersonBankruptcy.Bankrupt(Records.IsDebtor = TRUE AND Records.FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null));
 Person: => BankruptcyCount := COUNT(PersonBankruptcy.Bankrupt(Records.IsDebtor = TRUE AND Records.FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)); 
-Person: => BankruptcyAge := ABS(MONTHSBETWEEN(MAX(PersonBankruptcy.Bankrupt, Records.DateFiled), BocaShellHistoryDate));
+Person: => BankruptcyAge := ABS(MONTHSBETWEEN(MAX(PersonBankruptcy.Bankrupt, Records.DateFiled), fBocaShellHistoryDate()));
 Person: => BankruptcyStatus := MostRecentBankruptcy.MostRecentBankruptcyStatus;
 Person: => BankruptcyFilingType := ONLY(MostRecentBankruptcy, Records.FilingType);
 Person: => BankruptcyDisposition := ONLY(MostRecentBankruptcy, Records.Disposition);
@@ -264,13 +249,13 @@ Person: => EmailSourceCount := IF(EXISTS(EmailSourceList), COUNT(EmailSourceList
 Person: => SSNCount := COUNT(PersonSSN.Social); // (Ssns_per_adl)ECL attribute name
 Person: => SSNInvalidCount := COUNT(PersonSSN.Social(NOT IsValid)); // (Invalid_ssns_per_adl) ECL attribute name
 Person: => SSNMultipleLexIDsCount := COUNT(PersonSSN.Social(LexIDCount > 1)); // (Ssns_per_adl_multiple_use) ECL attribute name
-Person: => SSNSeenInLast6MonthsCount := COUNT(PersonSSN(ABS(DAYSBETWEEN(Social.HeaderFirstSeen, Person.BocaShellHistoryDate)) <= 183)); //(Ssns_per_adl_created_6months) ECL attribute name
-Person: => SSNSeenInLast18MonthsCount := COUNT(PersonSSN(ABS(DAYSBETWEEN(Social.HeaderFirstSeen, Person.BocaShellHistoryDate)) <= 540)); //(Ssns_per_adl_created_18months) ECL attribute name
+Person: => SSNSeenInLast6MonthsCount := COUNT(PersonSSN(ABSDAYSBETWEEN(Social.HeaderFirstSeen, fBocaShellHistoryDate()) <= 183)); //(Ssns_per_adl_created_6months) ECL attribute name
+Person: => SSNSeenInLast18MonthsCount := COUNT(PersonSSN(ABSDAYSBETWEEN(Social.HeaderFirstSeen, fBocaShellHistoryDate()) <= 540)); //(Ssns_per_adl_created_18months) ECL attribute name
 Person: => FirstDegreeRelativeLexIDs := FirstDegreeRelative.Relative{UID};
 Person: => SSNMultipleLexIDsSet := PersonSSN.Social(LexIDCount > 1){SSN := UID, LexID := PersonSSN.Subject.UID};
 Person: => SSNMultipleNonRelativeLexIDsSet := SSNMultipleLexIDsSet(NOT LexID IN Person.FirstDegreeRelativeLexIDs);
 Person: => SSNMultipleNonRelativeLexIDsCount := COUNT(SSNMultipleNonRelativeLexIDsSet{SSN}(SSN:Weight > 1));
-Person: => SSNCreatedInLast6MonthsInvalidCount := COUNT(PersonSSN(NOT Social.IsValid AND ABS(DAYSBETWEEN(Social.HeaderFirstSeen, Person.BocaShellHistoryDate)) < 183));
+Person: => SSNCreatedInLast6MonthsInvalidCount := COUNT(PersonSSN(NOT Social.IsValid AND ABSDAYSBETWEEN(Social.HeaderFirstSeen, fBocaShellHistoryDate()) < 183));
 
 //Property Attributes for a Person
  
@@ -290,13 +275,10 @@ Person: => PropertyOwnedAssessedTotal := SUM(PersonProperty(IsBuyerOrOwner OR Is
 Property: => PropertyOwnedAssessedCounts := COUNT(PersonProperty(IsBuyerOrOwner OR IsSeller).Transaction(AssessedTotalValue > 0));
 
 
-Phone: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
 Phone: => IsValid := Phone10 != 0 AND LENGTH(TRIMALL(Phone10)) = 10 AND NOT STARTSWITH(Phone10, '555') AND NOT SUBSTR(Phone10, 4, 10) IN ['0000000', '1234567'] AND SUBSTR(Phone10, 7, 10) != '9999' AND NOT Phone10 IN REPEATING_NUMBERS;
 
 
- 
-SocialSecurityNumber: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
-SocialSecurityNumber: => AddressCount := COUNT(SSNAddress.Location); //	(Addrs_per_ssn)	ECL attribute name
+ SocialSecurityNumber: => AddressCount := COUNT(SSNAddress.Location); //	(Addrs_per_ssn)	ECL attribute name
 SocialSecurityNumber: => IsValid := SSN != 0 AND 
     LENGTH(TRIMALL(SSN)) = 9 AND 
     NOT STARTSWITH(SSN, '9') AND NOT STARTSWITH(SSN, '000') AND NOT STARTSWITH(SSN, '666') AND 
@@ -308,16 +290,13 @@ SocialSecurityNumber: => LexIDCount := PersonSSN.Subject:Count; // (Adlperssn_co
 SocialSecurityNumber: => Deceased := EXISTS(DatesOfDeath); //(Deceased) ECL attribute name
 SocialSecurityNumber: => DeceasedDate := MIN(DatesOfDeath);  //(Deceaseddate) ECL attribute name
 SocialSecurityNumber: => RandomizedSSN := (YEAR(OfficialFirstSeen) = 2011) AND (MONTH(OfficialFirstSeen) = 6) AND IsValid AND COUNT(PersonSSN(LegacySSN))=0;
-SocialSecurityNumber: => HighIssueDate := IF(RandomizedSSN AND CURRENTDATE() >= D'20110601', BocaShellHistoryDate, OfficialLastSeen); // (High_issue_date) ECL attribute name
+SocialSecurityNumber: => HighIssueDate := IF(RandomizedSSN AND CURRENTDATE() >= D'20110601', fBocaShellHistoryDate(), OfficialLastSeen); // (High_issue_date) ECL attribute name
 SocialSecurityNumber: => LowIssueDate := IF(RandomizedSSN AND CURRENTDATE() >= D'20110601', D'20110601', OfficialFirstSeen); // (Low_issue_date) ECL attribute name
 
 
+Watercraft: => DaysOld := ABSDAYSBETWEEN(WatercraftKey:DateFirstSeen,fBocaShellHistoryDate()); 
 
-
-Watercraft: => BocaShellHistoryDate := IF(CURRENTDATE() >= TODAY(), CURRENTDATE(), DATEFROMPARTS(YEAR(CURRENTDATE()), MONTH(CURRENTDATE()), 1));
-Watercraft: => DaysOld := ABS(DAYSBETWEEN(WatercraftKey:DateFirstSeen, BocaShellHistoryDate)); 
-
-Person: => Age := YEARSBETWEEN(ONLY(ReportedDatesOfBirth, DateOfBirth), CURRENTDATE());
+Person: => Age := AGE(ONLY(ReportedDatesOfBirth, DateOfBirth));
 Household: => MembersCount :=  COUNT(HouseholdMember(Version = 1).Subject);// hh_members_ct
 Household: => Age65PlusCount := COUNT(HouseholdMember(Version = 1).Subject(Age > 65)); // hh_age_65_plus
 Household: => Age31To65Count := COUNT(HouseholdMember(Version = 1).Subject(30 < Age AND Age <= 65)); // hh_age_31_to_65
@@ -357,4 +336,9 @@ PersonVehicle: => Historical := EXISTS(CountsModel(HistorySource AND NOT Sequenc
 Person: => VehicleCurrentCount := BOUNDSFOLD(COUNT(PersonVehicle(Current){Automobile.OriginalVin}),0,MAX_VEHICLES);
 Person: => VehicleHistoricalCount := BOUNDSFOLD(COUNT(PersonVehicle(Historical){Automobile.OriginalVin}),0,MAX_VEHICLES);
 Person: => RelativeVehicleCount := COUNT(FirstDegreeRelative.Relative(VehicleCurrentCount>0));
+
+
+
+Person: => DLCount := COUNT(PersonDriversLicense.License);
+Person: => HasDL := DLCount > 0;
 Person: => PII := ONLY(InputPII);

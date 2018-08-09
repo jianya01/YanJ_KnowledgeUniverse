@@ -53,7 +53,7 @@ LayoutSSN := RECORD
   unsigned8 __internal_fpos__;
  END;
 
-blankDataset := dataset([], LayoutSSN);
+blankDataset := dataset([], LayoutSSN); 
 
 fileName := '~thor_data400::key::death_master::fcra::qa::ssn_table_v4_filtered';
 

@@ -1,5 +1,5 @@
 ﻿IMPORT _Control;
-
+ 
 LayoutSSN_SSA := RECORD
   string9 ssn;
   string12 did;

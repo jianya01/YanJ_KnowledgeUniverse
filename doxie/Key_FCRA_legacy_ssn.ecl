@@ -5,6 +5,7 @@ Layoutlegacyssn :=  RECORD
 		unsigned6 did;
  END;
 
+
 blankDataset := dataset([], Layoutlegacyssn);
 
 fileName := '~thor_data400::key::fcra::header.legacy_ssn_qa';
