@@ -1,1 +1,0 @@
-﻿EXPORT IN_Vault := I_Tobacco_Realsource.Constants.VaultFile;

@@ -1,1 +1,0 @@
-﻿EXPORT File_FCRA_Banko_Logs_Common := dataset('~thor10_231::base::banko_acclogs_common', inquiry_acclogs.CommonLayout, thor);

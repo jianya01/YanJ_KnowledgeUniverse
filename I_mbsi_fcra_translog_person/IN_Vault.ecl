@@ -1,1 +1,0 @@
-﻿EXPORT IN_vault := I_mbsi_fcra_translog_person.constants.VaultFile;
