@@ -1,1 +1,0 @@
-﻿EXPORT IN_vault := DEtranOL.Constants.VaultFile;

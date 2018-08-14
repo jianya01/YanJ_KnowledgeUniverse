@@ -1,1 +1,0 @@
-﻿EXPORT IN_vault := I_Telematics_translog.constants.VaultFile;

@@ -1,1 +1,0 @@
-﻿EXPORT IN_vault := I_Key_Relatives_V3.constants.VaultFile;

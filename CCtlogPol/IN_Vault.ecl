@@ -1,1 +1,0 @@
-﻿EXPORT IN_vault := CCtlogPol.Constants.VaultFile;
