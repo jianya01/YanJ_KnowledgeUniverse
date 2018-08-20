@@ -1,0 +1,212 @@
+﻿IMPORT KnowledgeUniverse.ProviderShell_KEL.Entities;
+IMPORT ProviderShell_KEL.Uses;
+
+FUNCTION: Distance(REAL Long1,REAL Lat1, REAL Long2, REAL Lat2) <= 3963.3453 * ACOS(((1 + COS(0.01745 *(Long1 - Long2))) * COS(0.01745 *(Lat1 - Lat2)) - (1 - COS(0.01745 *(Long1 - Long2))) * COS(0.01745 *(Lat1 + Lat2))) / 2);
+
+Provider: => ProviderClaimCount := COUNT(ProviderClaims.Clm); 
+Provider: => ProviderPatientCount := COUNT(ProviderPatients.Pat);
+Provider: => ProviderHighChargeAmount := SUM(ProviderClaims.Clm, ChargeAmt);  
+Provider: => ProviderHighPaidAmount := SUM(ProviderClaims.Clm, PaidAmt);  
+Provider: => ProviderHighPaidAmountPerClaim := SUM(ProviderClaims.Clm, PaidAmt) / COUNT(ProviderClaims.Clm); 
+Provider: => ProviderHighPaidAmountPerPatient := SUM(ProviderClaims.Clm, PaidAmt) / COUNT(ProviderPatients.Pat); 
+Provider: => ProviderServiceDateMin := MIN(ProviderClaims.Clm, ServiceDate); 
+Provider: => ProviderServiceDateMax := MAX(ProviderClaims.Clm, ServiceDate); 
+Patient: => PatientServiceDateMin := MIN(ProviderPatientsClaims.Clm, ServiceDate);
+Patient: => PatientServiceDateMax := MAX(ProviderPatientsClaims.Clm, ServiceDate);
+Provider: => ExcludeAddressFlag := EXISTS(ProviderAddress.Addr(ExclusionList = TRUE));//EXISTS(ExclusionList(PrimaryRange=Provider.PrimaryRange,PreDirectional = Provider.PreDirectional, PrimaryName = Provider.PrimaryName, AddressSuffix = Provider.AddressSuffix, PostDirectional = Provider.PostDirectional, SecondaryRange = Provider.SecondaryRange, City = Provider.City, State = Provider.State, Zip = Provider.Zip));
+Person: => BestDateOfDeath := MAX(DateOfDeath,DOD);
+Patient: => DOD := rPerson.BestDateOfDeath;
+Patient: => PatientDateOfDeath := MAP(DOD > 0 => DOD, ClientDOD = 21991231 => 0, ClientDOD:Null => 0, ClientDOD > 0 => ClientDOD, 0); 
+Provider: => PatientDOD := MAX(ProviderPatients.Pat, PatientDateOfDeath);
+Provider: => DOD := rPerson.BestDateOfDeath;
+Provider: => ProvBankruptcyDate := MAP(TRIMBOTH(BankruptcyDate) = 'Past 1M' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-1,0)), 
+	TRIMBOTH(BankruptcyDate) = 'Past 3M' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-3,0)), 
+	TRIMBOTH(BankruptcyDate) = 'Past 6M' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-6,0)), 
+	TRIMBOTH(BankruptcyDate) = 'Past 1Y' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),-1,0,0)), 
+	TRIMBOTH(BankruptcyDate) = 'Past 2Y' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),-2,0,0)), 
+	TRIMBOTH(BankruptcyDate) = 'Past 5Y' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),-5,0,0)), 
+	0);
+Provider: => ProvConvictionDate := MAP(TRIMBOTH(ConvictionDate) = 'Past 1M' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-1,0)), 
+	TRIMBOTH(ConvictionDate) = 'Past 3M' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-3,0)), 
+	TRIMBOTH(ConvictionDate) = 'Past 6M' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-6,0)), 
+	TRIMBOTH(ConvictionDate) = 'Past 1Y' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),-1,0,0)), 
+	TRIMBOTH(ConvictionDate) = 'Past 2Y' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),-2,0,0)), 
+	TRIMBOTH(ConvictionDate) = 'Past 5Y' => INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),-5,0,0)), 
+	0);
+Claim: => PatientDOD := MAX(ProviderPatientsClaims.Pat, PatientDateOfDeath);
+Claim: => DeceasedFlag := ServiceDate > PatientDOD AND PatientDOD > 0 AND ServiceDate > 0 AND ChargeAmt > 0; 
+Claim: => StateExclusionDate := MAX(ProviderPatientsClaims.Prov, CurrentStateExclusionDate);
+Claim: => ActiveStateExclusionDate := IF(StateExclusionDate > 0, StateExclusionDate, INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-6,0)));
+Claim: => isStateExclusion := ServiceDate > 0 AND ActiveStateExclusionDate > 0 AND ServiceDate > ActiveStateExclusionDate;
+Claim: => OIGExclusionDate := MAX(ProviderPatientsClaims.Prov, CurrentOIGExclusionDate);
+Claim: => ActiveOIGExclusionDate := IF(OIGExclusionDate > 0, OIGExclusionDate, INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-6,0)));
+Claim: => isOIGExclusion := ServiceDate > 0 AND ActiveOIGExclusionDate > 0 AND ServiceDate > ActiveOIGExclusionDate;
+Claim: => OPMExclusionDate := MAX(ProviderPatientsClaims.Prov, CurrentOPMExclusionDate);
+Claim: => ActiveOPMExclusionDate := IF(OPMExclusionDate > 0, OPMExclusionDate, INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-6,0)));
+Claim: => isOPMExclusion := ServiceDate > 0 AND ActiveOPMExclusionDate > 0 AND ServiceDate > ActiveOPMExclusionDate;
+Claim: => StateReinstatedDate := MAX(ProviderPatientsClaims.Prov, PastStateExclusionDate);
+Claim: => PastStateReinstatedDate := IF(StateReinstatedDate > 0, INTEGERFROMDATE(ADJUSTCALENDAR(FROMSTRINGTODATE(INTFORMAT(StateReinstatedDate,8,1), 'Ymd'),0,-6,0)),0);
+Claim: => isPastStateExclusion := IF(StateExclusionDate > 0 AND StateReinstatedDate > 0 AND StateReinstatedDate > StateExclusionDate , ServiceDate > 0 AND ServiceDate >= StateExclusionDate AND ServiceDate <= StateReinstatedDate, ServiceDate > 0 AND PastStateReinstatedDate > 0 AND ServiceDate >= PastStateReinstatedDate AND ServiceDate <= StateReinstatedDate);
+Claim: => OIGReinstatedDate := MAX(ProviderPatientsClaims.Prov, PastOIGExclusionDate);
+Claim: => PastOIGReinstatedDate := IF(OIGReinstatedDate > 0, INTEGERFROMDATE(ADJUSTCALENDAR(FROMSTRINGTODATE(INTFORMAT(OIGReinstatedDate,8,1), 'Ymd'),0,-6,0)),0);
+Claim: => isPastOIGExclusion := IF(OIGExclusionDate > 0 AND OIGReinstatedDate > 0 AND OIGReinstatedDate > OIGExclusionDate , ServiceDate > 0 AND ServiceDate >=  OIGExclusionDate AND ServiceDate <= OIGReinstatedDate, ServiceDate > 0 AND PastOIGReinstatedDate > 0 AND ServiceDate >= PastOIGReinstatedDate AND ServiceDate <= OIGReinstatedDate);
+Claim: => OPMReinstatedDate := MAX(ProviderPatientsClaims.Prov, PastOPMExclusionDate);
+Claim: => PastOPMReinstatedDate := IF(OPMReinstatedDate > 0, INTEGERFROMDATE(ADJUSTCALENDAR(FROMSTRINGTODATE(INTFORMAT(OPMReinstatedDate,8,1), 'Ymd'),0,-6,0)),0);
+Claim: => isPastOPMExclusion := IF(OPMExclusionDate > 0 AND OPMReinstatedDate > 0 AND OPMReinstatedDate > 0 AND OPMExclusionDate > 0, ServiceDate > 0 AND ServiceDate >=  OPMExclusionDate AND ServiceDate <= OPMReinstatedDate, ServiceDate > 0 AND PastOPMReinstatedDate > 0 AND ServiceDate >=  PastOPMReinstatedDate AND ServiceDate <= OPMReinstatedDate);
+Claim: => RevokedLicenseDate := MAX(ProviderPatientsClaims.Prov, CurrentRevokedLicenseDate);
+Claim: => CurrentRevokedLicenseDate := IF(RevokedLicenseDate > 0, INTEGERFROMDATE(FROMSTRINGTODATE(INTFORMAT(RevokedLicenseDate,8,1),'Ymd')),INTEGERFROMDATE(ADJUSTCALENDAR(CURRENTDATE(),0,-6,0)));
+Claim: => isLicenseRevoked := ServiceDate > 0 AND CurrentRevokedLicenseDate > 0  AND ServiceDate > CurrentRevokedLicenseDate;
+Claim: => PriorRevokedLicenseDate := MAX(ProviderPatientsClaims.Prov, PastRevokedLicenseDate);
+Claim: => PastRevokedLicenseDate := IF(PriorRevokedLicenseDate > 0, INTEGERFROMDATE(ADJUSTCALENDAR(FROMSTRINGTODATE(INTFORMAT(PriorRevokedLicenseDate,8,1),'Ymd'),0,-6,0)),0);
+Claim: => isPastLicenseRevoked := IF(RevokedLicenseDate > 0 AND PriorRevokedLicenseDate > 0 AND PriorRevokedLicenseDate > RevokedLicenseDate, ServiceDate > 0 AND ServiceDate >= RevokedLicenseDate AND ServiceDate <= PriorRevokedLicenseDate, ServiceDate > 0 AND ServiceDate >=  PastRevokedLicenseDate AND ServiceDate <= PriorRevokedLicenseDate);
+Claim: => LicExpiredDate := MAX(ProviderPatientsClaims.Prov, INTEGERFROMDATE(LicenseExpiredDate)); 
+Claim: => isLicenseExpired := ServiceDate > 0 AND LicExpiredDate > 0 AND ServiceDate > LicExpiredDate;
+Claim: => NPIDate := MAX(ProviderPatientsClaims.Prov(NPIFlag = 'I'), NPIDeactivationDate);
+Claim: => isNPIDeactive := ServiceDate > 0 AND NPIDate > 0 AND ServiceDate > NPIDate;
+Claim: => isDeceasedPatient := ServiceDate > PatientDOD AND PatientDOD > 0 AND ServiceDate > 0 AND PaidAmt > 0;
+Claim: => ProviderDeceasedDate := MAX(ProviderClaims.Prov, DOD);
+Claim: => isProviderDeceased := ServiceDate > 0 AND ProviderDeceasedDate > 0 AND ServiceDate > ProviderDeceasedDate;
+Claim: => BankruptcyDate := MAX(ProviderPatientsClaims.Prov, ProvBankruptcyDate);
+Claim: => isBankruptcy := ServiceDate > 0 AND BankruptcyDate > 0 AND ServiceDate > BankruptcyDate;
+Claim: => ConvictionDate := MAX(ProviderPatientsClaims.Prov, ProvConvictionDate);
+Claim: => isConviction := ServiceDate > 0 AND ConvictionDate > 0 AND ServiceDate > ConvictionDate;
+
+Provider: => PatientDeceasedFlag := EXISTS(ProviderPatientsClaims(Prov=Provider.UID).Clm(DeceasedFlag)) AND rProfessional > 0; 
+Provider: => DeceasedPatient := ProviderPatientsClaims(Prov=Provider.UID).Clm(DeceasedFlag).ProviderPatientsClaims{Pat}; 
+Provider: => PatientDeceasedCount := COUNT(DeceasedPatient); 
+Provider: => ProviderDeceasedFlag := ProviderServiceDateMax > DOD;
+Provider: => ProviderNPIDeactivatedFlag := ProviderServiceDateMax > NPIDeactivationDate AND ProviderHighChargeAmount > 0 AND NPIFlag = 'I' AND NPIDeactivationDate > 0;
+Provider: => Dea90Date := ADJUSTCALENDAR(DEADate,0,0,90);
+Provider: => LIC90Date := ADJUSTCALENDAR(LicenseExpiredDate,0,0,90);
+Provider: => ProviderDEADeactivatedFlag := ProviderServiceDateMax > INTEGERFROMDATE(Dea90Date) AND ProviderHighChargeAmount > 0;
+Provider: => ProviderLicenseExpiredFlag := ProviderServiceDateMax > INTEGERFROMDATE(LIC90Date) AND ProviderHighChargeAmount > 0; 	
+Address: => AddressProviderCount := COUNT(ProviderAddress);
+Address: => AddressPatientCount := COUNT(PatientAddress);
+Address: => AddressClaimCount := COUNT(AddressClaims.Clm);
+Address: => AddressHighChargeAmount := SUM(AddressClaims.Clm, ChargeAmt);  
+Address: => AddressHighPaidAmount := SUM(AddressClaims.Clm, PaidAmt);  
+Address: => AddressServiceDateMin := MIN(AddressClaims.Clm, ServiceDate); 
+Address: => AddressServiceDateMax := MAX(AddressClaims.Clm, ServiceDate); 
+Address: => TotalNPICount := COUNT(ProviderAddress(Prov.EntityType = '1'));
+Address: => NewNPI := ProviderAddress(Prov.rProfessional > 0 AND Prov.EntityType = '1' AND MONTHSBETWEEN(Prov.NPIEnumerationDate, CURRENTDATE()) < 6);
+Address: => NewNPICount := COUNT(NewNPI);
+ProviderAddress: => isStudentNPI := SUBSTR(Prov.Taxonomy,1,2) = '39';
+Address: => StudentNPICount := COUNT(ProviderAddress(Prov.EntityType = '1' AND Prov.rProfessional > 0 AND isStudentNPI));
+Address: => RecentNPIFlag := TotalNPICount > 0 AND TotalNPICount = NewNPICount;
+Address: => StudentNPIFlag := TotalNPICount > 0 AND TotalNPICount = StudentNPICount;	
+Provider: => LNPIDCount := ProviderProfessionalPatients.Addr{PrimaryRange,PreDirectional,PrimaryName,AddressSuffix,PostDirectional,SecondaryRange,City,State,Zip,cnt:=COUNT(GROUP)};
+Provider: => LargePatientGroupFlag := EXISTS(LNPIDCount(cnt > 10)) AND rProfessional > 0;
+Provider: => LargePatientGroupCount := MAX(LNPIDCount,cnt);
+Provider: => LNPIDCountAddress := ONLY(TOPN(LNPIDCount,1,-cnt)(cnt > 10));
+Provider: => LargePatientGroupAddress := TRIMBOTH(LNPIDCountAddress.PrimaryRange) + ' ' + TRIMBOTH(LNPIDCountAddress.PreDirectional) + ' ' + TRIMBOTH(LNPIDCountAddress.PrimaryName) + ' ' + 
+	TRIMBOTH(LNPIDCountAddress.AddressSuffix) + ' ' + TRIMBOTH(LNPIDCountAddress.PostDirectional) + ' ' + TRIMBOTH(LNPIDCountAddress.SecondaryRange) + ' ' + 
+	TRIMBOTH(LNPIDCountAddress.City) + ' ' + TRIMBOTH(LNPIDCountAddress.State) + ' ' + TRIMBOTH(LNPIDCountAddress.Zip); 
+Provider: => ProviderPatientAddress := ONLY(ProviderPatients.Pat(PatientAddress.Addr = Provider.ProviderAddress.Addr),PatientAddress.Addr);
+// ONLY(ProviderPatients.Pat(PrimaryRange=Provider.PrimaryRange,PreDirectional = Provider.PreDirectional, PrimaryName <> '', PrimaryName = Provider.PrimaryName, 
+	// AddressSuffix = Provider.AddressSuffix, PostDirectional = Provider.PostDirectional, SecondaryRange = Provider.SecondaryRange, 
+	// City = Provider.City, State = Provider.State, Zip <> '', Zip = Provider.Zip));
+Provider: => ProviderPatientSharedAddress := TRIMBOTH(ProviderPatientAddress.PrimaryRange + ' ' + ProviderPatientAddress.PreDirectional + ' ' + ProviderPatientAddress.PrimaryName + ' ' + 
+	ProviderPatientAddress.AddressSuffix + ' ' + ProviderPatientAddress.PostDirectional + ' ' + ProviderPatientAddress.SecondaryRange + ' ' + 
+	ProviderPatientAddress.City + ' ' + ProviderPatientAddress.State + ' ' + ProviderPatientAddress.Zip);
+Provider: => ProviderPatientAddressCount := COUNT(ProviderPatients.Pat(PatientAddress.Addr = Provider.ProviderAddress.Addr));
+// COUNT(ProviderPatients.Pat(PrimaryRange=Provider.PrimaryRange,PreDirectional = Provider.PreDirectional, PrimaryName <> '', PrimaryName = Provider.PrimaryName, 
+	// AddressSuffix = Provider.AddressSuffix, PostDirectional = Provider.PostDirectional, SecondaryRange = Provider.SecondaryRange, 
+	// City = Provider.City, State = Provider.State, Zip <> '', Zip = Provider.Zip));
+Provider: => ProviderPatientAddressFlag := EXISTS(ProviderPatientAddress) AND rProfessional > 0;
+Provider: => VacationClaims := ProviderClaims(Clm.ServiceDate >= Prov.VacationBeginDate AND Clm.ServiceDate <= Prov.VacationEndDate);	
+Provider: => VacationChargeAmount := SUM(VacationClaims.Clm, ChargeAmt);
+Provider: => VacantAddrActivityFlag := EXISTS(VacationClaims) AND VacationChargeAmount > 0; 
+Provider: => DMEFlag := TRIM(ClientSpeciality) = '85';
+Provider: => LABFlag := TRIM(ClientSpeciality) = '122';
+Provider: NOT rProfessional:Null => NoofAddress := COUNT(GROUP{rProfessional}); 
+Provider: NOT rProfessional:Null => LNPIDClaimCount := ProviderClaimCount$GROUP{rProfessional}:Sum; 
+Provider: NOT rProfessional:Null => LNPIDHighChargeAmount := ProviderHighChargeAmount$GROUP{rProfessional}:Sum; 
+Provider: NOT rProfessional:Null => LNPIDHighPaidAmount := ProviderHighPaidAmount$GROUP{rProfessional}:Sum; 
+ProviderPatients: => LongDistance := Distance(ONLY(Prov.ProviderAddress.Addr,Long),ONLY(Prov.ProviderAddress.Addr,Lat),ONLY(Pat.PatientAddress.Addr,Long),ONLY(Pat.PatientAddress.Addr,Lat));
+Provider: => NoOfPatientDrivingLongDistance := COUNT(ProviderPatients(LongDistance >= 50.0 AND LongDistance <= 500.0));
+Provider: => AveDistanceTravelled := AVE(ProviderPatients(Prov.ProviderKey <> '' AND Pat.PatientKey <> '' AND Prov.ProviderAddress.Addr.State <> '' AND Pat.PatientAddress.Addr.State <> ''), LongDistance);
+
+Provider: ActiveStateExclusionFlag = 'Y' => ActiveStateExclusionImpactAmount := ROUND(SUM(ProviderClaims.Clm(isStateExclusion),  PaidAmt));
+Provider: ActiveOIGExclusionFlag = 'Y' => ActiveOIGExclusionImpactAmount := ROUND(SUM(ProviderClaims.Clm(isOIGExclusion),  PaidAmt));
+Provider: ActiveOPMExclusionFlag = 'Y' => ActiveOPMExclusionImpactAmount := ROUND(SUM(ProviderClaims.Clm(isOPMExclusion),  PaidAmt));
+Provider: PastStateExclusionFlag = 'Y' => PastStateExclusionImpactAmount := ROUND(SUM(ProviderClaims.Clm(isPastStateExclusion),  PaidAmt));
+Provider: PastOIGExclusionFlag = 'Y' => PastOIGExclusionImpactAmount := ROUND(SUM(ProviderClaims.Clm(isPastOIGExclusion),  PaidAmt));
+Provider: PastOPMExclusionFlag = 'Y' => PastOPMExclusionImpactAmount := ROUND(SUM(ProviderClaims.Clm(isPastOPMExclusion),  PaidAmt));
+Provider: ActiveLicenseRevokedFlag = 'Y' => CurrentLicenseRevokedImpactAmount := ROUND(SUM(ProviderClaims.Clm(isLicenseRevoked),  PaidAmt));
+Provider: PastLicenseRevokedFlag = 'Y' => PastLicenseRevokedImpactAmount := ROUND(SUM(ProviderClaims.Clm(isPastLicenseRevoked),  PaidAmt));
+Provider: => LicenseExpiredImpactAmount := ROUND(SUM(ProviderClaims.Clm(isLicenseExpired),  PaidAmt));
+Provider: => NPIDeactiveImpactAmount := ROUND(SUM(ProviderClaims.Clm(isNPIDeactive),  PaidAmt));
+Provider: => PatientDeceasedImpactAmount := ROUND(SUM(ProviderPatientsClaims.Clm(isDeceasedPatient),  PaidAmt));
+Provider: => ProviderDeceasedImpactAmount := ROUND(SUM(ProviderClaims.Clm(isProviderDeceased),  PaidAmt));
+Provider: => BankruptcyImpactAmount := ROUND(SUM(ProviderClaims.Clm(isBankruptcy),  PaidAmt));
+Provider: => ConvictionImpactAmount := ROUND(SUM(ProviderClaims.Clm(isConviction),  PaidAmt));
+
+Provider: ActiveStateExclusionFlag = 'Y' => ActiveStateExclusionClaimCount := COUNT(ProviderClaims.Clm(isStateExclusion));
+Provider: ActiveOIGExclusionFlag = 'Y' => ActiveOIGExclusionClaimCount := COUNT(ProviderClaims.Clm(isOIGExclusion));
+Provider: ActiveOPMExclusionFlag = 'Y' => ActiveOPMExclusionClaimCount := COUNT(ProviderClaims.Clm(isOPMExclusion));
+Provider: PastStateExclusionFlag = 'Y' => PastStateExclusionClaimCount := COUNT(ProviderClaims.Clm(isPastStateExclusion));
+Provider: PastOIGExclusionFlag = 'Y' => PastOIGExclusionClaimCount := COUNT(ProviderClaims.Clm(isPastOIGExclusion));
+Provider: PastOPMExclusionFlag = 'Y' => PastOPMExclusionClaimCount := COUNT(ProviderClaims.Clm(isPastOPMExclusion));
+Provider: ActiveLicenseRevokedFlag = 'Y' => CurrentLicenseRevokedClaimCount := COUNT(ProviderClaims.Clm(isLicenseRevoked));
+Provider: PastLicenseRevokedFlag = 'Y' => PastLicenseRevokedClaimCount := COUNT(ProviderClaims.Clm(isPastLicenseRevoked));
+Provider: => LicenseExpiredClaimCount := COUNT(ProviderClaims.Clm(isLicenseExpired));
+Provider: => NPIDeactiveClaimCount := COUNT(ProviderClaims.Clm(isNPIDeactive));
+Provider: => PatientDeceasedClaimCount := COUNT(ProviderPatientsClaims.Clm(isDeceasedPatient));
+Provider: => ProviderDeceasedClaimCount := COUNT(ProviderClaims.Clm(isProviderDeceased));
+Provider: => BankruptcyClaimCount := COUNT(ProviderClaims.Clm(isBankruptcy));
+Provider: => ConvictionClaimCount := COUNT(ProviderClaims.Clm(isConviction));
+
+Provider: => AddressActiveStateExclusionImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ActiveStateExclusionImpactAmount);
+Provider: => AddressActiveOIGExclusionImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ActiveOIGExclusionImpactAmount);
+Provider: => AddressActiveOPMExclusionImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ActiveOPMExclusionImpactAmount);
+Provider: => AddressPastStateExclusionImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PastStateExclusionImpactAmount);
+Provider: => AddressPastOIGExclusionImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PastOIGExclusionImpactAmount);
+Provider: => AddressPastOPMExclusionImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PastOPMExclusionImpactAmount);
+Provider: => AddressCurrentLicenseRevokedImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, CurrentLicenseRevokedImpactAmount);
+Provider: => AddressPastLicenseRevokedImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PastLicenseRevokedImpactAmount);
+Provider: => AddressLicenseExpiredImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, LicenseExpiredImpactAmount);
+Provider: => AddressNPIDeactiveImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, NPIDeactiveImpactAmount);
+Provider: => AddressPatientDeceasedImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PatientDeceasedImpactAmount);
+Provider: => AddressProviderDeceasedImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ProviderDeceasedImpactAmount);
+Provider: => AddressBankruptcyImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, BankruptcyImpactAmount);
+Provider: => AddressConvictionImpactAmount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ConvictionImpactAmount);
+
+Provider: => AddressActiveStateExclusionClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ActiveStateExclusionClaimCount);
+Provider: => AddressActiveOIGExclusionClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ActiveOIGExclusionClaimCount);
+Provider: => AddressActiveOPMExclusionClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ActiveOPMExclusionClaimCount);
+Provider: => AddressPastStateExclusionClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PastStateExclusionClaimCount);
+Provider: => AddressPastOIGExclusionClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PastOIGExclusionClaimCount);
+Provider: => AddressPastOPMExclusionClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PastOPMExclusionClaimCount);
+Provider: => AddressCurrentLicenseRevokedClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, CurrentLicenseRevokedClaimCount);
+Provider: => AddressPastLicenseRevokedClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PastLicenseRevokedClaimCount);
+Provider: => AddressLicenseExpiredClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, LicenseExpiredClaimCount);
+Provider: => AddressNPIDeactiveClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, NPIDeactiveClaimCount);
+Provider: => AddressPatientDeceasedClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, PatientDeceasedClaimCount);
+Provider: => AddressProviderDeceasedClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ProviderDeceasedClaimCount);
+Provider: => AddressBankruptcyClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, BankruptcyClaimCount);
+Provider: => AddressConvictionClaimCount := SUM(ProviderAddress.Addr.ProviderAddress.Prov, ConvictionClaimCount);
+
+Provider: => ProviderImpactAmount := MAX(ActiveStateExclusionImpactAmount, ActiveOIGExclusionImpactAmount, ActiveOPMExclusionImpactAmount, CurrentLicenseRevokedImpactAmount, LicenseExpiredImpactAmount, NPIDeactiveImpactAmount, PatientDeceasedImpactAmount, ProviderDeceasedImpactAmount);
+Provider: => ProviderImpactClaimCount := MAX(ActiveStateExclusionClaimCount, ActiveOIGExclusionClaimCount, ActiveOPMExclusionClaimCount, CurrentLicenseRevokedClaimCount, LicenseExpiredClaimCount, NPIDeactiveClaimCount, PatientDeceasedClaimCount, ProviderDeceasedClaimCount);				
+
+Provider:  => AddressImpactAmount := MAX(AddressActiveStateExclusionImpactAmount, AddressActiveOIGExclusionImpactAmount, AddressActiveOPMExclusionImpactAmount, AddressCurrentLicenseRevokedImpactAmount, AddressLicenseExpiredImpactAmount, AddressNPIDeactiveImpactAmount, AddressPatientDeceasedImpactAmount, AddressProviderDeceasedImpactAmount);
+Provider:  => AddressImpactClaimCount := MAX(AddressActiveStateExclusionClaimCount, AddressActiveOIGExclusionClaimCount, AddressActiveOPMExclusionClaimCount, AddressCurrentLicenseRevokedClaimCount, AddressLicenseExpiredClaimCount, AddressNPIDeactiveClaimCount, AddressPatientDeceasedClaimCount, AddressProviderDeceasedClaimCount);	
+
+Provider: NOT rProfessional:Null => LNPIDImpactClaimCount := ProviderImpactClaimCount$GROUP{rProfessional}:Sum; 
+Provider: NOT rProfessional:Null => LNPIDImpactAmount := ROUND(ProviderImpactAmount$GROUP{rProfessional}:Sum); 
+
+//Removed Redundant Logic
+Provider: => ProviderImpactRange := MAP(ProviderImpactAmount <= 0 => 0,
+					ProviderImpactAmount <= 500 => 1, 
+					ProviderImpactAmount <= 1000 => 2, 
+					ProviderImpactAmount <= 5000 => 3, 										  
+					ProviderImpactAmount <= 10000 => 4, 
+					ProviderImpactAmount <= 25000 => 5, 										  										  
+					ProviderImpactAmount <= 50000 => 6, 
+					ProviderImpactAmount <= 100000 => 7, 
+					ProviderImpactAmount <= 500000 => 8, 
+					ProviderImpactAmount <= 1000000 => 9, 
+					ProviderImpactAmount > 1000000 => 10);
+
+Provider: ProviderImpactAmount > 0 => ProviderImpactMAXAmount := ROUND(ProviderImpactAmount$^Max);
+Provider: ProviderImpactAmount > 0 => ProviderImpactPercent := ROUND((100 * ProviderImpactAmount) / ProviderImpactMAXAmount);
