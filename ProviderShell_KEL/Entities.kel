@@ -1,0 +1,115 @@
+﻿
+// Added Person ENTITY
+Person := ENTITY(FLAT(UID = LexID,
+		STRING LName,
+		STRING FName,
+		STRING MName,
+		STRING SName,
+		INTEGER DOD),	// Consider changing toDATE
+	MODEL(UID,
+		LName,FName,MName,SName,
+		DateOfDeath{DOD}));
+
+// Added Professional ENTITY
+Professional := ENTITY(FLAT(UID = LNPID),MODEL(*));
+
+// Removed Address fields
+// Removed Person fields
+// Removed Professional fields
+// Added rPerson reference
+// Added rProfessional reference
+Provider := ENTITY(FLAT(UID(ProviderKey),
+		STRING ProviderKey,
+		Person rPerson,
+		Professional rProfessional,
+		STRING NPI,
+		DATE NPIEnumerationDate,
+		STRING EntityType,
+		INTEGER NPIDeactivationDate,					// Consider changing to DATE
+		STRING NPIFlag,											// Consider changing to BOOLEAN
+		DATE DEADate,
+		STRING Taxonomy,
+		STRING Speciality,
+		STRING ClientSpeciality,							// Consider changing to INTEGER
+		INTEGER VacationBeginDate = NULL(0) ,	// Consider changing to DATE
+		INTEGER VacationEndDate = NULL(0),			// Consider changing to DATE
+		DATE LicenseExpiredDate,	
+		INTEGER CurrentStateExclusionDate,		// Consider changing to DATE
+		INTEGER CurrentOIGExclusionDate,			// Consider changing to DATE
+		INTEGER CurrentOPMExclusionDate,			// Consider changing to DATE
+		INTEGER PastStateExclusionDate,			// Consider changing to DATE
+		INTEGER PastOIGExclusionDate,				// Consider changing to DATE
+		INTEGER PastOPMExclusionDate,				// Consider changing to DATE
+		INTEGER CurrentRevokedLicenseDate,		// Consider changing to DATE
+		INTEGER PastRevokedLicenseDate,			// Consider changing to DATE
+		STRING BankruptcyDate,								// Consider changing to DATE
+		STRING ConvictionDate,								// Consider changing to DATE
+		STRING ActiveStateExclusionFlag,			// Consider changing to BOOLEAN
+		STRING ActiveOIGExclusionFlag,				// Consider changing to BOOLEAN
+		STRING ActiveOPMExclusionFlag,				// Consider changing to BOOLEAN
+		STRING PastStateExclusionFlag,				// Consider changing to BOOLEAN
+		STRING PastOIGExclusionFlag,					// Consider changing to BOOLEAN
+		STRING PastOPMExclusionFlag,					// Consider changing to BOOLEAN
+		STRING ActiveLicenseRevokedFlag,			// Consider changing to BOOLEAN
+		STRING PastLicenseRevokedFlag),				// Consider changing to BOOLEAN
+	MODEL(*));
+
+// Removed Address
+// Removed Person fields
+// Added rPerson reference
+Patient := ENTITY(FLAT(UID(PatientKey), 
+		STRING PatientKey,
+		Person rPerson,
+		INTEGER ClientDOD,	// Consider changing to DATE
+		STRING DODFLAG), 		// Consider changing to BOOLEAN	
+	MODEL(*));
+
+// Removed Provider
+// Removed Patient
+Claim := ENTITY(FLAT(UID(ClaimNumber,ClaimLineNumber), 
+		STRING ClaimNum,
+		STRING ClaimLineNum,
+		INTEGER ServiceDate,	// Consider changing to DATE
+		REAL ChargeAmt,
+		REAL PaidAmt),
+	MODEL(*));
+
+// Added Lat & Long
+// Added ExlucsionList & FacilityName
+// Removed City and State from UID
+Address := ENTITY(FLAT(UID(PrimaryRange, PreDirectional, PrimaryName, AddressSuffix, PostDirectional, SecondaryRange, Zip), 
+		STRING PrimaryRange = NULL(),
+		STRING PreDirectional = NULL(),
+		STRING PrimaryName = NULL(),
+		STRING AddressSuffix = NULL(),
+		STRING PostDirectional = NULL(),
+		STRING SecondaryRange = NULL(),
+		STRING City = NULL(),
+		STRING State = NULL(),
+		STRING Zip = NULL(),
+		REAL Lat,
+		REAL Long,
+		BOOLEAN ExclusionList,
+		STRING FacilityName),
+	MODEL(*));																						
+
+// Removed ExclusionList ENTITY
+
+ProviderPatients := ASSOCIATION(FLAT(Provider Prov = UID(ClaimRenderingProviderKey),  Patient Pat = UID(ClaimPatientKey)));
+ProviderClaims := ASSOCIATION(FLAT(Provider 	Prov = UID(ClaimRenderingProviderKey),  Claim Clm = UID(ClaimNumber,ClaimLineNumber)));
+PatientClaims := ASSOCIATION(FLAT(Patient Pat = UID(ClaimPatientKey),  Claim Clm = UID(ClaimNumber,ClaimLineNumber)));
+ProviderPatientsClaims := ASSOCIATION(FLAT(Provider 	Prov = UID(ClaimRenderingProviderKey),  Patient Pat  = UID(ClaimPatientKey), Claim Clm = UID(ClaimNumber,ClaimLineNumber)));
+ProviderAddress := ASSOCIATION(FLAT(Provider Prov = UID(ProviderKey),	Address Addr = UID(PrimaryRange, PreDirectional, PrimaryName, AddressSuffix, PostDirectional, SecondaryRange, Zip)));
+PatientAddress := ASSOCIATION(FLAT(Patient Pat = UID(PatientKey), Address Addr = UID(PrimaryRange, PreDirectional, PrimaryName, AddressSuffix, PostDirectional, SecondaryRange, Zip)));
+AddressClaims := ASSOCIATION(FLAT(Address Addr = UID(PrimaryRange, PreDirectional, PrimaryName, AddressSuffix, PostDirectional, SecondaryRange, Zip), Claim Clm = UID(ClaimNumber,ClaimLineNumber)));
+// Change ProviderLNPIDPatients to ProviderProfessionalPatients
+// Change ENTITY to ASSOCIATION
+// Removed Address fields
+// Removed Person fields
+// Added Provider reference
+// Added Person reference
+// Added Address reference
+ProviderProfessionalPatients := ASSOCIATION(FLAT(Provider Prov = UID(ClaimRenderingProviderKey), Person Per, Address Addr = UID(PrimaryRange, PreDirectional, PrimaryName, AddressSuffix, PostDirectional, SecondaryRange, Zip)));
+
+GLOBAL: ProviderClaims(#1, #2), ProviderAddress(#1, #3) => AddressClaims(#3, #2);
+GLOBAL: ProviderPatients(#1, #2), Patient(#2, #3=rPerson), PatientAddress(#2,#4) => ProviderProfessionalPatients(#1,#3,#4);
