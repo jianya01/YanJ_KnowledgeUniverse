@@ -3,7 +3,7 @@
 #OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
 
 // --- ENTITY Definitions Section --- 
-IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities; 
+IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities;
 
 // --- USE Statements Section ---
 IMPORT PublicRecords_KEL.Uses;
@@ -11,7 +11,7 @@ IMPORT PublicRecords_KEL.Uses;
 // --- Attributes Section ---
 IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
 
-// --- Final QUERY/SHELLs Section --- 
+// --- Final QUERY/SHELLs Section ---
 QUERY: ConsumerShellV1(LexID, ArchiveDate) <= Person(UID = LexID){LexID := UID, // The logic below "caps" each attribute at specific values
 		BankruptcyCountInLast1Month := BOUNDSFOLD(BankruptcyCountInLast1Month, -1, 255),
 		BankruptcyCountInLast3Months := BOUNDSFOLD(BankruptcyCountInLast3Months, -1, 255), 
@@ -40,26 +40,27 @@ QUERY: AddressShellV1(_PrimaryRange, _Predirectional, _PrimaryName, _Suffix, _Po
 		ADVODropIndicator, ADVOResidentialOrBusinessIndicator, ADVOOnlyWayToGetMailIndicator, ADVORecordTypeCode, ADVOAddressTypeCode, ADVOMixedUsageCode,
 		ADVODateFirstSeen, ADVODateLastSeen, ADVODateVendorFirstReported, ADVODateVendorLastReported, ADVOVacationBeginDate, ADVOVacationEndDate, 
 		ADVONumberOfVacationMonths, ADVOMaxVacationMonths, ADVOVacationPeriodsCount};
-
- QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.AttrWithDate_Layout InputPIIDataset, STRING ArchiveDate) <= InputPII{InputID := UID, 
-		Account := InputAccountValue,	InputLexID := InputLexIDValue, AppendedLexID, AppendedLexIDScore,
-		InputFirstName := InputFirstNameValue, InputAddress := InputAddressValue,
-		InputCity := InputCityValue, InputState := InputStateValue, 
-		InputZip := InputZipValue, InputHomePhone := InputHomePhoneValue, 
-		InputWorkPhone := InputWorkPhoneValue, InputEmail := InputEmailValue,
-		InputArchiveDate := InputArchiveDateValue,
-		InputCleanPrefix, InputCleanFirstName, InputCleanSuffix, InputCleanPrimaryRange,
-		InputCleanPreDirection, InputCleanPrimaryName, InputCleanAddressSuffix, InputCleanPostDirection,
-		InputCleanUnitDesig, InputCleanSecondaryRange, InputCleanCityName, InputCleanState,InputCleanZip5,
-		InputCleanZip4, InputCleanLatitude, InputCleanLongitude, InputCleanCounty, InputCleanGeoblock, 
-		InputCleanAddressType, InputCleanAddressStatus, InputCleanEMail, InputCleanHomePhone, 
-		InputCleanWorkPhone, ArchiveDate, RepNumber := IRepNumberValue}
+ 
+ QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Attr_Layout InputPIIDataset, STRING InputArchiveDateClean) <= InputPII{InputUIDAppend := UID, 
+		InputAccountEcho := InputAccountValue,	InputLexIDEcho := InputLexIDValue,  
+		InputFirstNameEcho := InputFirstNameValue, InputAddressEcho := InputAddressValue,
+		InputCityEcho := InputCityValue, InputStateEcho := InputStateValue, 
+		InputZipEcho := InputZipValue, InputHomePhoneEcho := InputHomePhoneValue,
+		InputWorkPhoneEcho := InputWorkPhoneValue, InputEmailEcho := InputEmailValue,
+		InputArchiveDateEcho := InputArchiveDateValue,
+		AppendedLexID, AppendedLexIDScore, 
+		InputPrefixClean, InputFirstNameClean, InputSuffixClean, InputPrimaryRangeClean,
+		InputPreDirectionClean, InputPrimaryNameClean, InputAddressSuffixClean, InputPostDirectionClean,
+		InputUnitDesigClean, InputSecondaryRangeClean, InputCityNameClean, InputStateClean,InputZip5Clean,
+		InputZip4Clean, InputLatitudeClean, InputLongitudeClean, InputCountyClean, InputGeoblockClean, 
+		InputAddressTypeClean, InputAddressStatusClean, InputEMailClean, InputHomePhoneClean, 
+		InputWorkPhoneClean, InputArchiveDateClean := InputArchiveDateValue, RepNumber := IRepNumberValue}
 	USE InputPIIDataset(FLAT, 
-		InputPII(UID = InputID, Subject = AppendedLexID));// We are linking the Input PII to the Person ENTITY via the InputID
+		InputPII(UID = InputUIDAppend, Subject = AppendedLexID));// We are linking the Input PII to the Person ENTITY via the InputUIDAppend
 
  QUERY: InputBusAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.InputEcho_Layout InputPIIDataset,
-					DATASET OF PublicRecords_KEL.ECL_Functions.AttrBusWithDate_Layout InputBIIDataset, 
-					STRING ArchiveDate) <= InputBII{InputUID := UID, 
+					DATASET OF PublicRecords_KEL.ECL_Functions.AttrBusWithUID_Layout InputBIIDataset, 
+					STRING BusInputArchiveDateEcho) <= InputBII{BusInputUIDAppend := UID, 
 		BusInputAccountEcho := BusInputAccountEchoValue,		
 		BusInputUIDAppend, InputLexIDBusExtendedFamilyEcho := InputLexIDBusExtendedFamilyEchoValue, 
 		InputLexIDBusLegalFamilyEcho := InputLexIDBusLegalFamilyEchoValue, InputLexIDBusLegalEntityEcho := InputLexIDBusLegalEntityEchoValue,
@@ -92,9 +93,9 @@ QUERY: AddressShellV1(_PrimaryRange, _Predirectional, _PrimaryName, _Suffix, _Po
 		ArchiveDate
 	} 
 	USE InputPIIDataset(FLAT,
-		InputPII(UID = InputID),
-		InputBIIInputPII(PII = InputID, BII = InputUID)),
-		InputBIIDataset(FLAT, InputBII(UID = InputUID));
+		InputPII(UID = InputUIDAppend),
+		InputBIIInputPII(PII = InputUIDAppend, BII = BusInputUIDAppend)),
+		InputBIIDataset(FLAT, InputBII(UID = BusInputUIDAppend));
 	
 // --- Debugging QUERYs Section (Only Uncomment for Debugging) ---
 // QUERY: PersonEntity(SearchForLexID, ArchiveDate) <= Person(UID = SearchForLexID) ASOF reportedby(ArchiveDate); 
