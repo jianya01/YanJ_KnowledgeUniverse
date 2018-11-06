@@ -1,4 +1,4 @@
-﻿﻿IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities; 
+﻿IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities; 
 IMPORT PublicRecords_KEL.Uses;
 
 
@@ -8,9 +8,43 @@ FUNCTION: IsBlank(STRING FieldToCheck, STRING DefaultVal) <= IF(FieldToCheck:Nul
 FUNCTION: IsZero(INTEGER FieldToCheck, INTEGER DefaultVal) <= IF(FieldToCheck:Null OR FieldToCheck = 0, DefaultVal, FieldToCheck);
 FUNCTION: IsBlank2Fields(STRING Field1ToCheck, STRING Default1Val, STRING Field2ToCheck, Default2Val) <=
 	MAP(Field1ToCheck:Null OR Field1ToCheck = '' => Default1Val,
-		Field2ToCheck:Null OR  Field2ToCheck = '' => Default2Val,
+		Field2ToCheck:Null OR  Field2ToCheck = '' => Default2Val, 
 		Field2ToCheck);
-
+FUNCTION: NameNotPopulatedCheck(STRING FnameToCheck, STRING MnameToCheck, STRING LnameToCheck) <= IF(
+					((FnameToCheck:Null OR FnameToCheck = '') AND (MnameToCheck:Null OR MnameToCheck = '') AND (LnameToCheck:Null OR LnameToCheck = '')), TRUE, FALSE);				
+/* There is a compiler issue being worked on, that doesn't allow us to use the code below. Once the compiler is fixed, we'll use this code vs the above code.
+//https://github.com/hpcc-systems/KEL/issues/2640
+FUNCTION: IsNotEnoughToClean(STRING FieldToCheck) <= IF(FieldToCheck:Null OR FieldToCheck = '', TRUE, FALSE);
+FUNCTION: NameNotPopulatedCheck(STRING FnameToCheck, STRING MnameToCheck, STRING LnameToCheck) <= IF(
+					IsNotEnoughToClean(FnameToCheck) AND IsNotEnoughToClean(MnameToCheck) AND IsNotEnoughToClean(LnameToCheck), TRUE, FALSE);				
+FUNCTION: AddrNotPopulatedCheck(STRING AddrToCheck, STRING CityToCheck, STRING StateToCheck, STRING ZipToCheck) <= 
+				MAP(
+					//Addr & City & State & Zip are blank = we can't clean 
+					(IsNotEnoughToClean(AddrToCheck) AND IsNotEnoughToClean(CityToCheck) AND
+						IsNotEnoughToClean(StateToCheck) AND IsNotEnoughToClean(ZipToCheck)) => TRUE,
+					//If Addr & City are populated but State and Zip are blank = we can't clean
+					 (NOT IsNotEnoughToClean(AddrToCheck) AND NOT IsNotEnoughToClean(CityToCheck) AND
+						IsNotEnoughToClean(StateToCheck) AND IsNotEnoughToClean(ZipToCheck)) => TRUE,
+					//If Addr & State are populated but City and Zip are blank = we can't clean
+					 (NOT IsNotEnoughToClean(AddrToCheck) AND NOT IsNotEnoughToClean(StateToCheck) AND 
+						IsNotEnoughToClean(CityToCheck) AND IsNotEnoughToClean(ZipToCheck)) => TRUE,
+				FALSE);	
+*/
+FUNCTION: AddrNotPopulatedCheck(STRING AddrToCheck, STRING CityToCheck, STRING StateToCheck, STRING ZipToCheck) <= 
+					MAP(
+					//Addr & City & State & Zip are blank = we can't clean 
+					((AddrToCheck:Null OR AddrToCheck = '') AND (CityToCheck:Null OR CityToCheck = '') AND
+						(StateToCheck:Null OR StateToCheck = '') AND (ZipToCheck:Null OR ZipToCheck = '')) => TRUE,
+					//If Addr & City are populated but State and Zip are blank = we can't clean
+					 (AddrToCheck != '' AND CityToCheck != '' AND (StateToCheck:Null OR StateToCheck = '') AND (ZipToCheck:Null OR ZipToCheck = '')) => TRUE,
+					//If Addr & State are populated but City and Zip are blank = we can't clean
+					 (AddrToCheck != '' AND StateToCheck != '' AND (CityToCheck:Null OR CityToCheck = '') AND (ZipToCheck:Null OR ZipToCheck = '')) => TRUE,
+						FALSE);	
+//Input Echo return 0/1 if populated						
+FUNCTION: IsEchoPopulated(STRING FieldToCheck) <= IF(FieldToCheck:Null OR FieldToCheck = '', '0', '1');
+//Input Cleaned returns -99/0/1 if cleaned attributes are populated
+FUNCTION: IsCleanPopulated(STRING FieldToCheck, STRING DefaultVal1, STRING DefaultVal2) <= IF(FieldToCheck = DefaultVal1, DefaultVal1,
+					IF(FieldToCheck = DefaultVal2, '0', '1'));
 FUNCTION: GETBUILDDATE(STRING variableName) <= ECL((UNSIGNED8)Risk_Indicators.get_Build_date(variableName)) FROM Risk_Indicators RETURNS DATE;
 
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
@@ -27,7 +61,7 @@ ProfessionalLicense: => CurrentDate := MIN(GETBUILDDATE('proflic_build_version')
 Property: => CurrentDate := MIN(GETBUILDDATE('property_build_version'), CURRENTDATE());
 Property: => CurrentDateFCRA := MIN(GETBUILDDATE('fcra_property_build_version'), CURRENTDATE());
 Watercraft: => CurrentDate := MIN(GETBUILDDATE('watercraft_build_version'), CURRENTDATE());
-
+					
 // Global Constant Definitions for MAS
 InputPII: MISSING_INPUT_DATA := '-99';
 InputPII: MISSING_INPUT_DATA_INT := -99;
@@ -39,10 +73,13 @@ InputBII: MISSING_INPUT_DATA_INT := -99;
 InputBII: NO_DATA_FOUND := '-98';
 InputBII: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-97';	 
 
+InputPII: => AddrNotPopulated := IF(AddrNotPopulatedCheck(InputStreetEcho, InputCityEcho, InputStateEcho, InputZipEcho), TRUE, FALSE);
+InputPII: => NameNotPopulated := IF(NameNotPopulatedCheck(InputFirstNameEcho, InputMiddleNameEcho, InputLastNameEcho), TRUE, FALSE);
+
 //Input PII input Echo attributes 
 InputPII: => InputAccountValue := IsBlank(InputAccountEcho, MISSING_INPUT_DATA);
 InputPII: => InputFirstNameValue := IsBlank(InputFirstNameEcho, MISSING_INPUT_DATA);
-InputPII: => InputAddressValue := IsBlank(InputAddressEcho, MISSING_INPUT_DATA);
+InputPII: => InputStreetValue := IsBlank(InputStreetEcho, MISSING_INPUT_DATA);
 InputPII: => InputCityValue := IsBlank(InputCityEcho, MISSING_INPUT_DATA);
 InputPII: => InputStateValue := IsBlank(InputStateEcho, MISSING_INPUT_DATA);
 InputPII: => InputZipValue := IsBlank(InputZipEcho, MISSING_INPUT_DATA);
@@ -52,6 +89,99 @@ InputPII: => InputEmailValue := IsBlank(InputEmailEcho, MISSING_INPUT_DATA);
 InputPII: => InputArchiveDateValue := IsBlank(InputArchiveDateEcho, MISSING_INPUT_DATA);
 InputPII: => InputLexIDValue := IsZero(InputLexIDEcho, MISSING_INPUT_DATA_INT); 
 InputPII: => IRepNumberValue := RepNumber;
+//Input PII input Echo Populated attributes 
+InputPII: => InputAccountEchoPopValue := IsEchoPopulated(InputAccountEcho);
+InputPII: => InputLexIDEchoPopValue := IsEchoPopulated(InputLexIDEcho);
+InputPII: => InputFirstNameEchoPopValue := IsEchoPopulated(InputFirstNameEcho);
+InputPII: => InputStreetEchoPopValue := IsEchoPopulated(InputStreetEcho);
+InputPII: => InputCityEchoPopValue := IsEchoPopulated(InputCityEcho);
+InputPII: => InputStateEchoPopValue := IsEchoPopulated(InputStateEcho);
+InputPII: => InputZipEchoPopValue := IsEchoPopulated(InputZipEcho);
+InputPII: => InputHomePhoneEchoPopValue := IsEchoPopulated(InputHomePhoneEcho);
+InputPII: => InputWorkPhoneEchoPopValue := IsEchoPopulated(InputWorkPhoneEcho);
+InputPII: => InputEmailEchoPopValue := IsEchoPopulated(InputEmailEcho);
+InputPII: => InputArchiveDateEchoPopValue := IsEchoPopulated(InputArchiveDateEcho);
+//Input PII input Clean attributes 
+InputPII: => InputFirstNameCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputFirstNameClean, NO_DATA_FOUND));
+InputPII: => InputSuffixCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputSuffixClean, NO_DATA_FOUND));
+InputPII: => InputMiddleNameCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputMiddleNameClean, NO_DATA_FOUND));
+InputPII: => InputLastNameCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputLastNameClean, NO_DATA_FOUND));
+InputPII: => InputPrefixCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputPrefixClean, NO_DATA_FOUND));
+InputPII: => InputPrimaryRangeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputPrimaryRangeClean, NO_DATA_FOUND));
+InputPII: => InputPrimaryNameCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputPrimaryNameClean, NO_DATA_FOUND));
+InputPII: => InputPreDirectionCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputPreDirectionClean, NO_DATA_FOUND));
+InputPII: => InputAddressSuffixCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputAddressSuffixClean, NO_DATA_FOUND));
+InputPII: => InputPostDirectionCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputPostDirectionClean, NO_DATA_FOUND));
+InputPII: => InputUnitDesigCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputUnitDesigClean, NO_DATA_FOUND));
+InputPII: => InputSecondaryRangeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputSecondaryRangeClean, NO_DATA_FOUND));
+InputPII: => InputCityCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputCityClean, NO_DATA_FOUND));
+InputPII: => InputStateCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputStateClean, NO_DATA_FOUND));
+InputPII: => InputZip5CleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputZip5Clean, NO_DATA_FOUND)); 
+InputPII: => InputZip4CleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputZip4Clean, NO_DATA_FOUND));
+InputPII: => InputLatitudeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputLatitudeClean, NO_DATA_FOUND));
+InputPII: => InputLongitudeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputLongitudeClean, NO_DATA_FOUND));
+InputPII: => InputAddressStatusCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputAddressStatusClean, NO_DATA_FOUND));
+InputPII: => InputAddressTypeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputAddressTypeClean, NO_DATA_FOUND));
+InputPII: => InputCountyCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputCountyClean, NO_DATA_FOUND));
+InputPII: => InputGeoblockCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, 
+	IsBlank(InputGeoblockClean, NO_DATA_FOUND));
+InputPII: => InputEmailCleanValue := IsBlank2Fields(InputEmailEcho, MISSING_INPUT_DATA,
+				InputEmailClean, NO_DATA_FOUND); 
+InputPII: => InputHomePhoneCleanValue := IsBlank2Fields(InputHomePhoneEcho, MISSING_INPUT_DATA,
+				InputHomePhoneClean, NO_DATA_FOUND);
+InputPII: => InputWorkPhoneCleanValue := IsBlank2Fields(InputWorkPhoneEcho, MISSING_INPUT_DATA,
+				InputWorkPhoneClean, NO_DATA_FOUND);
+InputPII: => InputSSNCleanValue := IsBlank(InputSSNClean, MISSING_INPUT_DATA);
+InputPII: => InputDLNumberCleanValue := IsBlank(InputDLNumberClean, MISSING_INPUT_DATA); 
+InputPII: => InputDLStateCleanValue := IsBlank(InputDLStateClean, MISSING_INPUT_DATA); 
+InputPII: => InputArchiveDateCleanValue := IsBlank2Fields(InputArchiveDateEcho, MISSING_INPUT_DATA,
+				InputArchiveDateClean, NO_DATA_FOUND);
+//Input PII input Clean Populated attributes 
+InputPII: => InputPrefixCleanPopValue := IsCleanPopulated(InputPrefixCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputFirstNameCleanPopValue := IsCleanPopulated(InputFirstNameCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputSuffixCleanPopValue := IsCleanPopulated(InputSuffixCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputPrimaryRangeCleanPopValue:= IsCleanPopulated(InputPrimaryRangeCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputPreDirectionCleanPopValue:= IsCleanPopulated(InputPreDirectionCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputPrimaryNameCleanPopValue:= IsCleanPopulated(InputPrimaryNameCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputAddressSuffixCleanPopValue:= IsCleanPopulated(InputAddressSuffixCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputPostDirectionCleanPopValue:= IsCleanPopulated(InputPostDirectionCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputUnitDesigCleanPopValue:= IsCleanPopulated(InputUnitDesigCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputSecondaryRangeCleanPopValue:= IsCleanPopulated(InputSecondaryRangeCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputCityCleanPopValue:= IsCleanPopulated(InputCityCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputStateCleanPopValue:= IsCleanPopulated(InputStateCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputZip5CleanPopValue:= IsCleanPopulated(InputZip5CleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputZip4CleanPopValue:= IsCleanPopulated(InputZip4CleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputLatitudeCleanPopValue:= IsCleanPopulated(InputLatitudeCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputLongitudeCleanPopValue:= IsCleanPopulated(InputLongitudeCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputCountyCleanPopValue:= IsCleanPopulated(InputCountyCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputGeoblockCleanPopValue:= IsCleanPopulated(InputGeoblockCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputAddressTypeCleanPopValue:= IsCleanPopulated(InputAddressTypeCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputAddressStatusCleanPopValue:= IsCleanPopulated(InputAddressStatusCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputEmailCleanPopValue:= IsCleanPopulated(InputEmailCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputHomePhoneCleanPopValue:= IsCleanPopulated(InputHomePhoneCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputWorkPhoneCleanPopValue:= IsCleanPopulated(InputWorkPhoneCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => InputArchiveDateCleanPopValue :=  IsCleanPopulated(InputArchiveDateCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 //For each Rep, it'll apply the PII input Echo attributes
 InputBII: => AuthRep1 := ONLY(InputBIIInputPII.PII(RepNumber = 1));
 InputBII: => AuthRep2 := ONLY(InputBIIInputPII.PII(RepNumber = 2));
@@ -81,7 +211,7 @@ InputBII: => BusInputArchiveDateEchoValue := IsBlank(BusInputArchiveDateEcho, MI
 InputBII: => BusInputAccountEchoValue := AuthRep1.InputAccountValue; 
 InputBII: => BusInputRep1LexIDEchoValue := AuthRep1.InputLexIDValue;
 InputBII: => BusInputRep1FirstNameEchoValue := AuthRep1.InputFirstNameValue;
-InputBII: => BusInputRep1StreetEchoValue := AuthRep1.InputAddressValue;
+InputBII: => BusInputRep1StreetEchoValue := AuthRep1.InputStreetValue;
 InputBII: => BusInputRep1CityEchoValue := AuthRep1.InputCityValue;
 InputBII: => BusInputRep1StateEchoValue := AuthRep1.InputStateValue;
 InputBII: => BusInputRep1ZipEchoValue := AuthRep1.InputZipValue;
@@ -90,7 +220,7 @@ InputBII: => BusInputRep1EmailEchoValue := AuthRep1.InputEmailValue;
 //AuthRep 2 input Echo attributes
 InputBII: => BusInputRep2LexIDEchoValue := AuthRep2.InputLexIDValue;
 InputBII: => BusInputRep2FirstNameEchoValue := AuthRep2.InputFirstNameValue;
-InputBII: => BusInputRep2StreetEchoValue := AuthRep2.InputAddressValue;
+InputBII: => BusInputRep2StreetEchoValue := AuthRep2.InputStreetValue;
 InputBII: => BusInputRep2CityEchoValue := AuthRep2.InputCityValue;
 InputBII: => BusInputRep2StateEchoValue := AuthRep2.InputStateValue;
 InputBII: => BusInputRep2ZipEchoValue := AuthRep2.InputZipValue;
@@ -99,7 +229,7 @@ InputBII: => BusInputRep2EmailEchoValue := AuthRep2.InputEmailValue;
 //AuthRep 3 input Echo attributes
 InputBII: => BusInputRep3LexIDEchoValue := AuthRep3.InputLexIDValue;
 InputBII: => BusInputRep3FirstNameEchoValue := AuthRep3.InputFirstNameValue;
-InputBII: => BusInputRep3StreetEchoValue := AuthRep3.InputAddressValue;
+InputBII: => BusInputRep3StreetEchoValue := AuthRep3.InputStreetValue;
 InputBII: => BusInputRep3CityEchoValue := AuthRep3.InputCityValue;
 InputBII: => BusInputRep3StateEchoValue := AuthRep3.InputStateValue;
 InputBII: => BusInputRep3ZipEchoValue := AuthRep3.InputZipValue;
@@ -108,7 +238,7 @@ InputBII: => BusInputRep3EmailEchoValue := AuthRep3.InputEmailValue;
 //AuthRep 4 input Echo attributes
 InputBII: => BusInputRep4LexIDEchoValue := AuthRep4.InputLexIDValue;
 InputBII: => BusInputRep4FirstNameEchoValue := AuthRep4.InputFirstNameValue;
-InputBII: => BusInputRep4StreetEchoValue := AuthRep4.InputAddressValue;
+InputBII: => BusInputRep4StreetEchoValue := AuthRep4.InputStreetValue;
 InputBII: => BusInputRep4CityEchoValue := AuthRep4.InputCityValue;
 InputBII: => BusInputRep4StateEchoValue := AuthRep4.InputStateValue;
 InputBII: => BusInputRep4ZipEchoValue := AuthRep4.InputZipValue;
@@ -117,7 +247,7 @@ InputBII: => BusInputRep4EmailEchoValue := AuthRep4.InputEmailValue;
 //AuthRep 5 input Echo attributes
 InputBII: => BusInputRep5LexIDEchoValue := AuthRep5.InputLexIDValue;
 InputBII: => BusInputRep5FirstNameEchoValue := AuthRep5.InputFirstNameValue;
-InputBII: => BusInputRep5StreetEchoValue := AuthRep5.InputAddressValue;
+InputBII: => BusInputRep5StreetEchoValue := AuthRep5.InputStreetValue;
 InputBII: => BusInputRep5CityEchoValue := AuthRep5.InputCityValue;
 InputBII: => BusInputRep5StateEchoValue := AuthRep5.InputStateValue;
 InputBII: => BusInputRep5ZipEchoValue := AuthRep5.InputZipValue;
