@@ -682,61 +682,61 @@ CriminalOffense.OffenseCharges: => CriminalDate := CaseNumber:DateFirstSeen;
 CriminalOffense: => RecentOffenderLevel := ONLY(TOPN(OffenderLevel, 1, -OffenderLevel:DateFirstSeen),OffenderLevel);
 CriminalOffense.OffenseCharges: => DismissedCharges := IF(CourtDispositionDescription:Null, FALSE, CourtDispositionDescription='DISMISSED') 
 																										OR IF(CourtAdditionalDispositionDescription:Null, FALSE, CourtAdditionalDispositionDescription = 'DISMISSED'); 
-CriminalOffense.OffenseCharges: => IsFelony := NOT DismissedCharges AND IF(OffenseScore:Null,FALSE, OffenseScore = 'F') AND RecentOffenderLevel = 4;
+CriminalOffense.OffenseCharges: => IsFelony := NOT DismissedCharges AND IF(OffenseScore:Null,FALSE, OffenseScore = 'F') AND (RecentOffenderLevel = 4 OR RecentOffenderLevel:Null);
 CriminalOffense.OffenseCharges: => AgeInDays := ABSDAYSBETWEEN(CriminalDate , CurrentDate);
 
 Person: => FelonyCnt1Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99);
 Person: => FelonyCnt7Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999);
-Person: => FelonyNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => FelonyOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => FelonyNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => FelonyOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestFelonyCnt1Y := IsBlank(MONTHSBETWEEN(DATE(FelonyNew1Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceOldestFelonyCnt1Y := IsBlank(MONTHSBETWEEN(DATE(FelonyOld1Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestFelonyCnt7Y := IsBlank(MONTHSBETWEEN(DATE(FelonyNew7Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceOldestFelonyCnt7Y := IsBlank(MONTHSBETWEEN(DATE(FelonyOld7Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => FelonyNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => FelonyOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => FelonyNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => FelonyOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceNewestFelonyCnt1Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyNew1Y), CurrentDate), 0, 12),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceOldestFelonyCnt1Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyOld1Y), CurrentDate), 0, 12),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceNewestFelonyCnt7Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyNew7Y), CurrentDate), 0, 84),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceOldestFelonyCnt7Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyOld7Y), CurrentDate), 0, 84),CriminalOffense.NO_DATA_FOUND_CRIM);
 
 //Person Attributes Derog - Criminal History - NonFelony
 CriminalOffense.OffenseCharges: => IsNonFelonyRecords := NOT DismissedCharges AND NOT OffenseScore = 'F'; 
 
 Person: => NonFelonyCnt1Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99);
 Person: => NonfelonyCnt7Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999);
-Person: => NonfelonyNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => NonfelonyOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => NonfelonyNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => NonfelonyOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestNonfelonyCnt1Y := IsBlank(MONTHSBETWEEN(DATE(NonfelonyNew1Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceOldestNonfelonyCnt1Y := IsBlank(MONTHSBETWEEN(DATE(NonfelonyOld1Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestNonfelonyCnt7Y := IsBlank(MONTHSBETWEEN(DATE(NonfelonyNew7Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceOldestNonfelonyCnt7Y := IsBlank(MONTHSBETWEEN(DATE(NonfelonyOld7Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => NonfelonyNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => NonfelonyOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => NonfelonyNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => NonfelonyOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceNewestNonfelonyCnt1Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyNew1Y), CurrentDate), 0, 12),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceOldestNonfelonyCnt1Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyOld1Y), CurrentDate), 0, 12),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceNewestNonfelonyCnt7Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyNew7Y), CurrentDate), 0, 84),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceOldestNonfelonyCnt7Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyOld7Y), CurrentDate), 0, 84),CriminalOffense.NO_DATA_FOUND_CRIM);
 
 //Person Attributes Derog - Criminal History - Arrest
 CriminalOffense.OffenseCharges: => IsArrest := DataType = 5;
 
 Person: => ArrestCnt1Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99);
 Person: => ArrestCnt7Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999);
-Person: => ArrestNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => ArrestOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => ArrestNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => ArrestOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestArrestCnt1Y := IsBlank(MONTHSBETWEEN(DATE(ArrestNew1Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceOldestArrestCnt1Y := IsBlank(MONTHSBETWEEN(DATE(ArrestOld1Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestArrestCnt7Y := IsBlank(MONTHSBETWEEN(DATE(ArrestNew7Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceOldestArrestCnt7Y := IsBlank(MONTHSBETWEEN(DATE(ArrestOld7Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => ArrestNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => ArrestOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => ArrestNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => ArrestOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceNewestArrestCnt1Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestNew1Y), CurrentDate), 0, 12),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceOldestArrestCnt1Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestOld1Y), CurrentDate), 0, 12),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceNewestArrestCnt7Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestNew7Y), CurrentDate), 0, 84),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceOldestArrestCnt7Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestOld7Y), CurrentDate), 0, 84),CriminalOffense.NO_DATA_FOUND_CRIM);
 
 //Person Attributes Derog - Criminal History - Criminal Conviction
 CriminalOffense.OffenseCharges: => IsCriminalCount := NOT DismissedCharges; 
 
 Person: => CrimCnt1Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99);
 Person: => CrimCnt7Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999);
-Person: => CrimNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => CrimOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => CrimNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => CrimOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null), OffenseCharges.CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestCrimCnt1Y := IsBlank(MONTHSBETWEEN(DATE(CrimNew1Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceOldestCrimCnt1Y := IsBlank(MONTHSBETWEEN(DATE(CrimOld1Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestCrimCnt7Y := IsBlank(MONTHSBETWEEN(DATE(CrimNew7Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceOldestCrimCnt7Y := IsBlank(MONTHSBETWEEN(DATE(CrimOld7Y), CurrentDate),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => CrimNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => CrimOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => CrimNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => CrimOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceNewestCrimCnt1Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimNew1Y), CurrentDate), 0, 12),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceOldestCrimCnt1Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimOld1Y), CurrentDate), 0, 12),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceNewestCrimCnt7Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimNew7Y), CurrentDate), 0, 84),CriminalOffense.NO_DATA_FOUND_CRIM);
+Person: => MonSinceOldestCrimCnt7Y := IsBlank(BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimOld7Y), CurrentDate), 0, 84),CriminalOffense.NO_DATA_FOUND_CRIM);
 
 //Person Attributes Derog - Criminal History - Others
 Person: => CrimSeverityIndex7Y := MAP(
