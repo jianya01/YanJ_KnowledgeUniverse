@@ -59,7 +59,7 @@ EXPORT E_Inquiry := MODULE
   SHARED __Trimmed := RECORD, MAXLENGTH(5000)
     STRING KeyVal;
   END;
-  SHARED __d0_Trim := PROJECT(inquiry_history.IntermediateLog,TRANSFORM(__Trimmed,SELF.KeyVal:=TRIM((STRING)LEFT.transaction_id)));
+  SHARED __d0_Trim := PROJECT(inquiry_history.IntermediateLog.VHR,TRANSFORM(__Trimmed,SELF.KeyVal:=TRIM((STRING)LEFT.transaction_id)));
   SHARED __d1_KELfiltered := transaction_log.TransactionLog(transaction_id != '');
   SHARED __d1_Trim := PROJECT(__d1_KELfiltered,TRANSFORM(__Trimmed,SELF.KeyVal:=TRIM((STRING)LEFT.transaction_id)));
   SHARED __d2_Trim := PROJECT(transaction_log_vehicle.TransactionLogVehicle,TRANSFORM(__Trimmed,SELF.KeyVal:=TRIM((STRING)LEFT.transaction_id)));
@@ -83,11 +83,11 @@ EXPORT E_Inquiry := MODULE
   SHARED Date_Changed_0Rule(STRING a) := MAP(KEL.Routines.IsValidDate((KEL.typ.kdate)(a[1..4]+a[6..7]+a[9..10]))=>a[1..4]+a[6..7]+a[9..10],'0');
   SHARED __Mapping0 := 'UID(UID),transaction_id(Transaction_I_D_:\'\'),sequence(Sequence_:0),product_id(Product_I_D_:0),date_added(Date_Added_:DATE:Date_Added_0Rule|Date_First_Seen_:EPOCH|Date_Last_Seen_:EPOCH),loginid(Login_I_D_:\'\'),billingcode(Billing_Code_:\'\'),functionname(Function_Name_:\'\'),reportcode(Report_Code_:\'\'),accountbase(Account_Base_:\'\'),accountsuffix(Account_Suffix_:\'\'),accountid(Account_I_D_:0),customernumber(Customer_Number_:0),customerreferencenumber(Customer_Reference_Number_:\'\'),dateordered(Date_Ordered_:DATE:Date_Ordered_0Rule),reference_number(Reference_Number_:\'\'),process_type(Process_Type_:0),processing_time(Processing_Time_:0.0),process_status(Processing_Status_:\'\'),billingtypeid(Billing_Type_I_D_:0),price(Price_:0.0),recordcount1(Record_Count1_:0),recordcount1type(Record_Count1_Type_:0),recordcount2(Record_Count2_:0),recordcount2type(Record_Count2_Type_:0),resultformat(Result_Format_:\'\'),reportoptions(Report_Options_:\'\'),transactioncode(Transaction_Code_:\'\'),returnnodeid(Return_Node_I_D_:\'\'),request_type(Request_Type_:\'\'),orderstatuscode(Order_Status_Code_:0),productline(Product_Line_:\'\'),product_version(Product_Version_:\'\'),ipaddress(Ip_Address_:\'\'),responsetime(Response_Time_:\'\'),vendor_code(Vendor_Code_:\'\'),espmethod(Esp_Method_:\'\'),batchjobid(Batch_Job_I_D_:0),batchseqnumber(Batch_Seq_Number_:0),useradded(User_Added_:\'\'),userchanged(User_Changed_:\'\'),datechanged(Date_Changed_:DATE:Date_Changed_0Rule)';
   SHARED __d0_Out := RECORD
-    RECORDOF(inquiry_history.IntermediateLog);
+    RECORDOF(inquiry_history.IntermediateLog.VHR);
     KEL.typ.uid UID := 0;
   END;
-  SHARED __d0_UID_Mapped := JOIN(inquiry_history.IntermediateLog,Lookup,TRIM((STRING)LEFT.transaction_id) = RIGHT.KeyVal,TRANSFORM(__d0_Out,SELF.UID:=RIGHT.UID,SELF:=LEFT),HASH);
-  EXPORT inquiry_history_IntermediateLog_Invalid := __d0_UID_Mapped(UID = 0);
+  SHARED __d0_UID_Mapped := JOIN(inquiry_history.IntermediateLog.VHR,Lookup,TRIM((STRING)LEFT.transaction_id) = RIGHT.KeyVal,TRANSFORM(__d0_Out,SELF.UID:=RIGHT.UID,SELF:=LEFT),HASH);
+  EXPORT inquiry_history_IntermediateLog_VHR_Invalid := __d0_UID_Mapped(UID = 0);
   SHARED __d0_Prefiltered := __d0_UID_Mapped(UID <> 0);
   SHARED __d0 := __SourceFilter(KEL.FromFlat.Convert(__d0_Prefiltered,InLayout,__Mapping0));
   SHARED Date_Added_1Rule(STRING a) := MAP(KEL.Routines.IsValidDate((KEL.typ.kdate)(a[1..4]+a[6..7]+a[9..10]))=>a[1..4]+a[6..7]+a[9..10],'0');
@@ -259,52 +259,52 @@ EXPORT E_Inquiry := MODULE
   EXPORT User_Added__SingleValue_Invalid := KEL.Intake.DetectMultipleValues(__PreResult,User_Added_);
   EXPORT User_Changed__SingleValue_Invalid := KEL.Intake.DetectMultipleValues(__PreResult,User_Changed_);
   EXPORT Date_Changed__SingleValue_Invalid := KEL.Intake.DetectMultipleValues(__PreResult,Date_Changed_);
-  EXPORT SanityCheck := DATASET([{COUNT(inquiry_history_IntermediateLog_Invalid),COUNT(transaction_log_TransactionLog_Invalid),COUNT(transaction_log_vehicle_TransactionLogVehicle_Invalid),COUNT(Transaction_I_D__SingleValue_Invalid),COUNT(Sequence__SingleValue_Invalid),COUNT(Product_I_D__SingleValue_Invalid),COUNT(Date_Added__SingleValue_Invalid),COUNT(Login_I_D__SingleValue_Invalid),COUNT(Billing_Code__SingleValue_Invalid),COUNT(Function_Name__SingleValue_Invalid),COUNT(Report_Code__SingleValue_Invalid),COUNT(Account_Base__SingleValue_Invalid),COUNT(Account_Suffix__SingleValue_Invalid),COUNT(Account_I_D__SingleValue_Invalid),COUNT(Customer_Number__SingleValue_Invalid),COUNT(Customer_Reference_Number__SingleValue_Invalid),COUNT(Date_Ordered__SingleValue_Invalid),COUNT(Reference_Number__SingleValue_Invalid),COUNT(Process_Type__SingleValue_Invalid),COUNT(Processing_Time__SingleValue_Invalid),COUNT(Processing_Status__SingleValue_Invalid),COUNT(Billing_Type_I_D__SingleValue_Invalid),COUNT(Price__SingleValue_Invalid),COUNT(Record_Count1__SingleValue_Invalid),COUNT(Record_Count1_Type__SingleValue_Invalid),COUNT(Record_Count2__SingleValue_Invalid),COUNT(Record_Count2_Type__SingleValue_Invalid),COUNT(Result_Format__SingleValue_Invalid),COUNT(Report_Options__SingleValue_Invalid),COUNT(Transaction_Code__SingleValue_Invalid),COUNT(Return_Node_I_D__SingleValue_Invalid),COUNT(Request_Type__SingleValue_Invalid),COUNT(Order_Status_Code__SingleValue_Invalid),COUNT(Product_Version__SingleValue_Invalid),COUNT(Product_Line__SingleValue_Invalid),COUNT(Ip_Address__SingleValue_Invalid),COUNT(Response_Time__SingleValue_Invalid),COUNT(Vendor_Code__SingleValue_Invalid),COUNT(Esp_Method__SingleValue_Invalid),COUNT(Batch_Job_I_D__SingleValue_Invalid),COUNT(Batch_Seq_Number__SingleValue_Invalid),COUNT(User_Added__SingleValue_Invalid),COUNT(User_Changed__SingleValue_Invalid),COUNT(Date_Changed__SingleValue_Invalid)}],{KEL.typ.int inquiry_history_IntermediateLog_Invalid,KEL.typ.int transaction_log_TransactionLog_Invalid,KEL.typ.int transaction_log_vehicle_TransactionLogVehicle_Invalid,KEL.typ.int Transaction_I_D__SingleValue_Invalid,KEL.typ.int Sequence__SingleValue_Invalid,KEL.typ.int Product_I_D__SingleValue_Invalid,KEL.typ.int Date_Added__SingleValue_Invalid,KEL.typ.int Login_I_D__SingleValue_Invalid,KEL.typ.int Billing_Code__SingleValue_Invalid,KEL.typ.int Function_Name__SingleValue_Invalid,KEL.typ.int Report_Code__SingleValue_Invalid,KEL.typ.int Account_Base__SingleValue_Invalid,KEL.typ.int Account_Suffix__SingleValue_Invalid,KEL.typ.int Account_I_D__SingleValue_Invalid,KEL.typ.int Customer_Number__SingleValue_Invalid,KEL.typ.int Customer_Reference_Number__SingleValue_Invalid,KEL.typ.int Date_Ordered__SingleValue_Invalid,KEL.typ.int Reference_Number__SingleValue_Invalid,KEL.typ.int Process_Type__SingleValue_Invalid,KEL.typ.int Processing_Time__SingleValue_Invalid,KEL.typ.int Processing_Status__SingleValue_Invalid,KEL.typ.int Billing_Type_I_D__SingleValue_Invalid,KEL.typ.int Price__SingleValue_Invalid,KEL.typ.int Record_Count1__SingleValue_Invalid,KEL.typ.int Record_Count1_Type__SingleValue_Invalid,KEL.typ.int Record_Count2__SingleValue_Invalid,KEL.typ.int Record_Count2_Type__SingleValue_Invalid,KEL.typ.int Result_Format__SingleValue_Invalid,KEL.typ.int Report_Options__SingleValue_Invalid,KEL.typ.int Transaction_Code__SingleValue_Invalid,KEL.typ.int Return_Node_I_D__SingleValue_Invalid,KEL.typ.int Request_Type__SingleValue_Invalid,KEL.typ.int Order_Status_Code__SingleValue_Invalid,KEL.typ.int Product_Version__SingleValue_Invalid,KEL.typ.int Product_Line__SingleValue_Invalid,KEL.typ.int Ip_Address__SingleValue_Invalid,KEL.typ.int Response_Time__SingleValue_Invalid,KEL.typ.int Vendor_Code__SingleValue_Invalid,KEL.typ.int Esp_Method__SingleValue_Invalid,KEL.typ.int Batch_Job_I_D__SingleValue_Invalid,KEL.typ.int Batch_Seq_Number__SingleValue_Invalid,KEL.typ.int User_Added__SingleValue_Invalid,KEL.typ.int User_Changed__SingleValue_Invalid,KEL.typ.int Date_Changed__SingleValue_Invalid});
+  EXPORT SanityCheck := DATASET([{COUNT(inquiry_history_IntermediateLog_VHR_Invalid),COUNT(transaction_log_TransactionLog_Invalid),COUNT(transaction_log_vehicle_TransactionLogVehicle_Invalid),COUNT(Transaction_I_D__SingleValue_Invalid),COUNT(Sequence__SingleValue_Invalid),COUNT(Product_I_D__SingleValue_Invalid),COUNT(Date_Added__SingleValue_Invalid),COUNT(Login_I_D__SingleValue_Invalid),COUNT(Billing_Code__SingleValue_Invalid),COUNT(Function_Name__SingleValue_Invalid),COUNT(Report_Code__SingleValue_Invalid),COUNT(Account_Base__SingleValue_Invalid),COUNT(Account_Suffix__SingleValue_Invalid),COUNT(Account_I_D__SingleValue_Invalid),COUNT(Customer_Number__SingleValue_Invalid),COUNT(Customer_Reference_Number__SingleValue_Invalid),COUNT(Date_Ordered__SingleValue_Invalid),COUNT(Reference_Number__SingleValue_Invalid),COUNT(Process_Type__SingleValue_Invalid),COUNT(Processing_Time__SingleValue_Invalid),COUNT(Processing_Status__SingleValue_Invalid),COUNT(Billing_Type_I_D__SingleValue_Invalid),COUNT(Price__SingleValue_Invalid),COUNT(Record_Count1__SingleValue_Invalid),COUNT(Record_Count1_Type__SingleValue_Invalid),COUNT(Record_Count2__SingleValue_Invalid),COUNT(Record_Count2_Type__SingleValue_Invalid),COUNT(Result_Format__SingleValue_Invalid),COUNT(Report_Options__SingleValue_Invalid),COUNT(Transaction_Code__SingleValue_Invalid),COUNT(Return_Node_I_D__SingleValue_Invalid),COUNT(Request_Type__SingleValue_Invalid),COUNT(Order_Status_Code__SingleValue_Invalid),COUNT(Product_Version__SingleValue_Invalid),COUNT(Product_Line__SingleValue_Invalid),COUNT(Ip_Address__SingleValue_Invalid),COUNT(Response_Time__SingleValue_Invalid),COUNT(Vendor_Code__SingleValue_Invalid),COUNT(Esp_Method__SingleValue_Invalid),COUNT(Batch_Job_I_D__SingleValue_Invalid),COUNT(Batch_Seq_Number__SingleValue_Invalid),COUNT(User_Added__SingleValue_Invalid),COUNT(User_Changed__SingleValue_Invalid),COUNT(Date_Changed__SingleValue_Invalid)}],{KEL.typ.int inquiry_history_IntermediateLog_VHR_Invalid,KEL.typ.int transaction_log_TransactionLog_Invalid,KEL.typ.int transaction_log_vehicle_TransactionLogVehicle_Invalid,KEL.typ.int Transaction_I_D__SingleValue_Invalid,KEL.typ.int Sequence__SingleValue_Invalid,KEL.typ.int Product_I_D__SingleValue_Invalid,KEL.typ.int Date_Added__SingleValue_Invalid,KEL.typ.int Login_I_D__SingleValue_Invalid,KEL.typ.int Billing_Code__SingleValue_Invalid,KEL.typ.int Function_Name__SingleValue_Invalid,KEL.typ.int Report_Code__SingleValue_Invalid,KEL.typ.int Account_Base__SingleValue_Invalid,KEL.typ.int Account_Suffix__SingleValue_Invalid,KEL.typ.int Account_I_D__SingleValue_Invalid,KEL.typ.int Customer_Number__SingleValue_Invalid,KEL.typ.int Customer_Reference_Number__SingleValue_Invalid,KEL.typ.int Date_Ordered__SingleValue_Invalid,KEL.typ.int Reference_Number__SingleValue_Invalid,KEL.typ.int Process_Type__SingleValue_Invalid,KEL.typ.int Processing_Time__SingleValue_Invalid,KEL.typ.int Processing_Status__SingleValue_Invalid,KEL.typ.int Billing_Type_I_D__SingleValue_Invalid,KEL.typ.int Price__SingleValue_Invalid,KEL.typ.int Record_Count1__SingleValue_Invalid,KEL.typ.int Record_Count1_Type__SingleValue_Invalid,KEL.typ.int Record_Count2__SingleValue_Invalid,KEL.typ.int Record_Count2_Type__SingleValue_Invalid,KEL.typ.int Result_Format__SingleValue_Invalid,KEL.typ.int Report_Options__SingleValue_Invalid,KEL.typ.int Transaction_Code__SingleValue_Invalid,KEL.typ.int Return_Node_I_D__SingleValue_Invalid,KEL.typ.int Request_Type__SingleValue_Invalid,KEL.typ.int Order_Status_Code__SingleValue_Invalid,KEL.typ.int Product_Version__SingleValue_Invalid,KEL.typ.int Product_Line__SingleValue_Invalid,KEL.typ.int Ip_Address__SingleValue_Invalid,KEL.typ.int Response_Time__SingleValue_Invalid,KEL.typ.int Vendor_Code__SingleValue_Invalid,KEL.typ.int Esp_Method__SingleValue_Invalid,KEL.typ.int Batch_Job_I_D__SingleValue_Invalid,KEL.typ.int Batch_Seq_Number__SingleValue_Invalid,KEL.typ.int User_Added__SingleValue_Invalid,KEL.typ.int User_Changed__SingleValue_Invalid,KEL.typ.int Date_Changed__SingleValue_Invalid});
   EXPORT NullCounts := DATASET([
-    {'Inquiry','inquiry_history.IntermediateLog','UID',COUNT(inquiry_history_IntermediateLog_Invalid),COUNT(__d0)},
-    {'Inquiry','inquiry_history.IntermediateLog','transaction_id',COUNT(__d0(__NL(Transaction_I_D_))),COUNT(__d0(__NN(Transaction_I_D_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','Sequence',COUNT(__d0(__NL(Sequence_))),COUNT(__d0(__NN(Sequence_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','product_id',COUNT(__d0(__NL(Product_I_D_))),COUNT(__d0(__NN(Product_I_D_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','date_added',COUNT(__d0(__NL(Date_Added_))),COUNT(__d0(__NN(Date_Added_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','LoginID',COUNT(__d0(__NL(Login_I_D_))),COUNT(__d0(__NN(Login_I_D_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','BillingCode',COUNT(__d0(__NL(Billing_Code_))),COUNT(__d0(__NN(Billing_Code_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','FunctionName',COUNT(__d0(__NL(Function_Name_))),COUNT(__d0(__NN(Function_Name_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','ReportCode',COUNT(__d0(__NL(Report_Code_))),COUNT(__d0(__NN(Report_Code_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','AccountBase',COUNT(__d0(__NL(Account_Base_))),COUNT(__d0(__NN(Account_Base_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','AccountSuffix',COUNT(__d0(__NL(Account_Suffix_))),COUNT(__d0(__NN(Account_Suffix_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','AccountID',COUNT(__d0(__NL(Account_I_D_))),COUNT(__d0(__NN(Account_I_D_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','CustomerNumber',COUNT(__d0(__NL(Customer_Number_))),COUNT(__d0(__NN(Customer_Number_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','CustomerReferenceNumber',COUNT(__d0(__NL(Customer_Reference_Number_))),COUNT(__d0(__NN(Customer_Reference_Number_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','DateOrdered',COUNT(__d0(__NL(Date_Ordered_))),COUNT(__d0(__NN(Date_Ordered_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','reference_number',COUNT(__d0(__NL(Reference_Number_))),COUNT(__d0(__NN(Reference_Number_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','process_type',COUNT(__d0(__NL(Process_Type_))),COUNT(__d0(__NN(Process_Type_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','processing_time',COUNT(__d0(__NL(Processing_Time_))),COUNT(__d0(__NN(Processing_Time_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','process_status',COUNT(__d0(__NL(Processing_Status_))),COUNT(__d0(__NN(Processing_Status_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','BillingTypeID',COUNT(__d0(__NL(Billing_Type_I_D_))),COUNT(__d0(__NN(Billing_Type_I_D_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','Price',COUNT(__d0(__NL(Price_))),COUNT(__d0(__NN(Price_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','RecordCount1',COUNT(__d0(__NL(Record_Count1_))),COUNT(__d0(__NN(Record_Count1_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','RecordCount1Type',COUNT(__d0(__NL(Record_Count1_Type_))),COUNT(__d0(__NN(Record_Count1_Type_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','RecordCount2',COUNT(__d0(__NL(Record_Count2_))),COUNT(__d0(__NN(Record_Count2_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','RecordCount2Type',COUNT(__d0(__NL(Record_Count2_Type_))),COUNT(__d0(__NN(Record_Count2_Type_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','ResultFormat',COUNT(__d0(__NL(Result_Format_))),COUNT(__d0(__NN(Result_Format_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','ReportOptions',COUNT(__d0(__NL(Report_Options_))),COUNT(__d0(__NN(Report_Options_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','TransactionCode',COUNT(__d0(__NL(Transaction_Code_))),COUNT(__d0(__NN(Transaction_Code_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','ReturnNodeID',COUNT(__d0(__NL(Return_Node_I_D_))),COUNT(__d0(__NN(Return_Node_I_D_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','request_type',COUNT(__d0(__NL(Request_Type_))),COUNT(__d0(__NN(Request_Type_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','OrderStatusCode',COUNT(__d0(__NL(Order_Status_Code_))),COUNT(__d0(__NN(Order_Status_Code_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','ProductLine',COUNT(__d0(__NL(Product_Line_))),COUNT(__d0(__NN(Product_Line_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','product_version',COUNT(__d0(__NL(Product_Version_))),COUNT(__d0(__NN(Product_Version_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','IpAddress',COUNT(__d0(__NL(Ip_Address_))),COUNT(__d0(__NN(Ip_Address_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','ResponseTime',COUNT(__d0(__NL(Response_Time_))),COUNT(__d0(__NN(Response_Time_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','vendor_code',COUNT(__d0(__NL(Vendor_Code_))),COUNT(__d0(__NN(Vendor_Code_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','EspMethod',COUNT(__d0(__NL(Esp_Method_))),COUNT(__d0(__NN(Esp_Method_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','BatchJobID',COUNT(__d0(__NL(Batch_Job_I_D_))),COUNT(__d0(__NN(Batch_Job_I_D_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','BatchSeqNumber',COUNT(__d0(__NL(Batch_Seq_Number_))),COUNT(__d0(__NN(Batch_Seq_Number_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','UserAdded',COUNT(__d0(__NL(User_Added_))),COUNT(__d0(__NN(User_Added_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','UserChanged',COUNT(__d0(__NL(User_Changed_))),COUNT(__d0(__NN(User_Changed_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','DateChanged',COUNT(__d0(__NL(Date_Changed_))),COUNT(__d0(__NN(Date_Changed_)))},
-    {'Inquiry','inquiry_history.IntermediateLog','DateFirstSeen',COUNT(__d0(Date_First_Seen_=0)),COUNT(__d0(Date_First_Seen_!=0))},
-    {'Inquiry','inquiry_history.IntermediateLog','DateLastSeen',COUNT(__d0(Date_Last_Seen_=0)),COUNT(__d0(Date_Last_Seen_!=0))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','UID',COUNT(inquiry_history_IntermediateLog_VHR_Invalid),COUNT(__d0)},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','transaction_id',COUNT(__d0(__NL(Transaction_I_D_))),COUNT(__d0(__NN(Transaction_I_D_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','Sequence',COUNT(__d0(__NL(Sequence_))),COUNT(__d0(__NN(Sequence_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','product_id',COUNT(__d0(__NL(Product_I_D_))),COUNT(__d0(__NN(Product_I_D_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','date_added',COUNT(__d0(__NL(Date_Added_))),COUNT(__d0(__NN(Date_Added_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','LoginID',COUNT(__d0(__NL(Login_I_D_))),COUNT(__d0(__NN(Login_I_D_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','BillingCode',COUNT(__d0(__NL(Billing_Code_))),COUNT(__d0(__NN(Billing_Code_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','FunctionName',COUNT(__d0(__NL(Function_Name_))),COUNT(__d0(__NN(Function_Name_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','ReportCode',COUNT(__d0(__NL(Report_Code_))),COUNT(__d0(__NN(Report_Code_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','AccountBase',COUNT(__d0(__NL(Account_Base_))),COUNT(__d0(__NN(Account_Base_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','AccountSuffix',COUNT(__d0(__NL(Account_Suffix_))),COUNT(__d0(__NN(Account_Suffix_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','AccountID',COUNT(__d0(__NL(Account_I_D_))),COUNT(__d0(__NN(Account_I_D_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','CustomerNumber',COUNT(__d0(__NL(Customer_Number_))),COUNT(__d0(__NN(Customer_Number_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','CustomerReferenceNumber',COUNT(__d0(__NL(Customer_Reference_Number_))),COUNT(__d0(__NN(Customer_Reference_Number_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','DateOrdered',COUNT(__d0(__NL(Date_Ordered_))),COUNT(__d0(__NN(Date_Ordered_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','reference_number',COUNT(__d0(__NL(Reference_Number_))),COUNT(__d0(__NN(Reference_Number_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','process_type',COUNT(__d0(__NL(Process_Type_))),COUNT(__d0(__NN(Process_Type_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','processing_time',COUNT(__d0(__NL(Processing_Time_))),COUNT(__d0(__NN(Processing_Time_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','process_status',COUNT(__d0(__NL(Processing_Status_))),COUNT(__d0(__NN(Processing_Status_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','BillingTypeID',COUNT(__d0(__NL(Billing_Type_I_D_))),COUNT(__d0(__NN(Billing_Type_I_D_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','Price',COUNT(__d0(__NL(Price_))),COUNT(__d0(__NN(Price_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','RecordCount1',COUNT(__d0(__NL(Record_Count1_))),COUNT(__d0(__NN(Record_Count1_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','RecordCount1Type',COUNT(__d0(__NL(Record_Count1_Type_))),COUNT(__d0(__NN(Record_Count1_Type_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','RecordCount2',COUNT(__d0(__NL(Record_Count2_))),COUNT(__d0(__NN(Record_Count2_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','RecordCount2Type',COUNT(__d0(__NL(Record_Count2_Type_))),COUNT(__d0(__NN(Record_Count2_Type_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','ResultFormat',COUNT(__d0(__NL(Result_Format_))),COUNT(__d0(__NN(Result_Format_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','ReportOptions',COUNT(__d0(__NL(Report_Options_))),COUNT(__d0(__NN(Report_Options_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','TransactionCode',COUNT(__d0(__NL(Transaction_Code_))),COUNT(__d0(__NN(Transaction_Code_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','ReturnNodeID',COUNT(__d0(__NL(Return_Node_I_D_))),COUNT(__d0(__NN(Return_Node_I_D_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','request_type',COUNT(__d0(__NL(Request_Type_))),COUNT(__d0(__NN(Request_Type_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','OrderStatusCode',COUNT(__d0(__NL(Order_Status_Code_))),COUNT(__d0(__NN(Order_Status_Code_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','ProductLine',COUNT(__d0(__NL(Product_Line_))),COUNT(__d0(__NN(Product_Line_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','product_version',COUNT(__d0(__NL(Product_Version_))),COUNT(__d0(__NN(Product_Version_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','IpAddress',COUNT(__d0(__NL(Ip_Address_))),COUNT(__d0(__NN(Ip_Address_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','ResponseTime',COUNT(__d0(__NL(Response_Time_))),COUNT(__d0(__NN(Response_Time_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','vendor_code',COUNT(__d0(__NL(Vendor_Code_))),COUNT(__d0(__NN(Vendor_Code_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','EspMethod',COUNT(__d0(__NL(Esp_Method_))),COUNT(__d0(__NN(Esp_Method_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','BatchJobID',COUNT(__d0(__NL(Batch_Job_I_D_))),COUNT(__d0(__NN(Batch_Job_I_D_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','BatchSeqNumber',COUNT(__d0(__NL(Batch_Seq_Number_))),COUNT(__d0(__NN(Batch_Seq_Number_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','UserAdded',COUNT(__d0(__NL(User_Added_))),COUNT(__d0(__NN(User_Added_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','UserChanged',COUNT(__d0(__NL(User_Changed_))),COUNT(__d0(__NN(User_Changed_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','DateChanged',COUNT(__d0(__NL(Date_Changed_))),COUNT(__d0(__NN(Date_Changed_)))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','DateFirstSeen',COUNT(__d0(Date_First_Seen_=0)),COUNT(__d0(Date_First_Seen_!=0))},
+    {'Inquiry','inquiry_history.IntermediateLog.VHR','DateLastSeen',COUNT(__d0(Date_Last_Seen_=0)),COUNT(__d0(Date_Last_Seen_!=0))},
     {'Inquiry','transaction_log.TransactionLog','UID',COUNT(transaction_log_TransactionLog_Invalid),COUNT(__d1)},
     {'Inquiry','transaction_log.TransactionLog','transaction_id',COUNT(__d1(__NL(Transaction_I_D_))),COUNT(__d1(__NN(Transaction_I_D_)))},
     {'Inquiry','transaction_log.TransactionLog','Sequence',COUNT(__d1(__NL(Sequence_))),COUNT(__d1(__NN(Sequence_)))},
