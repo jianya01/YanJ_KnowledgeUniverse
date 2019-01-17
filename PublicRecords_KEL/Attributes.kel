@@ -78,6 +78,10 @@ InputPII: => NameNotPopulated := IF(NameNotPopulatedCheck(InputFirstNameEcho, In
 CriminalOffense: NO_DATA_FOUND_CRIM := '-99998';
 CriminalOffense: NO_DATA_FOUND_CRIM_INT := -99998;
 
+Bankruptcy: NO_DATA_FOUND_BANKRUPTCY := '-99998';
+Bankruptcy: NO_DATA_FOUND_BANKRUPTCY_INT := -99998;
+Bankruptcy: NO_DATA_FOUND_CHAPTER_INT := -99997;
+
 //Input PII input Echo attributes 
 InputPII: => InputAccountValue := IsBlank(InputAccountEcho, MISSING_INPUT_DATA);
 InputPII: => InputLexIDValue := IsZero(InputLexIDEcho, MISSING_INPUT_DATA_INT); 
@@ -916,14 +920,78 @@ Person: => CrimSeverityIndex7Y := MAP(
 			); 
 
 Person: => CrimBehaviorIndex7Y := MAP(
-			(FelonyCnt7Y > 0 AND MonSinceNewestFelonyCnt7Y <= 12) => '6',
-			(CrimCnt7Y > 0 AND MonSinceNewestCrimCnt7Y <= 12) => '5',
+			(FelonyCnt7Y > 0 AND MonSinceNewestFelonyCnt7Y >= 0 AND MonSinceNewestFelonyCnt7Y <= 12) => '6',
+			(CrimCnt7Y > 0 AND MonSinceNewestFelonyCnt7Y >= 0 AND MonSinceNewestFelonyCnt7Y <= 12) => '5',
 			(FelonyCnt7Y > 0) => '4',
 			(CrimCnt7Y >= 3) => '3',
 			(CrimCnt7Y = 2) => '2',
 			(CrimCnt7Y = 1) => '1',
 			(CrimCnt7Y = 0) => '0'
 			); 
+
+
+
+// Bankruptcy Helper Attributes
+Bankruptcy: ONE_MONTH_IN_DAYS := 30;
+Bankruptcy: THREE_MONTHS_IN_DAYS := 90;
+Bankruptcy: SIX_MONTHS_IN_DAYS := 180;
+Bankruptcy: ONE_YEAR_IN_DAYS := 365;
+Bankruptcy: TWO_YEARS_IN_DAYS := 730;
+Bankruptcy: THREE_YEARS_IN_DAYS := 1095;
+Bankruptcy: FOUR_YEARS_IN_DAYS := 1461;
+Bankruptcy: FIVE_YEARS_IN_DAYS := 1826;
+Bankruptcy: SIX_YEARS_IN_DAYS := 2191;
+Bankruptcy: SEVEN_YEARS_IN_DAYS := 2556;
+Bankruptcy: TEN_YEARS_IN_DAYS := 3652;
+
+Bankruptcy: => HasCaseNumber := TRIMALL(CaseNumber) <> '' AND NOT CaseNumber:Null;
+Bankruptcy.Records: => IsDebtor := NameType IN ['D'];
+Bankruptcy.Records: => BankruptcyDate := CaseNumber:DateFirstSeen;														 
+Bankruptcy.Records: => FilingAgeInDays := ABSDAYSBETWEEN(BankruptcyDate, CurrentDate);
+Bankruptcy.Records: => ChapterType := OriginalChapter IN ['7','11','12','13','15'];
+Bankruptcy.Records: => Chapter7 := OriginalChapter = '7';
+Bankruptcy.Records: => Chapter11 := OriginalChapter = '11';
+Bankruptcy.Records: => Chapter12 := OriginalChapter = '12';
+Bankruptcy.Records: => Chapter13 := OriginalChapter = '13';
+Bankruptcy.Records: => Chapter15 := OriginalChapter = '15';
+Bankruptcy.Records: => IsBankruptcy := HasCaseNumber AND IsDebtor;
+Person: => Ch7Cnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.Chapter7 AND Records.FilingAgeInDays <= ONE_YEAR_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 99);			
+Person: => Ch7Cnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.Chapter7 AND Records.FilingAgeInDays <= SEVEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 999);
+Person: => Ch7Cnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.Chapter7 AND Records.FilingAgeInDays <= TEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 999);
+Person: => Ch13Cnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.Chapter13 AND Records.FilingAgeInDays <= ONE_YEAR_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 99);			
+Person: => Ch13Cnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.Chapter13 AND Records.FilingAgeInDays <= SEVEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 999);
+Person: => Ch13Cnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.Chapter13 AND Records.FilingAgeInDays <= TEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 999);
+Person: => BkCnt1yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND NOT Records.ChapterType AND Records.FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 99);	
+Person: => BkCnt7yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND NOT Records.ChapterType AND Records.FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 99);
+Person: => BkCnt10yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND NOT Records.ChapterType AND Records.FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 99);
+Person: => NewestBankoChpt1Y := MAX(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT Records.FilingAgeInDays:Null), INTEGER(Records.OriginalChapter));
+Person: => NewestBankoChpt7Y := MAX(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null), INTEGER(Records.OriginalChapter));
+Person: => NewestBankoChpt10Y := MAX(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null), INTEGER(Records.OriginalChapter));
+Person: => MostRecentBankruptcy := ONLY(PersonBankruptcy.Bankrupt(Records.DateFiled = MAX(PersonBankruptcy.Bankrupt, Records.DateFiled)));
+Person: => BankruptcyDisposition := ONLY(MostRecentBankruptcy, Records.Disposition);
+
+// Bankruptcy Attributes
+Person: => BkCnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 99);			
+Person: => BkCnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 999);
+Person: => BkCnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null)), 0, 999);
+Person: => DtOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT Records.FilingAgeInDays:Null){Records.BankruptcyDate}, 1000, BankruptcyDate);
+Person: => DtOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null){Records.BankruptcyDate}, 1000, BankruptcyDate);
+Person: => DtOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt(Records.IsBankruptcy AND Records.FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT Records.FilingAgeInDays:Null){Records.BankruptcyDate}, 1000, BankruptcyDate);
+Person: => BkNew1Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.Records(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkNew7Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.Records(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkNew10Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.Records(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkOld1Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.Records(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkOld7Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.Records(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkOld10Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.Records(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => MonSinceNewestBkCnt1Y := IF(BkNew1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew1Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 12));	
+Person: => MonSinceNewestBkCnt7Y := IF(BkNew7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew7Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 84));	
+Person: => MonSinceNewestBkCnt10Y := IF(BkNew10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew10Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 120));	
+Person: => MonSinceOldestBkCnt1Y := IF(BkOld1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld1Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 12));	
+Person: => MonSinceOldestBkCnt7Y := IF(BkOld7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld7Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 84));	
+Person: => MonSinceOldestBkCnt10Y := IF(BkOld10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld10Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 120));	
+
+
+
 
   
 //	Chad Albrecht: Per Brenton call on 10/26/18 everything below can be removed.  I will just comment this out for now and we will remove this at a latter date.
