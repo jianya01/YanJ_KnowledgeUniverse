@@ -9,36 +9,20 @@ FUNCTION: IsBlank2Fields(STRING Field1ToCheck, STRING Default1Val, STRING Field2
 	MAP(Field1ToCheck:Null OR Field1ToCheck = '' => Default1Val,
 		Field2ToCheck:Null OR  Field2ToCheck = '' => Default2Val, 
 		Field2ToCheck);
+		
 FUNCTION: NameNotPopulatedCheck(STRING FnameToCheck, STRING MnameToCheck, STRING LnameToCheck) <= IF(
-					((FnameToCheck:Null OR FnameToCheck = '') AND (MnameToCheck:Null OR MnameToCheck = '') AND (LnameToCheck:Null OR LnameToCheck = '')), TRUE, FALSE);				
+					((FnameToCheck:Null OR FnameToCheck = '') AND (MnameToCheck:Null OR MnameToCheck = '') AND (LnameToCheck:Null OR LnameToCheck = '')), TRUE, FALSE);		
+FUNCTION: IsNotEnoughToClean(STRING FieldToCheck) <= IF(FieldToCheck:Null OR FieldToCheck = '', TRUE, FALSE);
+					
 /* There is a compiler issue being worked on, that doesn't allow us to use the code below. Once the compiler is fixed, we'll use this code vs the above code.
 //https://github.com/hpcc-systems/KEL/issues/2640
-FUNCTION: IsNotEnoughToClean(STRING FieldToCheck) <= IF(FieldToCheck:Null OR FieldToCheck = '', TRUE, FALSE);
 FUNCTION: NameNotPopulatedCheck(STRING FnameToCheck, STRING MnameToCheck, STRING LnameToCheck) <= IF(
 					IsNotEnoughToClean(FnameToCheck) AND IsNotEnoughToClean(MnameToCheck) AND IsNotEnoughToClean(LnameToCheck), TRUE, FALSE);				
-FUNCTION: AddrNotPopulatedCheck(STRING AddrToCheck, STRING CityToCheck, STRING StateToCheck, STRING ZipToCheck) <= 
-				MAP(
-					//Addr & City & State & Zip are blank = we can't clean 
-					(IsNotEnoughToClean(AddrToCheck) AND IsNotEnoughToClean(CityToCheck) AND
-						IsNotEnoughToClean(StateToCheck) AND IsNotEnoughToClean(ZipToCheck)) => TRUE,
-					//If Addr & City are populated but State and Zip are blank = we can't clean
-					 (NOT IsNotEnoughToClean(AddrToCheck) AND NOT IsNotEnoughToClean(CityToCheck) AND
-						IsNotEnoughToClean(StateToCheck) AND IsNotEnoughToClean(ZipToCheck)) => TRUE,
-					//If Addr & State are populated but City and Zip are blank = we can't clean
-					 (NOT IsNotEnoughToClean(AddrToCheck) AND NOT IsNotEnoughToClean(StateToCheck) AND 
-						IsNotEnoughToClean(CityToCheck) AND IsNotEnoughToClean(ZipToCheck)) => TRUE,
-				FALSE);	
+FUNCTION: CityStateZipNotPopulatedCheck(STRING City, STRING State, STRING Zip) <= IsNotEnoughToClean(Zip) AND (IsNotEnoughToClean(City) OR IsNotEnoughToClean(State));
 */
-FUNCTION: AddrNotPopulatedCheck(STRING AddrToCheck, STRING CityToCheck, STRING StateToCheck, STRING ZipToCheck) <= 
-					MAP(
-					//Addr & City & State & Zip are blank = we can't clean 
-					((AddrToCheck:Null OR AddrToCheck = '') AND (CityToCheck:Null OR CityToCheck = '') AND
-						(StateToCheck:Null OR StateToCheck = '') AND (ZipToCheck:Null OR ZipToCheck = '')) => TRUE,
-					//If Addr & City are populated but State and Zip are blank = we can't clean
-					 (AddrToCheck != '' AND CityToCheck != '' AND (StateToCheck:Null OR StateToCheck = '') AND (ZipToCheck:Null OR ZipToCheck = '')) => TRUE,
-					//If Addr & State are populated but City and Zip are blank = we can't clean
-					 (AddrToCheck != '' AND StateToCheck != '' AND (CityToCheck:Null OR CityToCheck = '') AND (ZipToCheck:Null OR ZipToCheck = '')) => TRUE,
-						FALSE);	
+
+FUNCTION: CityStateZipNotPopulatedCheck(STRING City, STRING State, STRING Zip) <= (Zip:Null OR Zip = '') AND ((City:Null OR City = '') OR (State:Null OR State = ''));
+						
 //Input Echo return 0/1 if populated						
 FUNCTION: IsEchoPopulated(STRING FieldToCheck) <= IF(FieldToCheck:Null OR FieldToCheck = '', '0', '1');
 //Input Cleaned returns -99999/0/1 if cleaned attributes are populated
@@ -73,7 +57,9 @@ InputBII: MISSING_INPUT_DATA_INT := -99999;
 InputBII: NO_DATA_FOUND := '-99998';
 InputBII: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-99997';	 
 
-InputPII: => AddrNotPopulated := IF(AddrNotPopulatedCheck(InputStreetEcho, InputCityEcho, InputStateEcho, InputZipEcho), TRUE, FALSE);
+InputPII: => AddrNotPopulated := IsNotEnoughToClean(InputStreetEcho);
+InputPII: => CityStateZipNotPopulated := CityStateZipNotPopulatedCheck(InputCityEcho, InputStateEcho, InputZipEcho);
+InputPII: => CleanCityStateZipNotPopulated := CityStateZipNotPopulatedCheck(InputCityClean, InputStateClean, InputZip5Clean);
 InputPII: => NameNotPopulated := IF(NameNotPopulatedCheck(InputFirstNameEcho, InputMiddleNameEcho, InputLastNameEcho), TRUE, FALSE);
 
 CriminalOffense: NO_DATA_FOUND_CRIM := '-99998';
@@ -129,25 +115,52 @@ InputPII: => InputFirstNameCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA
 InputPII: => InputMiddleNameCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(InputMiddleNameClean, NO_DATA_FOUND));
 InputPII: => InputLastNameCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(InputLastNameClean, NO_DATA_FOUND));
 InputPII: => InputSuffixCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(InputSuffixClean, NO_DATA_FOUND));
-InputPII: => InputPrimaryRangeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputPrimaryRangeClean, NO_DATA_FOUND));
-InputPII: => InputPreDirectionCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputPreDirectionClean, NO_DATA_FOUND));
-InputPII: => InputPrimaryNameCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputPrimaryNameClean, NO_DATA_FOUND));
-InputPII: => InputAddressSuffixCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputAddressSuffixClean, NO_DATA_FOUND));
-InputPII: => InputPostDirectionCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputPostDirectionClean, NO_DATA_FOUND));
-InputPII: => InputUnitDesigCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputUnitDesigClean, NO_DATA_FOUND));
-InputPII: => InputSecondaryRangeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputSecondaryRangeClean, NO_DATA_FOUND));
-InputPII: => InputCityCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputCityClean, NO_DATA_FOUND));
-InputPII: => InputStateCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputStateClean, NO_DATA_FOUND));
-InputPII: => InputZip5CleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputZip5Clean, NO_DATA_FOUND)); 
-InputPII: => InputZip4CleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputZip4Clean, NO_DATA_FOUND));
+InputPII: => InputPrimaryRangeCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(InputPrimaryRangeClean, NO_DATA_FOUND));
+InputPII: => InputPreDirectionCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(InputPreDirectionClean, NO_DATA_FOUND));
+InputPII: => InputPrimaryNameCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(InputPrimaryNameClean, NO_DATA_FOUND));
+InputPII: => InputAddressSuffixCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(InputAddressSuffixClean, NO_DATA_FOUND));
+InputPII: => InputPostDirectionCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(InputPostDirectionClean, NO_DATA_FOUND));
+InputPII: => InputUnitDesigCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(InputUnitDesigClean, NO_DATA_FOUND));
+InputPII: => InputSecondaryRangeCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(InputSecondaryRangeClean, NO_DATA_FOUND));
+InputPII: => InputCityCleanValue := MAP(
+				InputCityEchoPopValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				InputCityEchoPopValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(InputCityClean, NO_DATA_FOUND));
+InputPII: => InputStateCleanValue := MAP(
+				InputStateEchoPopValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				InputStateEchoPopValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(InputStateClean, NO_DATA_FOUND));
+InputPII: => InputZip5CleanValue := MAP(
+				InputZipEchoPopValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				InputZipEchoPopValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(InputZip5Clean, NO_DATA_FOUND)); 
+InputPII: => InputZip4CleanValue := MAP(
+				InputZipEchoPopValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				InputZipEchoPopValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(InputZip4Clean, NO_DATA_FOUND));
 InputPII: => InputStreetCleanValue := MAP(
-				(InputPrimaryRangeCleanValue=MISSING_INPUT_DATA
-					OR InputPreDirectionCleanValue=MISSING_INPUT_DATA
-					OR InputPrimaryNameCleanValue=MISSING_INPUT_DATA 
-					OR InputAddressSuffixCleanValue=MISSING_INPUT_DATA 
-					OR InputPostDirectionCleanValue=MISSING_INPUT_DATA 
-					OR InputUnitDesigCleanValue=MISSING_INPUT_DATA 
-					OR InputSecondaryRangeCleanValue=MISSING_INPUT_DATA) => MISSING_INPUT_DATA,
+				AddrNotPopulated => MISSING_INPUT_DATA,
 				(InputPrimaryRangeCleanValue=NO_DATA_FOUND
 					AND InputPreDirectionCleanValue=NO_DATA_FOUND
 					AND InputPrimaryNameCleanValue=NO_DATA_FOUND 
@@ -164,12 +177,8 @@ InputPII: => InputStreetCleanValue := MAP(
 					IF(InputSecondaryRangeCleanValue=NO_DATA_FOUND,'', TRIM(InputSecondaryRangeClean)))
 				);
 InputPII: => InputFullAddressCleanValue := MAP(
-				((InputStreetCleanValue=MISSING_INPUT_DATA
-					AND InputCityCleanValue=MISSING_INPUT_DATA
-					AND InputStateCleanValue=MISSING_INPUT_DATA)
-					OR
-					(InputStreetCleanValue=MISSING_INPUT_DATA
-					AND InputZip5CleanValue=MISSING_INPUT_DATA))=> MISSING_INPUT_DATA,
+				(AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				InputStreetCleanPopValue = '0' OR CleanCityStateZipNotPopulated => NO_DATA_FOUND,
 				(IF(InputPrimaryRangeCleanValue=NO_DATA_FOUND,'',TRIM(InputPrimaryRangeClean)+ ' ')+
 				 IF(InputPreDirectionCleanValue=NO_DATA_FOUND,'',TRIM(InputPreDirectionClean)+ ' ')+
 				 IF(InputPrimaryNameCleanValue=NO_DATA_FOUND,'',TRIM(InputPrimaryNameClean)+ ' ')+
@@ -182,12 +191,12 @@ InputPII: => InputFullAddressCleanValue := MAP(
 				 IF(InputZip5CleanValue=NO_DATA_FOUND,'',TRIM(InputZip5Clean)+ ' ')+
 				 IF(InputZip4CleanValue=NO_DATA_FOUND,'',TRIM(InputZip4Clean)))
 				);	
-InputPII: => InputLatitudeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputLatitudeClean, NO_DATA_FOUND));
-InputPII: => InputLongitudeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputLongitudeClean, NO_DATA_FOUND));
-InputPII: => InputCountyCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputCountyClean, NO_DATA_FOUND));
-InputPII: => InputGeoblockCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputGeoblockClean, NO_DATA_FOUND));
-InputPII: => InputAddressTypeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputAddressTypeClean, NO_DATA_FOUND));
-InputPII: => InputAddressStatusCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(InputAddressStatusClean, NO_DATA_FOUND));
+InputPII: => InputLatitudeCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(InputLatitudeClean, NO_DATA_FOUND));
+InputPII: => InputLongitudeCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(InputLongitudeClean, NO_DATA_FOUND));
+InputPII: => InputCountyCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(InputCountyClean, NO_DATA_FOUND));
+InputPII: => InputGeoblockCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(InputGeoblockClean, NO_DATA_FOUND));
+InputPII: => InputAddressTypeCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(InputAddressTypeClean, NO_DATA_FOUND));
+InputPII: => InputAddressStatusCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(InputAddressStatusClean, NO_DATA_FOUND));
 InputPII: => InputSSNCleanValue := IsBlank2Fields(InputSSNEcho, MISSING_INPUT_DATA, InputSSNClean, NO_DATA_FOUND);
 InputPII: => InputDOBCleanValue := IsBlank2Fields(InputDOBEcho, MISSING_INPUT_DATA, STRING(InputDOBClean), NO_DATA_FOUND); 
 InputPII: => InputDLCleanValue := IsBlank2Fields(InputDLEcho, MISSING_INPUT_DATA, InputDLClean, NO_DATA_FOUND); 
@@ -421,28 +430,57 @@ InputBII: => BusInputRep5EmailEchoPopValue := AuthRep5.InputEmailEchoPopValue;
 InputBII: => BusInputRep5DLEchoPopValue := AuthRep5.InputDLEchoPopValue;
 InputBII: => BusInputRep5DLStateEchoPopValue := AuthRep5.InputDLStateEchoPopValue;
 //Clean Business Input Attributes
-InputBII: => AddrNotPopulated := IF(AddrNotPopulatedCheck(BusInputStreetEcho, BusInputCityEcho, BusInputStateEcho, BusInputZipEcho), TRUE, FALSE);
+InputBII: => AddrNotPopulated := IsNotEnoughToClean(BusInputStreetEcho);
+InputBII: => CityStateZipNotPopulated := CityStateZipNotPopulatedCheck(BusInputCityEcho, BusInputStateEcho, BusInputZipEcho);
+InputBII: => CleanCityStateZipNotPopulated := CityStateZipNotPopulatedCheck(BusInputCityClean, BusInputStateClean, BusInputZip5Clean);
 InputBII: => BusInputNameCleanValue := IsBlank2Fields(BusInputNameEcho, MISSING_INPUT_DATA, BusInputNameClean, NO_DATA_FOUND);
 InputBII: => BusInputAlternateNameCleanValue := IsBlank2Fields(BusInputAlternateNameEcho, MISSING_INPUT_DATA, BusInputAlternateNameClean, NO_DATA_FOUND);
-InputBII: => BusInputPrimRangeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputPrimRangeClean, NO_DATA_FOUND));
-InputBII: => BusInputPreDirCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputPreDirClean, NO_DATA_FOUND));
-InputBII: => BusInputPrimNameCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputPrimNameClean, NO_DATA_FOUND));
-InputBII: => BusInputAddrSuffixCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputAddrSuffixClean, NO_DATA_FOUND));
-InputBII: => BusInputPostDirCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputPostDirClean, NO_DATA_FOUND));
-InputBII: => BusInputUnitDesigCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputUnitDesigClean, NO_DATA_FOUND));
-InputBII: => BusInputSecRangeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputSecRangeClean, NO_DATA_FOUND));
-InputBII: => BusInputCityCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputCityClean, NO_DATA_FOUND));
-InputBII: => BusInputStateCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputStateClean, NO_DATA_FOUND));
-InputBII: => BusInputZip5CleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputZip5Clean, NO_DATA_FOUND));
-InputBII: => BusInputZip4CleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputZip4Clean, NO_DATA_FOUND));
+InputBII: => BusInputPrimRangeCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(BusInputPrimRangeClean, NO_DATA_FOUND));
+InputBII: => BusInputPreDirCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(BusInputPreDirClean, NO_DATA_FOUND));
+InputBII: => BusInputPrimNameCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(BusInputPrimNameClean, NO_DATA_FOUND));
+InputBII: => BusInputAddrSuffixCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(BusInputAddrSuffixClean, NO_DATA_FOUND));
+InputBII: => BusInputPostDirCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(BusInputPostDirClean, NO_DATA_FOUND));
+InputBII: => BusInputUnitDesigCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(BusInputUnitDesigClean, NO_DATA_FOUND));
+InputBII: => BusInputSecRangeCleanValue := MAP(
+				AddrNotPopulated => MISSING_INPUT_DATA, 
+				CityStateZipNotPopulated => NO_DATA_FOUND,
+				IsBlank(BusInputSecRangeClean, NO_DATA_FOUND));
+InputBII: => BusInputCityCleanValue := MAP(
+				BusInputCityEchoPopValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				BusInputCityEchoPopValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(BusInputCityClean, NO_DATA_FOUND));
+InputBII: => BusInputStateCleanValue := MAP(
+				BusInputStateEchoPopValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				BusInputStateEchoPopValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(BusInputStateClean, NO_DATA_FOUND));
+InputBII: => BusInputZip5CleanValue := MAP(
+				BusInputZipEchoPopValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				BusInputZipEchoPopValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(BusInputZip5Clean, NO_DATA_FOUND));
+InputBII: => BusInputZip4CleanValue := MAP(
+				BusInputZipEchoPopValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				BusInputZipEchoPopValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(BusInputZip4Clean, NO_DATA_FOUND));
 InputBII: => BusInputStreetCleanValue := MAP(
-				(BusInputPrimRangeCleanValue=MISSING_INPUT_DATA
-					OR BusInputPreDirCleanValue=MISSING_INPUT_DATA
-					OR BusInputPrimNameCleanValue=MISSING_INPUT_DATA 
-					OR BusInputAddrSuffixCleanValue=MISSING_INPUT_DATA 
-					OR BusInputPostDirCleanValue=MISSING_INPUT_DATA 
-					OR BusInputUnitDesigCleanValue=MISSING_INPUT_DATA 
-					OR BusInputSecRangeCleanValue=MISSING_INPUT_DATA) => MISSING_INPUT_DATA,
+				AddrNotPopulated => MISSING_INPUT_DATA,
 				(BusInputPrimRangeCleanValue=NO_DATA_FOUND
 					AND BusInputPreDirCleanValue=NO_DATA_FOUND
 					AND BusInputPrimNameCleanValue=NO_DATA_FOUND 
@@ -459,12 +497,8 @@ InputBII: => BusInputStreetCleanValue := MAP(
 					IF(BusInputSecRangeCleanValue=NO_DATA_FOUND,'', TRIM(BusInputSecRangeClean)))
 				);
 InputBII: => BusInputFullAddressCleanValue := MAP(
-				((BusInputStreetCleanValue=MISSING_INPUT_DATA
-					AND BusInputCityCleanValue=MISSING_INPUT_DATA
-					AND BusInputStateCleanValue=MISSING_INPUT_DATA)
-					OR
-					(BusInputStreetCleanValue=MISSING_INPUT_DATA
-					AND BusInputZip5CleanValue=MISSING_INPUT_DATA))=> MISSING_INPUT_DATA,
+				(AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				BusInputStreetCleanPopValue = '0' OR CleanCityStateZipNotPopulated => NO_DATA_FOUND,
 				(IF(BusInputPrimRangeCleanValue=NO_DATA_FOUND,'',TRIM(BusInputPrimRangeClean)+ ' ')+
 				 IF(BusInputPreDirCleanValue=NO_DATA_FOUND,'',TRIM(BusInputPreDirClean)+ ' ')+
 				 IF(BusInputPrimNameCleanValue=NO_DATA_FOUND,'',TRIM(BusInputPrimNameClean)+ ' ')+
@@ -477,12 +511,12 @@ InputBII: => BusInputFullAddressCleanValue := MAP(
 				 IF(BusInputZip5CleanValue=NO_DATA_FOUND,'',TRIM(BusInputZip5Clean)+ ' ')+
 				 IF(BusInputZip4CleanValue=NO_DATA_FOUND,'',TRIM(BusInputZip4Clean)))
 				);	
-InputBII: => BusInputLatitudeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputLatitudeClean, NO_DATA_FOUND));
-InputBII: => BusInputLongitudeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputLongitudeClean, NO_DATA_FOUND));
-InputBII: => BusInputCountyCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputCountyClean, NO_DATA_FOUND));
-InputBII: => BusInputGeoblockCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputGeoblockClean, NO_DATA_FOUND));
-InputBII: => BusInputAddrTypeCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputAddrTypeClean, NO_DATA_FOUND));
-InputBII: => BusInputAddrStatusCleanValue := IF(AddrNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputAddrStatusClean, NO_DATA_FOUND));
+InputBII: => BusInputLatitudeCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputLatitudeClean, NO_DATA_FOUND));
+InputBII: => BusInputLongitudeCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputLongitudeClean, NO_DATA_FOUND));
+InputBII: => BusInputCountyCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputCountyClean, NO_DATA_FOUND));
+InputBII: => BusInputGeoblockCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputGeoblockClean, NO_DATA_FOUND));
+InputBII: => BusInputAddrTypeCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputAddrTypeClean, NO_DATA_FOUND));
+InputBII: => BusInputAddrStatusCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(BusInputAddrStatusClean, NO_DATA_FOUND));
 InputBII: => BusInputPhoneCleanValue := IsBlank2Fields(BusInputPhoneEcho, MISSING_INPUT_DATA, BusInputPhoneClean, NO_DATA_FOUND);
 InputBII: => BusInputTINCleanValue := IsBlank2Fields(BusInputTINEcho, MISSING_INPUT_DATA, BusInputTINClean, NO_DATA_FOUND);
 InputBII: => BusInputEmailCleanValue := IsBlank2Fields(BusInputEmailEcho, MISSING_INPUT_DATA, BusInputEmailClean, NO_DATA_FOUND);
