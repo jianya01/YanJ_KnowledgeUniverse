@@ -1,6 +1,4 @@
-﻿﻿#OPTION(persist, 0) // Set to 0 to disable PERSIST functionality
-#OPTION(persistexpire, 30) // Number of days before PERSIST files are automatically deleted
-#OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
+﻿#OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
 
 // --- ENTITY Definitions Section --- 
 IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities;
@@ -11,7 +9,10 @@ IMPORT PublicRecords_KEL.Uses;
 // --- Attributes Section ---
 IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
 
- QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset, STRING InputArchiveDateClean) <= InputPII{InputUIDAppend := UID, 
+QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset, 
+					InputArchiveDateClean, 
+					PERMITS DPM) <= InputPII{
+		InputUIDAppend := UID, 
 		InputAccountEcho := InputAccountValue,	
 		InputLexIDEcho := InputLexIDValue,  
 		InputFirstNameEcho := InputFirstNameValue, 
@@ -114,12 +115,15 @@ IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
 		InputArchiveDateCleanPop := InputArchiveDateCleanPopValue,
 		BusInputUIDAppend,
 		RepNumber := IRepNumberValue}
+	USING DPM
 	USE InputPIIDataset(FLAT, 
 		InputPII(UID = InputUIDAppend, Subject = AppendedLexID));// We are linking the Input PII to the Person ENTITY via the InputUIDAppend
 
  QUERY: InputBusAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputBII InputBIIDataset, 
-					STRING BusInputArchiveDateEcho) <= InputBII{BusInputUIDAppend := UID, 
+					InputArchiveDateClean,
+					PERMITS DPM) <= InputBII{
+		BusInputUIDAppend := UID, 
 		BusInputAccountEcho := BusInputAccountEchoValue,
 		BusInputUIDAppend, 
 		InputLexIDBusExtendedFamilyEcho := InputLexIDBusExtendedFamilyEchoValue, 
@@ -666,15 +670,17 @@ IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
 		BusInputRep5DOBCleanPop := BusInputRep5DOBCleanPopValue,
 		BusInputRep5EmailCleanPop := BusInputRep5EmailCleanPopValue,
 		BusInputRep5DLCleanPop := BusInputRep5DLCleanPopValue,
-		BusInputRep5DLStateCleanPop := BusInputRep5DLStateCleanPopValue
-	} 
+		BusInputRep5DLStateCleanPop := BusInputRep5DLStateCleanPopValue}
+	USING DPM
 	USE InputPIIDataset(FLAT,
 		InputPII(UID = InputUIDAppend),
 		InputBIIInputPII(PII = InputUIDAppend, BII = BusInputUIDAppend)),
 		InputBIIDataset(FLAT, InputBII(UID = BusInputUIDAppend));
 
- QUERY: NonFCRAPersonAttributesV1(SET OF Person LexIDs, ArchiveDate, PERMITS DPM) <= Person(UID IN LexIDs) 
-		{LexID := UID,
+ QUERY: NonFCRAPersonAttributesV1(SET OF Person LexIDs, 
+					InputArchiveDateClean, 
+					PERMITS DPM) <= Person(UID IN LexIDs){
+		LexID := UID,
 		// Criminal Attributes 
 		FelonyCnt1Y, 
 		FelonyCnt7Y, 
@@ -783,11 +789,14 @@ IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
 		BkHavingBusTypeFlag7Y,
 		BkHavingBusTypeFlag10Y,
 		BkSeverityIndex10Y
-		
-		} ASOF reportedby(ArchiveDate) USING DPM;
+		} 
+	ASOF reportedby(InputArchiveDateClean) 
+	USING DPM;
 
- QUERY: FCRAPersonAttributesV1(SET OF Person LexIDs, ArchiveDate, PERMITS DPM) <= Person(UID IN LexIDs) 
-		{LexID := UID,
+ QUERY: FCRAPersonAttributesV1(SET OF Person LexIDs, 
+					InputArchiveDateClean, 
+					PERMITS DPM) <= Person(UID IN LexIDs){
+		LexID := UID,
 		// Criminal Attributes 
 		FelonyCnt1Y, 
 		FelonyCnt7Y, 
@@ -886,9 +895,139 @@ IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
 		BkHavingBusTypeFlag7Y,
 		BkHavingBusTypeFlag10Y,
 		BkSeverityIndex10Y	
-		} ASOF reportedby(ArchiveDate) USING DPM;
-		
+		} 
+	ASOF reportedby(InputArchiveDateClean) 
+	USING DPM;
+
+// --- Index Build QUERY ---
+/* This QUERY Ensures we are generating all of the ECL Code necessary for building any of the ENTITY or ASSOCIATION Indexes at any given time (That KEL doesn't optimize them away completely
+   MAKE SURE TO ADD ANY NEW ENTITY OR ASSOCIATIONS TO THIS LIST */ 
+QUERY: IndexBuildEntity(InputArchiveDateClean, PERMITS DPM) <= 
+		Accident,
+		Address,
+		Aircraft,
+		Bankruptcy,
+		Business,
+		CriminalOffender,
+		CriminalOffense,
+		CriminalPunishment,
+		DriversLicense,
+		Education,
+		Email,
+		Employment,
+		Household,
+		Inquiry,
+		Neighborhood,
+		// Person, // Currently causes an "internal - invalid internal compiler state" when uncommented, being investigated by the compiler team.  Thankfully the Attribute QUERY's above will generate this build code anyways.
+		Phone,
+		ProfessionalLicense,
+		Property,
+		SocialSecurityNumber,
+		Utility,
+		Vehicle,
+		Watercraft,
+		ZipCode
+	ASOF reportedby(InputArchiveDateClean) 
+	USING DPM;
+
+QUERY: IndexBuildAssociation(InputArchiveDateClean, PERMITS DPM) <=  
+		AccidentAddress,
+		AccidentDriversLicense,
+		AddressDriversLicense,
+		AddressInquiry,
+		AddressPhone,
+		AddressProperty,
+		AircraftOwner,
+		// BusinessProperty, // Removing temporarily until the Business ENTITY is complete
+		CriminalDetails,
+		DriversLicenseInquiry,
+		EducationSSN,
+		EducationStudentAddress,
+		// EmploymentBusiness, // Removing temporarily until the Business ENTITY is complete
+		EmploymentBusinessAddress,
+		EmploymentPerson,
+		EmploymentSSN,
+		FirstDegreeAssociations,
+		FirstDegreeRelative,
+		HouseholdMember,
+		OffenderAddress,
+		OffenderSSN,
+		PersonAccident,
+		PersonAddress,
+		PersonBankruptcy,
+		PersonDriversLicense,
+		PersonEducation,
+		PersonEmail,
+		PersonInquiry,
+		PersonOffender,
+		PersonOffenses,
+		PersonPhone,
+		PersonProperty,
+		PersonSSN,
+		PersonVehicle,
+		PhoneInquiry,
+		PhoneSSN,
+		ProfessionalLicenseAddress,
+		ProfessionalLicensePerson,
+		ProfessionalLicensePhone,
+		SecondDegreeAssociations,
+		SSNAddress,
+		SSNBankruptcy,
+		SSNInquiry,
+		SSNProperty,
+		UtilityHomeAddress,
+		UtilityPerson,
+		UtilityPhone,
+		WatercraftAddress,
+		WatercraftOwner,
+		ZipCodePerson
+	ASOF reportedby(InputArchiveDateClean) 
+	USING DPM;
+
+
+
 // --- Debugging QUERYs Section (Only Uncomment for Debugging) ---
+// QUERY: DataPermissions(SET OF Person LexIDs, 
+					// PERMITS DPM, 
+					// InputArchiveDateClean) <= 
+	// Person(UID IN LexIDs){DataSources}, // Person
+	// Person(UID IN LexIDs).PersonAddress{DataSources}, // PersonAddress
+	// Person(UID IN LexIDs).PersonAddress.Location{DataSources}, // Address
+	// Person(UID IN LexIDs).PersonBankruptcy{DataSources}, // PersonBankruptcy
+	// Person(UID IN LexIDs).PersonBankruptcy.Bankrupt{DataSources}, // Bankruptcy
+	// Person(UID IN LexIDs).PersonPhone{DataSources}, // PersonPhone
+	// Person(UID IN LexIDs).PersonPhone.PhoneNumber{DataSources}, // Phone
+	// Person(UID IN LexIDs).PersonOffenses{DataSources}, // PersonOffenses
+	// Person(UID IN LexIDs).PersonOffenses.Offense{DataSources}, // CriminalOffense
+	// Person(UID IN LexIDs).PersonOffender{DataSources}, // PersonOffender
+	// Person(UID IN LexIDs).PersonOffender.Offender{DataSources}, // CriminalOffender
+	// Person(UID IN LexIDs).PersonSSN{DataSources}, // PersonSSN
+	// Person(UID IN LexIDs).PersonSSN.Social{DataSources}, // SocialSecurityNumber
+	// Person(UID IN LexIDs).PersonInquiry{DataSources}, // PersonInquiry
+	// Person(UID IN LexIDs).PersonInquiry.Inquiry{DataSources}, // Inquiry
+	// Person(UID IN LexIDs).PersonDriversLicense{DataSources}, // PersonDriversLicense
+	// Person(UID IN LexIDs).PersonDriversLicense.License{DataSources}, // DriversLicense
+	// Person(UID IN LexIDs).AircraftOwner{DataSources}, // AircraftOwner
+	// Person(UID IN LexIDs).AircraftOwner.Plane{DataSources}, // Aircraft
+	// Person(UID IN LexIDs).WatercraftOwner{DataSources}, // WatercraftOwner
+	// Person(UID IN LexIDs).WatercraftOwner.WCraft{DataSources}, // Watercraft
+	// Person(UID IN LexIDs).PersonEmail{DataSources}, // PersonEmail
+	// Person(UID IN LexIDs).PersonEmail.rEmail{DataSources}, // Email
+	// Person(UID IN LexIDs).PersonProperty{DataSources}, // PersonProperty
+	// Person(UID IN LexIDs).PersonProperty.Transaction{DataSources}, // Property
+	// Person(UID IN LexIDs).PersonEducation{DataSources}, // PersonEducation
+	// Person(UID IN LexIDs).PersonEducation.Edu{DataSources}, // Education
+	// Person(UID IN LexIDs).UtilityPerson{DataSources}, // UtilityPerson
+	// Person(UID IN LexIDs).UtilityPerson.Util{DataSources}, // Utility
+	// Person(UID IN LexIDs).ZipCodePerson{DataSources}, // ZipCodePerson
+	// Person(UID IN LexIDs).ZipCodePerson.Zip{DataSources}, // ZipCode
+	// Person(UID IN LexIDs).PersonVehicle{DataSources}, // PersonVehicle
+	// Person(UID IN LexIDs).PersonVehicle.Automobile{DataSources}, // Vehicle
+	// Person(UID IN LexIDs).PersonAccident{DataSources}, // PersonAccident
+	// Person(UID IN LexIDs).PersonAccident.Acc{DataSources} // Accident
+	// ASOF reportedby(InputArchiveDateClean)
+	// USING DPM;
+
 // QUERY: BuildDates(ArchiveDate) <= Aircraft{CurrentDate}, Bankruptcy{CurrentDate}, Business{CurrentDate}, CriminalOffense{CurrentDate}, CriminalOffender{CurrentDate}, CriminalPunishment{CurrentDate}, Inquiry{CurrentDate}, Person{CurrentDate}, Phone{CurrentDate}, ProfessionalLicense{CurrentDate}, Property{CurrentDate, CurrentDateFCRA}, Watercraft{CurrentDate} ASOF reportedby(ArchiveDate);
 
 // QUERY: PersonEntity(SearchForLexID, ArchiveDate) <= Person(UID = SearchForLexID) ASOF reportedby(ArchiveDate); 
