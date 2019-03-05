@@ -1,0 +1,36 @@
+﻿IMPORT KnowledgeUniverse.LifeRiskClassifier_KEL.Entities;
+IMPORT LifeRiskClassifier_KEL.Uses;
+
+// Major SVC in Life
+MVRActivity: LIFE_MAJOR_SVC_LIST := ['18430','16160','16170','84150','16260','18120','16220','11710','58210','22720','22710','314JZ','16940','16990','16810','16820','16840','16860','16850','16830','16930','16700','16710','16720','16730','16740','16760','16750','16890','16920','16910','56240','16510','12430','16690','53220','52150','51310','22110','52140','52110','12410','12460','12450',
+																		'35340','35350','52120','52130','52170','52310','52100','55220','12350','22600','12720','21340','56310','88410','22040','58120','58110','12730','12630','12610','18450','18420','12030','16230','18440','12620','55110','53210','82130','22030','55210','52160','16310','16320','13510','51210','51220','12440','52180','13420','86110','16150','16180','11720',
+																		'31620','16340','18510','31610','56230','84140','51120','51110','52810','52820','13410','12013','56220','12012','16290','16210','55320','55340','311DI','311FZ','311FH','311FI','311GZ','311GH','311HN','311HZ','311HI','311IZ','311IH','311II','311IJ','311PZ','311PI','311PP','311JZ','311JI','311JJ','311JK','311KZ','311LZ','311LK','311LR','311SZ','311MZ',
+																		'311MR','311ML','311RZ','311NZ','31180','16110','12011','56210','57110','12330','11730','56110','52320','55310','52330','22700','16460','16420','16430','16140'];
+
+// Additional Major SVC in Life with conditions
+// MVRActivity: LIFE_MAJOR_SVC_G60_LIST := ['16520','16530','16540','16550','16560'];
+
+// Valid MVRStatus 
+MVReport: VALID_MVR_STATUS := ['C','R','Y','H','D'];
+MVReport: DEFAULT_LV1 := -1;
+
+MVRActivity: ACCI_TYPE := 'ACCI';
+
+
+// MVReport: => InquiryDOB := ONLY(MVRReportInquiry.Transaction, DateOfBirth);
+// MVReport: => InquiryAge := YEARSBETWEEN(InquiryDOB, Datestamp);
+// MVRActivity: => InquiryAge := rMVReport.InquiryAge;
+MVRActivity: => ProcessDate := ADJUSTCALENDAR(rMVReport.Datestamp,0,0,-1);
+
+MVRActivity: => StdSVC := SUBSTR(StandardViolationCode,1,5);
+
+// MVRActivity: => MajorViolations := (StdSVC IN LIFE_MAJOR_SVC_LIST) OR ((StdSVC IN LIFE_MAJOR_SVC_G60_LIST) AND (InquiryAge>60));
+MVRActivity: => MajorViolations := StdSVC IN LIFE_MAJOR_SVC_LIST;
+MVRActivity: => AgeOfViolation := IF((ActivityType = 'ACCI' AND NOT VISUDate:Null) OR COREDate:Null,
+																			MONTHSBETWEEN(VISUDate, ProcessDate),
+																			MONTHSBETWEEN(COREDate, ProcessDate));
+
+MVReport: => ValidReport := MVRStatus IN VALID_MVR_STATUS;
+
+MVReport: => Major3Yr := IF(ValidReport, COUNT(MVRActivity(AgeOfViolation<36 AND MajorViolations)), DEFAULT_LV1);
+
