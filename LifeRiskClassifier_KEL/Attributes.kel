@@ -13,6 +13,7 @@ MVRActivity: LIFE_MAJOR_SVC_LIST := ['18430','16160','16170','84150','16260','18
 // Valid MVRStatus 
 MVReport: VALID_MVR_STATUS := ['C','R','Y','H','D'];
 MVReport: DEFAULT_LV1 := -1;
+MVReport: CAP_DEFAULT := 92;
 
 MVRActivity: ACCI_TYPE := 'ACCI';
 
@@ -26,11 +27,12 @@ MVRActivity: => StdSVC := SUBSTR(StandardViolationCode,1,5);
 
 // MVRActivity: => MajorViolations := (StdSVC IN LIFE_MAJOR_SVC_LIST) OR ((StdSVC IN LIFE_MAJOR_SVC_G60_LIST) AND (InquiryAge>60));
 MVRActivity: => MajorViolations := StdSVC IN LIFE_MAJOR_SVC_LIST;
-MVRActivity: => AgeOfViolation := IF((ActivityType = 'ACCI' AND NOT VISUDate:Null) OR COREDate:Null,
-																			MONTHSBETWEEN(VISUDate, ProcessDate),
-																			MONTHSBETWEEN(COREDate, ProcessDate));
+MVRActivity: => ViolDate := IF((ActivityType = ACCI_TYPE AND NOT VISUDate:Null) OR COREDate:Null,VISUDate, COREDate);
+MVRActivity: => AgeOfViolationInM := MONTHSBETWEEN(ViolDate, ProcessDate);
+MVRActivity: => AgeOfViolationInD := DAYSBETWEEN(ViolDate, rMVReport.Datestamp);
+
 
 MVReport: => ValidReport := MVRStatus IN VALID_MVR_STATUS;
 
-MVReport: => Major3Yr := IF(ValidReport, COUNT(MVRActivity(AgeOfViolation<36 AND MajorViolations)), DEFAULT_LV1);
+MVReport: => major_3y := IF(ValidReport, MIN(COUNT(MVRActivity(AgeOfViolationInM<36 AND AgeOfViolationInD >=0 AND MajorViolations)), CAP_DEFAULT), DEFAULT_LV1);
 
