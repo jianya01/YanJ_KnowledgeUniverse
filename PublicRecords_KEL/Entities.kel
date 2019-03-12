@@ -3,7 +3,72 @@ ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
 // Defining the PERMITS to allow for USING functionality
-PERMITS FCRA, nonFCRA;
+// When adding new permissions, replace the highest number "UnassignedNN" with your new permission - 
+// these are intended to be placeholders to represent how much available permissions space we have.  Also, do not reorganize these permissions.
+PERMITS Restricted, // 1
+		NoRestriction, // 2
+		FCRA, // 3
+		NonFCRA, // 4
+		GLBA, // 5
+		DPPA, // 6
+		Marketing, // 7
+		InsuranceProduct, // 8
+		Fares, // 9
+		Experian, // 10
+		ExperianFCRA, // 11
+		TransUnion, // 12
+		Equifax, // 13
+		Advo, // 14
+		Cortera, // 15
+		ExperianEBR, // 16
+		ExperianCRDB, // 17
+		SSNDeathMaster, // 18
+		FDN, // 19
+		InsuranceDL, // 20
+		SBFE, // 21
+		DNBDMI, // 22
+		Targus, // 23
+		Certegy, // 24
+		PreGLB, // 25
+		LiensJudgments, // 26
+		ExperianPhones, // 27
+		Inquiries, // 28
+		DPPAGroup1, // 29
+		DPPAGroup2, // 23
+		DPPAGroup3, // 31
+		DPPAGroup4, // 32
+		DPPAGroup5, // 33
+		DPPAGroup6, // 34
+		DPPAGroup7, // 35
+		DPPAGroup8, // 36
+		DPPAGroup9, // 37
+		DPPAGroup10, // 38
+		DPPAGroup11, // 39
+		DPPAGroup12, // 40
+		DPPAGroup13, // 41
+		DPPAGroup14, // 42
+		DPPAGroup15, // 43
+		DPPAGroup16, // 44
+		DPPAGroup17, // 45
+		DPPAGroup18, // 46
+		DPPAGroup19, // 47
+		DPPAGroup20, // 48
+		DPPAGroup21, // 49
+		DPPAGroup22, // 50
+		DPPAGroup23, // 51
+		DPPAGroup24, // 52
+		DPPAGroup25, // 53
+		DPPAGroup26, // 54
+		DPPAGroup27, // 55
+		Unassigned9, 
+		Unassigned8, 
+		Unassigned7, 
+		Unassigned6, 
+		Unassigned5, 
+		Unassigned4, 
+		Unassigned3, 
+		Unassigned2, 
+		Unassigned1;
 
 // Global Person Entity Definition
 Person := ENTITY(FLAT(UID=LexID,
@@ -84,7 +149,7 @@ SocialSecurityNumber := ENTITY(FLAT(UID=SSN,
 		DatesOfDeath{DateOfDeath},
 		DataSources{Source}));
 
-Bankruptcy := ENTITY(FLAT(UID(TMSID, Court_Code, Case_Number),
+Bankruptcy := ENTITY(FLAT(UID(TMSID, Court_Code, Case_Number, DID),
 		STRING TMSID=NULL(),
 		STRING CourtCode=NULL(),
 		STRING CaseNumber=NULL(),
@@ -675,7 +740,7 @@ InputBII := ENTITY(QUERY(UID=BusInputUIDAppend,
 		STRING BusInputPhoneClean,
 		STRING BusInputEmailClean,
 		STRING BusInputTINClean,
-		STRING BusInputArchiveDateClean,
+		INTEGER BusInputArchiveDateClean,
 		STRING ArchiveDate
 			),
 	MODEL(*));
@@ -966,7 +1031,7 @@ InputPII := ENTITY(QUERY(UID=InputUIDAppend,
 		STRING InputDLStateClean,
 		DATE InputDOBClean,
 		STRING InputSSNClean,
-		STRING InputArchiveDateClean,
+		INTEGER InputArchiveDateClean,
 		INTEGER BusInputUIDAppend,
 		INTEGER RepNumber
 		),
@@ -1318,7 +1383,7 @@ Tradeline := ENTITY(FLAT(UID(AccountKey),
 
 PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), INTEGER AddressRank, STRING Source),
 	MODEL(Subject, Location, AddressRank, DataSources{Source})); // Connects a Person to an Address
-PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number), STRING Source),
+PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number, DID), STRING Source),
 	MODEL(Subject, Bankrupt, DataSources{Source}));
 PersonPhone := ASSOCIATION(FLAT(Person Subject, Phone PhoneNumber, INTEGER ConfidenceScore, INTEGER PersonScore, INTEGER NameScore, INTEGER BestNameMatchFlag, INTEGER LatestPhoneOwnerFlag, INTEGER ActivePhoneFlag, STRING Source),
 	MODEL(Subject, PhoneNumber, ConfidenceScore, PersonScore, NameScore, BestNameMatchFlag, LatestPhoneOwnerFlag, ActivePhoneFlag, DataSources{Source}));
@@ -1346,7 +1411,7 @@ PersonSSN := ASSOCIATION(FLAT(Person Subject, SocialSecurityNumber Social, BOOLE
 PersonSSN: => LegacySSN := EXISTS(TempLegacySSN);
 SSNAddress := ASSOCIATION(FLAT(SocialSecurityNumber Social, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), STRING Source),
 	MODEL(Social, Location, DataSources{Source}));
-SSNBankruptcy := ASSOCIATION(FLAT(SocialSecurityNumber Social, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number), STRING Source),
+SSNBankruptcy := ASSOCIATION(FLAT(SocialSecurityNumber Social, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number, DID), STRING Source),
 	MODEL(Social, Bankrupt, DataSources{Source}));
 PhoneSSN := ASSOCIATION(FLAT(Phone PhoneNumber, SocialSecurityNumber Social, STRING Source),
 	MODEL(PhoneNumber, Social, DataSources{Source}));
@@ -1398,8 +1463,9 @@ PersonProperty := ASSOCIATION(FLAT(Person Subject, Property Transaction = UID(Ln
 	MODEL(Subject, Transaction, PurchaseDateBySubject, SaleDateBySubject, IsBuyerOrOwner, IsSeller, IsBorrower, IsCareOf, PersonNumber, ConjunctiveNameSequence, DataSources{Source}));
 AddressProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), BOOLEAN IsOwnerAddress, BOOLEAN IsSellerAddress, BOOLEAN IsPropertyAddress, BOOLEAN IsBorrowerAddress, STRING Source),
 	MODEL(Transaction, Location, IsOwnerAddress, IsSellerAddress, IsPropertyAddress, IsBorrowerAddress, DataSources{Source}));
-BusinessProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), Business Company, STRING Source),
-	MODEL(Transaction, Company, DataSources{Source}));
+// Removing until we get the Business ENTITY up and running
+// BusinessProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), Business Company, STRING Source),
+	// MODEL(Transaction, Company, DataSources{Source}));
 SSNProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), SocialSecurityNumber Social, STRING Source),
 	MODEL(Transaction, Social, DataSources{Source}));
 
@@ -1411,9 +1477,9 @@ EducationStudentAddress := ASSOCIATION(FLAT(Education Edu, Address UniLocation =
 	MODEL(Edu, UniLocation, DataSources{Source}));
 
 InputBIIInputPII := ASSOCIATION(QUERY(InputPII PII, InputBII BII));
-
-EmploymentBusiness := ASSOCIATION(FLAT(Business Bus, Employment Emp, STRING Source),
-	MODEL(Bus, Emp, DataSources{Source}));
+// Removing until we get the Business ENTITY up and running
+// EmploymentBusiness := ASSOCIATION(FLAT(Business Bus, Employment Emp, STRING Source),
+	// MODEL(Bus, Emp, DataSources{Source}));
 EmploymentPerson := ASSOCIATION(FLAT(Person Subject, Employment Emp, STRING Source),
 	MODEL(Subject, Emp, DataSources{Source}));
 EmploymentSSN := ASSOCIATION(FLAT(SocialSecurityNumber Social, Employment Emp, STRING Source),
