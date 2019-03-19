@@ -899,6 +899,31 @@ QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.Layo
 	ASOF reportedby(InputArchiveDateClean) 
 	USING DPM;
 
+QUERY: NonFCRABusinessSeleIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in, 
+					InputArchiveDateClean, 
+					PERMITS DPM) <= Business(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
+		LexIDBusExtendedFamilyAppend := UltID,
+		LexIDBusLegalFamilyAppend := OrgID,
+		LexIDBusLegalEntityAppend := SeleID,
+		LexIDBusLegalEntitySeen
+		} 
+	ASOF reportedby(InputArchiveDateClean) 
+	USING DPM;
+
+// NonFCRABusinessSeleIDNoDatesAttributesV1 is used only to calculate LexIDBusLegalEntityRestricted. 
+// The intention of this is to check if we can find any records on file for the business given the permissions we have set, regardless of the date on the records.
+// This is a search on the Business SeleID ENTITY with no ASOF filtering applied. If we find records on file, we say the business is not restricted.
+// If no records are found, but we do have a SeleID, then the business must only be seen on restricted sources. This attribute is ONLY used in the master layout,
+// And therefore should only be calculated when master results are requested so that we do not impact production performance.
+QUERY: NonFCRABusinessSeleIDNoDatesAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in, 
+					PERMITS DPM) <= Business(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
+		LexIDBusExtendedFamilyAppend := UltID,
+		LexIDBusLegalFamilyAppend := OrgID,
+		LexIDBusLegalEntityAppend := SeleID,
+		LexIDBusLegalEntityRestricted
+		} 
+	USING DPM;
+	
 // --- Index Build QUERY ---
 /* This QUERY Ensures we are generating all of the ECL Code necessary for building any of the ENTITY or ASSOCIATION Indexes at any given time (That KEL doesn't optimize them away completely
    MAKE SURE TO ADD ANY NEW ENTITY OR ASSOCIATIONS TO THIS LIST */ 
@@ -984,6 +1009,7 @@ QUERY: IndexBuildAssociation(InputArchiveDateClean, PERMITS DPM) <=
 		ZipCodePerson 
 	ASOF reportedby(InputArchiveDateClean) 
 	USING DPM;
+
 
 // QUERY: BusinessSearch(INTEGER UltID, INTEGER OrgID, INTEGER SeleID) <= Business(UltID, OrgID, SeleID)
 
