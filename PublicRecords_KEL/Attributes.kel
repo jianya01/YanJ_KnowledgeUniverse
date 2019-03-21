@@ -30,11 +30,12 @@ FUNCTION: IsCleanPopulated(STRING FieldToCheck, STRING DefaultVal1, STRING Defau
 					IF(FieldToCheck = DefaultVal2, '0', '1'));
 FUNCTION: GETBUILDDATE(STRING variableName) <= ECL((UNSIGNED8)Risk_Indicators.get_Build_date(variableName)) FROM Risk_Indicators RETURNS DATE;
 FUNCTION: EditDistance(STRING field1, STRING field2) <= ECL(STD.Str.EditDistance(field1, field2)) FROM STD RETURNS INTEGER;
+FUNCTION: SourceGroup(STRING RawSource) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.SourceGroup(RawSource)) FROM PublicRecords_KEL RETURNS STRING;
 
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
 Aircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
 Bankruptcy: => CurrentDate := MIN(GETBUILDDATE('bankruptcy_daily'), CURRENTDATE());
-Business: => CurrentDate := MIN(GETBUILDDATE('bheader_build_version'), CURRENTDATE());
+Business: => CurrentDate := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
 CriminalOffense: => CurrentDate := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
 CriminalOffender: => CurrentDate := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
 CriminalPunishment: => CurrentDate := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
@@ -1276,3 +1277,10 @@ Person: => BkSeverityIndex10Y := MAP(
 ////////////////////////////////////
 Business: => LexIDBusLegalEntityRestricted := IF(EXISTS(DataSources), '0', '1');
 Business: => LexIDBusLegalEntitySeen := IF(EXISTS(DataSources), '1', '0');
+
+Business.DataSources: => TranslatedSource := SourceGroup(Source);
+Business: => SrcVerBusLegalEntityList := TOPN(DataSources{
+	TranslatedSourceCode := TranslatedSource,
+	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), INTEGER(TranslatedSource:DateFirstSeen), 0),
+	SourceDateLastSeen := IF(ISVALIDDATE(TranslatedSource:DateLastSeen), INTEGER(TranslatedSource:DateLastSeen), 0)
+	}, 1000, SourceDateFirstSeen = 0, SourceDateFirstSeen, SourceDateLastSeen = 0, SourceDateLastSeen, TranslatedSourceCode);
