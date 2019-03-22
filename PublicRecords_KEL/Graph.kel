@@ -1,10 +1,10 @@
 ﻿#OPTION(codegen, 'nosmartjoins') // Hidden option that disables SMART joins in favor of more traditional HASH joins
 
 // --- ENTITY Definitions Section --- 
-IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities;
+IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities; 
 
 // --- USE Statements Section ---
-IMPORT PublicRecords_KEL.Uses;
+IMPORT PublicRecords_KEL.Uses; 
 
 // --- Attributes Section ---
 IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
@@ -17,7 +17,7 @@ QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.Layo
 		InputLexIDEcho := InputLexIDValue,  
 		InputFirstNameEcho := InputFirstNameValue, 
 		InputMiddleNameEcho := InputMiddleNameValue,
-		InputLastNameEcho := InputLastNameValue,
+		InputLastNameEcho := InputLastNameValue, 
 		InputStreetEcho := InputStreetValue,
 		InputCityEcho := InputCityValue, 
 		InputStateEcho := InputStateValue, 
@@ -899,6 +899,32 @@ QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.Layo
 	ASOF reportedby(InputArchiveDateClean) 
 	USING DPM;
 
+QUERY: NonFCRABusinessSeleIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in, 
+					InputArchiveDateClean, 
+					PERMITS DPM) <= Business(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
+		LexIDBusExtendedFamilyAppend := UltID,
+		LexIDBusLegalFamilyAppend := OrgID,
+		LexIDBusLegalEntityAppend := SeleID,
+		LexIDBusLegalEntitySeen,
+		SrcVerBusLegalEntityList
+		} 
+	ASOF reportedby(InputArchiveDateClean) 
+	USING DPM;
+
+// NonFCRABusinessSeleIDNoDatesAttributesV1 is used only to calculate LexIDBusLegalEntityRestricted. 
+// The intention of this is to check if we can find any records on file for the business given the permissions we have set, regardless of the date on the records.
+// This is a search on the Business SeleID ENTITY with no ASOF filtering applied. If we find records on file, we say the business is not restricted.
+// If no records are found, but we do have a SeleID, then the business must only be seen on restricted sources. This attribute is ONLY used in the master layout,
+// And therefore should only be calculated when master results are requested so that we do not impact production performance.
+QUERY: NonFCRABusinessSeleIDNoDatesAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in, 
+					PERMITS DPM) <= Business(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
+		LexIDBusExtendedFamilyAppend := UltID,
+		LexIDBusLegalFamilyAppend := OrgID,
+		LexIDBusLegalEntityAppend := SeleID,
+		LexIDBusLegalEntityRestricted
+		} 
+	USING DPM;
+	
 // --- Index Build QUERY ---
 /* This QUERY Ensures we are generating all of the ECL Code necessary for building any of the ENTITY or ASSOCIATION Indexes at any given time (That KEL doesn't optimize them away completely
    MAKE SURE TO ADD ANY NEW ENTITY OR ASSOCIATIONS TO THIS LIST */ 
@@ -923,6 +949,7 @@ QUERY: IndexBuildEntity(InputArchiveDateClean, PERMITS DPM) <=
 		ProfessionalLicense,
 		Property,
 		SocialSecurityNumber,
+		Tradeline,
 		Utility,
 		Vehicle,
 		Watercraft,
@@ -975,15 +1002,24 @@ QUERY: IndexBuildAssociation(InputArchiveDateClean, PERMITS DPM) <=
 		SSNBankruptcy,
 		SSNInquiry,
 		SSNProperty,
+		TradelineBusiness,
 		UtilityHomeAddress,
 		UtilityPerson,
 		UtilityPhone,
-		WatercraftAddress,
 		WatercraftOwner,
-		ZipCodePerson
+		ZipCodePerson 
 	ASOF reportedby(InputArchiveDateClean) 
 	USING DPM;
 
+
+// QUERY: BusinessSearch(INTEGER UltID, INTEGER OrgID, INTEGER SeleID) <= Business(UltID, OrgID, SeleID)
+
+
+		// QUERY: BusinessSearch(SET OF Business SeleIDs, ArchiveDate, PERMITS DPM) <= Business(UID IN SeleIDs){ 
+				// QUERY: BusinessSearch(UltIDs, OrgIDs, SeleIDs, ArchiveDate, PERMITS DPM) <= Business(UltIDs, OrgIDs, SeleIDs){ 
+		// UID, TradelineBusiness.Account{
+		// QUERY: BusinessSearch(SET OF Business UltIDs, SET OF Business OrgIDs, SET OF Business SeleIDs, ArchiveDate, PERMITS DPM) <= Business(UID IN UltIDs, UID IN OrgIDs, UID IN SeleIDs){ 
+		// QUERY: BusinessSearch(INTEGER UltID, INTEGER OrgID, INTEGER SeleID, ArchiveDate, PERMITS DPM) <= Business(UltID=UltID,OrgID=OrgID, SeleID=SeleID){ 
 
 
 // --- Debugging QUERYs Section (Only Uncomment for Debugging) ---
@@ -1049,10 +1085,10 @@ QUERY: IndexBuildAssociation(InputArchiveDateClean, PERMITS DPM) <=
 // QUERY: AddressEntity(ArchiveDate) <= Address ASOF reportedby(ArchiveDate);
 
 // Aircraft Queries
-// QUERY: AircraftEntity <= Aircraft, AircraftOwner, AircraftAddress;
+// QUERY: AircraftEntity <= Aircraft, AircraftOwner;
 
 // Watercraft Queries
-// QUERY: WatercraftEntity <= Watercraft, WatercraftOwner, WatercraftAddress;
+// QUERY: WatercraftEntity <= Watercraft, WatercraftOwner; 
 
 // Phone Queries
 // QUERY: PhoneEntity <= Phone;

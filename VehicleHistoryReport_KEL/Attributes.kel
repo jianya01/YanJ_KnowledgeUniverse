@@ -1,7 +1,6 @@
 ﻿IMPORT VehicleHistoryReport_KEL.Uses;
 IMPORT KnowledgeUniverse.VehicleHistoryReport_KEL.Entities;
 
-
 Vehicle: LVL1_DEFAULT := -1;
 Vehicle: MONTHS_IN_YEAR := 12;
 Vehicle: DAYS_IN_MONTH := 31;
@@ -14,7 +13,7 @@ Vehicle: CAP_CURRENT_OWNER_ANNUAL_MILEAGE := 41873;
 
 
 VehicleReportInquiry: => ReportDate := Transaction.DateOrdered;
-Vehicle: => SearchDate := ADJUSTCALENDAR(ONLY(VehicleReportInquiry, ReportDate), 0, 0, -1);
+Vehicle: => SearchDate := ONLY(VehicleReportInquiry, ReportDate);
 
 Vehicle: => SearchYear := YEAR(SearchDate);
 Vehicle: => SearchMonth := MONTH(SearchDate);
@@ -29,10 +28,6 @@ Vehicle: => ValidFOSD := (FirstOwnerStartDate >= Prior_VinYear18Month) AND (Firs
 Vehicle: => OldestTitleDate := MIN(Events(ExperianType = 100), EventDate);
 Vehicle: => ValidOTD := (OldestTitleDate >= Prior_VinYear18Month) AND (OldestTitleDate <= After_VinYear18Month) AND (OldestTitleDate <= DateOfLastMileage);
 
-Vehicle: => LastSequenceNumber := MAX(Owners, SequenceNumber);
-Vehicle: => MostRecentOwnerStartDate := ONLY(Owners(SequenceNumber = rVehicle.LastSequenceNumber), StartDate);
-
-Vehicle: => MostRecentTitleDate := MAX(Events(ExperianType = 100), EventDate);
 
 Vehicle: => DateOfFirstMileage := MIN(Events(NOT Odometer:Null), EventDate);
 Vehicle: => DateOfLastMileage := MAX(Events(NOT Odometer:Null), EventDate);
@@ -46,6 +41,31 @@ Vehicle: => TotalAge := MAP(ValidFOSD => MAX(((SearchYear - YEAR(FirstOwnerStart
 Vehicle: => SinceLastMileageAge := IF(OldestTitleDate > DateOfLastMileage, ((SearchYear - YEAR(OldestTitleDate)) * MONTHS_IN_YEAR + (SearchMonth - MONTH(OldestTitleDate))) / MONTHS_IN_YEAR, ((SearchYear - YEAR(DateOfLastMileage)) * MONTHS_IN_YEAR + (SearchMonth - MONTH(DateOfLastMileage))) / MONTHS_IN_YEAR);
 
 
+
+// ****************   Helpers for Calculating date and reading for the 2 most recent odo records for COAM, COAM2, COAM3 **************************
+Vehicle: => LastOwnerSequenceNumber := MAX(Owners, SequenceNumber);
+Vehicle: => MostRecentOwnerStartDate := ONLY(Owners(SequenceNumber = rVehicle.LastOwnerSequenceNumber), StartDate);
+Vehicle: => MostRecentTitleDate := MAX(Events(ExperianType = 100), EventDate);
+Vehicle: => CurrentOwnerStartDate := IF(LastOwnerSequenceNumber:Null, MostRecentTitleDate, MostRecentOwnerStartDate);
+
+Events: => WithIn3Yr := DAYSBETWEEN(EventDate, rVehicle.SearchDate) < DAYS_IN_3_YEAR AND DAYSBETWEEN(EventDate, rVehicle.SearchDate) >= 0;
+Events: => OdoEventCurrentOwner := (DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0) AND (NOT Odometer:Null);
+
+// Outside of 3 Yr
+Vehicle: => DateOfLastMileageCOAM := MAX(Events(OdoEventCurrentOwner), EventDate);
+Events: => SecondMROdoEventCOAM := OdoEventCurrentOwner AND DAYSBETWEEN(rVehicle.DateOfLastMileageCOAM, EventDate) < 0 AND DAYSBETWEEN(EventDate, rVehicle.DateOfLastMileageCOAM) >= 100;
+Vehicle: => DateOfLastMileage2COAM := MAX(Events(SecondMROdoEventCOAM), EventDate);
+
+Vehicle: => LastMileageCOAM := ONLY(Events(EventDate = rVehicle.DateOfLastMileageCOAM AND (NOT Odometer:Null)), Odometer);
+Vehicle: => LastMileage2COAM := ONLY(Events(EventDate = rVehicle.DateOfLastMileage2COAM AND (NOT Odometer:Null)), Odometer);
+
+// Inside of 3 Yr
+Vehicle: => DateOfLastMileageCOAM3Yr := MAX(Events(OdoEventCurrentOwner AND WithIn3Yr), EventDate);
+Vehicle: => DateOfLastMileage2COAM3Yr := MAX(Events(SecondMROdoEventCOAM AND WithIn3Yr), EventDate);
+
+Vehicle: => LastMileageCOAM3Yr := ONLY(Events(EventDate = rVehicle.DateOfLastMileageCOAM3Yr AND (NOT Odometer:Null)), Odometer);
+Vehicle: => LastMileage2COAM3Yr := ONLY(Events(EventDate = rVehicle.DateOfLastMileage2COAM3Yr AND (NOT Odometer:Null)), Odometer);
+
 //  Modeled Annual Mileage
 Vehicle: => ModeledAnnualMileageTmp := ROUND(EstimatedAverageMiles / TotalAge);
 Vehicle: => ModeledAnnualMileage := MAP(((NOT OldestTitleDate:Null) AND (DAYSBETWEEN(OldestTitleDate, SearchDate) <= DAYS_IN_MONTH) OR (NOT FirstOwnerStartDate:Null) AND (DAYSBETWEEN(FirstOwnerStartDate, SearchDate) <= DAYS_IN_MONTH)) AND (ModeledAnnualMileageTmp < 599 * MONTHS_IN_YEAR) => CAP_MODELED_ANNUAL_MILEAGE_1,
@@ -57,7 +77,7 @@ Vehicle: => ModeledAnnualMileage := MAP(((NOT OldestTitleDate:Null) AND (DAYSBET
 																				ModeledAnnualMileageTmp);
 
 // Blended Annual Mileage
-Vehicle: => EstimatedMilesDrDurBlankYears := SinceLastMileageAge * ModeledAnnualMileage;
+Vehicle: => EstimatedMilesDrDurBlankYears := IF(ModeledAnnualMileage = LVL1_DEFAULT, 0, SinceLastMileageAge * ModeledAnnualMileage);
 Vehicle: => EstimatedTotalMiles := LastOdometer + EstimatedMilesDrDurBlankYears;
 Vehicle: => BlendedAnnualMileageTmp := ROUND(EstimatedTotalMiles / TotalAge);
 Vehicle: => BlendedAnnualMileage := MAP(BlendedAnnualMileageTmp:Null => ModeledAnnualMileage,
@@ -66,91 +86,45 @@ Vehicle: => BlendedAnnualMileage := MAP(BlendedAnnualMileageTmp:Null => ModeledA
 																				YearMake < 1900 => LVL1_DEFAULT,
 																				BlendedAnnualMileageTmp);
 
-// CurrentOwnerAnnualMileage
-Events: => IsOdometerEvent := NOT Odometer:Null;
-Events: => WithIn3Yr := DAYSBETWEEN(EventDate, rVehicle.SearchDate) < DAYS_IN_3_YEAR AND DAYSBETWEEN(EventDate, rVehicle.SearchDate) >= 0;
-
-Events: => OdoEventOnAfterMOSD3Yr := DAYSBETWEEN(rVehicle.MostRecentOwnerStartDate, EventDate) >= 0 AND IsOdometerEvent AND WithIn3Yr;
-Events: => OdoEventOnAfterMTD3Yr := DAYSBETWEEN(rVehicle.MostRecentTitleDate, EventDate) >= 0 AND IsOdometerEvent AND WithIn3Yr;
-
-Vehicle: => DateOfFirstMileageMOSD3Yr := MIN(Events(OdoEventOnAfterMOSD3Yr), EventDate);
-Vehicle: => DateOfFirstMileageMTD3Yr := MIN(Events(OdoEventOnAfterMTD3Yr), EventDate);
-
-Vehicle: => DateOfLastMileageMOSD3Yr := MAX(Events(OdoEventOnAfterMOSD3Yr), EventDate);
-Vehicle: => DateOfLastMileageMTD3Yr := MAX(Events(OdoEventOnAfterMTD3Yr), EventDate);
-
-Vehicle: => COAMDateOfFirstMileage3Yr := IF(EXISTS(Events(OdoEventOnAfterMOSD3Yr)), DateOfFirstMileageMOSD3Yr, DateOfFirstMileageMTD3Yr);
-Vehicle: => COAMDateOfLastMileage3Yr := IF(EXISTS(Events(OdoEventOnAfterMOSD3Yr)), DateOfLastMileageMOSD3Yr, DateOfLastMileageMTD3Yr);
-
-Vehicle: => COAMFirstOdometer3Yr := ONLY(Events(EventDate = rVehicle.COAMDateOfFirstMileage3Yr AND (NOT Odometer:Null)), Odometer);
-Vehicle: => COAMLastOdometer3Yr := ONLY(Events(EventDate = rVehicle.COAMDateOfLastMileage3Yr AND (NOT Odometer:Null)), Odometer);
-
-
-Vehicle: => ViolationAgeTotalTmp := DAYSBETWEEN(COAMDateOfFirstMileage3Yr, COAMDateOfLastMileage3Yr) / DAYS_IN_1_YEAR;
-Vehicle: => ViolationAgeTotal := MAP((DAYSBETWEEN(COAMDateOfFirstMileage3Yr, COAMDateOfLastMileage3Yr) >= 100) AND
-																			(NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND
-																			(COAMDateOfFirstMileage3Yr < COAMDateOfLastMileage3Yr) AND (COAMFirstOdometer3Yr < COAMLastOdometer3Yr) => ViolationAgeTotalTmp,
+// CurrentOwnerAnnualMileage	
+Vehicle: => ViolationAgeTotalTmp := DAYSBETWEEN(DateOfLastMileage2COAM3Yr, DateOfLastMileageCOAM3Yr) / DAYS_IN_1_YEAR;
+Vehicle: => ViolationAgeTotal := MAP((NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND
+																			(DateOfLastMileage2COAM3Yr < DateOfLastMileageCOAM3Yr) AND (LastMileage2COAM3Yr < LastMileageCOAM3Yr) => ViolationAgeTotalTmp,
 																			LVL1_DEFAULT);
 
-Vehicle: => ViolationMileageTotalTmp := COAMLastOdometer3Yr - COAMFirstOdometer3Yr;
-Vehicle: => ViolationMileageTotal := MAP((DAYSBETWEEN(COAMDateOfFirstMileage3Yr, COAMDateOfLastMileage3Yr) >= 100) AND
-																				(NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND
-																				(COAMDateOfFirstMileage3Yr < COAMDateOfLastMileage3Yr) AND (COAMFirstOdometer3Yr < COAMLastOdometer3Yr) => ViolationMileageTotalTmp,
-																				LVL1_DEFAULT);
+Vehicle: => ViolationMileageTotalTmp := LastMileageCOAM3Yr - LastMileage2COAM3Yr;
+Vehicle: => ViolationMileageTotal := MAP((NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND
+																			(DateOfLastMileage2COAM3Yr < DateOfLastMileageCOAM3Yr) AND (LastMileage2COAM3Yr < LastMileageCOAM3Yr) => ViolationMileageTotalTmp,
+																			LVL1_DEFAULT);
 
 Vehicle: => CurrentOwnerAnnualMileageTmp := ROUND(ViolationMileageTotal / ViolationAgeTotal);
 Vehicle: => CurrentOwnerAnnualMileage := MAP(ViolationAgeTotal = -1 => LVL1_DEFAULT,
-																							CurrentOwnerAnnualMileageTmp < 0 => LVL1_DEFAULT,
 																							CurrentOwnerAnnualMileageTmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
 																							CurrentOwnerAnnualMileageTmp);
+			
+
 // CurrentOwnerAnnualMileage2
-Events: => OdoEventOnAfterMOSD := DAYSBETWEEN(rVehicle.MostRecentOwnerStartDate, EventDate) >= 0 AND IsOdometerEvent;
-Events: => OdoEventOnAfterMTD := DAYSBETWEEN(rVehicle.MostRecentTitleDate, EventDate) >= 0 AND IsOdometerEvent;
+Vehicle: => ViolationAgeTotal2Tmp := DAYSBETWEEN(DateOfLastMileage2COAM, DateOfLastMileageCOAM3Yr) / DAYS_IN_1_YEAR;
+Vehicle: => ViolationAgeTotal2 := IF((NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND (DateOfLastMileage2COAM < DateOfLastMileageCOAM3Yr) AND (LastMileage2COAM < LastMileageCOAM3Yr), ViolationAgeTotal2Tmp, LVL1_DEFAULT);
 
-Vehicle: => DateOfFirstMileageMOSD := MIN(Events(OdoEventOnAfterMOSD), EventDate);
-Vehicle: => DateOfFirstMileageMTD := MIN(Events(OdoEventOnAfterMTD), EventDate);
-
-Vehicle: => COAMDateOfFirstMileage := IF(EXISTS(Events(OdoEventOnAfterMOSD)), DateOfFirstMileageMOSD, DateOfFirstMileageMTD);
-Vehicle: => COAMFirstOdometer := ONLY(Events(EventDate = rVehicle.COAMDateOfFirstMileage AND (NOT Odometer:Null)), Odometer);
-
-Vehicle: => ViolationAgeTotal2Tmp := DAYSBETWEEN(COAMDateOfFirstMileage, COAMDateOfLastMileage3Yr) / DAYS_IN_1_YEAR;
-Vehicle: => ViolationAgeTotal2 := MAP((DAYSBETWEEN(COAMDateOfFirstMileage, COAMDateOfLastMileage3Yr) >= 100) AND
-																			(NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND
-																			(COAMDateOfFirstMileage < COAMDateOfLastMileage3Yr) AND (COAMFirstOdometer < COAMLastOdometer3Yr) => ViolationAgeTotal2Tmp,
-																			LVL1_DEFAULT);
-
-Vehicle: => ViolationMileageTotal2Tmp := COAMLastOdometer3Yr - COAMFirstOdometer;
-Vehicle: => ViolationMileageTotal2 := MAP((DAYSBETWEEN(COAMDateOfFirstMileage, COAMDateOfLastMileage3Yr) >= 100) AND
-																					(NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND
-																					(COAMDateOfFirstMileage < COAMDateOfLastMileage3Yr) AND (COAMFirstOdometer < COAMLastOdometer3Yr) => ViolationMileageTotal2Tmp,
-																					LVL1_DEFAULT);
+Vehicle: => ViolationMileageTotal2Tmp := LastMileageCOAM3Yr - LastMileage2COAM;
+Vehicle: => ViolationMileageTotal2 := IF((NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND (DateOfLastMileage2COAM < DateOfLastMileageCOAM3Yr) AND (LastMileage2COAM < LastMileageCOAM3Yr), ViolationMileageTotal2Tmp, LVL1_DEFAULT);
 
 Vehicle: => CurrentOwnerAnnualMileage2Tmp := ROUND(ViolationMileageTotal2 / ViolationAgeTotal2);
 Vehicle: => CurrentOwnerAnnualMileage2 := MAP(ViolationAgeTotal2 = -1 => LVL1_DEFAULT,
-																							CurrentOwnerAnnualMileage2Tmp < 0 => LVL1_DEFAULT,
 																							CurrentOwnerAnnualMileage2Tmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
-																							CurrentOwnerAnnualMileage2Tmp);
+																							CurrentOwnerAnnualMileage2Tmp);																							
+
+
 // CurrentOwnerAnnualMileage3
-Vehicle: => DateOfLastMileageMOSD := MAX(Events(OdoEventOnAfterMOSD), EventDate);
-Vehicle: => DateOfLastMileageMTD := MAX(Events(OdoEventOnAfterMTD), EventDate);
+Vehicle: => ViolationAgeTotal3Tmp := DAYSBETWEEN(DateOfLastMileage2COAM, DateOfLastMileageCOAM) / DAYS_IN_1_YEAR;
+Vehicle: => ViolationAgeTotal3 := IF((NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND (DateOfLastMileage2COAM < DateOfLastMileageCOAM) AND (LastMileage2COAM < LastMileageCOAM), ViolationAgeTotal3Tmp, LVL1_DEFAULT);
 
-Vehicle: => COAMDateOfLastMileage := IF(EXISTS(Events(OdoEventOnAfterMOSD)), DateOfLastMileageMOSD, DateOfLastMileageMTD);
-Vehicle: => COAMLastOdometer := ONLY(Events(EventDate = rVehicle.COAMDateOfLastMileage AND (NOT Odometer:Null)), Odometer);
+Vehicle: => ViolationMileageTotal3Tmp := LastMileageCOAM - LastMileage2COAM;
+Vehicle: => ViolationMileageTotal3 := IF((NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND (DateOfLastMileage2COAM < DateOfLastMileageCOAM) AND (LastMileage2COAM < LastMileageCOAM), ViolationMileageTotal3Tmp, LVL1_DEFAULT);
 
-Vehicle: => ViolationAgeTotal3Tmp := DAYSBETWEEN(COAMDateOfFirstMileage, COAMDateOfLastMileage) / DAYS_IN_1_YEAR;
-Vehicle: => ViolationAgeTotal3 := MAP((DAYSBETWEEN(COAMDateOfFirstMileage, COAMDateOfLastMileage) >= 100) AND
-																			(NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND
-																			(COAMDateOfFirstMileage < COAMDateOfLastMileage) AND (COAMFirstOdometer < COAMLastOdometer) => ViolationAgeTotal3Tmp,
-																			LVL1_DEFAULT);
-
-Vehicle: => ViolationMileageTotal3Tmp := COAMLastOdometer - COAMFirstOdometer;
-Vehicle: => ViolationMileageTotal3 := MAP((DAYSBETWEEN(COAMDateOfFirstMileage, COAMDateOfLastMileage) >= 100) AND
-																					(NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND
-																					(COAMDateOfFirstMileage < COAMDateOfLastMileage) AND (COAMFirstOdometer < COAMLastOdometer) => ViolationMileageTotal3Tmp,
-																					LVL1_DEFAULT);
 
 Vehicle: => CurrentOwnerAnnualMileage3Tmp := ROUND(ViolationMileageTotal3 / ViolationAgeTotal3);
 Vehicle: => CurrentOwnerAnnualMileage3 := MAP(ViolationAgeTotal3 = -1 => LVL1_DEFAULT,
-																							CurrentOwnerAnnualMileage3Tmp < 0 => LVL1_DEFAULT,
 																							CurrentOwnerAnnualMileage3Tmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
 																							CurrentOwnerAnnualMileage3Tmp);
