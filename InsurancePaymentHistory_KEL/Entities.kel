@@ -1,0 +1,256 @@
+﻿// Defining the ERA to allow for ASOF functionality
+ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
+ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
+
+PERMITS FCRA, NonFCRA;
+
+Policy := ENTITY(FLAT(UID(PolicyNumber),
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		STRING LineOfBusiness,
+		INTEGER AMBestNumber,
+		INTEGER EndorsementNumber,
+		DATE EndorsementDate,
+		INTEGER GroupNumber,
+		STRING OPolicyNumber,	//No idea what this is
+		INTEGER ProductUsage,	//??
+		DATE ReportStartDate,
+		DATE ReportEndDate,
+		BOOLEAN IsCombinationPolicyPayment,
+		INTEGER NumberOfPolicies,
+		STRING PaymentGroupIndicator,
+		STRING PaymentStatusCode,
+		STRING CompanyName,
+		INTEGER NAICCode, // National Association of Insurance Commissioners
+		STRING PolicyState,
+		DATE OriginationDate,
+		DATE TermBeginDate,
+		DATE TermEndDate,
+		DATE ChangeEffectiveDate,
+		DATE CancellationNoticeDate,
+		DATE CancelliationDate,
+		STRING CancellationReasonCode,
+		STRING PaymentExtractExclusion,
+		STRING PolicyStatus,
+		STRING IsUsage,
+		DATE FirstLoadDate,
+		BOOLEAN DeleteFlag,
+		STRING BatchID,
+		STRING Status),
+	MODEL(UID,
+		PolicyNumber, PolicyPlan, LineOfBusiness, AMBestNumber, GroupNumber, OPolicyNumber,
+		ProductUsage, IsCombinationPolicyPayment, NumberOfPolicies, PaymentGroupIndicator, PaymentStatusCode, 
+		CompanyName, NAICCode, PolicyState, OriginationDate, IsUsage, FirstLoadDate, DeleteFlag, BatchID, Status,
+		Details{TermBeginDate, TermEndDate, ChangeEffectiveDate, CancellationNoticeDate, CancelliationDate, CancellationReasonCode, PolicyStatus, EndorsementNumber, EndorsementDate},
+		ReportDates{ReportStartDate, ReportEndDate},
+		PaymentSpecialProjects{PaymentExtractExclusion}));
+
+PaymentPlan := ENTITY(FLAT(Policy rPolicy=UID(PolicyNumber),
+		DATE PlanEffectiveDate,
+		INTEGER PolicyTermLengthNonLife,
+		INTEGER PolicyTermLengthLife,
+		STRING PaymentFrequency,
+		STRING PaymentFrequencyOtherReason,
+		REAL DownPaymentPercentage,
+		INTEGER NumberOfInstallmentPayments,
+		REAL InstallmentPaymentPercentageAmount,
+		BOOLEAN IsAccountSetupForAutoDebit,
+		STRING BillType,
+		STRING BillTypeIfOther), 
+	MODEL(rPolicy,
+		PlanEffectiveDate, PolicyTermLengthNonLife, PolicyTermLengthLife, PaymentFrequency, PaymentFrequencyOtherReason, DownPaymentPercentage, NumberOfInstallmentPayments,
+		InstallmentPaymentPercentageAmount, IsAccountSetupForAutoDebit, BillType, BillTypeIfOther));
+
+Invoice := ENTITY(FLAT(UID(InvoiceTransactionID),
+		STRING InvoiceTransactionID,
+		DATE InvoiceDate,
+		DATE DueDate,
+		BOOLEAN IsReturnMail,
+		STRING ReturnMailReason,
+		DATE ReturnMailDate), 
+	MODEL(UID,
+		InvoiceTransactionID, InvoiceDate, DueDate, IsReturnMail, ReturnMailReason, ReturnMailDate));
+		
+PaymentDetails := ENTITY(FLAT(Invoice rInvoice = UID(InvoiceTransactionID),
+		STRING PaymentReceivedMethod,
+		STRING PaymentReceivedType,
+		STRING PaymentReceivedTypeIfOther,
+		REAL TransactionPaymentReceivedPercentage,
+		REAL TotalPaymentReceivedPercentage,
+		DATE PaymentReceivedDate,
+		STRING PolicyInEquityIndicator,
+		BOOLEAN IsPaymentPercentageDueNotPaidInFull,
+		BOOLEAN IsPaymentClearance,
+		STRING PaymentClearanceIndicatorReason,
+		BOOLEAN IsLatePayment,
+		DATE LatePaymentRecognitionDate,
+		BOOLEAN IsPaymentFailure,
+		DATE PaymentFailureDate,
+		BOOLEAN IsPaymentFailureNotice,
+		DATE PaymentFailureNoticeDate,
+		BOOLEAN IsPolicyReinstatement,
+		DATE PolicyReinstatementDate,
+		BOOLEAN IsPaidInFull,
+		DATE PaidInFullDate),
+	MODEL(rInvoice,
+		PaymentReceived{PaymentReceivedMethod, PaymentReceivedType, PaymentReceivedTypeIfOther, TransactionPaymentReceivedPercentage, TotalPaymentReceivedPercentage, PaymentReceivedDate,
+			PolicyInEquityIndicator, IsPaymentPercentageDueNotPaidInFull, IsPaymentClearance, PaymentClearanceIndicatorReason},
+		LatePayment{IsLatePayment, LatePaymentRecognitionDate},
+		PaymentFailure{IsPaymentFailure, PaymentFailureDate, IsPaymentFailureNotice, PaymentFailureNoticeDate},
+		PolicyReinstatement{IsPolicyReinstatement, PolicyReinstatementDate},
+		PaidInFull{IsPaidInFull, PaidInFullDate}));
+		
+Agent := ENTITY(FLAT(UID = AgentNationalProducerNumber,
+		STRING Name),
+	MODEL(UID,
+		Name));
+		
+Agency := ENTITY(FLAT(UID(CompanyProducerNumber),
+		STRING CompanyProducerNumber,
+		STRING Name),
+	MODEL(UID,
+		CompanyProducerNumber, Name));
+		
+Individual := ENTITY(FLAT(UID = LexID,
+		INTEGER OwnerID,
+		INTEGER IndividualNameID,
+		INTEGER IndividualAddressID,
+		STRING Source,
+		INTEGER SourceRID,
+		DATE VendorDateFirstSeen,
+		DATE VendorDateLastSeen,
+		STRING Title,
+		STRING FirstName,
+		STRING MiddleName,
+		STRING LastName,
+		STRING NameSuffix,
+		STRING ProfessionalSuffix,
+		STRING NameIndicator,			// Individual, Business, Turstee (Possibly not required)
+		BOOLEAN IsPrimaryPolicyOwner,
+		DATE DateOfBirth,
+		STRING EmailAddress,
+		INTEGER SocialSecurityNumber,
+		INTEGER TaxIdentificationNumber,
+		STRING Gender,
+		STRING PolicyOwnerExtractExclusion),
+	MODEL(UID,
+		OwnerID, IndividualNameID, IndividualAddressID, Source, SourceRID,
+		FullName{Title, FirstName, MiddleName, LastName, NameSuffix, ProfessionalSuffix},
+		NameIndicator, IsPrimaryPolicyOwner, 
+		ReportedDatesOfBirth{DateOfBirth},
+		ReportedEmailAddresses{EmailAddress},
+		ReportedSocialSecurityNumbers{SocialSecurityNumber},
+		ReportedTaxIdentificationNumbers{TaxIdentificationNumber},
+		Gender,
+		PolicyOwnerSpecialProjects{PolicyOwnerExtractExclusion},
+		VendorDateFirstSeen, VendorDateLastSeen));
+
+Trustee := ENTITY(FLAT(UID = OwnerID,
+		// Policy rPolicy=UID(PolicyNumber),
+		INTEGER TrusteeAddressID,
+		STRING TrusteeName,
+		STRING NameIndicator,			// Individual, Business, Turstee (Possibly not required)
+		STRING EmailAddress,
+		INTEGER SocialSecurityNumber,
+		INTEGER TaxIdentificationNumber,
+		STRING TrusteeExtractExclusion),
+	MODEL(UID,
+		// rPolicy,
+		TrusteeAddressID, NameIndicator, TrusteeName,
+		ReportedEmailAddresses{EmailAddress},
+		ReportedSocialSecurityNumbers{SocialSecurityNumber},
+		ReportedTaxIdentificationNumbers{TaxIdentificationNumber},
+		TrusteeSpecialProjects{TrusteeExtractExclusion}));
+
+Business := ENTITY(FLAT(UID = BDID,
+		INTEGER OwnerID,
+		INTEGER BusinessAddressID,
+		STRING NameIndicator,
+		STRING BusinessName,
+		STRING EmailAddress,
+		INTEGER SocialSecurityNumber,
+		INTEGER TaxIdentificationNumber,
+		STRING BusinessExtractExclusion,
+		STRING DoingBusinessAs,
+		INTEGER ProxID,
+		INTEGER PowID,
+		INTEGER SeleID,
+		INTEGER OrgID,
+		INTEGER UltID),
+ MODEL(UID,
+		OwnerID, BusinessAddressID, NameIndicator, BusinessName, 
+		ReportedEmailAddresses{EmailAddress},
+		ReportedSocialSecurityNumbers{SocialSecurityNumber},
+		ReportedTaxIdentificationNumbers{TaxIdentificationNumber},
+		DBAs{DoingBusinessAs},
+		BIPs{ProxID, PowID, SeleID, OrgID, UltID},
+		BusinessSpecialProjects{BusinessExtractExclusion}));
+		
+Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
+		STRING PrimaryRange=NULL(),
+		STRING Predirectional=NULL(),
+		STRING PrimaryName=NULL(),
+		STRING Suffix=NULL(),
+		STRING Postdirectional=NULL(),
+		STRING UnitDesignation=NULL(),
+		STRING SecondaryRange=NULL(),
+		STRING City=NULL(),
+		STRING State=NULL(),
+		INTEGER ZIP5,
+		INTEGER ZIP4=NULL(),
+		STRING CarrierRouteNumber=NULL(),
+		STRING CarrierRouteSortationAtZIP=NULL(),
+		INTEGER LineOfTravel=NULL(),
+		STRING LineOfTravelOrder=NULL(),
+		INTEGER DeliveryPointBarcode=NULL(),
+		INTEGER DeliveryPointBarcodeCheckDigit=NULL(),
+		STRING TypeCode=NULL(),
+		INTEGER FipsState=NULL(),
+		INTEGER County=NULL(),
+		REAL Latitude=NULL(),
+		REAL Longitude=NULL(),
+		INTEGER MetropolitanStatisticalArea=NULL(),
+		INTEGER GeoBlock=NULL(),
+		STRING GeoMatch=NULL(),
+		STRING ACECleanerErrorCode=NULL(),
+		INTEGER AddressID,
+		STRING AddressTypeCode),
+	MODEL(UID, 
+		PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, UnitDesignation, SecondaryRange, City, State, 
+		ZIP5, ZIP4, CarrierRouteNumber, CarrierRouteSortationAtZIP, LineOfTravel, LineOfTravelOrder, DeliveryPointBarcode, DeliveryPointBarcodeCheckDigit, 
+		TypeCode, FipsState, County, Latitude, Longitude, MetropolitanStatisticalArea, GeoBlock, GeoMatch, ACECleanerErrorCode, AddressID,
+		AddressType{AddressTypeCode}));
+		
+Phone := ENTITY(FLAT(UID=Phone10,
+		STRING Phone10,
+		STRING Type,
+		STRING CountryCode),
+	MODEL(UID,
+		Phone10,
+		ReportedTypes{Type},
+		CountryCode));
+		
+DriversLicense := ENTITY(FLAT(UID(DriversLicenseNumber,IssuingState),
+		STRING DriversLicenseNumber,
+		STRING IssuingState),
+	MODEL(UID,
+		DriversLicenseNumber, IssuingState));
+
+AgentCompany := ASSOCIATION(FLAT(Agent Agent, Agency Company = UID(CompanyProducerNumber)));
+AgentPolicy := ASSOCIATION(FLAT(Agent Agent, Policy Policy = UID(PolicyNumber)));
+AgencyPolicy := ASSOCIATION(FLAT(Agency Company = UID(CompanyProducerNumber), Policy Policy = UID(PolicyNumber)));
+
+IndividualPolicy := ASSOCIATION(FLAT(Individual Person, Policy Policy = UID(PolicyNumber)));
+IndividualAddress := ASSOCIATION(FLAT(Individual Person, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+IndividualPhone := ASSOCIATION(FLAT(Individual Person, Phone PhoneNumber));
+IndividualDriversLicense := ASSOCIATION(FLAT(Individual Person, DriversLicense LicenseInformation=UID(DriversLicenseNumber, IssuingState)));
+
+PolicyTrustee	:= ASSOCIATION(FLAT(Trustee Trustee, Policy Policy = UID(PolicyNumber)));
+TrusteePhone := ASSOCIATION(FLAT(Trustee Trustee, Phone PhoneNumber));
+TrusteeAddress := ASSOCIATION(FLAT(Trustee Trustee, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+
+BusinessPolicy	:= ASSOCIATION(FLAT(Business Company, Policy Policy = UID(PolicyNumber)));
+BusinessPhone := ASSOCIATION(FLAT(Business Company, Phone PhoneNumber));
+BusinessAddress := ASSOCIATION(FLAT(Business Company, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+
+InvoicePolicy	:= ASSOCIATION(FLAT(Invoice Bill=UID(InvoiceTransactionID), Policy Policy = UID(PolicyNumber)));
