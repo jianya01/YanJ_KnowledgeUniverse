@@ -45,6 +45,7 @@ Phone: => CurrentDate := MIN(GETBUILDDATE('targus_build_version'), CURRENTDATE()
 ProfessionalLicense: => CurrentDate := MIN(GETBUILDDATE('proflic_build_version'), CURRENTDATE());
 Property: => CurrentDate := MIN(GETBUILDDATE('property_build_version'), CURRENTDATE());
 Property: => CurrentDateFCRA := MIN(GETBUILDDATE('fcra_property_build_version'), CURRENTDATE());
+Tradeline: => CurrentDate := MIN(GETBUILDDATE('cortera_build_version'), CURRENTDATE());
 Watercraft: => CurrentDate := MIN(GETBUILDDATE('watercraft_build_version'), CURRENTDATE());
 					
 // Global Constant Definitions for MAS
@@ -70,6 +71,11 @@ Bankruptcy: NO_DATA_FOUND_BANKRUPTCY := '-99998';
 Bankruptcy: NO_DATA_FOUND_BANKRUPTCY_INT := -99998;
 Bankruptcy: NO_DATA_FOUND_97_INT := -99997;
 Bankruptcy: NO_DATA_FOUND_97 := '-99997';
+
+Tradeline: NO_DATA_FOUND_TRADELINE := '-99998';
+Tradeline: NO_DATA_FOUND_TRADELINE_INT := -99998;
+Tradeline: NO_DATA_FOUND_97_INT := -99997;
+Tradeline: NO_DATA_FOUND_97 := '-99997';
 
 //Input PII input Echo attributes 
 InputPII: => InputAccountValue := IsBlank(InputAccountEcho, MISSING_INPUT_DATA);
@@ -1275,6 +1281,39 @@ Person: => BkSeverityIndex10Y := MAP(
 ////////////////////////////////////
 // Business Attributes
 ////////////////////////////////////
+
+//Tradline Helper Attributes
+Tradeline: ONE_MONTH_IN_DAYS := 30;
+Tradeline: THREE_MONTHS_IN_DAYS := 90;
+Tradeline: SIX_MONTHS_IN_DAYS := 180;
+Tradeline: ONE_YEAR_IN_DAYS := 365;
+Tradeline: TWO_YEARS_IN_DAYS := 730;
+Tradeline: THREE_YEARS_IN_DAYS := 1095;
+Tradeline: FOUR_YEARS_IN_DAYS := 1461;
+Tradeline: FIVE_YEARS_IN_DAYS := 1826;
+Tradeline: SIX_YEARS_IN_DAYS := 2191;
+Tradeline: SEVEN_YEARS_IN_DAYS := 2556;
+Tradeline: TEN_YEARS_IN_DAYS := 3652;
+TradelineBusiness: => TradeAccount := Account{AccountKey};
+Tradeline: => TradeDate := AccountKey:DateFirstSeen;	
+Tradeline: => FilingAgeInDays := ABSDAYSBETWEEN(TradeDate, CurrentDate);
+Tradeline.Records: => RecordDate := ARDate:DateFirstSeen; 
+Tradeline.Records: => RecordAgeInDays := ABSDAYSBETWEEN(RecordDate, CurrentDate);
+Tradeline: => NewestRecordAgeInDays := MIN(Records,RecordAgeInDays);
+
+Tradeline.Records: => CarrierSegment := SegmentID IN [1,4,5,6,8]; 
+Tradeline.Records: => FleetSegment:= SegmentID IN [2,3,9]; 
+Tradeline.Records: => MaterialsSegment:= SegmentID IN [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25];
+Tradeline.Records: => OperationsSegment:= SegmentID IN [26,27,28,29,30,31,32,33,34,35];
+Tradeline.Records: => OtherSegment:= NOT (CarrierSegment OR FleetSegment OR MaterialsSegment OR OperationsSegment);
+
+Tradeline: => NewestCarrierRecordAgeInDays := MIN(Records(Records.CarrierSegment),RecordAgeInDays);
+Tradeline: => NewestFleetRecordAgeInDays := MIN(Records(Records.FleetSegment),RecordAgeInDays);
+Tradeline: => NewestMaterialsRecordAgeInDays := MIN(Records(Records.MaterialsSegment),RecordAgeInDays);
+Tradeline: => NewestOperationsRecordAgeInDays := MIN(Records(Records.OperationsSegment),RecordAgeInDays);
+Tradeline: => NewestOtherRecordAgeInDays := MIN(Records(Records.OtherSegment),RecordAgeInDays);
+
+//Tradline Attributes
 Business: => LexIDBusLegalEntityRestricted := IF(EXISTS(DataSources), '0', '1');
 Business: => LexIDBusLegalEntitySeen := IF(EXISTS(DataSources), '1', '0');
 
@@ -1285,3 +1324,45 @@ Business: => SrcVerBusLegalEntityList := TOPN(TranslatedSources{
 	SourceDateFirstSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), INTEGER(TranslatedSourceCode:DateFirstSeen), 0), INTEGER(CurrentDate)),
 	SourceDateLastSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), INTEGER(TranslatedSourceCode:DateLastSeen), 0), INTEGER(CurrentDate))
 	}, 1000, SourceDateFirstSeen = 0, SourceDateFirstSeen, SourceDateLastSeen = 0, SourceDateLastSeen, TranslatedSourceCode);
+//KS-1395
+Business: => B2bTLCntEv := IF(LexIDBusLegalEntitySeen = '0',-99999,BOUNDSFOLD(COUNT(TradelineBusiness.TradeAccount), 0, 999));
+Business: => B2bTLCnt2Y := IF(LexIDBusLegalEntitySeen = '0',-99999,BOUNDSFOLD(COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS){AccountKey}), 0, 99));
+Business: => B2bTLInCarrCnt2Y := IF(LexIDBusLegalEntitySeen = '0',-99999,BOUNDSFOLD(COUNT(TradelineBusiness.Account(NewestCarrierRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS){AccountKey}), 0, 99));
+Business: => B2bTLInFltCnt2Y := IF(LexIDBusLegalEntitySeen = '0',-99999,BOUNDSFOLD(COUNT(TradelineBusiness.Account(NewestFleetRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS){AccountKey}), 0, 99));
+Business: => B2bTLInMatCnt2Y := IF(LexIDBusLegalEntitySeen = '0',-99999,BOUNDSFOLD(COUNT(TradelineBusiness.Account(NewestMaterialsRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS){AccountKey}), 0, 99));
+Business: => B2bTLInOpsCnt2Y := IF(LexIDBusLegalEntitySeen = '0',-99999,BOUNDSFOLD(COUNT(TradelineBusiness.Account(NewestOperationsRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS){AccountKey}), 0, 99));
+Business: => B2bTLInOthCnt2Y := IF(LexIDBusLegalEntitySeen = '0',-99999,BOUNDSFOLD(COUNT(TradelineBusiness.Account(NewestOtherRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS){AccountKey}), 0, 99));
+
+
+Business: => B2bTLInCarrPct2Y := MAP(
+			(LexIDBusLegalEntitySeen = '0') => -99999,
+			(B2bTLCnt2Y = 0) => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			(B2bTLCnt2Y > 0) => (B2bTLInCarrCnt2Y/B2bTLCnt2Y)*100
+			); 
+Business: => B2bTLInFltPct2Y := MAP(
+			(LexIDBusLegalEntitySeen = '0') => -99999,
+			(B2bTLCnt2Y = 0) => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			(B2bTLCnt2Y > 0) => (B2bTLInFltCnt2Y/B2bTLCnt2Y)*100
+			); 
+			
+Business: => B2bTLInMatPct2Y := MAP(
+			(LexIDBusLegalEntitySeen = '0') => -99999,
+			(B2bTLCnt2Y = 0) => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			(B2bTLCnt2Y > 0) => (B2bTLInMatCnt2Y/B2bTLCnt2Y)*100
+			); 
+			
+Business: => B2bTLInOpsPct2Y := MAP(
+			(LexIDBusLegalEntitySeen = '0') => -99999,
+			(B2bTLCnt2Y = 0) => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			(B2bTLCnt2Y > 0) => (B2bTLInOpsCnt2Y/B2bTLCnt2Y)*100
+			); 
+			
+Business: => B2bTLInOthPct2Y := MAP(
+			(LexIDBusLegalEntitySeen = '0') => -99999,
+			(B2bTLCnt2Y = 0) => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			(B2bTLCnt2Y > 0) => (B2bTLInOthCnt2Y/B2bTLCnt2Y)*100
+			); 	
+
+
+
+
