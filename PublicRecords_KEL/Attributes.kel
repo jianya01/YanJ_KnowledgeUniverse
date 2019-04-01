@@ -1281,7 +1281,17 @@ Person: => BkSeverityIndex10Y := MAP(
 ////////////////////////////////////
 // Business Attributes
 ////////////////////////////////////
+Business: => LexIDBusLegalEntityRestricted := IF(EXISTS(DataSources), '0', '1');
+Business: => LexIDBusLegalEntitySeen := IF(EXISTS(DataSources), '1', '0');
 
+Business.DataSources: => TranslatedSourceCode := SourceGroup(Source);
+Business: => TranslatedSources := DataSources{TranslatedSourceCode};
+Business: => SrcVerBusLegalEntityList := TOPN(TranslatedSources{
+	TranslatedSourceCode := TranslatedSourceCode,
+	SourceDateFirstSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), INTEGER(TranslatedSourceCode:DateFirstSeen), 0), INTEGER(CurrentDate)),
+	SourceDateLastSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), INTEGER(TranslatedSourceCode:DateLastSeen), 0), INTEGER(CurrentDate))
+	}, 1000, SourceDateFirstSeen = 0, SourceDateFirstSeen, SourceDateLastSeen = 0, SourceDateLastSeen, TranslatedSourceCode);
+	
 //Tradline Helper Attributes
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
@@ -1300,12 +1310,21 @@ Tradeline: => FilingAgeInDays := ABSDAYSBETWEEN(TradeDate, CurrentDate);
 Tradeline.Records: => RecordDate := ARDate:DateFirstSeen; 
 Tradeline.Records: => RecordAgeInDays := ABSDAYSBETWEEN(RecordDate, CurrentDate);
 Tradeline: => NewestRecordAgeInDays := MIN(Records,RecordAgeInDays);
+Tradeline: => IsActive := NewestRecordAgeInDays <= THREE_MONTHS_IN_DAYS;
+
 Tradeline: => OldestRecordAgeInDays := MAX(Records,RecordAgeInDays);
 Tradeline.Records: => CarrierSegment := SegmentID IN [1,4,5,6,8]; 
+Tradeline: => IsCarrierSegment := EXISTS(Tradeline.Records(CarrierSegment));
 Tradeline.Records: => FleetSegment:= SegmentID IN [2,3,9]; 
+Tradeline: => IsFleetSegment := EXISTS(Tradeline.Records(FleetSegment));
 Tradeline.Records: => MaterialsSegment:= SegmentID IN [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25];
+Tradeline: => IsMaterialsSegment := EXISTS(Tradeline.Records(MaterialsSegment));
 Tradeline.Records: => OperationsSegment:= SegmentID IN [26,27,28,29,30,31,32,33,34,35];
+Tradeline: => IsOperationsSegment := EXISTS(Tradeline.Records(OperationsSegment));
 Tradeline.Records: => OtherSegment:= NOT (CarrierSegment OR FleetSegment OR MaterialsSegment OR OperationsSegment);
+Tradeline: => IsOtherSegment := EXISTS(Tradeline.Records(OtherSegment));
+
+
 Business: => B2bTLCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS));
 Business: => B2bTLInCarrCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND EXISTS(Records(CarrierSegment))));
 Business: => B2bTLInFltCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND EXISTS(Records(FleetSegment))));
@@ -1314,16 +1333,6 @@ Business: => B2bTLInOpsCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecor
 Business: => B2bTLInOthCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND EXISTS(Records(OtherSegment))));
 
 //Tradline Attributes
-Business: => LexIDBusLegalEntityRestricted := IF(EXISTS(DataSources), '0', '1');
-Business: => LexIDBusLegalEntitySeen := IF(EXISTS(DataSources), '1', '0');
-
-Business.DataSources: => TranslatedSourceCode := SourceGroup(Source);
-Business: => TranslatedSources := DataSources{TranslatedSourceCode};
-Business: => SrcVerBusLegalEntityList := TOPN(TranslatedSources{
-	TranslatedSourceCode := TranslatedSourceCode,
-	SourceDateFirstSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), INTEGER(TranslatedSourceCode:DateFirstSeen), 0), INTEGER(CurrentDate)),
-	SourceDateLastSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), INTEGER(TranslatedSourceCode:DateLastSeen), 0), INTEGER(CurrentDate))
-	}, 1000, SourceDateFirstSeen = 0, SourceDateFirstSeen, SourceDateLastSeen = 0, SourceDateLastSeen, TranslatedSourceCode);
 Business: => B2bTLCntEv := BOUNDSFOLD(COUNT(TradelineBusiness.TradeAccount), 0, 9999);
 Business: => B2bTLCnt2Y := BOUNDSFOLD(B2bTLCnt2YNoCap, 0, 999);
 Business: => B2bTLInCarrCnt2Y := BOUNDSFOLD(B2bTLInCarrCnt2YNoCap, 0, 999);
@@ -1345,4 +1354,21 @@ Business: => B2bNewestTLDt2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRAD
 Business: => B2bOldestTLMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bOldestTLDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24));
 Business: => B2bNewestTLMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bNewestTLDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24));
 
+Business: => B2bActvTLCntNoCap := COUNT(TradelineBusiness.Account(IsActive));
+Business: => B2bActvTLCnt := BOUNDSFOLD(B2bActvTLCntNoCap, 0, 999);
+Business: => B2bActvTLInCarrCntNoCap := COUNT(TradelineBusiness.Account(IsActive AND IsCarrierSegment));
+Business: => B2bActvTLInCarrCnt := BOUNDSFOLD(B2bActvTLInCarrCntNoCap, 0, 999);
+Business: => B2bActvTLInFltCntNoCap := COUNT(TradelineBusiness.Account(IsActive AND IsFleetSegment));
+Business: => B2bActvTLInFltCnt := BOUNDSFOLD(B2bActvTLInFltCntNoCap, 0, 999);
+Business: => B2bActvTLInMatCntNoCap := COUNT(TradelineBusiness.Account(IsActive AND IsMaterialsSegment));
+Business: => B2bActvTLInMatCnt := BOUNDSFOLD(B2bActvTLInMatCntNoCap, 0, 999);
+Business: => B2bActvTLInOpsCntNoCap := COUNT(TradelineBusiness.Account(IsActive AND IsOperationsSegment));
+Business: => B2bActvTLInOpsCnt := BOUNDSFOLD(B2bActvTLInOpsCntNoCap, 0, 999);
+Business: => B2bActvTLInOthCntNoCap := COUNT(TradelineBusiness.Account(IsActive AND IsOtherSegment));
+Business: => B2bActvTLInOthCnt := BOUNDSFOLD(B2bActvTLInOthCntNoCap, 0, 999);
 
+Business: => B2bActvTLInCarrPct := IF(B2bActvTLCntNoCap = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLInCarrCntNoCap/B2bActvTLCntNoCap)*100);
+Business: => B2bActvTLInFltPct := IF(B2bActvTLCntNoCap = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLInFltCntNoCap/B2bActvTLCntNoCap)*100);
+Business: => B2bActvTLInMatPct := IF(B2bActvTLCntNoCap = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLInMatCntNoCap/B2bActvTLCntNoCap)*100);
+Business: => B2bActvTLInOpsPct := IF(B2bActvTLCntNoCap = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLInOpsCntNoCap/B2bActvTLCntNoCap)*100);
+Business: => B2bActvTLInOthPct := IF(B2bActvTLCntNoCap = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLInOthCntNoCap/B2bActvTLCntNoCap)*100);
