@@ -388,6 +388,9 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		STRING SeasonalStartSuppressionDate=NULL(),
 		STRING SeasonalEndSuppressionDate=NULL(),
 		STRING DoNotDeliverIndicator=NULL(),
+		STRING DoNotMailIndicator=NULL(),
+		STRING DeadCOIndicator=NULL(),
+		STRING HotListIndicator=NULL(),
 		STRING CollegeIndicator=NULL(),
 		STRING CollegeStartSuppressionDate=NULL(),
 		STRING CollegeEndSuppressionDate=NULL(),
@@ -404,17 +407,31 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		INTEGER NumberOfCurrentVacationMonths=NULL(),
 		INTEGER MaxVacationMonths=NULL(),
 		INTEGER VacationPeriodsCount=NULL(),
-		STRING InstitutionTypeCode=NULL(),
-		STRING InstitutionTypeExpanded=NULL(),
-		STRING InstitutionName=NULL(),
+		STRING CompanyAddressTypeRaw,
+		STRING CompanyAddressTypeDerived,
+		STRING AddressTypeDerived,
+		STRING AddressMethod,
+		STRING IsActive,
+		STRING IsDefunct,
+		STRING Address_Type,
+		STRING Address_Desc,
 		STRING Source),
-	MODEL(UID, 
-		PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, UnitDesignation, SecondaryRange, PostalCity, VanityCity, State, 
+	MODEL(UID,
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, UnitDesignation, SecondaryRange, PostalCity, VanityCity, State, 
 		ZIP5, ZIP4, CarrierRouteNumber, CarrierRouteSortationAtZIP, LineOfTravel, LineOfTravelOrder, DeliveryPointBarcode, DeliveryPointBarcodeCheckDigit, 
 		TypeCode, County, Latitude, Longitude, MetropolitanStatisticalArea, GeoBlock, GeoMatch, ACECleanerErrorCode,
 		College{CollegeIndicator, CollegeStartSuppressionDate, CollegeEndSuppressionDate},
 		ADVODateSummary{ADVODateFirstSeen, ADVODateLastSeen, ADVODateVendorFirstReported, ADVODateVendorLastReported},
+		BusinessCharacteristics{CompanyAddressTypeRaw,CompanyAddressTypeDerived,AddressTypeDerived, Address_Type, Address_Desc},
+		BIPV2Best{AddressMethod,IsActive,IsDefunct},
 		DoNotDeliver{DoNotDeliverIndicator},
+		DoNotMail{DoNotMailIndicator},
+		DeadCO{DeadCOIndicator},
+		HotList{HotListIndicator},
 		MailDrop{DropIndicator},
 		MixedUsage{MixedUsageCode},
 		OnlyWayToGetMail{OnlyWayToGetMailIndicator},
@@ -427,7 +444,6 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		ThrowBack{ThrowBackIndicator},
 		Vacancy{VacancyIndicator},
 		Vacation{NumberOfCurrentVacationMonths, MaxVacationMonths, VacationPeriodsCount, VacationBeginDate, VacationEndDate},
-		ACA{InstitutionTypeCode, InstitutionTypeExpanded, InstitutionName},
 		DataSources{Source}));
 
 Property := ENTITY(FLAT(UID(LnFaresId),
@@ -1391,13 +1407,66 @@ Tradeline := ENTITY(FLAT(UID(UltID, OrgID, SeleID, AccountKey),
 		VendorDates{DtVendorFirstReported, DtVendorLastReported},
 		DataSources{Source}));
 
-PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), INTEGER AddressRank, STRING Source),
-	MODEL(Subject, Location, AddressRank, DataSources{Source})); // Connects a Person to an Address
+PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
+		STRING PrimaryRange,
+		STRING Predirectional,
+		STRING PrimaryName,
+		STRING Suffix,
+		STRING Postdirectional,
+		STRING SecondaryRange,
+		ZipCode ZIP5,
+		INTEGER AddressRank, 
+		INTEGER InsuranceSourceCount,
+		INTEGER PropertySourceCount,
+		INTEGER UtilitySourceCount,
+		INTEGER VehicleSourceCount,
+		INTEGER DLSourceCount,
+		INTEGER VoterSourceCount,
+		STRING AddressType, 
+		STRING Source),
+	MODEL(Subject, 
+				Location,
+				PrimaryRange, 
+				Predirectional, 
+				PrimaryName, 
+				Suffix, 
+				Postdirectional, 
+				ZIP5, 
+				SecondaryRange,
+				AddressRank, 
+				InsuranceSourceCount,
+				PropertySourceCount,
+				UtilitySourceCount,
+				VehicleSourceCount,
+				DLSourceCount,
+				VoterSourceCount,
+				AddressType, 
+				DataSources{Source})); 
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number, DID), STRING Source),	MODEL(Subject, Bankrupt, DataSources{Source}));
 PersonPhone := ASSOCIATION(FLAT(Person Subject, Phone PhoneNumber, INTEGER ConfidenceScore, INTEGER PersonScore, INTEGER NameScore, INTEGER BestNameMatchFlag, INTEGER LatestPhoneOwnerFlag, INTEGER ActivePhoneFlag, STRING Source),
 	MODEL(Subject, PhoneNumber, ConfidenceScore, PersonScore, NameScore, BestNameMatchFlag, LatestPhoneOwnerFlag, ActivePhoneFlag, DataSources{Source}));
-AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), INTEGER BestAddressMatchFlag, STRING Source), 
-	MODEL(PhoneNumber, Location, BestAddressMatchFlag, DataSources{Source}));
+AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
+	INTEGER BestAddressMatchFlag, 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,
+	STRING Source), 
+	MODEL(
+		PhoneNumber, 
+		Location,
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		BestAddressMatchFlag, 
+		DataSources{Source}));
 PersonOffenses := ASSOCIATION(FLAT(Person Subject, CriminalOffense Offense=UID(OffenderKey), STRING Source),
 	MODEL(Subject, Offense, DataSources{Source}));
 CriminalDetails := ASSOCIATION(FLAT(CriminalOffender Offender = UID(OffenderKey), CriminalOffense Offense = UID(OffenderKey), CriminalPunishment Punishment = UID(OffenderKey), STRING Source),
@@ -1408,8 +1477,26 @@ CriminalDetails := ASSOCIATION(FLAT(CriminalOffender Offender = UID(OffenderKey)
 //	MODEL(Offense, Punishment, DataSources{Source}));
 // OffenderPunishment := ASSOCIATION(FLAT(CriminalOffender Offender = UID(OffenderKey), CriminalPunishment Punishment = UID(OffenderKey), STRING Source),
 //	MODEL(Offender, Punishment, DataSources{Source}));
-OffenderAddress := ASSOCIATION(FLAT(CriminalOffender Offender = UID(OffenderKey), Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), STRING Source),
-	MODEL(Offender, Location, DataSources{Source}));
+OffenderAddress := ASSOCIATION(FLAT(CriminalOffender Offender = UID(OffenderKey), Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,	
+	STRING Source),
+	MODEL(
+		Offender, 
+		Location,
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		DataSources{Source}));
 OffenderSSN := ASSOCIATION(FLAT(SocialSecurityNumber Social, CriminalOffender Offender=UID(OffenderKey), STRING Source),
 	MODEL(Social, Offender, DataSources{Source}));
 PersonOffender := ASSOCIATION(FLAT(Person Subject, CriminalOffender Offender = UID(OffenderKey), STRING Source),
@@ -1418,16 +1505,52 @@ PersonOffender := ASSOCIATION(FLAT(Person Subject, CriminalOffender Offender = U
 PersonSSN := ASSOCIATION(FLAT(Person Subject, SocialSecurityNumber Social, BOOLEAN TempLegacySSN, STRING Source), 
 	MODEL(Subject, Social, {TempLegacySSN}, DataSources{Source}));
 PersonSSN: => LegacySSN := EXISTS(TempLegacySSN);
-SSNAddress := ASSOCIATION(FLAT(SocialSecurityNumber Social, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), STRING Source),
-	MODEL(Social, Location, DataSources{Source}));
+SSNAddress := ASSOCIATION(FLAT(SocialSecurityNumber Social, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,	
+	STRING Source),
+	MODEL(
+		Social, 
+		Location, 
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,	
+		DataSources{Source}));
 SSNBankruptcy := ASSOCIATION(FLAT(SocialSecurityNumber Social, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number, DID), STRING Source),	MODEL(Social, Bankrupt, DataSources{Source}));
 PhoneSSN := ASSOCIATION(FLAT(Phone PhoneNumber, SocialSecurityNumber Social, STRING Source),
 	MODEL(PhoneNumber, Social, DataSources{Source}));
 
 PersonInquiry := ASSOCIATION(FLAT(Person Subject, Inquiry Inquiry=UID(TransactionID), STRING Source),
 	MODEL(Subject, Inquiry, DataSources{Source}));
-AddressInquiry := ASSOCIATION(FLAT(Inquiry Inquiry=UID(TransactionID), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), STRING Source),
-	MODEL(Inquiry, Location, DataSources{Source}));
+AddressInquiry := ASSOCIATION(FLAT(Inquiry Inquiry=UID(TransactionID), Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,
+	STRING Source),
+	MODEL(
+		Inquiry, 
+		Location, 
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		DataSources{Source}));
 SSNInquiry := ASSOCIATION(FLAT(SocialSecurityNumber SSN, Inquiry Inquiry=UID(TransactionID), STRING Source),
 	MODEL(SSN, Inquiry, DataSources{Source}));
 PhoneInquiry := ASSOCIATION(FLAT(Phone PhoneNumber, Inquiry Inquiry=UID(TransactionID), STRING Source),
@@ -1437,9 +1560,26 @@ DriversLicenseInquiry := ASSOCIATION(FLAT(DriversLicense LicenseInformation=UID(
 
 PersonDriversLicense := ASSOCIATION(FLAT(Person Subject, DriversLicense License=UID(DriversLicenseNumber,IssuingState), STRING Source),
 	MODEL(Subject, License, DataSources{Source}));
-AddressDriversLicense := ASSOCIATION(FLAT(Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), DriversLicense License=UID(DriversLicenseNumber,IssuingState), STRING Source),
-	MODEL(Location, License, DataSources{Source}));
-
+AddressDriversLicense := ASSOCIATION(FLAT(Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), DriversLicense License=UID(DriversLicenseNumber,IssuingState), 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,
+	STRING Source),
+	MODEL(
+		Location,
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		License, 
+		DataSources{Source}));
 // Define a first degree and second degree associations
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
 SecondDegreeAssociations := ASSOCIATION(FLAT(Person FirstDegreeAssociation=LexID, Person SecondDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
@@ -1457,10 +1597,9 @@ GLOBAL: FirstDegreeAssociations(#Subj, #FirstDegree, #Title, #RelationshipType, 
 
 AircraftOwner := ASSOCIATION(FLAT(Aircraft Plane = UID(NNumber), Person Owner, INTEGER RegistrantType, DATE CertificateIssueDate, STRING Certification, STRING Source),
 	MODEL(Plane, Owner, RegistrantType, CertificateIssueDate, Certification, DataSources{Source}));
-
 WatercraftOwner := ASSOCIATION(FLAT(Watercraft WCraft=UID(WatercraftKey), Person Owner, STRING Source),
 	MODEL(WCraft, Owner, DataSources{Source}));
-	
+
 PersonEmail := ASSOCIATION(FLAT(Person Subject = did, Email rEmail = UID(EmailAddress), STRING Source),
 	MODEL(Subject, rEmail, DataSources{Source}));
 
@@ -1469,20 +1608,65 @@ HouseholdMember := ASSOCIATION(FLAT(Person Subject, Household Household, INTEGER
 
 PersonProperty := ASSOCIATION(FLAT(Person Subject, Property Transaction = UID(LnFaresId), DATE PurchaseDateBySubject, DATE SaleDateBySubject, BOOLEAN IsBuyerOrOwner, BOOLEAN IsSeller, BOOLEAN IsBorrower, BOOLEAN IsCareOf, INTEGER PersonNumber /*Which_Orig*/, INTEGER ConjunctiveNameSequence, STRING Source),
 	MODEL(Subject, Transaction, PurchaseDateBySubject, SaleDateBySubject, IsBuyerOrOwner, IsSeller, IsBorrower, IsCareOf, PersonNumber, ConjunctiveNameSequence, DataSources{Source}));
-AddressProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), BOOLEAN IsOwnerAddress, BOOLEAN IsSellerAddress, BOOLEAN IsPropertyAddress, BOOLEAN IsBorrowerAddress, STRING Source),
-	MODEL(Transaction, Location, IsOwnerAddress, IsSellerAddress, IsPropertyAddress, IsBorrowerAddress, DataSources{Source}));
+AddressProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,
+	BOOLEAN IsOwnerAddress, 
+	BOOLEAN IsSellerAddress, 
+	BOOLEAN IsPropertyAddress, 
+	BOOLEAN IsBorrowerAddress, 
+	STRING Source),
+	MODEL(
+		Transaction, 
+		Location, 
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		IsOwnerAddress, 
+		IsSellerAddress, 
+		IsPropertyAddress, 
+		IsBorrowerAddress, 
+		DataSources{Source}));
 // Removing until we get the Business ENTITY up and running
 BusinessProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), Business Company=UID(UltID, OrgID, SeleID), STRING Source),
 	MODEL(Transaction, Company, DataSources{Source}));
 SSNProperty := ASSOCIATION(FLAT(Property Transaction = UID(LnFaresId), SocialSecurityNumber Social, STRING Source),
 	MODEL(Transaction, Social, DataSources{Source}));
-
+// BusinessAddress := ASSOCIATION(FLAT(Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), Business Company=UID(UltID, OrgID, SeleID, ProxID), STRING Source),//best with prox I think
+// MODEL(Location, Company, DataSources{Source}));
 PersonEducation := ASSOCIATION(FLAT( Education Edu, Person Subject, STRING Source),
 	MODEL(Edu, Subject, DataSources{Source}));
 EducationSSN := ASSOCIATION(FLAT( Education Edu, SocialSecurityNumber Social, STRING Source),
 	MODEL(Edu, Social, DataSources{Source}));
-EducationStudentAddress := ASSOCIATION(FLAT(Education Edu, Address UniLocation = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), STRING Source),
-	MODEL(Edu, UniLocation, DataSources{Source}));
+EducationStudentAddress := ASSOCIATION(FLAT(Education Edu, Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,
+	STRING Source),
+	MODEL(
+		Edu, 
+		Location, 
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		DataSources{Source}));
 
 InputBIIInputPII := ASSOCIATION(QUERY(InputPII PII, InputBII BII));
 // Removing until we get the Business ENTITY up and running
@@ -1492,18 +1676,73 @@ EmploymentPerson := ASSOCIATION(FLAT(Person Subject, Employment Emp, STRING Sour
 	MODEL(Subject, Emp, DataSources{Source}));
 EmploymentSSN := ASSOCIATION(FLAT(SocialSecurityNumber Social, Employment Emp, STRING Source),
 	MODEL(Social, Emp, DataSources{Source}));
-EmploymentBusinessAddress := ASSOCIATION(FLAT(Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange),Employment Emp, STRING Source),
-	MODEL(Location, Emp, DataSources{Source}));
+EmploymentBusinessAddress := ASSOCIATION(FLAT(Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange),Employment Emp, 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,
+	STRING Source),
+	MODEL(
+		Location,
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		Emp, 
+		DataSources{Source}));
 
-UtilityHomeAddress := ASSOCIATION(FLAT(Utility Util, Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), STRING Source),
-	MODEL(Util, Location, DataSources{Source}));
+
+UtilityAddress := ASSOCIATION(FLAT(Utility Util, Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,
+	STRING Source),
+	MODEL(
+		Util, 
+		Location, 
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		DataSources{Source}));
 UtilityPerson := ASSOCIATION(FLAT(Utility Util, Person Subject, STRING Source),
 	MODEL(Util, Subject, DataSources{Source}));
 UtilityPhone := ASSOCIATION(FLAT(Utility Util, Phone PhoneNumber, STRING Source),
 	MODEL(Util, PhoneNumber, DataSources{Source}));
 	
-ProfessionalLicenseAddress := ASSOCIATION(FLAT(ProfessionalLicense ProfLic=UID(LicenseNumber,LicenseState), Address Location= UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), STRING Source),
-	MODEL(ProfLic, Location, DataSources{Source})); 
+ProfessionalLicenseAddress := ASSOCIATION(FLAT(ProfessionalLicense ProfLic=UID(LicenseNumber,LicenseState), Address Location= UID(PrimaryRange, Predirectional, PrimaryName, Postdirectional, Suffix, ZIP5, SecondaryRange), 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,
+	STRING Source),
+	MODEL(
+		ProfLic, 
+		Location, 
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		DataSources{Source})); 
 ProfessionalLicensePhone := ASSOCIATION(FLAT(ProfessionalLicense ProfLic=UID(LicenseNumber,LicenseState), Phone PhoneNumber, STRING Source),
 	MODEL(ProfLic, PhoneNumber, DataSources{Source})); 
 ProfessionalLicensePerson := ASSOCIATION(FLAT(ProfessionalLicense ProfLic=UID(LicenseNumber,LicenseState), Person Subject, STRING Source),
@@ -1553,8 +1792,26 @@ PersonVehicle := ASSOCIATION(FLAT(Person Subject, Vehicle Automobile=UID(Vehicle
 
 AccidentDriversLicense := ASSOCIATION(FLAT(Accident Acc=UID(AccidentNumber), DriversLicense License=UID(DriversLicenseNumber,IssuingState), STRING Source),
 	MODEL(Acc, License, DataSources{Source}));
-AccidentAddress := ASSOCIATION(FLAT(Accident Acc=UID(AccidentNumber),  Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), STRING Source),
-	MODEL(Acc, Location, DataSources{Source})); 
+AccidentAddress := ASSOCIATION(FLAT(Accident Acc=UID(AccidentNumber),  Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
+	STRING PrimaryRange,
+	STRING Predirectional,
+	STRING PrimaryName,
+	STRING Suffix,
+	STRING Postdirectional,
+	STRING SecondaryRange,
+	ZipCode ZIP5,
+	STRING Source),
+	MODEL(
+		Acc, 
+		Location, 
+		PrimaryRange,
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+	DataSources{Source})); 
 
 PersonAccident := ASSOCIATION(FLAT(Person Subject, Accident Acc=UID(AccidentNumber),
 		STRING PointOfImpact,
