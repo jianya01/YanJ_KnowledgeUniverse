@@ -1324,6 +1324,13 @@ Tradeline: => IsOperationsSegment := EXISTS(Tradeline.Records(OperationsSegment)
 Tradeline.Records: => OtherSegment:= NOT (CarrierSegment OR FleetSegment OR MaterialsSegment OR OperationsSegment);
 Tradeline: => IsOtherSegment := EXISTS(Tradeline.Records(OtherSegment));
 
+// Helper attributes for calculating tradeline attributes asof one year before the Currentdate (B2b*Arch1Y* attributes).
+Tradeline.Records: => Is1YRecord := RecordAgeInDays >= ONE_YEAR_IN_DAYS;
+//If record is at least 1 year old, find the number of days old it was AS OF 1 year ago. If it is not at least a year old, RecordAgeInDays1Y will be null.
+Tradeline.Records: Is1YRecord => RecordAgeInDays1Y := ABSDAYSBETWEEN(RecordDate, ADJUSTCALENDAR(CURRENTDATE(), -1, 0, 0));
+Tradeline: => NewestRecordAgeInDays1Y := MIN(Records,RecordAgeInDays1Y);
+Tradeline: => IsActive1Y := NewestRecordAgeInDays1Y <= THREE_MONTHS_IN_DAYS;
+
 Business: => B2bTLCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS));
 Business: => B2bTLInCarrCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND IsCarrierSegment));
 Business: => B2bTLInFltCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND IsFleetSegment));
@@ -1344,6 +1351,13 @@ Business: => B2bActvTLBalInFltTotNoCap := SUM(TradelineBusiness.Account(IsActive
 Business: => B2bActvTLBalInMatTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsMaterialsSegment),Records.TotalAR);
 Business: => B2bActvTLBalInOpsTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsOperationsSegment),Records.TotalAR);
 Business: => B2bActvTLBalInOthTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsOtherSegment),Records.TotalAR);
+
+Business: => B2bActvTLCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y));
+Business: => B2bActvTLInCarrCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y AND IsCarrierSegment));
+Business: => B2bActvTLInFltCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y AND IsFleetSegment));
+Business: => B2bActvTLInMatCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y AND IsMaterialsSegment));
+Business: => B2bActvTLInOpsCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y AND IsOperationsSegment));
+Business: => B2bActvTLInOthCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y AND IsOtherSegment));
 
 //Tradline Attributes
 Business: => B2bTLCntEv := BOUNDSFOLD(COUNT(TradelineBusiness.TradeAccount), 0, 9999);
@@ -1414,3 +1428,17 @@ Business: => B2bActvTLBalInOthPct := MAP(
 			B2bActvTLBalTot = 0 => Tradeline.NO_DATA_FOUND_97_INT,
 			B2bActvTLCntNoCap > 0 => (B2bActvTLBalInOthTotNoCap/B2bActvTLBalTotNoCap)*100
 			);
+//KS-2279  REMOVE THIS LINE AFTER ALL ATTRIBUTES COMPLETED
+Business: => B2bActvTLCntArch1Y := BOUNDSFOLD(B2bActvTLCntArch1YNoCap, 0, 999);
+Business: => B2bActvTLInCarrCntArch1Y := BOUNDSFOLD(B2bActvTLInCarrCntArch1YNoCap, 0, 999);
+Business: => B2bActvTLInFltCntArch1Y := BOUNDSFOLD(B2bActvTLInFltCntArch1YNoCap, 0, 999);
+Business: => B2bActvTLInMatCntArch1Y := BOUNDSFOLD(B2bActvTLInMatCntArch1YNoCap, 0, 999);
+Business: => B2bActvTLInOpsCntArch1Y := BOUNDSFOLD(B2bActvTLInOpsCntArch1YNoCap, 0, 999);
+Business: => B2bActvTLInOthCntArch1Y := BOUNDSFOLD(B2bActvTLInOthCntArch1YNoCap, 0, 999);
+Business: => B2bActvTLCntGrow1Y := IF(B2bActvTLCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, B2bActvTLCntNoCap/B2bActvTLCntArch1YNoCap);
+Business: => B2bActvTLCntInCarrGrow1Y := IF(B2bActvTLInCarrCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLCntNoCap/B2bActvTLCntArch1YNoCap, 0, 999.9999));
+Business: => B2bActvTLCntInFltGrow1Y := IF(B2bActvTLInFltCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLInFltCntNoCap/B2bActvTLInFltCntArch1YNoCap, 0, 999.9999));
+Business: => B2bActvTLCntInMatGrow1Y := IF(B2bActvTLInMatCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLInMatCntNoCap/B2bActvTLInMatCntArch1YNoCap, 0, 999.9999));
+Business: => B2bActvTLCntInOpsGrow1Y := IF(B2bActvTLInOpsCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLInOpsCntNoCap/B2bActvTLInOpsCntArch1YNoCap, 0, 999.9999));
+Business: => B2bActvTLCntInOthGrow1Y := IF(B2bActvTLInOthCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLInOthCntNoCap/B2bActvTLInOthCntArch1YNoCap, 0, 999.9999));
+			
