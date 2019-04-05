@@ -1312,7 +1312,6 @@ Tradeline.Records: => RecordAgeInDays := ABSDAYSBETWEEN(RecordDate, CurrentDate)
 Tradeline: => NewestRecordAgeInDays := MIN(Records,RecordAgeInDays);
 Tradeline: => IsActive := NewestRecordAgeInDays <= THREE_MONTHS_IN_DAYS;
 
-Tradeline: => OldestRecordAgeInDays := MAX(Records,RecordAgeInDays);
 Tradeline.Records: => CarrierSegment := SegmentID IN [1,4,5,6,8]; 
 Tradeline: => IsCarrierSegment := EXISTS(Tradeline.Records(CarrierSegment));
 Tradeline.Records: => FleetSegment:= SegmentID IN [2,3,9]; 
@@ -1323,6 +1322,11 @@ Tradeline.Records: => OperationsSegment:= SegmentID IN [26,27,28,29,30,31,32,33,
 Tradeline: => IsOperationsSegment := EXISTS(Tradeline.Records(OperationsSegment));
 Tradeline.Records: => OtherSegment:= NOT (CarrierSegment OR FleetSegment OR MaterialsSegment OR OperationsSegment);
 Tradeline: => IsOtherSegment := EXISTS(Tradeline.Records(OtherSegment));
+
+//For the Cortera attribute calculation, we will calculate the  ‘LN’ version for some of the fields provided by Cortera in specific . 
+//Then use the ‘LN’ version fields to build the attributes.  Current_AR any negative balance will be set at zero. 
+Tradeline.Records: => Current_AR_LN := IF(CurrentAR >= 0, CurrentAR , 0);
+Tradeline.Records: => Total_AR_LN := Current_AR_LN + Aging1To30 + Aging31To60 + Aging61To90  + Aging91Plus;
 
 // Helper attributes for calculating tradeline attributes asof one year before the Currentdate (B2b*Arch1Y* attributes).
 Tradeline.Records: => Is1YRecord := RecordAgeInDays >= ONE_YEAR_IN_DAYS;
@@ -1345,12 +1349,12 @@ Business: => B2bActvTLInMatCntNoCap := COUNT(TradelineBusiness.Account(IsActive 
 Business: => B2bActvTLInOpsCntNoCap := COUNT(TradelineBusiness.Account(IsActive AND IsOperationsSegment));
 Business: => B2bActvTLInOthCntNoCap := COUNT(TradelineBusiness.Account(IsActive AND IsOtherSegment));
 
-Business: => B2bActvTLBalTotNoCap := SUM(TradelineBusiness.Account(IsActive),Records.TotalAR);
-Business: => B2bActvTLBalInCarrTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsCarrierSegment),Records.TotalAR);
-Business: => B2bActvTLBalInFltTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsFleetSegment),Records.TotalAR);
-Business: => B2bActvTLBalInMatTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsMaterialsSegment),Records.TotalAR);
-Business: => B2bActvTLBalInOpsTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsOperationsSegment),Records.TotalAR);
-Business: => B2bActvTLBalInOthTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsOtherSegment),Records.TotalAR);
+Business: => B2bActvTLBalTotNoCap := SUM(TradelineBusiness.Account(IsActive),Records.Total_AR_LN);
+Business: => B2bActvTLBalInCarrTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsCarrierSegment),Records.Total_AR_LN);
+Business: => B2bActvTLBalInFltTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsFleetSegment),Records.Total_AR_LN);
+Business: => B2bActvTLBalInMatTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsMaterialsSegment),Records.Total_AR_LN);
+Business: => B2bActvTLBalInOpsTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsOperationsSegment),Records.Total_AR_LN);
+Business: => B2bActvTLBalInOthTotNoCap := SUM(TradelineBusiness.Account(IsActive AND IsOtherSegment),Records.Total_AR_LN);
 
 Business: => B2bActvTLCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y));
 Business: => B2bActvTLInCarrCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y AND IsCarrierSegment));
@@ -1375,8 +1379,8 @@ Business: => B2bTLInOthPct2Y := IF(B2bTLCnt2Y = 0, Tradeline.NO_DATA_FOUND_TRADE
 //KS-1396  REMOVE THIS LINE AFTER ALL ATTRIBUTES COMPLETED
 Business: => B2bOldestTLDtEv := IF(B2bTLCntEv = 0, Tradeline.NO_DATA_FOUND_TRADELINE,STRING(MIN(TradelineBusiness.Account, Records.ARDate)));
 Business: => B2bOldestTLMsinceEv := IF(B2bTLCntEv = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bOldestTLDtEv), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 999));
-Business: => B2bOldestTLDt2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, STRING(MIN(TradelineBusiness.Account(OldestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS), Records.ARDate)));
-Business: => B2bNewestTLDt2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, STRING(MAX(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS), Records.ARDate)));
+Business: => B2bOldestTLDt2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, STRING(MIN(TradelineBusiness.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS), ARDate)));
+Business: => B2bNewestTLDt2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, STRING(MAX(TradelineBusiness.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS), ARDate)));
 Business: => B2bOldestTLMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bOldestTLDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24));
 Business: => B2bNewestTLMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bNewestTLDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24));
 //KS-1397  REMOVE THIS LINE AFTER ALL ATTRIBUTES COMPLETED
