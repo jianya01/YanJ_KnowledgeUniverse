@@ -720,14 +720,13 @@ BusinessProx := ENTITY(FLAT(UID=ProxID,
 		STRING ActiveDunsNumber,
 		STRING HistDunsNumber,
 		STRING DeletedKey,	// Duns numbers deleted by D&B
-		STRING DeletedFEIN,
 		STRING DunsNumber,
 		DATE DateVendorFirstReported,
 		DATE DateVendorLastReported,
 		STRING Source), 
 	MODEL(UID,
 		ParentProxID, SeleProxID, OrgProxID, UltProxID, LevelsFromTop, NodesBelow, ProxSegment, StoreNumber, ActiveDunsNumber, HistDunsNumber, DunsNumber,
-		DeletedIDNumbers{DeletedKey, DeletedFEIN},
+		DeletedIDNumbers{DeletedKey},
 		VendorDates{DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source}));
 		
@@ -784,8 +783,8 @@ BusinessSele := ENTITY(FLAT(UID=SeleID,
 		STRING CurrentIndicator,
 		STRING Source),
 	MODEL(UID,
-		SeleGold, IsSeleLevel, IsOrgLevel, IsUltLevel, SeleSegment, IsCorporation, CompanyName, CompanyNameType,
-		CorporationNumber, BusinessType, LowValueWorks,	 CorporationLegalName, DoingBusinessAs, ActiveEnterpriseNumber, HistEnterpriseNumber,
+		SeleGold, IsSeleLevel, IsOrgLevel, IsUltLevel, SeleSegment, IsCorporation, 
+		CorporationNumber, BusinessType, LowValueWorks,	ActiveEnterpriseNumber, HistEnterpriseNumber,
 		EbrFileNumber, ActiveDomesticCorporationKey, HistDomesticCorporationKey, ForeignCorporationKey, UnknownCorporationKey,
 		CompanyOrganizationStructure, CompanyIncorporationDate, 
 		StandardIndustrialClassificationCode1, StandardIndustrialClassificationCode2, StandardIndustrialClassificationCode3,
@@ -793,9 +792,9 @@ BusinessSele := ENTITY(FLAT(UID=SeleID,
 		NorthAmericanIndustryClassificationSystemCode1, NorthAmericanIndustryClassificationSystemCode2, NorthAmericanIndustryClassificationSystemCode3,
 		NorthAmericanIndustryClassificationSystemCode4, NorthAmericanIndustryClassificationSystemCode5,
 		CompanyTicker, CompanyTickerExchange, CompanyForeignDomestic, CompanyURL, StateIncorporated, CharterNumber,
-		CompanyFilingDate, CompanyStatusDate, CompanyForeignDate, EventFilingDate, CompanyNameStatus, CompanyStatus,
-		CompanyNameDates{DateFirstSeenCompanyName, DateLastSeenCompanyName},
-		CurrentIndicator,
+		CompanyFilingDate, CompanyStatusDate, CompanyForeignDate, EventFilingDate, CompanyStatus,
+		ReportedCompanyNames{CompanyName, CompanyNameType, CompanyNameStatus, DateFirstSeenCompanyName, DateLastSeenCompanyName, CorporationLegalName, DoingBusinessAs},
+		CurrentRecordIndicator{CurrentIndicator},
 		VendorDates{DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source}));
 
@@ -832,19 +831,104 @@ BusinessUlt := ENTITY(FLAT(UID=UltID,
 		VendorDates{DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source}));
 
-FederalEmployerIdentificationNumber := ENTITY(FLAT(UID(TaxID),
-		STRING TaxID), 
+BusinessTaxIDNumber := ENTITY(FLAT(UID(TaxID),
+		STRING TaxID, 
+		STRING Source), 
 	MODEL(UID,
-		TaxID));
+		TaxID, 
+		DataSources{Source}));
 
-BusinessContact := ASSOCIATION(FLAT(BusinessSele Company, Person Contact,DATE DateFirstSeenContact, DATE DateLastSeenContact, STRING ContactType, STRING JobTitle, STRING ContactStatus));
-BusinessLocation := ASSOCIATION(FLAT(BusinessProx Store, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),DATE DateFirstSeenCompanyAddress, DATE DateLastSeenCompanyAddress));
-BusinessPhone := ASSOCIATION(FLAT(BusinessProx Store, Phone PhoneNumber, INTEGER PhoneScore));
-BusinessLocations := ASSOCIATION(FLAT(BusinessSele Company, BusinessProx Store));
-BusinessOrganization := ASSOCIATION(FLAT(BusinessSele Company, BusinessOrg Organization));
-BusinessTaxID := ASSOCIATION(FLAT(BusinessSele Company, FederalEmployerIdentificationNumber CompanyTaxNumber=UID(TaxID), INTEGER BestTaxIndicator));
-OrganizationLocation := ASSOCIATION(FLAT(BusinessPow Headquarters, BusinessOrg Organization));
-BusinessUltimate := ASSOCIATION(FLAT(BusinessUlt Ultimate, BusinessOrg Organization));
+BusinessContact := ASSOCIATION(FLAT(
+		BusinessSele Company, 
+		Person Contact,
+		DATE DateFirstSeenContact, 
+		DATE DateLastSeenContact, 
+		STRING ContactType, 
+		STRING JobTitle, 
+		STRING ContactStatus, 
+		STRING Source),
+	MODEL(
+		Company, 
+		Contact,
+		DateFirstSeenContact, 
+		DateLastSeenContact, 
+		ContactType, 
+		JobTitle, 
+		ContactStatus, 
+		DataSources{Source}));
+
+BusinessLocation := ASSOCIATION(FLAT(
+		BusinessProx Store, 
+		Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
+		DATE DateFirstSeenCompanyAddress, 
+		DATE DateLastSeenCompanyAddress, 
+		STRING Source),
+	MODEL(
+		Store,
+		Location,
+		DateFirstSeenCompanyAddress,
+		DateLastSeenCompanyAddress, 
+		DataSources{Source}));
+		
+BusinessPhone := ASSOCIATION(FLAT(
+		BusinessProx Store, 
+		Phone PhoneNumber, 
+		INTEGER PhoneScore, 
+		STRING Source),
+	MODEL(
+		Store,
+		PhoneNumber,
+		PhoneScore,
+		DataSources{Source}));
+
+BusinessLocations := ASSOCIATION(FLAT(
+		BusinessSele Company, 
+		BusinessProx Store, 
+		STRING Source),
+	MODEL(
+		Company,
+		Store,
+		DataSources{Source}));
+		
+BusinessOrganization := ASSOCIATION(FLAT(
+		BusinessSele Company,
+		BusinessOrg Organization, 
+		STRING Source),
+	MODEL(
+		Company,
+		Organization,
+		DataSources{Source}));
+
+BusinessTaxID := ASSOCIATION(FLAT(
+		BusinessSele Company, 
+		BusinessTaxIDNumber CompanyTaxNumber=UID(TaxID), 
+		INTEGER BestTaxIndicator, 
+		STRING DeletedFEIN, 
+		STRING Source),
+	MODEL(
+		Company,
+		CompanyTaxNumber,
+		BestTaxIndicator,
+		DeletedFEIN,
+		DataSources{Source}));
+		
+OrganizationLocation := ASSOCIATION(FLAT(
+		BusinessPow Headquarters, 
+		BusinessOrg Organization, 
+		STRING Source),
+	MODEL(
+		Headquarters,
+		Organization,
+		DataSources{Source}));
+
+BusinessUltimate := ASSOCIATION(FLAT(
+		BusinessUlt Ultimate, 
+		BusinessOrg Organization, 
+		STRING Source),
+	MODEL(
+		Ultimate,
+		Organization,
+		DataSources{Source}));
 		
 InputBII := ENTITY(QUERY(UID=BusInputUIDAppend,
 		Business Company=UID(LexIDBusExtendedFamilyAppend,LexIDBusLegalFamilyAppend,LexIDBusLegalEntityAppend), 
