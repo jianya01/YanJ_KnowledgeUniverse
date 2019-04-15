@@ -708,7 +708,12 @@ Business := ENTITY(FLAT(UID(UltID,OrgID,SeleID),
 		TaxIDs{TaxID},
 		DataSources{Source}));	  
 		
-BusinessProx := ENTITY(FLAT(UID=ProxID,
+BusinessProx := ENTITY(FLAT(UID(UltID,OrgID,SeleID,ProxID),
+		INTEGER UltID,
+		INTEGER OrgID,
+		INTEGER SeleID,
+		INTEGER ProxID,
+		BusinessSele Legal = UID(UltID,OrgID,SeleID),
 		INTEGER ParentProxID,	//Potentially goes in an association
 		INTEGER SeleProxID,	//Potentially goes in an association
 		INTEGER OrgProxID,	//Potentially goes in an association
@@ -725,12 +730,17 @@ BusinessProx := ENTITY(FLAT(UID=ProxID,
 		DATE DateVendorLastReported,
 		STRING Source), 
 	MODEL(UID,
+		UltID, OrgID, SeleID, ProxID, Legal,
 		ParentProxID, SeleProxID, OrgProxID, UltProxID, LevelsFromTop, NodesBelow, ProxSegment, StoreNumber, ActiveDunsNumber, HistDunsNumber, DunsNumber,
 		DeletedIDNumbers{DeletedKey},
 		VendorDates{DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source}));
 		
-BusinessSele := ENTITY(FLAT(UID=SeleID,
+BusinessSele := ENTITY(FLAT(UID(UltID,OrgID,SeleID),
+		INTEGER UltID,
+		INTEGER OrgID,
+		INTEGER SeleID,
+		BusinessOrg Family=UID(UltID,OrgID),
 		STRING SeleGold,
 		BOOLEAN IsSeleLevel,
 		BOOLEAN IsOrgLevel,
@@ -783,6 +793,7 @@ BusinessSele := ENTITY(FLAT(UID=SeleID,
 		STRING CurrentIndicator,
 		STRING Source),
 	MODEL(UID,
+		UltID, OrgID, SeleID, Family, 
 		SeleGold, IsSeleLevel, IsOrgLevel, IsUltLevel, SeleSegment, IsCorporation, 
 		CorporationNumber, BusinessType, LowValueWorks,	ActiveEnterpriseNumber, HistEnterpriseNumber,
 		EbrFileNumber, ActiveDomesticCorporationKey, HistDomesticCorporationKey, ForeignCorporationKey, UnknownCorporationKey,
@@ -798,26 +809,36 @@ BusinessSele := ENTITY(FLAT(UID=SeleID,
 		VendorDates{DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source}));
 
-BusinessPow := ENTITY(FLAT(UID=PowID,
+BusinessPow := ENTITY(FLAT(UID(UltID,OrgID,SeleID, ProxID, PowID),
+		INTEGER UltID,
+		INTEGER OrgID,
+		INTEGER SeleID,
+		INTEGER ProxID,
+		INTEGER PowID,
+		BusinessOrg Family=UID(UltID,OrgID),
 		STRING PowSegment,
 		DATE DateVendorFirstReported,
 		DATE DateVendorLastReported,
 		STRING Source),
-	MODEL(UID, 
+	MODEL(UID,
+		UltID, OrgID, SeleID, ProxID, PowID, Family,
 		PowSegment,
 		VendorDates{DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source}));
 		
-BusinessOrg := ENTITY(FLAT(UID=OrgID,
+BusinessOrg := ENTITY(FLAT(UID(UltID,OrgID),
+		INTEGER UltID,
+		INTEGER OrgID,
+		BusinessUlt ExtendedFamily,
 		INTEGER NodesTotal,	//Total ProxID nodes within this organization
-		INTEGER EmpID,
 		STRING OrgSegment,
 		DATE DateVendorFirstReported,
 		DATE DateVendorLastReported,
 		STRING SourceGroupID,	/*vl_id*/
 		STRING Source),
 	MODEL(UID,
-		NodesTotal, EmpID, SourceGroupID, OrgSegment,
+		UltID, OrgID, ExtendedFamily,
+		NodesTotal, SourceGroupID, OrgSegment,
 		VendorDates{DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source}));
 
@@ -838,8 +859,8 @@ BusinessTaxIDNumber := ENTITY(FLAT(UID(TaxID),
 		TaxID, 
 		DataSources{Source}));
 
-BusinessContact := ASSOCIATION(FLAT(
-		BusinessSele Company, 
+SelePerson := ASSOCIATION(FLAT(
+		BusinessSele Legal = UID(UltID,OrgID,SeleID), 
 		Person Contact,
 		DATE DateFirstSeenContact, 
 		DATE DateLastSeenContact, 
@@ -848,7 +869,7 @@ BusinessContact := ASSOCIATION(FLAT(
 		STRING ContactStatus, 
 		STRING Source),
 	MODEL(
-		Company, 
+		Legal, 
 		Contact,
 		DateFirstSeenContact, 
 		DateLastSeenContact, 
@@ -857,77 +878,41 @@ BusinessContact := ASSOCIATION(FLAT(
 		ContactStatus, 
 		DataSources{Source}));
 
-BusinessLocation := ASSOCIATION(FLAT(
-		BusinessProx Store, 
+ProxAddress := ASSOCIATION(FLAT(
+		BusinessProx Site=UID(UltID,OrgID,SeleID,ProxID), 
 		Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
 		DATE DateFirstSeenCompanyAddress, 
 		DATE DateLastSeenCompanyAddress, 
 		STRING Source),
 	MODEL(
-		Store,
+		Site,
 		Location,
 		DateFirstSeenCompanyAddress,
 		DateLastSeenCompanyAddress, 
 		DataSources{Source}));
 		
-BusinessPhone := ASSOCIATION(FLAT(
-		BusinessProx Store, 
+ProxPhoneNumber := ASSOCIATION(FLAT(
+		BusinessProx Site=UID(UltID,OrgID,SeleID,ProxID), 
 		Phone PhoneNumber, 
 		INTEGER PhoneScore, 
 		STRING Source),
 	MODEL(
-		Store,
+		Site,
 		PhoneNumber,
 		PhoneScore,
 		DataSources{Source}));
-
-BusinessLocations := ASSOCIATION(FLAT(
-		BusinessSele Company, 
-		BusinessProx Store, 
-		STRING Source),
-	MODEL(
-		Company,
-		Store,
-		DataSources{Source}));
 		
-BusinessOrganization := ASSOCIATION(FLAT(
-		BusinessSele Company,
-		BusinessOrg Organization, 
-		STRING Source),
-	MODEL(
-		Company,
-		Organization,
-		DataSources{Source}));
-
-BusinessTaxID := ASSOCIATION(FLAT(
-		BusinessSele Company, 
+SeleTaxID := ASSOCIATION(FLAT(
+		BusinessSele Legal=UID(UltID,OrgID,SeleID), 
 		BusinessTaxIDNumber CompanyTaxNumber=UID(TaxID), 
 		INTEGER BestTaxIndicator, 
 		STRING DeletedFEIN, 
 		STRING Source),
 	MODEL(
-		Company,
+		Legal,
 		CompanyTaxNumber,
 		BestTaxIndicator,
 		DeletedFEIN,
-		DataSources{Source}));
-		
-OrganizationLocation := ASSOCIATION(FLAT(
-		BusinessPow Headquarters, 
-		BusinessOrg Organization, 
-		STRING Source),
-	MODEL(
-		Headquarters,
-		Organization,
-		DataSources{Source}));
-
-BusinessUltimate := ASSOCIATION(FLAT(
-		BusinessUlt Ultimate, 
-		BusinessOrg Organization, 
-		STRING Source),
-	MODEL(
-		Ultimate,
-		Organization,
 		DataSources{Source}));
 		
 InputBII := ENTITY(QUERY(UID=BusInputUIDAppend,
