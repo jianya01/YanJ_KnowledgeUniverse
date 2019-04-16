@@ -1312,7 +1312,7 @@ Tradeline.Records: => RecordAgeInDays := ABSDAYSBETWEEN(RecordDate, CurrentDate)
 Tradeline: => NewestRecordAgeInDays := MIN(Records,RecordAgeInDays);
 Tradeline: => IsActive := NewestRecordAgeInDays <= THREE_MONTHS_IN_DAYS;
 Tradeline.Records: => IsMostRecentActiveRecord := IsActive AND ARDate = MAX(Tradeline.Records, ARDate);
-
+Tradeline: => IsActive2Y := NewestRecordAgeInDays <= TWO_YEARS_IN_DAYS;
 Tradeline.Records: => CarrierSegment := SegmentID IN [1,4,5,6,8]; 
 Tradeline: => IsCarrierSegment := EXISTS(Tradeline.Records(CarrierSegment));
 Tradeline.Records: => FleetSegment:= SegmentID IN [2,3,9]; 
@@ -1396,6 +1396,36 @@ Business: => B2bBalOnActvTL1pDpdTotArch1YNoCap := SUM(TradelineBusiness.Account.
 Business: => B2bBalOnActvTL31pDpdTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y), DPD31Total);
 Business: => B2bBalOnActvTL61pDpdTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y), DPD61Total);
 Business: => B2bBalOnActvTL91pDpdTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y), DPD91Total);
+
+
+Business: => B2bTLBalNewestDate2Y := TOPN(TradelineBusiness.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
+Business: => B2bTLBalInCarrNewestDate2Y := TOPN(TradelineBusiness.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND CarrierSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
+Business: => B2bTLBalInFltNewestDate2Y := TOPN(TradelineBusiness.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND FleetSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
+Business: => B2bTLBalInMatNewestDate2Y := TOPN(TradelineBusiness.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND MaterialsSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
+Business: => B2bTLBalInOpsNewestDate2Y := TOPN(TradelineBusiness.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND OperationsSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
+Business: => B2bTLBalInOthNewestDate2Y := TOPN(TradelineBusiness.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND OtherSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
+
+Business: => B2bTLBalMax2YNoCap := ONLY(B2bTLBalNewestDate2Y,TotalARLN);
+Business: => B2bTLBalInCarrMax2YNoCap := ONLY(B2bTLBalInCarrNewestDate2Y,TotalARLN);
+Business: => B2bTLBalInFltMax2YNoCap := ONLY(B2bTLBalInFltNewestDate2Y,TotalARLN);
+Business: => B2bTLBalInMatMax2YNoCap := ONLY(B2bTLBalInMatNewestDate2Y,TotalARLN); 
+Business: => B2bTLBalInOpsMax2YNoCap := ONLY(B2bTLBalInOpsNewestDate2Y,TotalARLN);
+Business: => B2bTLBalInOthMax2YNoCap := ONLY(B2bTLBalInOthNewestDate2Y,TotalARLN);
+
+
+Business: => B2bActvTLBalTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y),TotalARLN);
+Business: => B2bActvTLBalInCarrTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y AND CarrierSegment),TotalARLN);
+Business: => B2bActvTLBalInFltTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y AND FleetSegment),TotalARLN);
+Business: => B2bActvTLBalInMatTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y AND MaterialsSegment),TotalARLN);
+Business: => B2bActvTLBalInOpsTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y AND OperationsSegment),TotalARLN);
+Business: => B2bActvTLBalInOthTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y AND OtherSegment),TotalARLN);
+
+Business: => B2bTLWMaxBalSeg2YMapCarr := IF(B2bTLBalInCarrMax2YNoCap = B2bTLBalMax2YNoCap,1,0);
+Business: => B2bTLWMaxBalSeg2YMapFlt := IF(B2bTLBalInFltMax2YNoCap = B2bTLBalMax2YNoCap,1,0);
+Business: => B2bTLWMaxBalSeg2YMapMat := IF(B2bTLBalInMatMax2YNoCap = B2bTLBalMax2YNoCap,1,0);
+Business: => B2bTLWMaxBalSeg2YMapOps := IF(B2bTLBalInOpsMax2YNoCap = B2bTLBalMax2YNoCap,1,0);
+Business: => B2bTLWMaxBalSeg2YMapOth := IF(B2bTLBalInOthMax2YNoCap = B2bTLBalMax2YNoCap,1,0);
+
 																				
 //Tradline Attributes
 Business: => B2bTLCntEv := BOUNDSFOLD(COUNT(TradelineBusiness.TradeAccount), 0, 9999);
@@ -1598,3 +1628,196 @@ Business: => B2bBalOnActvTL91pDpdGrow1Y := MAP(
 			B2bBalOnActvTL91pDpdTotArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
 			MIN(B2bBalOnActvTL91pDpdTotNoCap/B2bBalOnActvTL91pDpdTotArch1YNoCap, 9999.9999));
 			
+//KS-2281  REMOVE THIS LINE AFTER ALL ATTRIBUTES COMPLETED
+Business: => B2bActvTLBalArch1Y := IF(B2bActvTLCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLBalTotArch1YNoCap, 0, 99999999));
+Business: => B2bActvTLBalInCarrArch1Y := IF(B2bActvTLInCarrCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLBalInCarrTotArch1YNoCap, 0, 99999999));
+Business: => B2bActvTLBalInFltArch1Y := IF(B2bActvTLInFltCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLBalInFltTotArch1YNoCap, 0, 99999999));
+Business: => B2bActvTLBalInMatArch1Y := IF(B2bActvTLInMatCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLBalInMatTotArch1YNoCap, 0, 99999999));
+Business: => B2bActvTLBalInOpsArch1Y := IF(B2bActvTLInOpsCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLBalInOpsTotArch1YNoCap, 0, 99999999));
+Business: => B2bActvTLBalInOthArch1Y := IF(B2bActvTLInOthCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bActvTLBalInOthTotArch1YNoCap, 0, 99999999));
+Business: => B2bActvTLBalGrow1Y := MAP(
+			B2bActvTLCntArch1YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLCntNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			B2bActvTLCntNoCap > 0 => MIN(B2bActvTLBalTotNoCap/B2bActvTLBalTotArch1YNoCap, 9999.9999)
+			);
+Business: => B2bActvTLBalInCarrGrow1Y := MAP(
+			B2bActvTLInCarrCntArch1YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bTLInCarrCnt2YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalInCarrArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			B2bActvTLInCarrCnt > 0 => MIN(B2bActvTLBalInCarrTotNoCap/B2bActvTLBalInCarrTotArch1YNoCap, 9999.9999)
+			); 
+Business: => B2bActvTLBalInFltGrow1Y := MAP(
+			B2bActvTLInFltCntArch1YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bTLInFltCnt2YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalInFltArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			B2bActvTLInFltCnt > 0 => MIN(B2bActvTLBalInFltTotNoCap/B2bActvTLBalInFltTotArch1YNoCap, 9999.9999)
+			); 
+Business: => B2bActvTLBalInMatGrow1Y := MAP(
+			B2bActvTLInMatCntArch1YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bTLInMatCnt2YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalInMatArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			B2bActvTLInMatCnt > 0 => MIN(B2bActvTLBalInMatTotNoCap/B2bActvTLBalInMatTotArch1YNoCap, 9999.9999)
+			); 
+Business: => B2bActvTLBalInOpsGrow1Y := MAP(
+			B2bActvTLInOpsCntArch1YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bTLInOpsCnt2YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalInOpsArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			B2bActvTLInOpsCnt > 0 => MIN(B2bActvTLBalInOpsTotNoCap/B2bActvTLBalInOpsTotArch1YNoCap, 9999.9999)
+			); 
+Business: => B2bActvTLBalInOthGrow1Y := MAP(
+			B2bActvTLInOthCntArch1YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bTLInOthCnt2YNoCap = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalInOthArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			B2bActvTLInOthCnt > 0 => MIN(B2bActvTLBalInOthTotNoCap/B2bActvTLBalInOthTotArch1YNoCap, 9999.9999)
+			); 
+Business: => B2bActvTLBalGrowIndex1Y := MAP(
+			B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLCntArch1Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalArch1Y = 0 => Tradeline.NO_DATA_FOUND_97,
+			B2bActvTLBalGrow1Y >= 0 AND B2bActvTLBalGrow1Y < 1 => '0',
+			B2bActvTLBalGrow1Y = 1 => '1',
+			B2bActvTLBalGrow1Y > 1 AND B2bActvTLBalGrow1Y <= 9999.9999 => '2'
+			);  
+Business: => B2bActvTLBalInCarrGrowIndex1Y := MAP(
+			B2bActvTLInCarrCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLInCarrCntArch1Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInCarrArch1Y = 0 => Tradeline.NO_DATA_FOUND_97,
+			B2bActvTLBalInCarrGrow1Y >= 0 AND B2bActvTLBalInCarrGrow1Y < 1 => '0',
+			B2bActvTLBalInCarrGrow1Y = 1 => '1',
+			B2bActvTLBalInCarrGrow1Y > 1 AND B2bActvTLBalInCarrGrow1Y <= 9999.9999 => '2'
+			);  
+Business: => B2bActvTLBalInFltGrowIndex1Y := MAP(
+			B2bActvTLInFltCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLInFltCntArch1Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInFltArch1Y = 0 => Tradeline.NO_DATA_FOUND_97,
+			B2bActvTLBalInFltGrow1Y >= 0 AND B2bActvTLBalInFltGrow1Y < 1 => '0',
+			B2bActvTLBalInFltGrow1Y = 1 => '1',
+			B2bActvTLBalInFltGrow1Y > 1 AND B2bActvTLBalInFltGrow1Y <= 9999.9999 => '2'
+			); 
+Business: => B2bActvTLBalInMatGrowIndex1Y := MAP(
+			B2bActvTLInMatCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLInMatCntArch1Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInMatArch1Y = 0 => Tradeline.NO_DATA_FOUND_97,
+			B2bActvTLBalInMatGrow1Y >= 0 AND B2bActvTLBalInMatGrow1Y < 1 => '0',
+			B2bActvTLBalInMatGrow1Y = 1 => '1',
+			B2bActvTLBalInMatGrow1Y > 1 AND B2bActvTLBalInMatGrow1Y <= 9999.9999 => '2'
+			); 
+Business: => B2bActvTLBalInOpsGrowIndex1Y := MAP(
+			B2bActvTLInOpsCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLInOpsCntArch1Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInOpsArch1Y = 0 => Tradeline.NO_DATA_FOUND_97,
+			B2bActvTLBalInOpsGrow1Y >= 0 AND B2bActvTLBalInOpsGrow1Y < 1 => '0',
+			B2bActvTLBalInOpsGrow1Y = 1 => '1',
+			B2bActvTLBalInOpsGrow1Y > 1 AND B2bActvTLBalInOpsGrow1Y <= 9999.9999 => '2'
+			); 
+Business: => B2bActvTLBalInOthGrowIndex1Y := MAP(
+			B2bActvTLInOthCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLInOthCntArch1Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInOthArch1Y = 0 => Tradeline.NO_DATA_FOUND_97,
+			B2bActvTLBalInOthGrow1Y >= 0 AND B2bActvTLBalInOthGrow1Y < 1 => '0',
+			B2bActvTLBalInOthGrow1Y = 1 => '1',
+			B2bActvTLBalInOthGrow1Y > 1 AND B2bActvTLBalInOthGrow1Y <= 9999.9999 => '2'
+			); 
+//KS-1399  REMOVE THIS LINE AFTER ALL ATTRIBUTES COMPLETED
+Business: => B2bTLBalMax2Y := IF(B2bTLCnt2Y  = 0,Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bTLBalMax2YNoCap, 0, 99999999));
+Business: => B2bTLBalInCarrMax2Y := IF(B2bTLInCarrCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bTLBalInCarrMax2YNoCap, 0, 99999999));
+Business: => B2bTLBalInFltMax2Y := IF(B2bTLInFltCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bTLBalInFltMax2YNoCap, 0, 99999999));
+Business: => B2bTLBalInMatMax2Y := IF(B2bTLInMatCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bTLBalInMatMax2YNoCap, 0, 99999999));
+Business: => B2bTLBalInOpsMax2Y := IF(B2bTLInOpsCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bTLBalInOpsMax2YNoCap, 0, 99999999));
+Business: => B2bTLBalInOthMax2Y := IF(B2bTLInOthCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bTLBalInOthMax2YNoCap, 0, 99999999));
+
+Business: => B2bMaxTLBalDt2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, ONLY(B2bTLBalNewestDate2Y,STRING(ARDate)));
+Business: => B2bMaxTLBalInCarrDt2Y := IF(B2bTLInCarrCnt2Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE, ONLY(B2bTLBalInCarrNewestDate2Y,STRING(ARDate)));
+Business: => B2bMaxTLBalInFltDt2Y := IF(B2bTLInFltCnt2Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE, ONLY(B2bTLBalInFltNewestDate2Y,STRING(ARDate))); 
+Business: => B2bMaxTLBalInMatDt2Y := IF(B2bTLInMatCnt2Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE, ONLY(B2bTLBalInMatNewestDate2Y,STRING(ARDate))); 
+Business: => B2bMaxTLBalInOpsDt2Y := IF(B2bTLInOpsCnt2Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE, ONLY(B2bTLBalInOpsNewestDate2Y,STRING(ARDate))); 
+Business: => B2bMaxTLBalInOthDt2Y := IF(B2bTLInOthCnt2Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE, ONLY(B2bTLBalInOthNewestDate2Y,STRING(ARDate))); 
+
+Business: => B2bMaxTLBalMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bMaxTLBalDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24));
+Business: => B2bMaxTLBalInCarrMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bMaxTLBalInCarrDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24)); 
+Business: => B2bMaxTLBalInFltMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bMaxTLBalInFltDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24)); 
+Business: => B2bMaxTLBalInMatMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bMaxTLBalInMatDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24)); 
+Business: => B2bMaxTLBalInOpsMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bMaxTLBalInOpsDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24)); 
+Business: => B2bMaxTLBalInOthMsince2Y := IF(B2bTLCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bMaxTLBalInOthDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24)); 
+
+Business: => B2bTLWMaxBalSeg2Y := MAP(
+			B2bTLCnt2Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bTLWMaxBalSeg2YMapCarr +
+			B2bTLWMaxBalSeg2YMapFlt +
+			B2bTLWMaxBalSeg2YMapMat +
+			B2bTLWMaxBalSeg2YMapOps +
+			B2bTLWMaxBalSeg2YMapOth	> 1 => '5',
+			B2bTLBalInCarrMax2YNoCap = B2bTLBalMax2YNoCap => '4',
+			B2bTLBalInFltMax2YNoCap = B2bTLBalMax2YNoCap => '3',
+			B2bTLBalInMatMax2YNoCap = B2bTLBalMax2YNoCap => '2',
+			B2bTLBalInOpsMax2YNoCap = B2bTLBalMax2YNoCap => '1',
+			B2bTLBalInOthMax2YNoCap = B2bTLBalMax2YNoCap => '0'
+			);		
+//KS-2293  REMOVE THIS LINE AFTER ALL ATTRIBUTES COMPLETED
+Business: => B2bActvTLBalTotBin := MAP(
+			B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalTot >= 0 AND B2bActvTLBalTot <= 500 => '1',
+			B2bActvTLBalTot >= 501 AND B2bActvTLBalTot <= 1000 => '2',
+			B2bActvTLBalTot >= 1001 AND B2bActvTLBalTot <= 5000 => '3',
+			B2bActvTLBalTot >= 5001 AND B2bActvTLBalTot <= 10000 => '4',
+			B2bActvTLBalTot >= 10001 AND B2bActvTLBalTot <= 20000 => '5',
+			B2bActvTLBalTot >= 20001 AND B2bActvTLBalTot <= 40000 => '6',
+			B2bActvTLBalTot >= 40001 AND B2bActvTLBalTot <= 999999 => '7'
+			);
+Business: => B2bActvTLBalInCarrTotBin := MAP(
+			B2bActvTLInCarrCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInCarrTot >= 0 AND B2bActvTLBalInCarrTot <= 500 => '1',
+			B2bActvTLBalInCarrTot >= 501 AND B2bActvTLBalInCarrTot <= 1000 => '2',
+			B2bActvTLBalInCarrTot >= 1001 AND B2bActvTLBalInCarrTot <= 5000 => '3',
+			B2bActvTLBalInCarrTot >= 5001 AND B2bActvTLBalInCarrTot <= 10000 => '4',
+			B2bActvTLBalInCarrTot >= 10001 AND B2bActvTLBalInCarrTot <= 20000 => '5',
+			B2bActvTLBalInCarrTot >= 20001 AND B2bActvTLBalInCarrTot <= 40000 => '6',
+			B2bActvTLBalInCarrTot >= 40001 AND B2bActvTLBalInCarrTot <= 999999 => '7'
+			);
+Business: => B2bActvTLBalInFltTotBin := MAP(
+			B2bActvTLInFltCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInFltTot >= 0 AND B2bActvTLBalInFltTot <= 500 => '1',
+			B2bActvTLBalInFltTot >= 501 AND B2bActvTLBalInFltTot <= 1000 => '2',
+			B2bActvTLBalInFltTot >= 1001 AND B2bActvTLBalInFltTot <= 5000 => '3',
+			B2bActvTLBalInFltTot >= 5001 AND B2bActvTLBalInFltTot <= 10000 => '4',
+			B2bActvTLBalInFltTot >= 10001 AND B2bActvTLBalInFltTot <= 20000 => '5',
+			B2bActvTLBalInFltTot >= 20001 AND B2bActvTLBalInFltTot <= 40000 => '6',
+			B2bActvTLBalInFltTot >= 40001 AND B2bActvTLBalInFltTot <= 999999 => '7'
+			);
+Business: => B2bActvTLBalInMatTotBin := MAP(
+			B2bActvTLInMatCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInMatTot >= 0 AND B2bActvTLBalInMatTot <= 500 => '1',
+			B2bActvTLBalInMatTot >= 501 AND B2bActvTLBalInMatTot <= 1000 => '2',
+			B2bActvTLBalInMatTot >= 1001 AND B2bActvTLBalInMatTot <= 5000 => '3',
+			B2bActvTLBalInMatTot >= 5001 AND B2bActvTLBalInMatTot <= 10000 => '4',
+			B2bActvTLBalInMatTot >= 10001 AND B2bActvTLBalInMatTot <= 20000 => '5',
+			B2bActvTLBalInMatTot >= 20001 AND B2bActvTLBalInMatTot <= 40000 => '6',
+			B2bActvTLBalInMatTot >= 40001 AND B2bActvTLBalInMatTot <= 999999 => '7'
+			);
+Business: => B2bActvTLBalInOpsTotBin := MAP(
+			B2bActvTLInOpsCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInOpsTot >= 0 AND B2bActvTLBalInOpsTot <= 500 => '1',
+			B2bActvTLBalInOpsTot >= 501 AND B2bActvTLBalInOpsTot <= 1000 => '2',
+			B2bActvTLBalInOpsTot >= 1001 AND B2bActvTLBalInOpsTot <= 5000 => '3',
+			B2bActvTLBalInOpsTot >= 5001 AND B2bActvTLBalInOpsTot <= 10000 => '4',
+			B2bActvTLBalInOpsTot >= 10001 AND B2bActvTLBalInOpsTot <= 20000 => '5',
+			B2bActvTLBalInOpsTot >= 20001 AND B2bActvTLBalInOpsTot <= 40000 => '6',
+			B2bActvTLBalInOpsTot >= 40001 AND B2bActvTLBalInOpsTot <= 999999 => '7'
+			);
+Business: => B2bActvTLBalInOthTotBin := MAP(
+			B2bActvTLInOthCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
+			B2bActvTLBalInOthTot >= 0 AND B2bActvTLBalInOthTot <= 500 => '1',
+			B2bActvTLBalInOthTot >= 501 AND B2bActvTLBalInOthTot <= 1000 => '2',
+			B2bActvTLBalInOthTot >= 1001 AND B2bActvTLBalInOthTot <= 5000 => '3',
+			B2bActvTLBalInOthTot >= 5001 AND B2bActvTLBalInOthTot <= 10000 => '4',
+			B2bActvTLBalInOthTot >= 10001 AND B2bActvTLBalInOthTot <= 20000 => '5',
+			B2bActvTLBalInOthTot >= 20001 AND B2bActvTLBalInOthTot <= 40000 => '6',
+			B2bActvTLBalInOthTot >= 40001 AND B2bActvTLBalInOthTot <= 999999 => '7'
+			);
+Business: => B2bActvTLBalAvg := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(B2bActvTLBalTotNoCap/B2bActvTLCntNoCap, 99999999.99));
+Business: => B2bActvTLBalInCarrAvg := IF(B2bActvTLInCarrCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(B2bActvTLBalInCarrTotNoCap/B2bActvTLInCarrCntNoCap, 99999999.99));
+Business: => B2bActvTLBalInFltAvg := IF(B2bActvTLInFltCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(B2bActvTLBalInFltTotNoCap/B2bActvTLInFltCntNoCap, 99999999.99));
+Business: => B2bActvTLBalInMatAvg := IF(B2bActvTLInMatCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(B2bActvTLBalInMatTotNoCap/B2bActvTLInMatCntNoCap, 99999999.99));
+Business: => B2bActvTLBalInOpsAvg := IF(B2bActvTLInOpsCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(B2bActvTLBalInOthTotNoCap/B2bActvTLInOpsCntNoCap, 99999999.99));
+Business: => B2bActvTLBalInOthAvg := IF(B2bActvTLInOthCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(B2bActvTLBalInOpsTotNoCap/B2bActvTLInOthCntNoCap, 99999999.99));
