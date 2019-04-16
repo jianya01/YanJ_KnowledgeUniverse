@@ -1311,6 +1311,7 @@ Tradeline.Records: => RecordDate := ARDate:DateFirstSeen;
 Tradeline.Records: => RecordAgeInDays := ABSDAYSBETWEEN(RecordDate, CurrentDate);
 Tradeline: => NewestRecordAgeInDays := MIN(Records,RecordAgeInDays);
 Tradeline: => IsActive := NewestRecordAgeInDays <= THREE_MONTHS_IN_DAYS;
+Tradeline.Records: => IsMostRecentActiveRecord := IsActive AND ARDate = MAX(Tradeline.Records, ARDate);
 
 Tradeline.Records: => CarrierSegment := SegmentID IN [1,4,5,6,8]; 
 Tradeline: => IsCarrierSegment := EXISTS(Tradeline.Records(CarrierSegment));
@@ -1324,25 +1325,34 @@ Tradeline.Records: => OtherSegment:= NOT (CarrierSegment OR FleetSegment OR Mate
 Tradeline: => IsOtherSegment := EXISTS(Tradeline.Records(OtherSegment));
 
 //For the Cortera attribute calculation, we will calculate the  ‘LN’ version for some of the fields provided by Cortera in specific . 
-//Then use the ‘LN’ version fields to build the attributes.  Current_AR any negative balance will be set at zero.
-//Any aging bucket that has a blank vaule will be set as zero
-Tradeline.Records: => CurrentARBlankToZero := IF(CurrentAR:Null,0,CurrentAR);
-Tradeline.Records: => Aging1To30BlankToZero := IF(Aging1To30:Null,0,Aging1To30);
-Tradeline.Records: => Aging31To60BlankToZero := IF(Aging31To60:Null,0,Aging31To60);
-Tradeline.Records: => Aging61To90BlankToZero := IF(Aging61To90:Null,0,Aging61To90);
-Tradeline.Records: => Aging91PlusBlankToZero := IF(Aging91Plus:Null,0,Aging91Plus); 
-
-Tradeline.Records: => CurrentARLN := IF(CurrentARBlankToZero >= 0, CurrentARBlankToZero , 0);
-Tradeline.Records: => TotalARLN := CurrentARBlankToZero + Aging1To30BlankToZero + Aging31To60BlankToZero + Aging61To90BlankToZero  + Aging91PlusBlankToZero;
+//Then use the ‘LN’ version fields to build the attributes.  Current_AR any NULL or negative balance will be set at zero.
+//Any aging bucket that has a NULL vaule will be set as zero
+Tradeline.Records: => CurrentARLN := IF(CurrentAR:Null OR CurrentAR < 0,0,CurrentAR);
+Tradeline.Records: => Aging1To30LN := IF(Aging1To30:Null OR Aging1To30 < 0,0,Aging1To30);
+Tradeline.Records: => Aging31To60LN := IF(Aging31To60:Null OR Aging31To60 < 0,0,Aging31To60);
+Tradeline.Records: => Aging61To90LN := IF(Aging61To90:Null OR Aging61To90 < 0,0,Aging61To90);
+Tradeline.Records: => Aging91PlusLN := IF(Aging91Plus:Null OR Aging91Plus < 0,0,Aging91Plus); 
+Tradeline.Records: => TotalARLN := CurrentARLN + Aging1To30LN + Aging31To60LN + Aging61To90LN  + Aging91PlusLN;
 
 Tradeline: => TotalARLN := ONLY(Records(RecordAgeInDays = MIN(Records,RecordAgeInDays)), TotalARLN);
+Tradeline.Records: => DPD1Total := Aging1To30LN + Aging31To60LN + Aging61To90LN + Aging91PlusLN;																				
+Tradeline.Records: => DPD31Total := Aging31To60LN + Aging61To90LN + Aging91PlusLN;																				
+Tradeline.Records: => DPD61Total := Aging61To90LN + Aging91PlusLN;																				
+Tradeline.Records: => DPD91Total := Aging91PlusLN;																				
 
+Tradeline.Records: => PerfLevel := MAP(
+																			Aging91PlusLN > 0 => 4,
+																			Aging61To90LN > 0 => 3,
+																			Aging31To60LN > 0 => 2, 
+																			Aging1To30LN  > 0 => 1, 0);
+																			
 // Helper attributes for calculating tradeline attributes asof one year before the Currentdate (B2b*Arch1Y* attributes).
 Tradeline.Records: => Is1YRecord := RecordAgeInDays >= ONE_YEAR_IN_DAYS;
 //If record is at least 1 year old, find the number of days old it was AS OF 1 year ago. If it is not at least a year old, RecordAgeInDays1Y will be null.
 Tradeline.Records: Is1YRecord => RecordAgeInDays1Y := ABSDAYSBETWEEN(RecordDate, ADJUSTCALENDAR(CURRENTDATE(), -1, 0, 0));
 Tradeline: => NewestRecordAgeInDays1Y := MIN(Records,RecordAgeInDays1Y);
 Tradeline: => IsActive1Y := NewestRecordAgeInDays1Y <= THREE_MONTHS_IN_DAYS;
+Tradeline.Records: => IsMostRecentActiveRecord1Y := IsActive1Y AND ARDate = MAX(Tradeline.Records(Is1YRecord), ARDate);
 
 Business: => B2bTLCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS));
 Business: => B2bTLInCarrCnt2YNoCap := COUNT(TradelineBusiness.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND IsCarrierSegment));
@@ -1372,11 +1382,20 @@ Business: => B2bActvTLInMatCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsA
 Business: => B2bActvTLInOpsCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y AND IsOperationsSegment));
 Business: => B2bActvTLInOthCntArch1YNoCap := COUNT(TradelineBusiness.Account(IsActive1Y AND IsOtherSegment));
 
-Tradeline.Records: => PerfLevel := MAP(
-																			Aging91PlusBlankToZero > 0 => 4,
-																			Aging61To90BlankToZero > 0 => 3,
-																			Aging31To60BlankToZero > 0 => 2, 
-																			Aging1To30BlankToZero  > 0 => 1, 0);
+Business: => B2bActvTLW1pDpdCntNoCap := COUNT(TradelineBusiness.Account.Records(IsMostRecentActiveRecord AND PerfLevel >= 1));
+Business: => B2bActvTLW31pDpdCntNoCap := COUNT(TradelineBusiness.Account.Records(IsMostRecentActiveRecord AND PerfLevel >= 2));
+Business: => B2bActvTLW61pDpdCntNoCap := COUNT(TradelineBusiness.Account.Records(IsMostRecentActiveRecord AND PerfLevel >= 3));
+Business: => B2bActvTLW91pDpdCntNoCap := COUNT(TradelineBusiness.Account.Records(IsMostRecentActiveRecord AND PerfLevel = 4));
+
+Business: => B2bBalOnActvTL1pDpdTotNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord), DPD1Total);
+Business: => B2bBalOnActvTL31pDpdTotNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord), DPD31Total);
+Business: => B2bBalOnActvTL61pDpdTotNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord), DPD61Total);
+Business: => B2bBalOnActvTL91pDpdTotNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord), DPD91Total);
+
+Business: => B2bBalOnActvTL1pDpdTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y), DPD1Total);
+Business: => B2bBalOnActvTL31pDpdTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y), DPD31Total);
+Business: => B2bBalOnActvTL61pDpdTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y), DPD61Total);
+Business: => B2bBalOnActvTL91pDpdTotArch1YNoCap := SUM(TradelineBusiness.Account.Records(IsMostRecentActiveRecord1Y), DPD91Total);
 																				
 //Tradline Attributes
 Business: => B2bTLCntEv := BOUNDSFOLD(COUNT(TradelineBusiness.TradeAccount), 0, 9999);
@@ -1463,35 +1482,35 @@ Business: => B2bActvTLCntInOpsGrow1Y := IF(B2bActvTLInOpsCntArch1Y = 0, Tradelin
 Business: => B2bActvTLCntInOthGrow1Y := IF(B2bActvTLInOthCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(B2bActvTLInOthCntNoCap/B2bActvTLInOthCntArch1YNoCap, 999.9999));
 //KS-1403  REMOVE THIS LINE AFTER ALL ATTRIBUTES COMPLETED
 Business: => B2bTLWorstPerfIndex2Y := MAP(B2bTLCnt2Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
-			EXISTS(TradelineBusiness.Account.Records(Aging91PlusBlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4,																						
-			EXISTS(TradelineBusiness.Account.Records(Aging61To90BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																								
-			EXISTS(TradelineBusiness.Account.Records(Aging31To60BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2,																									
-			EXISTS(TradelineBusiness.Account.Records(Aging1To30BlankToZero  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0);																								
+			EXISTS(TradelineBusiness.Account.Records(Aging91PlusLN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4,																						
+			EXISTS(TradelineBusiness.Account.Records(Aging61To90LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																								
+			EXISTS(TradelineBusiness.Account.Records(Aging31To60LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2,																									
+			EXISTS(TradelineBusiness.Account.Records(Aging1To30LN  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0);																								
 Business: => B2bTLWorstPerfInCarrIndex2Y := MAP(B2bTLInCarrCnt2Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
-			EXISTS(TradelineBusiness.Account.Records(CarrierSegment  AND Aging91PlusBlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4, 																																														
-			EXISTS(TradelineBusiness.Account.Records(CarrierSegment  AND Aging61To90BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																																														 
-			EXISTS(TradelineBusiness.Account.Records(CarrierSegment  AND Aging31To60BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2, 																																											
-			EXISTS(TradelineBusiness.Account.Records(CarrierSegment  AND Aging1To30BlankToZero  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0);																								
+			EXISTS(TradelineBusiness.Account.Records(CarrierSegment  AND Aging91PlusLN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4, 																																														
+			EXISTS(TradelineBusiness.Account.Records(CarrierSegment  AND Aging61To90LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																																														 
+			EXISTS(TradelineBusiness.Account.Records(CarrierSegment  AND Aging31To60LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2, 																																											
+			EXISTS(TradelineBusiness.Account.Records(CarrierSegment  AND Aging1To30LN  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0);																								
 Business: => B2bTLWorstPerfInFltIndex2Y := MAP( B2bTLInFltCnt2Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,	
-			EXISTS(TradelineBusiness.Account.Records(FleetSegment  AND Aging91PlusBlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4,																								
-			EXISTS(TradelineBusiness.Account.Records(FleetSegment  AND Aging61To90BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																								
-			EXISTS(TradelineBusiness.Account.Records(FleetSegment  AND Aging31To60BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2, 																								
-			EXISTS(TradelineBusiness.Account.Records(FleetSegment  AND Aging1To30BlankToZero  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0); 																								
+			EXISTS(TradelineBusiness.Account.Records(FleetSegment  AND Aging91PlusLN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4,																								
+			EXISTS(TradelineBusiness.Account.Records(FleetSegment  AND Aging61To90LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																								
+			EXISTS(TradelineBusiness.Account.Records(FleetSegment  AND Aging31To60LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2, 																								
+			EXISTS(TradelineBusiness.Account.Records(FleetSegment  AND Aging1To30LN  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0); 																								
 Business: => B2bTLWorstPerfInMatIndex2Y := MAP( B2bTLInMatCnt2Y = 0 =>  Tradeline.NO_DATA_FOUND_TRADELINE,
-			EXISTS(TradelineBusiness.Account.Records(MaterialsSegment  AND Aging91PlusBlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4, 																								
-			EXISTS(TradelineBusiness.Account.Records(MaterialsSegment  AND Aging61To90BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																								
-			EXISTS(TradelineBusiness.Account.Records(MaterialsSegment  AND Aging31To60BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2, 																								
-			EXISTS(TradelineBusiness.Account.Records(MaterialsSegment  AND Aging1To30BlankToZero  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0); 																								
+			EXISTS(TradelineBusiness.Account.Records(MaterialsSegment  AND Aging91PlusLN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4, 																								
+			EXISTS(TradelineBusiness.Account.Records(MaterialsSegment  AND Aging61To90LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																								
+			EXISTS(TradelineBusiness.Account.Records(MaterialsSegment  AND Aging31To60LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2, 																								
+			EXISTS(TradelineBusiness.Account.Records(MaterialsSegment  AND Aging1To30LN  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0); 																								
 Business: => B2bTLWorstPerfInOpsIndex2Y := MAP( B2bTLInOpsCnt2Y = 0 =>  Tradeline.NO_DATA_FOUND_TRADELINE,
-			EXISTS(TradelineBusiness.Account.Records(OperationsSegment  AND Aging91PlusBlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4,  																								
-			EXISTS(TradelineBusiness.Account.Records(OperationsSegment  AND Aging61To90BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3,  																								
-			EXISTS(TradelineBusiness.Account.Records(OperationsSegment  AND Aging31To60BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2,  																								
-			EXISTS(TradelineBusiness.Account.Records(OperationsSegment  AND Aging1To30BlankToZero  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0);  																																								
+			EXISTS(TradelineBusiness.Account.Records(OperationsSegment  AND Aging91PlusLN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 4,  																								
+			EXISTS(TradelineBusiness.Account.Records(OperationsSegment  AND Aging61To90LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3,  																								
+			EXISTS(TradelineBusiness.Account.Records(OperationsSegment  AND Aging31To60LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2,  																								
+			EXISTS(TradelineBusiness.Account.Records(OperationsSegment  AND Aging1To30LN  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0);  																																								
 Business: => B2bTLWorstPerfInOthIndex2Y := MAP( B2bTLInOthCnt2Y = 0 => Tradeline.NO_DATA_FOUND_TRADELINE,
-			EXISTS(TradelineBusiness.Account.Records(OtherSegment  AND Aging91PlusBlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) =>  4,  																								
-			EXISTS(TradelineBusiness.Account.Records(OtherSegment  AND Aging61To90BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																								 	
-			EXISTS(TradelineBusiness.Account.Records(OtherSegment  AND Aging31To60BlankToZero > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2,  																								
-			EXISTS(TradelineBusiness.Account.Records(OtherSegment  AND Aging1To30BlankToZero  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0);  																																																																																																			
+			EXISTS(TradelineBusiness.Account.Records(OtherSegment  AND Aging91PlusLN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) =>  4,  																								
+			EXISTS(TradelineBusiness.Account.Records(OtherSegment  AND Aging61To90LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 3, 																								 	
+			EXISTS(TradelineBusiness.Account.Records(OtherSegment  AND Aging31To60LN > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 2,  																								
+			EXISTS(TradelineBusiness.Account.Records(OtherSegment  AND Aging1To30LN  > 0 AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS)) => 1, 0);  																																																																																																			
 Business: => B2bTLWorstPerfDt2Y := IF(B2bTLCnt2Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE, STRING(MAX(TradelineBusiness.Account.Records(PerfLevel=Business.B2bTLWorstPerfIndex2Y AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS),ARDate)));
 Business: => B2bTLWorstPerfInCarrDt2Y := IF(B2bTLInCarrCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE, STRING(MAX(TradelineBusiness.Account.Records(PerfLevel=Business.B2bTLWorstPerfInCarrIndex2Y AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS),ARDate)));
 Business: => B2bTLWorstPerfInFltDt2Y := IF(B2bTLInFltCnt2Y  = 0, Tradeline.NO_DATA_FOUND_TRADELINE, STRING(MAX(TradelineBusiness.Account.Records(PerfLevel=Business.B2bTLWorstPerfInFltIndex2Y AND RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS),ARDate)));                                          
@@ -1522,3 +1541,60 @@ Business: => B2bTLWorstPerfInOthMsince2Y := MAP(
 			B2bTLInOthCnt2Y  = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
 			B2bTLWorstPerfInOthIndex2Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(B2bTLWorstPerfInOthDt2Y), ONLY(TradelineBusiness.Account, CurrentDate)), 0, 24));			
+			
+// KS-1401
+Business: => B2bActvTLW1pDpdCnt := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, B2bActvTLW1pDpdCntNoCap);
+Business: => B2bActvTLW31pDpdCnt := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, B2bActvTLW31pDpdCntNoCap);
+Business: => B2bActvTLW61pDpdCnt := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, B2bActvTLW61pDpdCntNoCap);
+Business: => B2bActvTLW91pDpdCnt := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, B2bActvTLW91pDpdCntNoCap);
+
+Business: => B2bActvTLW1pDpdPct := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLW1pDpdCntNoCap/B2bActvTLCntNoCap)*100);
+Business: => B2bActvTLW31pDpdPct := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLW31pDpdCntNoCap/B2bActvTLCntNoCap)*100);
+Business: => B2bActvTLW61pDpdPct := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLW61pDpdCntNoCap/B2bActvTLCntNoCap)*100);
+Business: => B2bActvTLW91pDpdPct := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLW91pDpdCntNoCap/B2bActvTLCntNoCap)*100);
+
+// KS-1402
+Business: => B2bBalOnActvTL1pDpdTot := IF(B2bActvTLCnt = 0 OR B2bActvTLW1pDpdCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL1pDpdTotNoCap, 0, 999999));
+Business: => B2bBalOnActvTL31pDpdTot := IF(B2bActvTLCnt = 0 OR B2bActvTLW31pDpdCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL31pDpdTotNoCap, 0, 999999));
+Business: => B2bBalOnActvTL61pDpdTot := IF(B2bActvTLCnt = 0 OR B2bActvTLW61pDpdCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL61pDpdTotNoCap, 0, 999999));
+Business: => B2bBalOnActvTL91pDpdTot := IF(B2bActvTLCnt = 0 OR B2bActvTLW91pDpdCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL91pDpdTotNoCap, 0, 999999));
+
+Business: => B2bBalOnActvTL1pDpdPct := MAP(
+			B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalTot = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			(B2bBalOnActvTL1pDpdTotNoCap/B2bActvTLBalTotNoCap)*100);
+Business: => B2bBalOnActvTL31pDpdPct := MAP(
+			B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalTot = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			(B2bBalOnActvTL31pDpdTotNoCap/B2bActvTLBalTotNoCap)*100);
+Business: => B2bBalOnActvTL61pDpdPct := MAP(
+			B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalTot = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			(B2bBalOnActvTL61pDpdTotNoCap/B2bActvTLBalTotNoCap)*100);
+Business: => B2bBalOnActvTL91pDpdPct := MAP(
+			B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bActvTLBalTot = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			(B2bBalOnActvTL91pDpdTotNoCap/B2bActvTLBalTotNoCap)*100);
+
+Business: => B2bBalOnActvTL1pDpdTotArch1Y := IF(B2bActvTLCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL1pDpdTotArch1YNoCap, 0, 999999));
+Business: => B2bBalOnActvTL31pDpdTotArch1Y := IF(B2bActvTLCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL31pDpdTotArch1YNoCap, 0, 999999));
+Business: => B2bBalOnActvTL61pDpdTotArch1Y := IF(B2bActvTLCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL61pDpdTotArch1YNoCap, 0, 999999));
+Business: => B2bBalOnActvTL91pDpdTotArch1Y := IF(B2bActvTLCntArch1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL91pDpdTotArch1YNoCap, 0, 999999));
+
+Business: => B2bBalOnActvTL1pDpdGrow1Y := MAP(
+			B2bActvTLCntArch1Y = 0 OR B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bBalOnActvTL1pDpdTotArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			MIN(B2bBalOnActvTL1pDpdTotNoCap/B2bBalOnActvTL1pDpdTotArch1YNoCap, 9999.9999));
+Business: => B2bBalOnActvTL31pDpdGrow1Y := MAP(
+			B2bActvTLCntArch1Y = 0 OR B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bBalOnActvTL31pDpdTotArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			MIN(B2bBalOnActvTL31pDpdTotNoCap/B2bBalOnActvTL31pDpdTotArch1YNoCap, 9999.9999));
+Business: => B2bBalOnActvTL61pDpdGrow1Y := MAP(
+			B2bActvTLCntArch1Y = 0 OR B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bBalOnActvTL61pDpdTotArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			MIN(B2bBalOnActvTL61pDpdTotNoCap/B2bBalOnActvTL61pDpdTotArch1YNoCap, 9999.9999));
+Business: => B2bBalOnActvTL91pDpdGrow1Y := MAP(
+			B2bActvTLCntArch1Y = 0 OR B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			B2bBalOnActvTL91pDpdTotArch1Y = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+			MIN(B2bBalOnActvTL91pDpdTotNoCap/B2bBalOnActvTL91pDpdTotArch1YNoCap, 9999.9999));
+			
