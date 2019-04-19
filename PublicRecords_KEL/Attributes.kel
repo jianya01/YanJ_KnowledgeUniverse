@@ -30,6 +30,7 @@ FUNCTION: IsCleanPopulated(STRING FieldToCheck, STRING DefaultVal1, STRING Defau
 					IF(FieldToCheck = DefaultVal2, '0', '1'));
 FUNCTION: GETBUILDDATE(STRING variableName) <= ECL((UNSIGNED8)Risk_Indicators.get_Build_date(variableName)) FROM Risk_Indicators RETURNS DATE;
 FUNCTION: EditDistance(STRING field1, STRING field2) <= ECL(STD.Str.EditDistance(field1, field2)) FROM STD RETURNS INTEGER;
+FUNCTION: FindCount(STRING source, STRING target) <= ECL(STD.Str.FindCount(source, target)) FROM STD RETURNS INTEGER;
 FUNCTION: SourceGroup(STRING RawSource) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.SourceGroup(RawSource)) FROM PublicRecords_KEL RETURNS STRING;
 
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
@@ -1345,11 +1346,21 @@ Tradeline.Records: => PerfLevel := MAP(
 																			Aging61To90LN > 0 => 3,
 																			Aging31To60LN > 0 => 2, 
 																			Aging1To30LN  > 0 => 1, 0);
-																			
+
+// Helper attributes for calculating B2b*24MFull attributes. 
+// This type of attribute counts tradelines per calendar month over the past two years, not including the current month.
+// For example, if the archive date is 02/13/2019, this type of attribute looks at records from 2/01/2017 to 01/31/2019. 
+Tradeline: => CurrentYear := YEAR(CurrentDate);
+Tradeline: => CurrentMonth := MONTH(CurrentDate);
+Tradeline: => CurrentDateFirstOfMonth := DATEFROMPARTS(CurrentYear, CurrentMonth, 1);
+Tradeline: => TwoYearFullDate := ADJUSTCALENDAR(CurrentDateFirstOfMonth, -2, 0, 0);
+Tradeline.Records: => IsTwoYearFullRecord := RecordDate < Tradeline.CurrentDateFirstOfMonth AND RecordDate >= Tradeline.TwoYearFullDate;
+Tradeline.Records: => MonthsFromFirstOfCurrentMonth := MONTHSBETWEEN(RecordDate, CurrentDateFirstOfMonth) + 1;
+
 // Helper attributes for calculating tradeline attributes asof one year before the Currentdate (B2b*Arch1Y* attributes).
 Tradeline.Records: => Is1YRecord := RecordAgeInDays >= ONE_YEAR_IN_DAYS;
 //If record is at least 1 year old, find the number of days old it was AS OF 1 year ago. If it is not at least a year old, RecordAgeInDays1Y will be null.
-Tradeline.Records: Is1YRecord => RecordAgeInDays1Y := ABSDAYSBETWEEN(RecordDate, ADJUSTCALENDAR(CURRENTDATE(), -1, 0, 0));
+Tradeline.Records: Is1YRecord => RecordAgeInDays1Y := ABSDAYSBETWEEN(RecordDate, ADJUSTCALENDAR(CurrentDate, -1, 0, 0));
 Tradeline: => NewestRecordAgeInDays1Y := MIN(Records,RecordAgeInDays1Y);
 Tradeline: => IsActive1Y := NewestRecordAgeInDays1Y <= THREE_MONTHS_IN_DAYS;
 Tradeline.Records: => IsMostRecentActiveRecord1Y := IsActive1Y AND ARDate = MAX(Tradeline.Records(Is1YRecord), ARDate);
@@ -1426,6 +1437,12 @@ Business: => B2bTLWMaxBalSeg2YMapMat := IF(B2bTLBalInMatMax2YNoCap = B2bTLBalMax
 Business: => B2bTLWMaxBalSeg2YMapOps := IF(B2bTLBalInOpsMax2YNoCap = B2bTLBalMax2YNoCap,1,0);
 Business: => B2bTLWMaxBalSeg2YMapOth := IF(B2bTLBalInOthMax2YNoCap = B2bTLBalMax2YNoCap,1,0);
 
+Business: => B2bTLCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS(Records(IsTwoYearFullRecord))));
+Business: => B2bTLInCarrCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS(Records(IsTwoYearFullRecord AND CarrierSegment))));
+Business: => B2bTLInFltCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS(Records(IsTwoYearFullRecord AND FleetSegment))));
+Business: => B2bTLInMatCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS(Records(IsTwoYearFullRecord AND MaterialsSegment))));
+Business: => B2bTLInOpsCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS(Records(IsTwoYearFullRecord AND OperationsSegment))));
+Business: => B2bTLInOthCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS(Records(IsTwoYearFullRecord AND OtherSegment))));
 																				
 //Tradline Attributes
 Business: => B2bTLCntEv := BOUNDSFOLD(COUNT(TradelineBusiness.TradeAccount), 0, 9999);
@@ -1584,10 +1601,10 @@ Business: => B2bActvTLW61pDpdPct := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND
 Business: => B2bActvTLW91pDpdPct := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, (B2bActvTLW91pDpdCntNoCap/B2bActvTLCntNoCap)*100);
 
 // KS-1402
-Business: => B2bBalOnActvTL1pDpdTot := IF(B2bActvTLCnt = 0 OR B2bActvTLW1pDpdCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL1pDpdTotNoCap, 0, 999999));
-Business: => B2bBalOnActvTL31pDpdTot := IF(B2bActvTLCnt = 0 OR B2bActvTLW31pDpdCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL31pDpdTotNoCap, 0, 999999));
-Business: => B2bBalOnActvTL61pDpdTot := IF(B2bActvTLCnt = 0 OR B2bActvTLW61pDpdCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL61pDpdTotNoCap, 0, 999999));
-Business: => B2bBalOnActvTL91pDpdTot := IF(B2bActvTLCnt = 0 OR B2bActvTLW91pDpdCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL91pDpdTotNoCap, 0, 999999));
+Business: => B2bBalOnActvTL1pDpdTot := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL1pDpdTotNoCap, 0, 999999));
+Business: => B2bBalOnActvTL31pDpdTot := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL31pDpdTotNoCap, 0, 999999));
+Business: => B2bBalOnActvTL61pDpdTot := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL61pDpdTotNoCap, 0, 999999));
+Business: => B2bBalOnActvTL91pDpdTot := IF(B2bActvTLCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, BOUNDSFOLD(B2bBalOnActvTL91pDpdTotNoCap, 0, 999999));
 
 Business: => B2bBalOnActvTL1pDpdPct := MAP(
 			B2bActvTLCnt = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
@@ -1846,3 +1863,172 @@ Business: => B2bActvTLWorstPerfInOthIndex    :=  IF(
                                                      B2bActvTLInOthCnt = 0, Tradeline.NO_DATA_FOUND_TRADELINE,
                                                      MAX(TradelineBusiness.Account.Records(IsMostRecentActiveRecord AND OtherSegment), PerfLevel));
 
+Business: => B2bTLCnt24Mfull := BOUNDSFOLD(B2bTLCnt24MfullNoCap, 0, 999);
+Business: => B2bTLInCarrCnt24Mfull := BOUNDSFOLD(B2bTLInCarrCnt24MfullNoCap, 0, 999);
+Business: => B2bTLInFltCnt24Mfull := BOUNDSFOLD(B2bTLInFltCnt24MfullNoCap, 0, 999);
+Business: => B2bTLInMatCnt24Mfull := BOUNDSFOLD(B2bTLInMatCnt24MfullNoCap, 0, 999);
+Business: => B2bTLInOpsCnt24Mfull := BOUNDSFOLD(B2bTLInOpsCnt24MfullNoCap, 0, 999);
+Business: => B2bTLInOthCnt24Mfull := BOUNDSFOLD(B2bTLInOthCnt24MfullNoCap, 0, 999);
+
+Business: => B2bIndOfMonWTLStr24Mfull := IF(B2bTLCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 1)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 2)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 3)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 4)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 5)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 6)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 7)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 8)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 9)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 10)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 11)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 12)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 13)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 14)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 15)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 16)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 17)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 18)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 19)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 20)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 21)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 22)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 23)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 24)), '1', '0'));
+
+Business: => B2bIndOfMonWTLInCarrStr24Mfull := IF(B2bTLInCarrCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 1)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 2)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 3)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 4)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 5)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 6)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 7)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 8)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 9)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 10)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 11)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 12)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 13)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 14)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 15)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 16)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 17)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 18)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 19)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 20)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 21)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 22)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 23)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(CarrierSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 24)), '1', '0'));
+			
+Business: => B2bIndOfMonWTLInFltStr24Mfull := IF(B2bTLInFltCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 1)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 2)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 3)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 4)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 5)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 6)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 7)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 8)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 9)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 10)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 11)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 12)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 13)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 14)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 15)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 16)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 17)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 18)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 19)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 20)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 21)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 22)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 23)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(FleetSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 24)), '1', '0'));
+
+Business: => B2bIndOfMonWTLInMatStr24Mfull := IF(B2bTLInMatCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 1)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 2)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 3)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 4)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 5)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 6)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 7)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 8)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 9)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 10)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 11)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 12)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 13)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 14)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 15)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 16)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 17)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 18)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 19)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 20)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 21)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 22)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 23)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(MaterialsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 24)), '1', '0'));
+			
+Business: => B2bIndOfMonWTLInOpsStr24Mfull := IF(B2bTLInOpsCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 1)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 2)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 3)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 4)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 5)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 6)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 7)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 8)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 9)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 10)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 11)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 12)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 13)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 14)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 15)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 16)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 17)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 18)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 19)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 20)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 21)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 22)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 23)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OperationsSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 24)), '1', '0'));
+			
+Business: => B2bIndOfMonWTLInOthStr24Mfull := IF(B2bTLInOthCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 1)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 2)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 3)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 4)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 5)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 6)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 7)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 8)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 9)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 10)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 11)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 12)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 13)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 14)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 15)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 16)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 17)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 18)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 19)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 20)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 21)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 22)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 23)), '1', '0') +
+			IF(EXISTS(TradelineBusiness.Account.Records(OtherSegment AND IsTwoYearFullRecord AND MonthsFromFirstOfCurrentMonth = 24)), '1', '0'));
+			
+Business: => B2bMonWTLCnt24Mfull := IF(B2bTLCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(B2bIndOfMonWTLStr24Mfull, '1'));
+Business: => B2bMonWTLInCarrCnt24Mfull := IF(B2bTLInCarrCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(B2bIndOfMonWTLInCarrStr24Mfull, '1'));
+Business: => B2bMonWTLInFltCnt24Mfull := IF(B2bTLInFltCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(B2bIndOfMonWTLInFltStr24Mfull, '1'));
+Business: => B2bMonWTLInMatCnt24Mfull := IF(B2bTLInMatCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(B2bIndOfMonWTLInMatStr24Mfull, '1'));
+Business: => B2bMonWTLInOpsCnt24Mfull := IF(B2bTLInOpsCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(B2bIndOfMonWTLInOpsStr24Mfull, '1'));
+Business: => B2bMonWTLInOthCnt24Mfull := IF(B2bTLInOthCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(B2bIndOfMonWTLInOthStr24Mfull, '1'));
