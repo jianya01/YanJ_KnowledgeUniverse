@@ -1443,6 +1443,13 @@ Business: => B2bTLInFltCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS
 Business: => B2bTLInMatCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS(Records(IsTwoYearFullRecord AND MaterialsSegment))));
 Business: => B2bTLInOpsCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS(Records(IsTwoYearFullRecord AND OperationsSegment))));
 Business: => B2bTLInOthCnt24MfullNoCap := COUNT(TradelineBusiness.Account(EXISTS(Records(IsTwoYearFullRecord AND OtherSegment))));
+
+Business: => B2bTLBal24MfullNoCap := SUM(TradelineBusiness.Account.Records(IsTwoYearFullRecord),TotalARLN);
+Business: => B2bTLInCarrBal24MfullNoCap := SUM(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND CarrierSegment),TotalARLN);
+Business: => B2bTLInFltBal24MfullNoCap := SUM(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND FleetSegment),TotalARLN);
+Business: => B2bTLInMatBal24MfullNoCap := SUM(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MaterialsSegment),TotalARLN);
+Business: => B2bTLInOpsBal24MfullNoCap := SUM(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND OperationsSegment),TotalARLN);
+Business: => B2bTLInOthBal24MfullNoCap := SUM(TradelineBusiness.Account.Records(IsTwoYearFullRecord AND OtherSegment),TotalARLN);
 																				
 //Tradline Attributes
 Business: => B2bTLCntEv := BOUNDSFOLD(COUNT(TradelineBusiness.TradeAccount), 0, 9999);
@@ -2027,3 +2034,67 @@ Business: => B2bMonWTLInFltCnt24Mfull := IF(B2bTLInFltCnt24Mfull = 0, Tradeline.
 Business: => B2bMonWTLInMatCnt24Mfull := IF(B2bTLInMatCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(B2bIndOfMonWTLInMatStr24Mfull, '1'));
 Business: => B2bMonWTLInOpsCnt24Mfull := IF(B2bTLInOpsCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(B2bIndOfMonWTLInOpsStr24Mfull, '1'));
 Business: => B2bMonWTLInOthCnt24Mfull := IF(B2bTLInOthCnt24Mfull = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(B2bIndOfMonWTLInOthStr24Mfull, '1'));
+
+//KS-1620  REMOVE THIS LINE AFTER ALL ATTRIBUTES COMPLETED
+//Need means for all segments
+Business: => B2bTLMEAN := (B2bTLBal24MfullNoCap/B2bMonWTLCnt24Mfull);
+Business: => B2bTLInCarrMEAN := (B2bTLInCarrBal24MfullNoCap/B2bMonWTLInCarrCnt24Mfull);
+Business: => B2bTLInFltMEAN := (B2bTLInFltBal24MfullNoCap/B2bMonWTLInFltCnt24Mfull);
+Business: => B2bTLInMatMEAN := (B2bTLInMatBal24MfullNoCap/B2bMonWTLInMatCnt24Mfull);
+Business: => B2bTLInOpsMEAN := (B2bTLInOpsBal24MfullNoCap/B2bMonWTLInOpsCnt24Mfull);
+Business: => B2bTLInOthMEAN := (B2bTLInOthBal24MfullNoCap/B2bMonWTLInOthCnt24Mfull);
+
+Tradeline.Records: => ARDateGroup:= DATEFROMPARTS(YEAR(ARDate), MONTH(ARDate), 0);
+//TotalARLN summed and grouped by month
+Business: => B2bTLGroupTotalARLNSum := TradelineBusiness.Account.Records(IsTwoYearFullRecord){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
+Business: => B2bTLGroupCarrTotalARLNSum := TradelineBusiness.Account.Records(IsTwoYearFullRecord AND CarrierSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
+Business: => B2bTLGroupFltTotalARLNSum := TradelineBusiness.Account.Records(IsTwoYearFullRecord AND FleetSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
+Business: => B2bTLGroupMatTotalARLNSum := TradelineBusiness.Account.Records(IsTwoYearFullRecord AND MaterialsSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
+Business: => B2bTLGroupOpsTotalARLNSum := TradelineBusiness.Account.Records(IsTwoYearFullRecord AND OperationsSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
+Business: => B2bTLGroupOthTotalARLNSum := TradelineBusiness.Account.Records(IsTwoYearFullRecord AND OtherSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
+//Standard deviation uses Population not sample size
+Business: => B2bTLSTDDevationPopulation := STDDEV(B2bTLGroupTotalARLNSum, TotalARLNSum); 
+Business: => B2bTLSTDDevationPopulationInCarr := STDDEV(B2bTLGroupCarrTotalARLNSum, TotalARLNSum); 
+Business: => B2bTLSTDDevationPopulationInFlt := STDDEV(B2bTLGroupFltTotalARLNSum, TotalARLNSum); 
+Business: => B2bTLSTDDevationPopulationInMat := STDDEV(B2bTLGroupMatTotalARLNSum, TotalARLNSum); 
+Business: => B2bTLSTDDevationPopulationInOps := STDDEV(B2bTLGroupOpsTotalARLNSum, TotalARLNSum);    
+Business: => B2bTLSTDDevationPopulationInOth := STDDEV(B2bTLGroupOthTotalARLNSum, TotalARLNSum); 
+//Difference from Standard deviation population to sample zie
+Business: => B2bTLModifiedNCount := SQRT(B2bMonWTLCnt24Mfull/(B2bMonWTLCnt24Mfull - 1));
+Business: => B2bTLModifiedNCountInCarr := SQRT(B2bMonWTLInCarrCnt24Mfull/(B2bMonWTLInCarrCnt24Mfull - 1));
+Business: => B2bTLModifiedNCountInFlt := SQRT(B2bMonWTLInFltCnt24Mfull/(B2bMonWTLInFltCnt24Mfull - 1));
+Business: => B2bTLModifiedNCountInMat := SQRT(B2bMonWTLInMatCnt24Mfull/(B2bMonWTLInMatCnt24Mfull - 1));
+Business: => B2bTLModifiedNCountInOps := SQRT(B2bMonWTLInOpsCnt24Mfull/(B2bMonWTLInOpsCnt24Mfull - 1));
+Business: => B2bTLModifiedNCountInOth := SQRT(B2bMonWTLInOthCnt24Mfull/(B2bMonWTLInOthCnt24Mfull - 1));
+//Standard Deviation using sample size 
+Business: => B2bTLDevationSample := B2bTLSTDDevationPopulation * B2bTLModifiedNCount;
+Business: => B2bTLDevationSampleInCarr := B2bTLSTDDevationPopulationInCarr * B2bTLModifiedNCountInCarr;
+Business: => B2bTLDevationSampleInFlt := B2bTLSTDDevationPopulationInFlt * B2bTLModifiedNCountInFlt;
+Business: => B2bTLDevationSampleInMat := B2bTLSTDDevationPopulationInMat * B2bTLModifiedNCountInMat;
+Business: => B2bTLDevationSampleInOps := B2bTLSTDDevationPopulationInOps * B2bTLModifiedNCountInOps;
+Business: => B2bTLDevationSampleInOth := B2bTLSTDDevationPopulationInOth * B2bTLModifiedNCountInOth;
+
+Business: => B2bTLBalVol24Mfull := MAP(
+		B2bMonWTLCnt24Mfull = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+		B2bTLCnt24Mfull = 1 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+		MIN(B2bTLDevationSample/B2bTLMEAN,2.00));
+Business: => B2bTLBalInCarrVol24Mfull := MAP(
+		B2bMonWTLInCarrCnt24Mfull = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+		B2bTLInCarrCnt24Mfull = 1 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+		MIN(B2bTLDevationSampleInCarr/B2bTLInCarrMEAN,2.00));
+Business: => B2bTLBalInFltVol24Mfull := MAP(
+		B2bMonWTLInFltCnt24Mfull = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+		B2bTLInFltCnt24Mfull = 1 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+		MIN(B2bTLDevationSampleInFlt/B2bTLInFltMEAN,2.00));
+Business: => B2bTLBalInMatVol24Mfull := MAP(
+		B2bMonWTLInMatCnt24Mfull = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+		B2bTLInMatCnt24Mfull = 1 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+		MIN(B2bTLDevationSampleInMat/B2bTLInMatMEAN,2.00));
+Business: => B2bTLBalInOpsVol24Mfull := MAP(
+		B2bMonWTLInOpsCnt24Mfull = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+		B2bTLInOpsCnt24Mfull = 1 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+		MIN(B2bTLDevationSampleInOps/B2bTLInOpsMEAN,2.00));
+Business: => B2bTLBalInOthVol24Mfull := MAP(
+		B2bMonWTLInOthCnt24Mfull = 0 => Tradeline.NO_DATA_FOUND_97_INT,
+		B2bTLInOthCnt24Mfull = 1 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
+		MIN(B2bTLDevationSampleInOth/B2bTLInOthMEAN,2.00));
