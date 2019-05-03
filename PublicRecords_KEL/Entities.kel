@@ -94,46 +94,62 @@ Person := ENTITY(FLAT(UID=LexID,
 
 Phone := ENTITY(FLAT(UID=Phone10,
 		STRING Phone10,
-		INTEGER AreaCode,
-		INTEGER Phone7,
-		DATE AreaCodeEffectiveDate,
-		DATE AreaCodeLastChangeDate,
-		INTEGER DialableIndicator,
 		STRING ListingType,
-		STRING Type,
 		STRING PublishCode,
 		INTEGER PortabilityIndicator,
-		INTEGER TimeZone,
 		INTEGER NXXType,	//Helps indicate the phone type
 		STRING COCType,
 		STRING SCC,
+		INTEGER PortedMatch,
+		STRING PhoneUse,
 		INTEGER PhoneNumberCompanyType,
-		STRING Usage,
-		DATE RegistrationDate,
-		STRING RegistrationPlace,
 		STRING PriorAreaCode,
-		BOOLEAN IsActive,
-		STRING CarrierCode,
+		STRING IsActive,
 		STRING CarrierName,
 		INTEGER ConfidenceScore,
+		STRING NoSolicitCode,
 		INTEGER MaximumConfidenceScore,
 		INTEGER MinimumConfidenceScore,
-		INTEGER CurrentConfidenceScore,
-		INTEGER SeenOnceIndicator,
-		INTEGER OwnerCount,
 		STRING OmitIndicator,		//Customer asked to omit his phone number in products
-		INTEGER NoteCounter,
-		STRING Note,
-		STRING Source),
+		STRING CurrentFlag,
+		STRING BusinessFlag,
+		STRING PhoneQuality, //this field is from P.Header R-# replaced by gong hist #, E-# enchanced by gong hist #, N-area code is from nxx match to tmp, P-property phone that was cleaned, A added Apt number
+		STRING TNT, 		//p.Header N = name+address not in gong, Y = Name+Address in Gong, P = Name+Address+Phone in gong, D=Dead
+		STRING RecordType,
+		INTEGER SourceFile, 
+		INTEGER IverIndicator, 
+		STRING PhoneType,
+		STRING ValidationFlag,
+		STRING ValidationDate,
+		STRING Source,//phones plus source
+		STRING OriginalSource), //source from Dataset originalsource
 	MODEL(UID,
-		Phone10, AreaCode, Phone7, AreaCodeEffectiveDate, AreaCodeLastChangeDate, DialableIndicator, PortabilityIndicator, TimeZone, ListingType, Type, NXXType, PublishCode,
-		COCType, SCC, PhoneNumberCompanyType, Usage, RegistrationDate, RegistrationPlace, ConfidenceScore, MaximumConfidenceScore, MinimumConfidenceScore,
-		CurrentConfidenceScore, SeenOnceIndicator, OwnerCount, OmitIndicator,
+		Phone10, 
+		PortabilityIndicator, 
+		CurrentFlag,
+		BusinessFlag,
+		NXXType,
+		PublishCode,
+		COCType, 
+		SCC,   
+		PhoneNumberCompanyType, 
+		PortedMatch, 
+		PhoneUse, 
+		NoSolicitCode, 
+		OmitIndicator,
+		HeaderPhoneQuality{PhoneQuality,TNT},
+		SourceFile,
+		IverIndicator,
+		ValidationFlag,
+		ValidationDate,
+		CarrierName,
 		PriorAreaCodes{PriorAreaCode},
-		Active{IsActive},
-		Carrier{CarrierCode, CarrierName}, //Making it into a Sub-Model to account for the portability of the phone number
-		Notes{NoteCounter, Note},
-		DataSources{Source}));
+		Active{IsActive, Source},
+		ConfidenceScores{ConfidenceScore,MaximumConfidenceScore,MinimumConfidenceScore},
+		ListingTypes{ListingType,Source},
+		PhoneTypes{PhoneType,Source},
+		RecordTypes{RecordType,Source},
+		DataSources{Source, OriginalSource}));
 
 
 SocialSecurityNumber := ENTITY(FLAT(UID=SSN,
@@ -881,25 +897,45 @@ SelePerson := ASSOCIATION(FLAT(
 ProxAddress := ASSOCIATION(FLAT(
 		BusinessProx Site=UID(UltID,OrgID,SeleID,ProxID), 
 		Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
+		STRING PrimaryRange,
+		STRING Predirectional,
+		STRING PrimaryName,
+		STRING Suffix,
+		STRING Postdirectional,
+		STRING SecondaryRange,
+		ZipCode ZIP5,
+		STRING SICCode, 
+		STRING NAICSCode, 
 		DATE DateFirstSeenCompanyAddress, 
 		DATE DateLastSeenCompanyAddress, 
 		STRING Source),
 	MODEL(
 		Site,
 		Location,
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional, 
+		ZIP5, 
+		SecondaryRange,
+		SICCodes{SICCode, Source},
+		NAICSCodes{NAICSCode, Source},
 		DateFirstSeenCompanyAddress,
 		DateLastSeenCompanyAddress, 
 		DataSources{Source}));
 		
 ProxPhoneNumber := ASSOCIATION(FLAT(
-		BusinessProx Site=UID(UltID,OrgID,SeleID,ProxID), 
+		BusinessProx Site=UID(UltID,OrgID,SeleID,ProxID),
 		Phone PhoneNumber, 
-		INTEGER PhoneScore, 
+		STRING SICCode, 
+		STRING NAICSCode, 
 		STRING Source),
 	MODEL(
 		Site,
 		PhoneNumber,
-		PhoneScore,
+		SICCodes{SICCode, Source},
+		NAICSCodes{NAICSCode, Source},
 		DataSources{Source}));
 		
 SeleTaxID := ASSOCIATION(FLAT(
@@ -968,6 +1004,14 @@ InputBII := ENTITY(QUERY(UID=BusInputUIDAppend,
 		STRING BusInputEmailClean,
 		STRING BusInputTINClean,
 		INTEGER BusInputArchiveDateClean,
+		STRING PhoneVerificationBureau,
+		STRING DialIndicator,
+		STRING PointID,
+		STRING NXXType,
+		BOOLEAN ZIPMatch,
+		STRING COCType,
+		STRING SSC,
+		STRING WirelessIndicator,		
 		STRING ArchiveDate
 			),
 	MODEL(*));
@@ -1260,6 +1304,14 @@ InputPII := ENTITY(QUERY(UID=InputUIDAppend,
 		STRING InputSSNClean,
 		INTEGER InputArchiveDateClean,
 		INTEGER BusInputUIDAppend,
+		STRING PhoneVerificationBureau,
+		STRING DialIndicator,
+		STRING PointID,
+		STRING NXXType,
+		BOOLEAN ZIPMatch,
+		STRING COCType,
+		STRING SSC,
+		STRING WirelessIndicator,
 		INTEGER RepNumber
 		),
 	MODEL(*));
@@ -1645,8 +1697,20 @@ PersonAddress := ASSOCIATION(FLAT(Person Subject, Address Location=UID(PrimaryRa
 				AddressType, 
 				DataSources{Source})); 
 PersonBankruptcy := ASSOCIATION(FLAT(Person Subject, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number, DID), STRING Source),	MODEL(Subject, Bankrupt, DataSources{Source}));
-PersonPhone := ASSOCIATION(FLAT(Person Subject, Phone PhoneNumber, INTEGER ConfidenceScore, INTEGER PersonScore, INTEGER NameScore, INTEGER BestNameMatchFlag, INTEGER LatestPhoneOwnerFlag, INTEGER ActivePhoneFlag, STRING Source),
-	MODEL(Subject, PhoneNumber, ConfidenceScore, PersonScore, NameScore, BestNameMatchFlag, LatestPhoneOwnerFlag, ActivePhoneFlag, DataSources{Source}));
+
+PersonPhone := ASSOCIATION(FLAT(
+		Person Subject, 
+		Phone PhoneNumber, 
+		INTEGER OwnerFlag,
+		STRING Source, 
+		STRING OriginalSource),
+	MODEL(
+		Subject, 
+		PhoneNumber, 
+		OwnerFlag,
+		DataSources{Source, OriginalSource}));
+
+
 AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
 	INTEGER BestAddressMatchFlag, 
 	STRING PrimaryRange,
@@ -1656,7 +1720,8 @@ AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(Primary
 	STRING Postdirectional,
 	STRING SecondaryRange,
 	ZipCode ZIP5,
-	STRING Source), 
+	STRING Source,
+	STRING OriginalSource), 
 	MODEL(
 		PhoneNumber, 
 		Location,
@@ -1668,7 +1733,7 @@ AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(Primary
 		ZIP5, 
 		SecondaryRange,
 		BestAddressMatchFlag, 
-		DataSources{Source}));
+		DataSources{Source, OriginalSource}));
 PersonOffenses := ASSOCIATION(FLAT(Person Subject, CriminalOffense Offense=UID(OffenderKey), STRING Source),
 	MODEL(Subject, Offense, DataSources{Source}));
 CriminalDetails := ASSOCIATION(FLAT(CriminalOffender Offender = UID(OffenderKey), CriminalOffense Offense = UID(OffenderKey), CriminalPunishment Punishment = UID(OffenderKey), STRING Source),
@@ -2068,3 +2133,6 @@ PersonAccident := ASSOCIATION(FLAT(Person Subject, Accident Acc=UID(AccidentNumb
 		
 TradelineBusiness := ASSOCIATION(FLAT(Business Company=UID(UltID, OrgID, SeleID), Tradeline Account=UID(UltID, OrgID, SeleID, AccountKey), STRING Source),
 	MODEL(Company, Account, DataSources{Source}));
+
+HouseHoldPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Household Household, STRING Source, STRING OriginalSource),
+	MODEL(PhoneNumber, Household, DataSources{Source, OriginalSource}));
