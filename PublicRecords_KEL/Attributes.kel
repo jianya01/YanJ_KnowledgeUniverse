@@ -48,6 +48,9 @@ Property: => CurrentDate := MIN(GETBUILDDATE('property_build_version'), CURRENTD
 Property: => CurrentDateFCRA := MIN(GETBUILDDATE('fcra_property_build_version'), CURRENTDATE());
 Tradeline: => CurrentDate := MIN(GETBUILDDATE('cortera_build_version'), CURRENTDATE());
 Watercraft: => CurrentDate := MIN(GETBUILDDATE('watercraft_build_version'), CURRENTDATE());
+Vehicle: => CurrentDate :=  MIN(GETBUILDDATE('vehicle_build_version'), CURRENTDATE());
+PersonVehicle: => CurrentDate :=  MIN(GETBUILDDATE('vehicle_build_version'), CURRENTDATE());
+WatercraftOwner: => CurrentDate :=  MIN(GETBUILDDATE('watercraft_build_version'), CURRENTDATE());
 					
 // Global Constant Definitions for MAS
 InputPII: MISSING_INPUT_DATA := '-99999';
@@ -886,7 +889,64 @@ InputBII: => BusInputRep5DOBCleanPopValue := AuthRep5.InputDOBCleanPopValue;
 InputBII: => BusInputRep5EmailCleanPopValue := AuthRep5.InputEmailCleanPopValue; 
 InputBII: => BusInputRep5DLCleanPopValue := AuthRep5.InputDLCleanPopValue;
 InputBII: => BusInputRep5DLStateCleanPopValue := AuthRep5.InputDLStateCleanPopValue; 
+//KS-395
+   /////////////////////////////
+   //Vehicle Helper Attributes//
+   /////////////////////////////
+Vehicle: MISSING_INPUT_DATA_INT := -99999;
+Vehicle: NO_DATA_FOUND_INT := -99998;
+Vehicle: MISSING_INPUT_DATA := '-99999';
+Vehicle: NO_DATA_FOUND := '-99998';
+Vehicle: REC_FOUND_BUT_INVALID :=  '-99997';
+Vehicle: REC_FOUND_BUT_INVALID_INT :=  -99997;
+Vehicle: TEN_YEARS_IN_DAYS := 3652;
+Vehicle: TWO_YEARS_IN_DAYS := 730;
+PersonVehicle.Registration: => RegistrationCurrentDate := CurrentDate ;
+Person: => VehicleBuildCurrentDate := ONLY(PersonVehicle,CurrentDate);
+PersonVehicle: => Seen_In_Last_Ten_Years := EXISTS(Registration(DAYSBETWEEN(RegistrationLatestExpirationeDate,RegistrationCurrentDate) < Vehicle.TEN_YEARS_IN_DAYS));
+PersonVehicle: => Seen_In_Last_Two_Years := EXISTS(Registration(DAYSBETWEEN(RegistrationLatestExpirationeDate,RegistrationCurrentDate) < Vehicle.TWO_YEARS_IN_DAYS));
+PersonVehicle: => VehicleMinDate := IF(MIN(Registration(NOT RegistrationFirstDate:Null),RegistrationFirstDate):Null, Vehicle.REC_FOUND_BUT_INVALID, DATETOSTRING(MIN(Registration,RegistrationFirstDate),'%Y%m%d'));
+PersonVehicle: => VehicleMaxDate := IF(MAX(Registration(NOT RegistrationLatestExpirationeDate:Null),RegistrationLatestExpirationeDate):Null, Vehicle.REC_FOUND_BUT_INVALID, DATETOSTRING(MAX(Registration,RegistrationLatestExpirationeDate),'%Y%m%d'));
 
+Person: => AssetVehicleCntEv := IF(LexIDSeen = '0', Vehicle.MISSING_INPUT_DATA_INT,
+			BOUNDSFOLD(COUNT(PersonVehicle), 0, 999));
+			
+Person: => AssetDtOfVehicleEmrgListEv := PersonVehicle{Automobile,RegistrationFirstSeenDate := VehicleMinDate};
+
+Person: => AssetDtVehicleLastSeenListEv := PersonVehicle{Automobile,RegistrationLastSeenDate := VehicleMaxDate};
+
+Person: => AssetVehicleCnt10Y := MAP(
+			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID,									
+			BOUNDSFOLD(COUNT(PersonVehicle(Seen_In_Last_Ten_Years)),0,999));
+			
+Person: => AssetVehicleCnt2Y := MAP(
+			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID,			
+			BOUNDSFOLD(COUNT(PersonVehicle(Seen_In_Last_Two_Years)),0,999));
+			
+Person: => AssetNewestVehicleEmrgDtEv := MAP(
+			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv = 0 => Vehicle.NO_DATA_FOUND,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID,			
+			DATETOSTRING(MAX(PersonVehicle(VehicleMaxDate != Vehicle.REC_FOUND_BUT_INVALID),DATE(VehicleMaxDate)),'%Y%m%d' ));
+			
+Person: => AssetOldestVehicleEmrgDtEv := MAP(
+			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv = 0 => Vehicle.NO_DATA_FOUND, 	
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID,		
+			DATETOSTRING(MIN(PersonVehicle(VehicleMinDate != Vehicle.REC_FOUND_BUT_INVALID),DATE(VehicleMinDate)) ,'%Y%m%d'));
+			
+Person: => AssetNewestVehicleEmrgMsinceEv := MAP(
+			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID_INT,	
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetNewestVehicleEmrgDtEv),VehicleBuildCurrentDate),0,999)); 
+			
+Person: => AssetOldestVehicleEmrgMsinceEv := MAP( 
+			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID_INT,	
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetOldestVehicleEmrgDtEv),VehicleBuildCurrentDate),0,999));	
+			
 ////////////////////////////////////
 //Criminal Attributes
 ////////////////////////////////////
