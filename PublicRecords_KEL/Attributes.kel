@@ -1244,9 +1244,18 @@ Person: => MonSinceNewestBkUpdateCnt10Y := MAP(
 			(MostRecentUpdate10Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentUpdate10Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 120)
 			); 
-Person: => DispOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt(Records.Banko1Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.DateVendorLastReported, Records.DateFiled}, BkCnt1Y, BankruptcyDate,DateVendorLastReported,DateFiled);
-Person: => DispOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt(Records.Banko7Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.DateVendorLastReported, Records.DateFiled}, BkCnt7Y, BankruptcyDate,DateVendorLastReported,DateFiled);
-Person: => DispOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt(Records.Banko10Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.DateVendorLastReported, Records.DateFiled}, BkCnt10Y, BankruptcyDate,DateVendorLastReported,DateFiled);
+/*For the following 3 attributes, there is a quirk when applying TOPN to ascending and descending lists when there is only one 
+record and that record has several child records.  The child record is re-sorted incorrectly.  
+This only happen if there 1 record with multiple child records.  Less than .005% of the times this happens.*/
+Person: => DispOfBksList1Y := IF(BkCnt1Y = 1, 
+		TOPN(PersonBankruptcy.Bankrupt(Records.Banko1Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled),
+		TOPN(PersonBankruptcy.Bankrupt(Records.Banko1Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled));
+Person: => DispOfBksList7Y := IF(BkCnt7Y = 1,
+		TOPN(PersonBankruptcy.Bankrupt(Records.Banko7Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled),
+		TOPN(PersonBankruptcy.Bankrupt(Records.Banko7Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled));
+Person: => DispOfBksList10Y := IF(BkCnt10Y = 1,
+		TOPN(PersonBankruptcy.Bankrupt(Records.Banko10Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled),
+		TOPN(PersonBankruptcy.Bankrupt(Records.Banko10Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled));
 Person: => BkWithNewestDateDisp1Y := MAP(
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo1Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
@@ -1347,7 +1356,7 @@ Person: => BkSeverityIndex10Y := MAP(
 			BkWithNewestDateDisp10Y = 'DISMISSED' => '3',
 			BkWithNewestDateCh10Y = 13 => '2',
 			'1'
-			); 		
+			); 	
 
 ////////////////////////////////////
 // Business Attributes
