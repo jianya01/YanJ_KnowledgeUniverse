@@ -2,7 +2,7 @@
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
-PERMITS FCRA, NonFCRA;
+//PERMITS FCRA, NonFCRA;
 
 Policy := ENTITY(FLAT(UID(PolicyNumber),
 		STRING PolicyNumber,
@@ -38,10 +38,13 @@ Policy := ENTITY(FLAT(UID(PolicyNumber),
 		STRING BatchID,
 		STRING Status),
 	MODEL(UID,
-		PolicyNumber, PolicyPlan, LineOfBusiness, AMBestNumber, GroupNumber, OPolicyNumber,
-		ProductUsage, IsCombinationPolicyPayment, NumberOfPolicies, PaymentGroupIndicator, PaymentStatusCode, 
-		CompanyName, NAICCode, PolicyState, OriginationDate, IsUsage, FirstLoadDate, DeleteFlag, BatchID, Status,
-		Details{TermBeginDate, TermEndDate, ChangeEffectiveDate, CancellationNoticeDate, CancelliationDate, CancellationReasonCode, PolicyStatus, EndorsementNumber, EndorsementDate},
+		PolicyNumber, PolicyPlan, LineOfBusiness, AMBestNumber, OPolicyNumber,
+		ProductUsage, NumberOfPolicies, 
+		CompanyName, NAICCode, PolicyState, OriginationDate, IsUsage, 
+		DataSource{FirstLoadDate, DeleteFlag, BatchID, Status},
+		Details{TermBeginDate, TermEndDate, PaymentGroupIndicator, PaymentStatusCode, IsCombinationPolicyPayment,
+			ChangeEffectiveDate, CancellationNoticeDate, CancelliationDate, CancellationReasonCode, 
+			PolicyStatus, EndorsementNumber, EndorsementDate, GroupNumber},
 		ReportDates{ReportStartDate, ReportEndDate},
 		PaymentSpecialProjects{PaymentExtractExclusion}));
 
@@ -69,9 +72,13 @@ Invoice := ENTITY(FLAT(UID(InvoiceTransactionID),
 		STRING ReturnMailReason,
 		DATE ReturnMailDate), 
 	MODEL(UID,
-		InvoiceTransactionID, InvoiceDate, DueDate, IsReturnMail, ReturnMailReason, ReturnMailDate));
+		InvoiceTransactionID, 
+		InvoiceDates{InvoiceDate, DueDate},
+		IsReturnMail, ReturnMailReason, ReturnMailDate));
 		
-PaymentDetails := ENTITY(FLAT(Invoice rInvoice = UID(InvoiceTransactionID),
+PaymentDetails := ENTITY(FLAT(UID(InvoiceTransactionID, PolicyNumber),
+		STRING InvoiceTransactionID,
+		STRING PolicyNumber,
 		STRING PaymentReceivedMethod,
 		STRING PaymentReceivedType,
 		STRING PaymentReceivedTypeIfOther,
@@ -92,7 +99,8 @@ PaymentDetails := ENTITY(FLAT(Invoice rInvoice = UID(InvoiceTransactionID),
 		DATE PolicyReinstatementDate,
 		BOOLEAN IsPaidInFull,
 		DATE PaidInFullDate),
-	MODEL(rInvoice,
+	MODEL(UID,
+		InvoiceTransactionID, PolicyNumber,
 		PaymentReceived{PaymentReceivedMethod, PaymentReceivedType, PaymentReceivedTypeIfOther, TransactionPaymentReceivedPercentage, TotalPaymentReceivedPercentage, PaymentReceivedDate,
 			PolicyInEquityIndicator, IsPaymentPercentageDueNotPaidInFull, IsPaymentClearance, PaymentClearanceIndicatorReason},
 		LatePayment{IsLatePayment, LatePaymentRecognitionDate},
@@ -100,10 +108,11 @@ PaymentDetails := ENTITY(FLAT(Invoice rInvoice = UID(InvoiceTransactionID),
 		PolicyReinstatement{IsPolicyReinstatement, PolicyReinstatementDate},
 		PaidInFull{IsPaidInFull, PaidInFullDate}));
 		
-Agent := ENTITY(FLAT(UID = AgentNationalProducerNumber,
+Agent := ENTITY(FLAT(UID(AgentNationalProducerNumber,Name),
+		INTEGER AgentNationalProducerNumber,
 		STRING Name),
 	MODEL(UID,
-		Name));
+		Name, AgentNationalProducerNumber));
 		
 Agency := ENTITY(FLAT(UID(CompanyProducerNumber),
 		STRING CompanyProducerNumber,
@@ -145,8 +154,9 @@ Individual := ENTITY(FLAT(UID = LexID,
 		PolicyOwnerSpecialProjects{PolicyOwnerExtractExclusion},
 		VendorDateFirstSeen, VendorDateLastSeen));
 
-Trustee := ENTITY(FLAT(UID = OwnerID,
-		// Policy rPolicy=UID(PolicyNumber),
+Trustee := ENTITY(FLAT(UID = ownerid,
+		INTEGER OwnerID,
+		Policy rPolicy=UID(PolicyNumber),
 		INTEGER TrusteeAddressID,
 		STRING TrusteeName,
 		STRING NameIndicator,			// Individual, Business, Turstee (Possibly not required)
@@ -154,8 +164,8 @@ Trustee := ENTITY(FLAT(UID = OwnerID,
 		INTEGER SocialSecurityNumber,
 		INTEGER TaxIdentificationNumber,
 		STRING TrusteeExtractExclusion),
-	MODEL(UID,
-		// rPolicy,
+	MODEL(UID, OwnerID,
+		rPolicy,
 		TrusteeAddressID, NameIndicator, TrusteeName,
 		ReportedEmailAddresses{EmailAddress},
 		ReportedSocialSecurityNumbers{SocialSecurityNumber},
@@ -236,8 +246,8 @@ DriversLicense := ENTITY(FLAT(UID(DriversLicenseNumber,IssuingState),
 	MODEL(UID,
 		DriversLicenseNumber, IssuingState));
 
-AgentCompany := ASSOCIATION(FLAT(Agent Agent, Agency Company = UID(CompanyProducerNumber)));
-AgentPolicy := ASSOCIATION(FLAT(Agent Agent, Policy Policy = UID(PolicyNumber)));
+AgentCompany := ASSOCIATION(FLAT(Agent Agent = UID(AgentNationalProducerNumber,Name), Agency Company = UID(CompanyProducerNumber)));
+AgentPolicy := ASSOCIATION(FLAT(Agent Agent = UID(AgentNationalProducerNumber,Name), Policy Policy = UID(PolicyNumber)));
 AgencyPolicy := ASSOCIATION(FLAT(Agency Company = UID(CompanyProducerNumber), Policy Policy = UID(PolicyNumber)));
 
 IndividualPolicy := ASSOCIATION(FLAT(Individual Person, Policy Policy = UID(PolicyNumber)));
@@ -254,3 +264,5 @@ BusinessPhone := ASSOCIATION(FLAT(Business Company, Phone PhoneNumber));
 BusinessAddress := ASSOCIATION(FLAT(Business Company, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
 
 InvoicePolicy	:= ASSOCIATION(FLAT(Invoice Bill=UID(InvoiceTransactionID), Policy Policy = UID(PolicyNumber)));
+InvoicePaymentDetails := ASSOCIATION(FLAT(Invoice Bill=UID(InvoiceTransactionID), PaymentDetails Payments = UID(InvoiceTransactionID,PolicyNumber)));
+PolicyPaymentDetails := ASSOCIATION(FLAT(Policy Policy=UID(PolicyNumber), PaymentDetails Payments = UID(InvoiceTransactionID,PolicyNumber)));
