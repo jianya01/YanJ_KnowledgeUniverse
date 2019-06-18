@@ -41,6 +41,7 @@ Vehicle: => TotalAge := MAP(ValidFOSD => MAX(((SearchYear - YEAR(FirstOwnerStart
 Vehicle: => SinceLastMileageAge := IF(OldestTitleDate > DateOfLastMileage, ((SearchYear - YEAR(OldestTitleDate)) * MONTHS_IN_YEAR + (SearchMonth - MONTH(OldestTitleDate))) / MONTHS_IN_YEAR, ((SearchYear - YEAR(DateOfLastMileage)) * MONTHS_IN_YEAR + (SearchMonth - MONTH(DateOfLastMileage))) / MONTHS_IN_YEAR);
 
 
+
 // ****************   Helpers for Calculating date and reading for the 2 most recent odo records for COAM, COAM2, COAM3 **************************
 Vehicle: => LastOwnerSequenceNumber := MAX(Owners, SequenceNumber);
 Vehicle: => MostRecentOwnerStartDate := ONLY(Owners(SequenceNumber = rVehicle.LastOwnerSequenceNumber), StartDate);
@@ -74,22 +75,22 @@ Vehicle: => LastMileage2COAM3Yr := ONLY(Events(EventCounter = rVehicle.EventCoun
 
 //  Modeled Annual Mileage
 Vehicle: => ModeledAnnualMileageTmp := ROUND(EstimatedAverageMiles / TotalAge);
-Vehicle: => ModeledAnnualMileage := MAP(((NOT OldestTitleDate:Null) AND (DAYSBETWEEN(OldestTitleDate, SearchDate) <= DAYS_IN_MONTH) OR (NOT FirstOwnerStartDate:Null) AND (DAYSBETWEEN(FirstOwnerStartDate, SearchDate) <= DAYS_IN_MONTH)) AND (ModeledAnnualMileageTmp < 599 * MONTHS_IN_YEAR) => CAP_MODELED_ANNUAL_MILEAGE_1,
-																				YEAR(OldestTitleDate):Null AND INTEGER(SearchYear) < YearMake => CAP_MODELED_ANNUAL_MILEAGE_1,
-																				ModeledAnnualMileageTmp > CAP_MODELED_ANNUAL_MILEAGE_2 => CAP_MODELED_ANNUAL_MILEAGE_2,
-																				YearMake:Null => LVL1_DEFAULT,
+Vehicle: => ModeledAnnualMileage := MAP(YearMake:Null => LVL1_DEFAULT,
 																				YearMake < 1900 => LVL1_DEFAULT,
 																				ModeledAnnualMileageTmp:Null => LVL1_DEFAULT,
+																				((NOT OldestTitleDate:Null) AND (DAYSBETWEEN(OldestTitleDate, SearchDate) <= DAYS_IN_MONTH) OR (NOT FirstOwnerStartDate:Null) AND (DAYSBETWEEN(FirstOwnerStartDate, SearchDate) <= DAYS_IN_MONTH)) AND (ModeledAnnualMileageTmp < 599 * MONTHS_IN_YEAR) => CAP_MODELED_ANNUAL_MILEAGE_1,
+																				YEAR(OldestTitleDate):Null AND INTEGER(SearchYear) < YearMake => CAP_MODELED_ANNUAL_MILEAGE_1,
+																				ModeledAnnualMileageTmp > CAP_MODELED_ANNUAL_MILEAGE_2 => CAP_MODELED_ANNUAL_MILEAGE_2,
 																				ModeledAnnualMileageTmp);
 
 // Blended Annual Mileage
 Vehicle: => EstimatedMilesDrDurBlankYears := IF(ModeledAnnualMileage = LVL1_DEFAULT, 0, SinceLastMileageAge * ModeledAnnualMileage);
 Vehicle: => EstimatedTotalMiles := LastOdometer + EstimatedMilesDrDurBlankYears;
 Vehicle: => BlendedAnnualMileageTmp := ROUND(EstimatedTotalMiles / TotalAge);
-Vehicle: => BlendedAnnualMileage := MAP(BlendedAnnualMileageTmp:Null => ModeledAnnualMileage,
-																				BlendedAnnualMileageTmp > CAP_BLENDED_ANNUAL_MILEAGE => CAP_BLENDED_ANNUAL_MILEAGE,
-																				YearMake:Null => LVL1_DEFAULT,
+Vehicle: => BlendedAnnualMileage := MAP(YearMake:Null => LVL1_DEFAULT,
 																				YearMake < 1900 => LVL1_DEFAULT,
+																				BlendedAnnualMileageTmp:Null => ModeledAnnualMileage,
+																				BlendedAnnualMileageTmp > CAP_BLENDED_ANNUAL_MILEAGE => CAP_BLENDED_ANNUAL_MILEAGE,
 																				BlendedAnnualMileageTmp);
 
 // CurrentOwnerAnnualMileage	
@@ -107,7 +108,7 @@ Vehicle: => CurrentOwnerAnnualMileageTmp := ROUND(ViolationMileageTotal / Violat
 Vehicle: => CurrentOwnerAnnualMileage := MAP(ViolationAgeTotal = -1 => LVL1_DEFAULT,
 																							CurrentOwnerAnnualMileageTmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
 																							CurrentOwnerAnnualMileageTmp);
-			
+
 // CurrentOwnerAnnualMileage2
 Vehicle: => ViolationAgeTotal2Tmp := DAYSBETWEEN(DateOfLastMileage2COAM, DateOfLastMileageCOAM3Yr) / DAYS_IN_1_YEAR;
 Vehicle: => ViolationAgeTotal2 := IF((NOT EstimatedAverageMiles:Null) AND (EstimatedAverageMiles != 0) AND (DateOfLastMileage2COAM < DateOfLastMileageCOAM3Yr) AND (LastMileage2COAM < LastMileageCOAM3Yr), ViolationAgeTotal2Tmp, LVL1_DEFAULT);
