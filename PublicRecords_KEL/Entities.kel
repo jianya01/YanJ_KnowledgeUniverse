@@ -62,9 +62,9 @@ PERMITS Restricted, // 1
 		DPPAGroup27, // 55
 		DirectToConsumer, // 56
 		Utility, // 57
-		Unassigned7, 
-		Unassigned6, 
-		Unassigned5, 
+		Fidelity, //58
+		InfutorMV, //59
+		InfutorWC, // 60
 		Unassigned4, 
 		Unassigned3, 
 		Unassigned2, 
@@ -200,7 +200,6 @@ Bankruptcy := ENTITY(FLAT(UID(TMSID, Court_Code, Case_Number, DID),
 		Deadlines{ DateVendorFirstReported, DateVendorLastReported},
 		CaseDetails{CaseID, DefendantID, DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source}));
-
 
 CriminalOffender := ENTITY(FLAT(UID(OffenderKey),
 		STRING OffenderKey,
@@ -859,6 +858,12 @@ BusinessSele := ENTITY(FLAT(UID(UltID,OrgID,SeleID),
 		STRING GovDebarredExcludingAgency,
 		DATE GovDebarredActiveDate,
 		STRING GovDebarredTerminationDate, // Contains YYYYMMDD OR 'indefinite' thus a STRING data type
+		STRING BestCompanyName,
+		INTEGER BestCompanyNameRank,
+		INTEGER BestSICCode,
+		INTEGER BestSICCodeRank,
+		INTEGER BestNAICSCode,
+		INTEGER BestNAICSCodeRank,
 		DATE DateVendorFirstReported,
 		DATE DateVendorLastReported,
 		BOOLEAN HeaderHitFlag, // This will likely need to be added to more locations based on what our Business Attributes end up needing
@@ -900,9 +905,13 @@ BusinessSele := ENTITY(FLAT(UID(UltID,OrgID,SeleID),
 			RetirementParticipantReceivingCount, RetirementParticipantFutureCount, RetirementReceivingBenefitCount, RetirementParticipantPartiallyVestedCount, RetirementParticipantAccountBalanceCount,
 			RetirementPlanPensionBenefitID, RetirementPlanWelfareBenefitIndicator},
 		ProcessingDates{SOSProcessDate, EBRProcessDate},
+		BestCompanyNames{BestCompanyName, BestCompanyNameRank},
+		BestSICCodes{BestSICCode, BestSICCodeRank},
+		BestNAICSCodes{BestNAICSCode, BestNAICSCodeRank},
 		VendorDates{DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source, HeaderHitFlag}
 		));
+		
 BusinessProx := ENTITY(FLAT(UID(UltID,OrgID,SeleID,ProxID),
 		INTEGER UltID,
 		INTEGER OrgID,
@@ -921,6 +930,12 @@ BusinessProx := ENTITY(FLAT(UID(UltID,OrgID,SeleID,ProxID),
 		STRING HistDunsNumber,
 		STRING DeletedKey,	// Duns numbers deleted by D&B
 		STRING DunsNumber,
+		STRING BestCompanyName,
+		INTEGER BestCompanyNameRank,
+		INTEGER BestSICCode,
+		INTEGER BestSICCodeRank,
+		INTEGER BestNAICSCode,
+		INTEGER BestNAICSCodeRank,
 		DATE DateVendorFirstReported,
 		DATE DateVendorLastReported,
 		STRING Source), 
@@ -928,6 +943,9 @@ BusinessProx := ENTITY(FLAT(UID(UltID,OrgID,SeleID,ProxID),
 		UltID, OrgID, SeleID, ProxID, Legal,
 		ParentProxID, SeleProxID, OrgProxID, UltProxID, LevelsFromTop, NodesBelow, ProxSegment, StoreNumber, ActiveDunsNumber, HistDunsNumber, DunsNumber,
 		DeletedIDNumbers{DeletedKey},
+		BestCompanyNames{BestCompanyName, BestCompanyNameRank},
+		BestSICCodes{BestSICCode, BestSICCodeRank},
+		BestNAICSCodes{BestNAICSCode, BestNAICSCodeRank},
 		VendorDates{DateVendorFirstReported, DateVendorLastReported},
 		DataSources{Source}));
 
@@ -1720,42 +1738,68 @@ TIN := ENTITY(FLAT(UID=TIN,
 		DateVendorFirstReported,
 		DataSources{Source}));		
 
-SeleTIN := ASSOCIATION(FLAT(
-		BusinessSele Legal=UID(UltID,OrgID,SeleID), 
-		TIN ID, 
+// ProxTIN is being added so that Best TaxID can be tracked at the ProxID level. Generally, TaxIDs belong at the SeleID level.
+ProxTIN := ASSOCIATION(FLAT(
+		BusinessProx Site=UID(UltID,OrgID,SeleID, ProxID), 
+		TIN TaxID, 
 		INTEGER UltID,
 		INTEGER OrgID,
 		INTEGER SeleID,
+		INTEGER ProxID,
+		INTEGER BestTIN,
+		INTEGER BestTINRank,
+		STRING Source),
+	MODEL(
+		Site,
+		TaxID,
+		UltID,
+		OrgID,
+		SeleID,
+		ProxID,
+		BestTIN,
+		BestTINRank,
+		DataSources{Source}));
+		
+SeleTIN := ASSOCIATION(FLAT(
+		BusinessSele Legal=UID(UltID,OrgID,SeleID), 
+		TIN TaxID, 
+		INTEGER UltID,
+		INTEGER OrgID,
+		INTEGER SeleID,
+		INTEGER BestTIN,
+		INTEGER BestTINRank,
 		DATE DateVendorLastReported,
 		DATE DateVendorFirstReported,
 		STRING Source),
 	MODEL(
 		Legal,
-		ID,
+		TaxID,
 		UltID,
 		OrgID,
 		SeleID,
+		BestTIN,
+		BestTINRank,
 		DateVendorLastReported,
 		DateVendorFirstReported,
 		DataSources{Source}));
 
 TINPhoneNumber := ASSOCIATION(FLAT(
 		Phone PhoneNumber, 
-		TIN ID, 
+		TIN TaxID, 
 		BOOLEAN IsContactPhone,
 		DATE DateVendorLastReported,
 		DATE DateVendorFirstReported,
 		STRING Source),
 	MODEL(
 		PhoneNumber,
-		ID,
+		TaxID,
 		IsContactPhone,
 		DateVendorLastReported,
 		DateVendorFirstReported,
 		DataSources{Source}));	
 
 TINAddress := ASSOCIATION(FLAT(
-		TIN ID, 
+		TIN TaxID, 
 		Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
 		STRING PrimaryRange,
 		STRING Predirectional,
@@ -1768,7 +1812,7 @@ TINAddress := ASSOCIATION(FLAT(
 		DATE DateVendorFirstReported,
 		STRING Source),
 	MODEL(
-		ID,
+		TaxID,
 		Location,
 		PrimaryRange, 
 		Predirectional, 
@@ -2351,6 +2395,20 @@ ProxAddress := ASSOCIATION(FLAT(
 		ZipCode ZIP5,
 		STRING SICCode, 
 		STRING NAICSCode, 
+		STRING BestPrimaryRange,
+		STRING BestPredirectional,
+		STRING BestPrimaryName,
+		STRING BestSuffix,
+		STRING BestPostdirectional,
+		STRING BestUnitDesignation,
+		STRING BestSecondaryRange,
+		STRING BestPostalCity,
+		STRING BestVanityCity,
+		STRING BestState,
+		ZipCode BestZip5,
+		INTEGER BestZip4,
+		STRING BestCounty,
+		INTEGER BestAddressRank,		
 		DATE DateFirstSeenCompanyAddress, 
 		DATE DateLastSeenCompanyAddress, 
 		STRING Source),
@@ -2366,8 +2424,48 @@ ProxAddress := ASSOCIATION(FLAT(
 		ZIP5, 
 		SICCodes{SICCode, Source},
 		NAICSCodes{NAICSCode, Source},
+		BestAddresses{BestPrimaryRange, BestPredirectional, BestPrimaryName, BestSuffix, BestPostdirectional, BestUnitDesignation, BestSecondaryRange, BestPostalCity, BestVanityCity, BestState, BestZip5, BestZip4, BestCounty, BestAddressRank},
 		DateFirstSeenCompanyAddress,
 		DateLastSeenCompanyAddress, 
+		DataSources{Source}));
+
+// SeleAddress is being added so that Best Address can be tracked at the SeleID level. Generally, Phones belong at the ProxID level.
+SeleAddress := ASSOCIATION(FLAT(
+		BusinessSele Legal=UID(UltID,OrgID,SeleID), 
+		Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
+		STRING PrimaryRange,
+		STRING Predirectional,
+		STRING PrimaryName,
+		STRING Suffix,
+		STRING Postdirectional,
+		STRING SecondaryRange,
+		ZipCode ZIP5,
+		STRING BestPrimaryRange,
+		STRING BestPredirectional,
+		STRING BestPrimaryName,
+		STRING BestSuffix,
+		STRING BestPostdirectional,
+		STRING BestUnitDesignation,
+		STRING BestSecondaryRange,
+		STRING BestPostalCity,
+		STRING BestVanityCity,
+		STRING BestState,
+		ZipCode BestZip5,
+		INTEGER BestZip4,
+		STRING BestCounty,
+		INTEGER BestAddressRank,
+		STRING Source),
+	MODEL(
+		Legal,
+		Location,
+		PrimaryRange, 
+		Predirectional, 
+		PrimaryName, 
+		Suffix, 
+		Postdirectional,
+		SecondaryRange,
+		ZIP5, 
+		BestAddresses{BestPrimaryRange, BestPredirectional, BestPrimaryName, BestSuffix, BestPostdirectional, BestUnitDesignation, BestSecondaryRange, BestPostalCity, BestVanityCity, BestState, BestZip5, BestZip4, BestCounty, BestAddressRank},
 		DataSources{Source}));
 		
 ProxPhoneNumber := ASSOCIATION(FLAT(
@@ -2375,14 +2473,32 @@ ProxPhoneNumber := ASSOCIATION(FLAT(
 		Phone PhoneNumber, 
 		STRING SICCode, 
 		STRING NAICSCode, 
+		STRING BestPhone,
+		INTEGER BestPhoneRank,		
 		STRING Source),
 	MODEL(
 		Site,
 		PhoneNumber,
+		BestPhone,
+		BestPhoneRank,		
 		SICCodes{SICCode, Source},
 		NAICSCodes{NAICSCode, Source},
 		DataSources{Source}));
-		
+
+// SelePhoneNumber is being added so that Best Phone can be tracked at the SeleID level. Generally, Phones belong at the ProxID level.
+SelePhoneNumber := ASSOCIATION(FLAT(
+		BusinessSele Legal=UID(UltID,OrgID,SeleID),
+		Phone PhoneNumber, 
+		STRING BestPhone,
+		INTEGER BestPhoneRank,
+		STRING Source),
+	MODEL(
+		Legal,
+		PhoneNumber,
+		BestPhone,
+		BestPhoneRank,
+		DataSources{Source}));
+
 SeleWatercraft := ASSOCIATION(FLAT(
 		BusinessSele Legal=UID(UltID,OrgID,SeleID), 
 		Watercraft WCraft=UID(WatercraftKey),
