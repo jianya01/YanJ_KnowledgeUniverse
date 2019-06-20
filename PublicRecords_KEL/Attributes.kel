@@ -36,6 +36,7 @@ FUNCTION: SourceGroup(STRING RawSource) <= ECL(PublicRecords_KEL.ECL_Functions.C
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
 Aircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
 Bankruptcy: => CurrentDate := MIN(GETBUILDDATE('bankruptcy_daily'), CURRENTDATE());
+PersonBankruptcy: => CurrentDate := MIN(GETBUILDDATE('bankruptcy_daily'), CURRENTDATE());
 Business: => CurrentDate := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
 CriminalOffense: => CurrentDate := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
 CriminalOffender: => CurrentDate := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
@@ -1065,79 +1066,93 @@ Bankruptcy: FIVE_YEARS_IN_DAYS := 1826;
 Bankruptcy: SIX_YEARS_IN_DAYS := 2191;
 Bankruptcy: SEVEN_YEARS_IN_DAYS := 2556;
 Bankruptcy: TEN_YEARS_IN_DAYS := 3652;
+
+// Secondary sort logic for picking best child record.
+Bankruptcy.Records: => ChildSortList := MAP( 
+			Disposition:Null => 1,
+			Disposition = 'Dismissed' => 2,
+			Disposition = 'Discharged' => 3,
+			Disposition = 'Discharge NA' => 4,
+			Disposition = 'Discharge Granted' => 5,
+			Disposition = 'Closed' => 6,			
+			7
+			); 
+// Create submodel that will only populate the best child.
+Bankruptcy: => BestChildRecord := TOPN(Records,1,-Records.DateFiled,-Records.LastStatusUpdate, Records.ChildSortList);
+
 Bankruptcy: => HasCaseNumber := TRIMALL(CaseNumber) <> '' AND NOT CaseNumber:Null;
-Bankruptcy.Records: => IsDebtor := NameType IN ['D'];
-Bankruptcy.Records: => TMSID := Bankruptcy.TMSID; 
-Bankruptcy.Records: => CourtCode := Bankruptcy.CourtCode; 
-Bankruptcy.Records: => CaseNumber := Bankruptcy.CaseNumber; 
-Bankruptcy.Records: => BankruptcyDate := CaseNumber:DateFirstSeen;	
-Bankruptcy.Records: => FilingAgeInDays := ABSDAYSBETWEEN(BankruptcyDate, CurrentDate);
-Bankruptcy.Records: => ChapterType := OriginalChapter IN ['7','11','12','13','15'];
-Bankruptcy.Records: => Chapter7 := OriginalChapter = '7';
-Bankruptcy.Records: => Chapter11 := OriginalChapter = '11';
-Bankruptcy.Records: => Chapter12 := OriginalChapter = '12';
-Bankruptcy.Records: => Chapter13 := OriginalChapter = '13';
-Bankruptcy.Records: => Chapter15 := OriginalChapter = '15';
-Bankruptcy.Records: => IsBankruptcy := HasCaseNumber AND IsDebtor AND CaseDetails.CaseID <> '';
-Bankruptcy.Records: => IsDisposed := NOT Disposition:Null;
-Bankruptcy.Records: => Banko1Year := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null);
-Bankruptcy.Records: => Banko7Year := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null);
-Bankruptcy.Records: => Banko10Year := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null);
-Person: => Ch7Cnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko1Year AND Records.Chapter7)), 0, 99);			
-Person: => Ch7Cnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko7Year AND Records.Chapter7)), 0, 999);
-Person: => Ch7Cnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko10Year AND Records.Chapter7)), 0, 999);
-Person: => Ch13Cnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko1Year AND Records.Chapter13)), 0, 99);			
-Person: => Ch13Cnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko7Year AND Records.Chapter13)), 0, 999);
-Person: => Ch13Cnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko10Year AND Records.Chapter13)), 0, 999);
-Person: => BkCnt1yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko1Year AND NOT Records.ChapterType)), 0, 99);	
-Person: => BkCnt7yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko7Year AND NOT Records.ChapterType)), 0, 99);
-Person: => BkCnt10yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko10Year AND NOT Records.ChapterType)), 0, 99);
-Person: => Top1Chapter1YListWithNull := TOPN(PersonBankruptcy.Bankrupt(Records.Banko1Year){OriginalChapter:=Records.OriginalChapter, Records.TMSID,Records.CaseNumber,Records.CourtCode, Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => Top1Chapter7YListWithNull := TOPN(PersonBankruptcy.Bankrupt(Records.Banko7Year){OriginalChapter:=Records.OriginalChapter, Records.TMSID,Records.CaseNumber,Records.CourtCode, Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => Top1Chapter10YListWithNull := TOPN(PersonBankruptcy.Bankrupt(Records.Banko10Year){OriginalChapter:=Records.OriginalChapter, Records.TMSID,Records.CaseNumber,Records.CourtCode, Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => Top1Chapter1YList := TOPN(PersonBankruptcy.Bankrupt(Records.Banko1Year AND NOT Records.OriginalChapter:Null){OriginalChapter:=IF(Records.OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97_INT,Records.OriginalChapter), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => Top1Chapter7YList := TOPN(PersonBankruptcy.Bankrupt(Records.Banko7Year AND NOT Records.OriginalChapter:Null){OriginalChapter:=IF(Records.OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97_INT,Records.OriginalChapter), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => Top1Chapter10YList := TOPN(PersonBankruptcy.Bankrupt(Records.Banko10Year AND NOT Records.OriginalChapter:Null){OriginalChapter:=IF(Records.OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97_INT,Records.OriginalChapter), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Bankruptcy.BestChildRecord: => TMSID := Bankruptcy.TMSID; 
+Bankruptcy.BestChildRecord: => CourtCode := Bankruptcy.CourtCode; 
+Bankruptcy.BestChildRecord: => CaseNumber := Bankruptcy.CaseNumber; 
+Bankruptcy.BestChildRecord: => BankruptcyDate := Bankruptcy.CaseNumber:DateFirstSeen;	
+Bankruptcy.BestChildRecord: => FilingAgeInDays := ABSDAYSBETWEEN(DateFiled, Bankruptcy.CurrentDate);
+Bankruptcy.BestChildRecord: => StatusUpdateAgeInDays := ABSDAYSBETWEEN(LastStatusUpdate, Bankruptcy.CurrentDate);
+Bankruptcy.BestChildRecord: => ChapterType := OriginalChapter IN ['7','11','12','13','15'];
+Bankruptcy.BestChildRecord: => Chapter7 := OriginalChapter = '7';
+Bankruptcy.BestChildRecord: => Chapter11 := OriginalChapter = '11';
+Bankruptcy.BestChildRecord: => Chapter12 := OriginalChapter = '12';
+Bankruptcy.BestChildRecord: => Chapter13 := OriginalChapter = '13';
+Bankruptcy.BestChildRecord: => Chapter15 := OriginalChapter = '15';
+Bankruptcy.BestChildRecord: => IsBankruptcy := Bankruptcy.HasCaseNumber AND EXISTS(CaseDetails(CaseID <> ''));
+Bankruptcy.BestChildRecord: => IsDisposed := NOT Disposition:Null;
+Bankruptcy.BestChildRecord: => Banko1Year := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null);
+Bankruptcy.BestChildRecord: => Banko7Year := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null);
+Bankruptcy.BestChildRecord: => Banko10Year := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null);
+Person: => Ch7Cnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.Chapter7)), 0, 99);			
+Person: => Ch7Cnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.Chapter7)), 0, 999);
+Person: => Ch7Cnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.Chapter7)), 0, 999);
+Person: => Ch13Cnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.Chapter13)), 0, 99);			
+Person: => Ch13Cnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.Chapter13)), 0, 999);
+Person: => Ch13Cnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.Chapter13)), 0, 999);
+Person: => BkCnt1yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND NOT BestChildRecord.ChapterType)), 0, 99);	
+Person: => BkCnt7yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND NOT BestChildRecord.ChapterType)), 0, 99);
+Person: => BkCnt10yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND NOT BestChildRecord.ChapterType)), 0, 99);
+Person: => Top1Chapter1YListWithNull := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){OriginalChapter:=BestChildRecord.OriginalChapter, BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => Top1Chapter7YListWithNull := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){OriginalChapter:=BestChildRecord.OriginalChapter, BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => Top1Chapter10YListWithNull := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){OriginalChapter:=BestChildRecord.OriginalChapter, BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => Top1Chapter1YList := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND NOT BestChildRecord.OriginalChapter:Null){OriginalChapter:=IF(BestChildRecord.OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97_INT,BestChildRecord.OriginalChapter), BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => Top1Chapter7YList := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND NOT BestChildRecord.OriginalChapter:Null){OriginalChapter:=IF(BestChildRecord.OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97_INT,BestChildRecord.OriginalChapter), BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => Top1Chapter10YList := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND NOT BestChildRecord.OriginalChapter:Null){OriginalChapter:=IF(BestChildRecord.OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97_INT,BestChildRecord.OriginalChapter), BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
 Person: => MostRecentChapter1YWithNull := ONLY(Top1Chapter1YListWithNull,OriginalChapter);
 Person: => MostRecentChapter7YWithNull := ONLY(Top1Chapter7YListWithNull,OriginalChapter);
 Person: => MostRecentChapter10YWithNull := ONLY(Top1Chapter10YListWithNull,OriginalChapter);
-Person: => MostRecentChapter1YList := TOPN(PersonBankruptcy.Bankrupt.Records(Banko1Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => MostRecentChapter7YList := TOPN(PersonBankruptcy.Bankrupt.Records(Banko7Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => MostRecentChapter10YList := TOPN(PersonBankruptcy.Bankrupt.Records(Banko10Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => MostRecentChapter1YList := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => MostRecentChapter7YList := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => MostRecentChapter10YList := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
 Person: => MostRecentChapter1Y := ONLY(MostRecentChapter1YList,OriginalChapter);
 Person: => MostRecentChapter7Y := ONLY(MostRecentChapter7YList,OriginalChapter);
 Person: => MostRecentChapter10Y := ONLY(MostRecentChapter10YList,OriginalChapter);
-Person: => Top1DtOfBksList1YWithNull := TOPN(PersonBankruptcy.Bankrupt(Records.Banko1Year){BankruptcyDateWithNull:=IF(Records.BankruptcyDate:Null, Bankruptcy.NO_DATA_FOUND_97,STRING(Records.BankruptcyDate)),Records.TMSID,Records.CaseNumber,Records.CourtCode, Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => Top1DtOfBksList7YWithNull := TOPN(PersonBankruptcy.Bankrupt(Records.Banko7Year){BankruptcyDateWithNull:=IF(Records.BankruptcyDate:Null, Bankruptcy.NO_DATA_FOUND_97,STRING(Records.BankruptcyDate)),Records.TMSID,Records.CaseNumber,Records.CourtCode, Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => Top1DtOfBksList10YWithNull := TOPN(PersonBankruptcy.Bankrupt(Records.Banko10Year){BankruptcyDateWithNull:=IF(Records.BankruptcyDate:Null, Bankruptcy.NO_DATA_FOUND_97,STRING(Records.BankruptcyDate)),Records.TMSID,Records.CaseNumber,Records.CourtCode, Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => Top1DtOfBksList1YWithNull := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){BankruptcyDateWithNull:=IF(BestChildRecord.BankruptcyDate:Null, Bankruptcy.NO_DATA_FOUND_97,STRING(BestChildRecord.BankruptcyDate)),BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => Top1DtOfBksList7YWithNull := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){BankruptcyDateWithNull:=IF(BestChildRecord.BankruptcyDate:Null, Bankruptcy.NO_DATA_FOUND_97,STRING(BestChildRecord.BankruptcyDate)),BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => Top1DtOfBksList10YWithNull := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){BankruptcyDateWithNull:=IF(BestChildRecord.BankruptcyDate:Null, Bankruptcy.NO_DATA_FOUND_97,STRING(BestChildRecord.BankruptcyDate)),BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
 Person: => MostRecentDtOfBks1YWithNull := ONLY(Top1DtOfBksList1YWithNull,BankruptcyDateWithNull);
 Person: => MostRecentDtOfBks7YWithNull := ONLY(Top1DtOfBksList7YWithNull,BankruptcyDateWithNull);
 Person: => MostRecentDtOfBks10YWithNull := ONLY(Top1DtOfBksList10YWithNull,BankruptcyDateWithNull);
-Person: => BkCnt1YFilingTypeAllNull := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko1Year AND Records.FilingType:Null)), 0, 99);	
-Person: => BkCnt7YFilingTypeAllNull := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko7Year AND Records.FilingType:Null)), 0, 999);	
-Person: => BkCnt10YFilingTypeAllNull := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko10Year AND Records.FilingType:Null)), 0, 999);	
-Person: => BkCnt1YBusinessType := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko1Year AND Records.FilingType = 'B')), 0, 99);	
-Person: => BkCnt7YBusinessType := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko7Year AND Records.FilingType = 'B')), 0, 999);	
-Person: => BkCnt10YBusinessType := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko10Year AND Records.FilingType = 'B')), 0, 999);	
-Bankruptcy.Records: => Banko1YearUpdateFilter := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null AND NOT Records.LastStatusUpdate:Null AND Records.LastStatusUpdate <= CurrentDate);
-Bankruptcy.Records: => Banko7YearUpdateFilter := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null AND NOT Records.LastStatusUpdate:Null AND Records.LastStatusUpdate <= CurrentDate);
-Bankruptcy.Records: => Banko10YearUpdateFilter := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null AND NOT Records.LastStatusUpdate:Null AND Records.LastStatusUpdate <= CurrentDate);
-Person: => MostRecentUpdateBks1Y := TOPN(PersonBankruptcy.Bankrupt.Records(Banko1YearUpdateFilter){BankruptcyDate,LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => MostRecentUpdateBks7Y := TOPN(PersonBankruptcy.Bankrupt.Records(Banko7YearUpdateFilter){BankruptcyDate,LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => MostRecentUpdateBks10Y := TOPN(PersonBankruptcy.Bankrupt.Records(Banko10YearUpdateFilter){BankruptcyDate,LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => BkCnt1YFilingTypeAllNull := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.FilingType:Null)), 0, 99);	
+Person: => BkCnt7YFilingTypeAllNull := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.FilingType:Null)), 0, 999);	
+Person: => BkCnt10YFilingTypeAllNull := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.FilingType:Null)), 0, 999);	
+Person: => BkCnt1YBusinessType := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.FilingType = 'B')), 0, 99);	
+Person: => BkCnt7YBusinessType := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.FilingType = 'B')), 0, 999);	
+Person: => BkCnt10YBusinessType := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.FilingType = 'B')), 0, 999);	
+Bankruptcy.BestChildRecord: => Banko1YearUpdateFilter := (IsBankruptcy AND StatusUpdateAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT LastStatusUpdate:Null AND LastStatusUpdate <= Bankruptcy.CurrentDate);
+Bankruptcy.BestChildRecord: => Banko7YearUpdateFilter := (IsBankruptcy AND StatusUpdateAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT LastStatusUpdate:Null AND LastStatusUpdate <= Bankruptcy.CurrentDate);
+Bankruptcy.BestChildRecord: => Banko10YearUpdateFilter := (IsBankruptcy AND StatusUpdateAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT LastStatusUpdate:Null AND LastStatusUpdate <= Bankruptcy.CurrentDate);
+Person: => MostRecentUpdateBks1Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1YearUpdateFilter){BankruptcyDate,LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => MostRecentUpdateBks7Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7YearUpdateFilter){BankruptcyDate,LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => MostRecentUpdateBks10Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10YearUpdateFilter){BankruptcyDate,LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
 Person: => MostRecentUpdate1Y := ONLY(MostRecentUpdateBks1Y,STRING(LastStatusUpdate));
 Person: => MostRecentUpdate7Y := ONLY(MostRecentUpdateBks7Y,STRING(LastStatusUpdate));
 Person: => MostRecentUpdate10Y := ONLY(MostRecentUpdateBks10Y,STRING(LastStatusUpdate));
-Bankruptcy.Records: => ModifiedDisposition := MAP(
+Bankruptcy.BestChildRecord: => ModifiedDisposition := MAP(
 			(EditDistance('DISCHARGED', UPCASE(TRIMALL(Disposition))) <= 3) => 'DISCHARGED',
 			(EditDistance('DISMISSED', UPCASE(TRIMALL(Disposition))) <= 3) => 'DISMISSED',
 			(EditDistance('WITHDRAWN', UPCASE(TRIMALL(Disposition))) <= 3) => 'WITHDRAWN',
 			(EditDistance('SPLIT_OUT', UPCASE(TRIMALL(Disposition))) <= 3) => 'SPLIT_OUT',
 			NO_DATA_FOUND_97
 			); 
-Person: => MostRecentDispoList1Y := TOPN(PersonBankruptcy.Bankrupt(Records.Banko1Year){ModDisposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,Records.ModifiedDisposition), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => MostRecentDispoList7Y := TOPN(PersonBankruptcy.Bankrupt(Records.Banko7Year){ModDisposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,Records.ModifiedDisposition), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
-Person: => MostRecentDispoList10Y := TOPN(PersonBankruptcy.Bankrupt(Records.Banko10Year){ModDisposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,Records.ModifiedDisposition), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled); 
+Person: => MostRecentDispoList1Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){ModDisposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,BestChildRecord.ModifiedDisposition), BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => MostRecentDispoList7Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){ModDisposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,BestChildRecord.ModifiedDisposition), BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+Person: => MostRecentDispoList10Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){ModDisposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,BestChildRecord.ModifiedDisposition), BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled); 
 Person: => MostRecentDispo1Y := ONLY(MostRecentDispoList1Y,ModDisposition);
 Person: => MostRecentDispo7Y := ONLY(MostRecentDispoList7Y,ModDisposition);
 Person: => MostRecentDispo10Y := ONLY(MostRecentDispoList10Y,ModDisposition);
@@ -1148,27 +1163,27 @@ Person: => MostRecentDispoDte10Y := ONLY(MostRecentDispoList10Y,STRING(Bankruptc
 ////////////////////////////////////
 // Bankruptcy Attributes
 ////////////////////////////////////
-Person: => BkCnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko1Year)), 0, 99);			
-Person: => BkCnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko7Year)), 0, 999);
-Person: => BkCnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko10Year)), 0, 999);
-Person: => DtOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt.Records(Banko1Year){TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => DtOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt.Records(Banko7Year){TMSID,CaseNumber,CourtCode,BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => DtOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt.Records(Banko10Year){TMSID,CaseNumber,CourtCode,BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => BkNew1Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.Records(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkNew7Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.Records(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkNew10Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.Records(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkOld1Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.Records(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkOld7Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.Records(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkOld10Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.Records(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => MonSinceNewestBkCnt1Y := IF(BkNew1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew1Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 12));	
-Person: => MonSinceNewestBkCnt7Y := IF(BkNew7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew7Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 84));	
-Person: => MonSinceNewestBkCnt10Y := IF(BkNew10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew10Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 120));	
-Person: => MonSinceOldestBkCnt1Y := IF(BkOld1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld1Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 12));	
-Person: => MonSinceOldestBkCnt7Y := IF(BkOld7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld7Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 84));	
-Person: => MonSinceOldestBkCnt10Y := IF(BkOld10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld10Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 120));	
-Person: => ChForBksList1Y := TOPN(PersonBankruptcy.Bankrupt.Records(Banko1Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => ChForBksList7Y := TOPN(PersonBankruptcy.Bankrupt.Records(Banko7Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => ChForBksList10Y := TOPN(PersonBankruptcy.Bankrupt.Records(Banko10Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => BkCnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year)), 0, 99);			
+Person: => BkCnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year)), 0, 999);
+Person: => BkCnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year)), 0, 999);
+Person: => DtOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => DtOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => DtOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => BkNew1Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkNew7Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkNew10Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkOld1Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkOld7Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => BkOld10Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => MonSinceNewestBkCnt1Y := IF(BkNew1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew1Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 12));	
+Person: => MonSinceNewestBkCnt7Y := IF(BkNew7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew7Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 84));	
+Person: => MonSinceNewestBkCnt10Y := IF(BkNew10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew10Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 120));	
+Person: => MonSinceOldestBkCnt1Y := IF(BkOld1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld1Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 12));	
+Person: => MonSinceOldestBkCnt7Y := IF(BkOld7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld7Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 84));	
+Person: => MonSinceOldestBkCnt10Y := IF(BkOld10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld10Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 120));	
+Person: => ChForBksList1Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => ChForBksList7Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => ChForBksList10Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
 Person: => BkWithNewestDateCh1Y := MAP(
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			MostRecentChapter1YWithNull = Bankruptcy.NO_DATA_FOUND_97_INT => Bankruptcy.NO_DATA_FOUND_97_INT,
@@ -1244,18 +1259,9 @@ Person: => MonSinceNewestBkUpdateCnt10Y := MAP(
 			(MostRecentUpdate10Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentUpdate10Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 120)
 			); 
-/*For the following 3 attributes, there is a quirk when applying TOPN to ascending and descending lists when there is only one 
-record and that record has several child records.  The child record is re-sorted incorrectly.  
-This only happen if there 1 record with multiple child records.  Less than .005% of the times this happens.*/
-Person: => DispOfBksList1Y := IF(BkCnt1Y = 1, 
-		TOPN(PersonBankruptcy.Bankrupt(Records.Banko1Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled),
-		TOPN(PersonBankruptcy.Bankrupt(Records.Banko1Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled));
-Person: => DispOfBksList7Y := IF(BkCnt7Y = 1,
-		TOPN(PersonBankruptcy.Bankrupt(Records.Banko7Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled),
-		TOPN(PersonBankruptcy.Bankrupt(Records.Banko7Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled));
-Person: => DispOfBksList10Y := IF(BkCnt10Y = 1,
-		TOPN(PersonBankruptcy.Bankrupt(Records.Banko10Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled),
-		TOPN(PersonBankruptcy.Bankrupt(Records.Banko10Year){Disposition:=IF(Records.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(Records.Disposition))), Records.BankruptcyDate, Records.LastStatusUpdate, Records.DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled));
+Person: => DispOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => DispOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => DispOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
 Person: => BkWithNewestDateDisp1Y := MAP(
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo1Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
@@ -1283,54 +1289,54 @@ Person: => DispOfNewestBkDt10Y := MAP(
 Person: => MonSinceDispOfNewestBkCnt1Y := MAP(
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo1Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
-			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentDispoDte1Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 12)
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentDispoDte1Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 12)
 			); 	
 Person: => MonSinceDispOfNewestBkCnt7Y := MAP(
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo7Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
-			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentDispoDte7Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 84)
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentDispoDte7Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 84)
 			); 
 Person: => MonSinceDispOfNewestBkCnt10Y := MAP(
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo10Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
-			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentDispoDte10Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 120)
-			); 
-Person: => BkDisposedCnt1Y := IF((BkCnt1Y = 0), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko1Year AND Records.IsDisposed)), 0, 99));
-Person: => BkDisposedCnt7Y := IF((BkCnt7Y = 0), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko7Year AND Records.IsDisposed)), 0, 999));
-Person: => BkDisposedCnt10Y := IF((BkCnt10Y = 0), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko10Year AND Records.IsDisposed)), 0, 999));
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentDispoDte10Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 120)
+			); 			
+Person: => BkDisposedCnt1Y := IF((BkCnt1Y = 0), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.IsDisposed)), 0, 99));
+Person: => BkDisposedCnt7Y := IF((BkCnt7Y = 0), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.IsDisposed)), 0, 999));
+Person: => BkDisposedCnt10Y := IF((BkCnt10Y = 0), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.IsDisposed)), 0, 999));
 Person: => BkDismissedCnt1Y := MAP(
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt1Y > 0 AND BkDisposedCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko1Year AND Records.ModifiedDisposition = 'DISMISSED')), 0, 99)
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.ModifiedDisposition = 'DISMISSED')), 0, 99)
 			); 
 Person: => BkDismissedCnt7Y := MAP(
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt7Y > 0 AND BkDisposedCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko7Year AND Records.ModifiedDisposition = 'DISMISSED')), 0, 999)
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.ModifiedDisposition = 'DISMISSED')), 0, 999)
 			); 
 Person: => BkDismissedCnt10Y := MAP(
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt10Y > 0 AND BkDisposedCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko10Year AND Records.ModifiedDisposition = 'DISMISSED')), 0, 999)
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.ModifiedDisposition = 'DISMISSED')), 0, 999)
 			); 
 Person: => BkDischargedCnt1Y := MAP(
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt1Y > 0 AND BkDisposedCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko1Year AND Records.ModifiedDisposition = 'DISCHARGED')), 0, 99)
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.ModifiedDisposition = 'DISCHARGED')), 0, 99)
 			);
 Person: => BkDischargedCnt7Y := MAP(
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt7Y > 0 AND BkDisposedCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko7Year AND Records.ModifiedDisposition = 'DISCHARGED')), 0, 999)
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.ModifiedDisposition = 'DISCHARGED')), 0, 999)
 			); 
 Person: => BkDischargedCnt10Y := MAP(
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt10Y > 0 AND BkDisposedCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Records.Banko10Year AND Records.ModifiedDisposition = 'DISCHARGED')), 0, 999)
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.ModifiedDisposition = 'DISCHARGED')), 0, 999)
 			); 
-Person: => TypeOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt.Records(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);			
-Person: => TypeOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt.Records(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);			
-Person: => TypeOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt.Records(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);		
+Person: => TypeOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);			
+Person: => TypeOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);			
+Person: => TypeOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);		
 Person: => BkHavingBusTypeFlag1Y := MAP(
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt1Y > 0 AND BkCnt1Y = BkCnt1YFilingTypeAllNull) => Bankruptcy.NO_DATA_FOUND_97_INT,
