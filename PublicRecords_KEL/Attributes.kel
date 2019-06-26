@@ -69,9 +69,20 @@ InputPII: => CityStateZipNotPopulated := CityStateZipNotPopulatedCheck(InputCity
 InputPII: => CleanCityStateZipNotPopulated := CityStateZipNotPopulatedCheck(InputCityClean, InputStateClean, InputZip5Clean);
 InputPII: => NameNotPopulated := IF(NameNotPopulatedCheck(InputFirstNameEcho, InputMiddleNameEcho, InputLastNameEcho), TRUE, FALSE);
 
+Vehicle: MISSING_INPUT_DATA_INT := -99999;
+Vehicle: NO_DATA_FOUND_INT := -99998;
+Vehicle: MISSING_INPUT_DATA := '-99999';
+Vehicle: NO_DATA_FOUND := '-99998';
+Vehicle: REC_FOUND_BUT_INVALID :=  '-99997';
+Vehicle: REC_FOUND_BUT_INVALID_INT :=  -99997;
+
+CriminalOffense: MISSING_INPUT_DATA := '-99999';
+CriminalOffense: MISSING_INPUT_DATA_INT := -99999;
 CriminalOffense: NO_DATA_FOUND_CRIM := '-99998';
 CriminalOffense: NO_DATA_FOUND_CRIM_INT := -99998;
 
+Bankruptcy: MISSING_INPUT_DATA := '-99999';
+Bankruptcy: MISSING_INPUT_DATA_INT := -99999;
 Bankruptcy: NO_DATA_FOUND_BANKRUPTCY := '-99998';
 Bankruptcy: NO_DATA_FOUND_BANKRUPTCY_INT := -99998;
 Bankruptcy: NO_DATA_FOUND_97_INT := -99997;
@@ -900,12 +911,6 @@ Person: => LexIDSeen := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
    /////////////////////////////
    //Vehicle Helper Attributes//
    /////////////////////////////
-Vehicle: MISSING_INPUT_DATA_INT := -99999;
-Vehicle: NO_DATA_FOUND_INT := -99998;
-Vehicle: MISSING_INPUT_DATA := '-99999';
-Vehicle: NO_DATA_FOUND := '-99998';
-Vehicle: REC_FOUND_BUT_INVALID :=  '-99997';
-Vehicle: REC_FOUND_BUT_INVALID_INT :=  -99997;
 Vehicle: TEN_YEARS_IN_DAYS := 3652;
 Vehicle: TWO_YEARS_IN_DAYS := 730;
 PersonVehicle.Registration: => RegistrationCurrentDate := CurrentDate ;
@@ -976,61 +981,110 @@ CriminalOffense.OffenseCharges: => DismissedCharges := IF(CourtDispositionDescri
 CriminalOffense.OffenseCharges: => IsFelony := NOT DismissedCharges AND IF(OffenseScore:Null,FALSE, OffenseScore = 'F') AND (RecentOffenderLevel = '4' OR RecentOffenderLevel:Null);
 CriminalOffense.OffenseCharges: => AgeInDays := ABSDAYSBETWEEN(CriminalDate , CurrentDate);
 
-Person: => FelonyCnt1Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99);
-Person: => FelonyCnt7Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999);
-Person: => FelonyNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => FelonyOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => FelonyNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => FelonyOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestFelonyCnt1Y := IF(FelonyNew1Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyNew1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
-Person: => MonSinceOldestFelonyCnt1Y := IF(FelonyOld1Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyOld1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
-Person: => MonSinceNewestFelonyCnt7Y := IF(FelonyNew7Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyNew7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
-Person: => MonSinceOldestFelonyCnt7Y := IF(FelonyOld7Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyOld7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
+Person: => FelonyCnt1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99));
+Person: => FelonyCnt7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999));
+Person: => FelonyNew1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => FelonyOld1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => FelonyNew7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => FelonyOld7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => MonSinceNewestFelonyCnt1Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			FelonyNew1Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyNew1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
+Person: => MonSinceOldestFelonyCnt1Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			FelonyOld1Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyOld1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
+Person: => MonSinceNewestFelonyCnt7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			FelonyNew7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyNew7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
+Person: => MonSinceOldestFelonyCnt7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			FelonyOld7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(FelonyOld7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
 
 //Person Attributes Derog - Criminal History - NonFelony
 CriminalOffense.OffenseCharges: => IsNonFelonyRecords := NOT DismissedCharges AND NOT OffenseScore = 'F'; 
 
-Person: => NonFelonyCnt1Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99);
-Person: => NonfelonyCnt7Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999);
-Person: => NonfelonyNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => NonfelonyOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => NonfelonyNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => NonfelonyOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestNonfelonyCnt1Y := IF(NonfelonyNew1Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyNew1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
-Person: => MonSinceOldestNonfelonyCnt1Y := IF(NonfelonyOld1Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyOld1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
-Person: => MonSinceNewestNonfelonyCnt7Y := IF(NonfelonyNew7Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyNew7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
-Person: => MonSinceOldestNonfelonyCnt7Y := IF(NonfelonyOld7Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyOld7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
+Person: => NonFelonyCnt1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99));
+Person: => NonfelonyCnt7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999));
+Person: => NonfelonyNew1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => NonfelonyOld1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => NonfelonyNew7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => NonfelonyOld7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => MonSinceNewestNonfelonyCnt1Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			NonfelonyNew1Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyNew1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
+Person: => MonSinceOldestNonfelonyCnt1Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			NonfelonyOld1Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyOld1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
+Person: => MonSinceNewestNonfelonyCnt7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			NonfelonyNew7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyNew7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
+Person: => MonSinceOldestNonfelonyCnt7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			NonfelonyOld7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(NonfelonyOld7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
 
 //Person Attributes Derog - Criminal History - Arrest
 CriminalOffense.OffenseCharges: => IsArrest := DataType = '5';
 
-Person: => ArrestCnt1Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99);
-Person: => ArrestCnt7Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999);
-Person: => ArrestNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => ArrestOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => ArrestNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => ArrestOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestArrestCnt1Y := IF(ArrestNew1Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestNew1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
-Person: => MonSinceOldestArrestCnt1Y := IF(ArrestOld1Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestOld1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
-Person: => MonSinceNewestArrestCnt7Y := IF(ArrestNew7Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestNew7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
-Person: => MonSinceOldestArrestCnt7Y := IF(ArrestOld7Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestOld7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
+Person: => ArrestCnt1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99));
+Person: => ArrestCnt7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999));
+Person: => ArrestNew1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => ArrestOld1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => ArrestNew7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => ArrestOld7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => MonSinceNewestArrestCnt1Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			ArrestNew1Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestNew1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
+Person: => MonSinceOldestArrestCnt1Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			ArrestOld1Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestOld1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
+Person: => MonSinceNewestArrestCnt7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			ArrestNew7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestNew7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
+Person: => MonSinceOldestArrestCnt7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			ArrestOld7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(ArrestOld7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
 
 //Person Attributes Derog - Criminal History - Criminal Conviction
 CriminalOffense.OffenseCharges: => IsCriminalCount := NOT DismissedCharges; 
 
-Person: => CrimCnt1Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99);
-Person: => CrimCnt7Y := BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999);
-Person: => CrimNew1Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => CrimOld1Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => CrimNew7Y := IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => CrimOld7Y := IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM);
-Person: => MonSinceNewestCrimCnt1Y := IF(CrimNew1Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimNew1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
-Person: => MonSinceOldestCrimCnt1Y := IF(CrimOld1Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimOld1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
-Person: => MonSinceNewestCrimCnt7Y := IF(CrimNew7Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimNew7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
-Person: => MonSinceOldestCrimCnt7Y := IF(CrimOld7Y = CriminalOffense.NO_DATA_FOUND_CRIM, CriminalOffense.NO_DATA_FOUND_CRIM_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimOld7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
+Person: => CrimCnt1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99));
+Person: => CrimCnt7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999));
+Person: => CrimNew1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => CrimOld1Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => CrimNew7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => CrimOld7Y := IF(LexIDSeen = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
+Person: => MonSinceNewestCrimCnt1Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			CrimNew1Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimNew1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
+Person: => MonSinceOldestCrimCnt1Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			CrimOld1Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimOld1Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 12));
+Person: => MonSinceNewestCrimCnt7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			CrimNew7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimNew7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
+Person: => MonSinceOldestCrimCnt7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
+			CrimOld7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(CrimOld7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
 
 //Person Attributes Derog - Criminal History - Others
 Person: => CrimSeverityIndex7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA,
 			CrimCnt7Y = 0 => '0 - 0',
 			(CrimCnt7Y = 1 AND FelonyCnt7Y = 0) => '1 - 0',
 			(CrimCnt7Y = 2 AND FelonyCnt7Y = 0) => '2 - 0',
@@ -1044,6 +1098,7 @@ Person: => CrimSeverityIndex7Y := MAP(
 			); 
 
 Person: => CrimBehaviorIndex7Y := MAP(
+			LexIDSeen = '0' => CriminalOffense.MISSING_INPUT_DATA,
 			(FelonyCnt7Y > 0 AND MonSinceNewestFelonyCnt7Y >= 0 AND MonSinceNewestFelonyCnt7Y <= 12) => '6',
 			(CrimCnt7Y > 0 AND MonSinceNewestCrimCnt7Y >= 0 AND MonSinceNewestCrimCnt7Y <= 12) => '5',
 			(FelonyCnt7Y > 0) => '4',
@@ -1163,98 +1218,132 @@ Person: => MostRecentDispoDte10Y := ONLY(MostRecentDispoList10Y,STRING(Bankruptc
 ////////////////////////////////////
 // Bankruptcy Attributes
 ////////////////////////////////////
-Person: => BkCnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year)), 0, 99);			
-Person: => BkCnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year)), 0, 999);
-Person: => BkCnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year)), 0, 999);
+Person: => BkCnt1Y := IF(LexIDSeen = '0', Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year)), 0, 99));			
+Person: => BkCnt7Y := IF(LexIDSeen = '0', Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year)), 0, 999));
+Person: => BkCnt10Y := IF(LexIDSeen = '0', Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year)), 0, 999));
 Person: => DtOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
 Person: => DtOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
 Person: => DtOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => BkNew1Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkNew7Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkNew10Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkOld1Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkOld7Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => BkOld10Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => MonSinceNewestBkCnt1Y := IF(BkNew1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew1Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 12));	
-Person: => MonSinceNewestBkCnt7Y := IF(BkNew7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew7Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 84));	
-Person: => MonSinceNewestBkCnt10Y := IF(BkNew10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew10Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 120));	
-Person: => MonSinceOldestBkCnt1Y := IF(BkOld1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld1Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 12));	
-Person: => MonSinceOldestBkCnt7Y := IF(BkOld7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld7Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 84));	
-Person: => MonSinceOldestBkCnt10Y := IF(BkOld10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld10Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 120));	
+Person: => BkNew1Y := IF(LexIDSeen = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+Person: => BkNew7Y := IF(LexIDSeen = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+Person: => BkNew10Y := IF(LexIDSeen = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+Person: => BkOld1Y := IF(LexIDSeen = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+Person: => BkOld7Y := IF(LexIDSeen = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+Person: => BkOld10Y := IF(LexIDSeen = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+
+Person: => MonSinceNewestBkCnt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			BkNew1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew1Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 12));
+Person: => MonSinceNewestBkCnt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			BkNew7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew7Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 84));
+Person: => MonSinceNewestBkCnt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			BkNew10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(BkNew10Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 120));	
+Person: => MonSinceOldestBkCnt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			BkOld1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld1Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 12));	
+Person: => MonSinceOldestBkCnt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			BkOld7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld7Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 84));	
+Person: => MonSinceOldestBkCnt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			BkOld10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(BkOld10Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 120));	
 Person: => ChForBksList1Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
 Person: => ChForBksList7Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
 Person: => ChForBksList10Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
 Person: => BkWithNewestDateCh1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			MostRecentChapter1YWithNull = Bankruptcy.NO_DATA_FOUND_97_INT => Bankruptcy.NO_DATA_FOUND_97_INT,
 			MostRecentChapter1Y
 			);
 Person: => BkWithNewestDateCh7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			MostRecentChapter7YWithNull = Bankruptcy.NO_DATA_FOUND_97_INT => Bankruptcy.NO_DATA_FOUND_97_INT,
 			MostRecentChapter7Y
 			); 
 Person: => BkWithNewestDateCh10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			MostRecentChapter10YWithNull = Bankruptcy.NO_DATA_FOUND_97_INT => Bankruptcy.NO_DATA_FOUND_97_INT,
 			MostRecentChapter10Y
 			); 		
 Person: => BkUnderCh7Cnt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt1Y > 0 AND BkCnt1yNoChpt > 0 AND BkCnt1Y = BkCnt1yNoChpt) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			Ch7Cnt1Y
 			); 
 Person: => BkUnderCh7Cnt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt7Y > 0 AND BkCnt7yNoChpt > 0 AND BkCnt7Y = BkCnt7yNoChpt) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			Ch7Cnt7Y
 			); 
 Person: => BkUnderCh7Cnt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt10Y > 0 AND BkCnt10yNoChpt > 0 AND BkCnt10Y = BkCnt10yNoChpt) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			Ch7Cnt10Y
 			);
 Person: => BkUnderCh13Cnt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt1Y > 0 AND BkCnt1yNoChpt > 0 AND BkCnt1Y = BkCnt1yNoChpt) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			Ch13Cnt1Y
 			); 
 Person: => BkUnderCh13Cnt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt7Y > 0 AND BkCnt7yNoChpt > 0 AND BkCnt7Y = BkCnt7yNoChpt) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			Ch13Cnt7Y
 			); 
 Person: => BkUnderCh13Cnt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt10Y > 0 AND BkCnt10yNoChpt > 0 AND BkCnt10Y = BkCnt10yNoChpt) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			Ch13Cnt10Y
 			); 
 Person: => NewestBkUpdateDt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, //Yes 10 year
 			(MostRecentUpdate1Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			MostRecentUpdate1Y
 			); 
 Person: => NewestBkUpdateDt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY, //Yes 10 year
 			(MostRecentUpdate7Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			MostRecentUpdate7Y
 			); 	
 Person: => NewestBkUpdateDt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			(MostRecentUpdate10Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			MostRecentUpdate10Y
 			); 		
 Person: => MonSinceNewestBkUpdateCnt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,  //Yes 10 year
 			(MostRecentUpdate1Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentUpdate1Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 12)
 			); 			
 Person: => MonSinceNewestBkUpdateCnt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,  //Yes 10 year
 			(MostRecentUpdate7Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentUpdate7Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 84)
 			); 
 Person: => MonSinceNewestBkUpdateCnt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			(MostRecentUpdate10Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentUpdate10Y), ONLY(PersonBankruptcy.Bankrupt, CurrentDate)), 0, 120)
@@ -1263,73 +1352,97 @@ Person: => DispOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Ban
 Person: => DispOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
 Person: => DispOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
 Person: => BkWithNewestDateDisp1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo1Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
 			MostRecentDispo1Y);
 Person: => BkWithNewestDateDisp7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo7Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
 			MostRecentDispo7Y);
 Person: => BkWithNewestDateDisp10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo10Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
 			MostRecentDispo10Y);
 Person: => DispOfNewestBkDt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo1Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
 			MostRecentDispoDte1Y);			
 Person: => DispOfNewestBkDt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo7Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
 			MostRecentDispoDte7Y);	
 Person: => DispOfNewestBkDt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo10Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
 			MostRecentDispoDte10Y);			
 Person: => MonSinceDispOfNewestBkCnt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo1Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentDispoDte1Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 12)
 			); 	
 Person: => MonSinceDispOfNewestBkCnt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo7Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentDispoDte7Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 84)
 			); 
 Person: => MonSinceDispOfNewestBkCnt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo10Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentDispoDte10Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CurrentDate)), 0, 120)
 			); 			
-Person: => BkDisposedCnt1Y := IF((BkCnt1Y = 0), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.IsDisposed)), 0, 99));
-Person: => BkDisposedCnt7Y := IF((BkCnt7Y = 0), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.IsDisposed)), 0, 999));
-Person: => BkDisposedCnt10Y := IF((BkCnt10Y = 0), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.IsDisposed)), 0, 999));
+Person: => BkDisposedCnt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.IsDisposed)), 0, 99));
+Person: => BkDisposedCnt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.IsDisposed)), 0, 999));
+Person: => BkDisposedCnt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.IsDisposed)), 0, 999));
 Person: => BkDismissedCnt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt1Y > 0 AND BkDisposedCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.ModifiedDisposition = 'DISMISSED')), 0, 99)
 			); 
 Person: => BkDismissedCnt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt7Y > 0 AND BkDisposedCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.ModifiedDisposition = 'DISMISSED')), 0, 999)
 			); 
 Person: => BkDismissedCnt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt10Y > 0 AND BkDisposedCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.ModifiedDisposition = 'DISMISSED')), 0, 999)
 			); 
 Person: => BkDischargedCnt1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt1Y > 0 AND BkDisposedCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year AND BestChildRecord.ModifiedDisposition = 'DISCHARGED')), 0, 99)
 			);
 Person: => BkDischargedCnt7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt7Y > 0 AND BkDisposedCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year AND BestChildRecord.ModifiedDisposition = 'DISCHARGED')), 0, 999)
 			); 
 Person: => BkDischargedCnt10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt10Y > 0 AND BkDisposedCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.ModifiedDisposition = 'DISCHARGED')), 0, 999)
@@ -1338,24 +1451,28 @@ Person: => TypeOfBksList1Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsB
 Person: => TypeOfBksList7Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);			
 Person: => TypeOfBksList10Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, BkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);		
 Person: => BkHavingBusTypeFlag1Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt1Y > 0 AND BkCnt1Y = BkCnt1YFilingTypeAllNull) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BkCnt1YBusinessType = 0 => '0',
 			BkCnt1YBusinessType > 0 => '1'
 			); 
 Person: => BkHavingBusTypeFlag7Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt7Y > 0 AND BkCnt7Y = BkCnt7YFilingTypeAllNull) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BkCnt7YBusinessType = 0 => '0',
 			BkCnt7YBusinessType > 0 => '1'
 			); 
 Person: => BkHavingBusTypeFlag10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(BkCnt10Y > 0 AND BkCnt10Y = BkCnt10YFilingTypeAllNull) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BkCnt10YBusinessType = 0 => '0',
 			BkCnt10YBusinessType > 0 => '1'
 			);
 Person: => BkSeverityIndex10Y := MAP(
+			LexIDSeen = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(BkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(MostRecentChapter10YWithNull = Bankruptcy.NO_DATA_FOUND_97_INT AND INTEGER(MostRecentDtOfBks10YWithNull) = Bankruptcy.NO_DATA_FOUND_97_INT) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BkCnt10Y >= 3 => '4',
