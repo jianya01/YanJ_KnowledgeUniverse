@@ -32,6 +32,17 @@ Policy := ENTITY(FLAT(UID(PolicyNumber),
 		STRING CancellationReasonCode,
 		STRING PaymentExtractExclusion,
 		STRING PolicyStatus,
+		DATE PlanEffectiveDate,
+		INTEGER PolicyTermLengthNonLife,
+		INTEGER PolicyTermLengthLife,
+		STRING PaymentFrequency,
+		STRING PaymentFrequencyOtherReason,
+		REAL DownPaymentPercentage=NULL(''),
+		INTEGER NumberOfInstallmentPayments=NULL(),
+		REAL InstallmentPaymentPercentageAmount=NULL(''),
+		BOOLEAN IsAccountSetupForAutoDebit,
+		STRING BillType,
+		STRING BillTypeIfOther,
 		STRING IsUsage,
 		DATE FirstLoadDate,
 		BOOLEAN DeleteFlag,
@@ -46,23 +57,9 @@ Policy := ENTITY(FLAT(UID(PolicyNumber),
 			ChangeEffectiveDate, CancellationNoticeDate, CancelliationDate, CancellationReasonCode, 
 			PolicyStatus, EndorsementNumber, EndorsementDate, GroupNumber},
 		ReportDates{ReportStartDate, ReportEndDate},
-		PaymentSpecialProjects{PaymentExtractExclusion}));
-
-PaymentPlan := ENTITY(FLAT(Policy rPolicy=UID(PolicyNumber),
-		DATE PlanEffectiveDate,
-		INTEGER PolicyTermLengthNonLife,
-		INTEGER PolicyTermLengthLife,
-		STRING PaymentFrequency,
-		STRING PaymentFrequencyOtherReason,
-		REAL DownPaymentPercentage,
-		INTEGER NumberOfInstallmentPayments,
-		REAL InstallmentPaymentPercentageAmount,
-		BOOLEAN IsAccountSetupForAutoDebit,
-		STRING BillType,
-		STRING BillTypeIfOther), 
-	MODEL(rPolicy,
-		PlanEffectiveDate, PolicyTermLengthNonLife, PolicyTermLengthLife, PaymentFrequency, PaymentFrequencyOtherReason, DownPaymentPercentage, NumberOfInstallmentPayments,
-		InstallmentPaymentPercentageAmount, IsAccountSetupForAutoDebit, BillType, BillTypeIfOther));
+		PaymentSpecialProjects{PaymentExtractExclusion},
+		PaymentPlans{PlanEffectiveDate, PolicyTermLengthNonLife, PolicyTermLengthLife, PaymentFrequency, PaymentFrequencyOtherReason, DownPaymentPercentage,
+			NumberOfInstallmentPayments, InstallmentPaymentPercentageAmount, IsAccountSetupForAutoDebit, BillType, BillTypeIfOther}));
 
 Invoice := ENTITY(FLAT(UID(InvoiceTransactionID),
 		STRING InvoiceTransactionID,
@@ -82,8 +79,8 @@ PaymentDetails := ENTITY(FLAT(UID(InvoiceTransactionID, PolicyNumber),
 		STRING PaymentReceivedMethod,
 		STRING PaymentReceivedType,
 		STRING PaymentReceivedTypeIfOther,
-		REAL TransactionPaymentReceivedPercentage,
-		REAL TotalPaymentReceivedPercentage,
+		REAL TransactionPaymentReceivedPercentage=NULL(''),
+		REAL TotalPaymentReceivedPercentage=NULL(''),
 		DATE PaymentReceivedDate,
 		STRING PolicyInEquityIndicator,
 		BOOLEAN IsPaymentPercentageDueNotPaidInFull,
@@ -108,17 +105,14 @@ PaymentDetails := ENTITY(FLAT(UID(InvoiceTransactionID, PolicyNumber),
 		PolicyReinstatement{IsPolicyReinstatement, PolicyReinstatementDate},
 		PaidInFull{IsPaidInFull, PaidInFullDate}));
 		
-Agent := ENTITY(FLAT(UID(AgentNationalProducerNumber,Name),
-		INTEGER AgentNationalProducerNumber,
-		STRING Name),
-	MODEL(UID,
-		Name, AgentNationalProducerNumber));
-		
 Agency := ENTITY(FLAT(UID(CompanyProducerNumber),
 		STRING CompanyProducerNumber,
-		STRING Name),
+		STRING Name,
+		INTEGER AgentNationalProducerNumber,
+		STRING AgentName),
 	MODEL(UID,
-		CompanyProducerNumber, Name));
+		CompanyProducerNumber, Name,
+		Agents{AgentName, AgentNationalProducerNumber}));
 		
 Individual := ENTITY(FLAT(UID = LexID,
 		INTEGER OwnerID,
@@ -246,8 +240,6 @@ DriversLicense := ENTITY(FLAT(UID(DriversLicenseNumber,IssuingState),
 	MODEL(UID,
 		DriversLicenseNumber, IssuingState));
 
-AgentCompany := ASSOCIATION(FLAT(Agent Agent = UID(AgentNationalProducerNumber,Name), Agency Company = UID(CompanyProducerNumber)));
-AgentPolicy := ASSOCIATION(FLAT(Agent Agent = UID(AgentNationalProducerNumber,Name), Policy Policy = UID(PolicyNumber)));
 AgencyPolicy := ASSOCIATION(FLAT(Agency Company = UID(CompanyProducerNumber), Policy Policy = UID(PolicyNumber)));
 
 IndividualPolicy := ASSOCIATION(FLAT(Individual Person, Policy Policy = UID(PolicyNumber)));
