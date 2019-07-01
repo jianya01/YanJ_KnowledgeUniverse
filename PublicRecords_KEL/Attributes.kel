@@ -35,6 +35,7 @@ FUNCTION: SourceGroup(STRING RawSource) <= ECL(PublicRecords_KEL.ECL_Functions.C
 
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
 Aircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
+AircraftOwner: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
 Bankruptcy: => CurrentDate := MIN(GETBUILDDATE('bankruptcy_daily'), CURRENTDATE());
 PersonBankruptcy: => CurrentDate := MIN(GETBUILDDATE('bankruptcy_daily'), CURRENTDATE());
 Business: => CurrentDate := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
@@ -911,52 +912,62 @@ Person: => LexIDSeen := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
    /////////////////////////////
    //Vehicle Helper Attributes//
    /////////////////////////////
-Vehicle: TEN_YEARS_IN_DAYS := 3652;
-Vehicle: TWO_YEARS_IN_DAYS := 730;
-PersonVehicle.Registration: => RegistrationCurrentDate := CurrentDate ;
 Person: => VehicleBuildCurrentDate := ONLY(PersonVehicle,CurrentDate);
-PersonVehicle: => Seen_In_Last_Ten_Years := EXISTS(Registration(DAYSBETWEEN(RegistrationLatestExpirationeDate,RegistrationCurrentDate) < Vehicle.TEN_YEARS_IN_DAYS));
-PersonVehicle: => Seen_In_Last_Two_Years := EXISTS(Registration(DAYSBETWEEN(RegistrationLatestExpirationeDate,RegistrationCurrentDate) < Vehicle.TWO_YEARS_IN_DAYS));
-PersonVehicle: => VehicleMinDate := IF(MIN(Registration(NOT RegistrationFirstDate:Null),RegistrationFirstDate):Null, Vehicle.REC_FOUND_BUT_INVALID, DATETOSTRING(MIN(Registration,RegistrationFirstDate),'%Y%m%d'));
-PersonVehicle: => VehicleMaxDate := IF(MAX(Registration(NOT RegistrationLatestExpirationeDate:Null),RegistrationLatestExpirationeDate):Null, Vehicle.REC_FOUND_BUT_INVALID, DATETOSTRING(MAX(Registration,RegistrationLatestExpirationeDate),'%Y%m%d'));
+PersonVehicle: MISSING_INPUT_DATA_INT := -99999;
+PersonVehicle: MISSING_INPUT_DATA := '-99999';
+PersonVehicle: NO_DATA_FOUND_INT := -99998;
+PersonVehicle: NO_DATA_FOUND := '-99998';
+PersonVehicle: REC_FOUND_BUT_INVALID_INT := -99997;
+PersonVehicle: REC_FOUND_BUT_INVALID := '-99997';
+PersonVehicle: TEN_YEARS_IN_DAYS := 3652;
+PersonVehicle: TWO_YEARS_IN_DAYS := 730;
+PersonVehicle: => Seen_In_Last_Ten_Years := DAYSBETWEEN(Automobile:DateLastSeen,CurrentDate) <= PersonVehicle.TEN_YEARS_IN_DAYS;
+PersonVehicle: => Seen_In_Last_Two_Years := DAYSBETWEEN(Automobile:DateLastSeen,CurrentDate) <= PersonVehicle.TWO_YEARS_IN_DAYS;
+PersonVehicle: => DateFirstSeenCapped := IF(Automobile:DateFirstSeen > CurrentDate, CurrentDate, Automobile:DateFirstSeen);
+PersonVehicle: => VehicleMinDate := IF(ISVALIDDATE(DateFirstSeenCapped), DATETOSTRING(DateFirstSeenCapped,'%Y%m%d'),PersonVehicle.REC_FOUND_BUT_INVALID);
+PersonVehicle: => DateLastSeenCapped := IF(Automobile:DateLastSeen > CurrentDate, CurrentDate,Automobile:DateLastSeen);
+PersonVehicle: => VehicleMaxDate := IF(ISVALIDDATE(DateLastSeenCapped), DATETOSTRING(DateLastSeenCapped,'%Y%m%d'),PersonVehicle.REC_FOUND_BUT_INVALID);
+PersonVehicle: => DateLastSeenString :=  IF(ISVALIDDATE(Automobile:DateLastSeen), DATETOSTRING(Automobile:DateLastSeen, '%Y%M%D'), PersonVehicle.REC_FOUND_BUT_INVALID);
 
-Person: => AssetVehicleCntEv := IF(LexIDSeen = '0', Vehicle.MISSING_INPUT_DATA_INT,
+Person: => AssetVehicleCntEv := IF(LexIDSeen = '0', PersonVehicle.MISSING_INPUT_DATA_INT,
 			BOUNDSFOLD(COUNT(PersonVehicle), 0, 999));
 			
-Person: => AssetDtOfVehicleEmrgListEv := PersonVehicle{Automobile,RegistrationFirstSeenDate := VehicleMinDate};
+Person: => AssetDtOfVehicleEmrgListEv := PersonVehicle{Automobile, VehicleFirstSeenDate := VehicleMinDate};
 
-Person: => AssetDtVehicleLastSeenListEv := PersonVehicle{Automobile,RegistrationLastSeenDate := VehicleMaxDate};
+Person: => AssetDtVehicleLastSeenListEv := PersonVehicle{Automobile,VehicleLastSeenDate := VehicleMaxDate};
 
 Person: => AssetVehicleCnt10Y := MAP(
-			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID,									
+			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID,									
 			BOUNDSFOLD(COUNT(PersonVehicle(Seen_In_Last_Ten_Years)),0,999));
 			
 Person: => AssetVehicleCnt2Y := MAP(
-			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID,			
+			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID,			
 			BOUNDSFOLD(COUNT(PersonVehicle(Seen_In_Last_Two_Years)),0,999));
 			
 Person: => AssetNewestVehicleEmrgDtEv := MAP(
-			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv = 0 => Vehicle.NO_DATA_FOUND,
-			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID,			
-			DATETOSTRING(MAX(PersonVehicle(VehicleMaxDate != Vehicle.REC_FOUND_BUT_INVALID),DATE(VehicleMaxDate)),'%Y%m%d' ));
+			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID,			
+			DATETOSTRING(MAX(PersonVehicle(VehicleMinDate != PersonVehicle.REC_FOUND_BUT_INVALID),DATE(VehicleMinDate)),'%Y%m%d' ));
 			
 Person: => AssetOldestVehicleEmrgDtEv := MAP(
-			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv = 0 => Vehicle.NO_DATA_FOUND, 	
-			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID,		
-			DATETOSTRING(MIN(PersonVehicle(VehicleMinDate != Vehicle.REC_FOUND_BUT_INVALID),DATE(VehicleMinDate)) ,'%Y%m%d'));
+			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND, 	
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID,		
+			DATETOSTRING(MIN(PersonVehicle(VehicleMinDate != PersonVehicle.REC_FOUND_BUT_INVALID),DATE(VehicleMinDate)) ,'%Y%m%d'));
 			
 Person: => AssetNewestVehicleEmrgMsinceEv := MAP(
-			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID_INT,	
+			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID_INT,	
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetNewestVehicleEmrgDtEv),VehicleBuildCurrentDate),0,999)); 
 			
 Person: => AssetOldestVehicleEmrgMsinceEv := MAP( 
-			LexIDSeen = '0' => Vehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = Vehicle.REC_FOUND_BUT_INVALID) => Vehicle.REC_FOUND_BUT_INVALID_INT,	
+			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
+			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND,
+			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID_INT,	
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetOldestVehicleEmrgDtEv),VehicleBuildCurrentDate),0,999));	
 			
 ////////////////////////////////////
