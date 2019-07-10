@@ -902,7 +902,6 @@ InputBII: => BusInputRep5DOBCleanPopValue := AuthRep5.InputDOBCleanPopValue;
 InputBII: => BusInputRep5EmailCleanPopValue := AuthRep5.InputEmailCleanPopValue; 
 InputBII: => BusInputRep5DLCleanPopValue := AuthRep5.InputDLCleanPopValue;
 InputBII: => BusInputRep5DLStateCleanPopValue := AuthRep5.InputDLStateCleanPopValue; 
-
    /////////////////////
    //Person Attributes//
    /////////////////////
@@ -923,11 +922,10 @@ PersonVehicle: TEN_YEARS_IN_DAYS := 3652;
 PersonVehicle: TWO_YEARS_IN_DAYS := 730;
 PersonVehicle: => Seen_In_Last_Ten_Years := DAYSBETWEEN(Automobile:DateLastSeen,CurrentDate) <= PersonVehicle.TEN_YEARS_IN_DAYS;
 PersonVehicle: => Seen_In_Last_Two_Years := DAYSBETWEEN(Automobile:DateLastSeen,CurrentDate) <= PersonVehicle.TWO_YEARS_IN_DAYS;
-PersonVehicle: => DateFirstSeenCapped := IF(Automobile:DateFirstSeen > CurrentDate, CurrentDate, Automobile:DateFirstSeen);
+PersonVehicle: => DateFirstSeenCapped := IF(MIN(CountsModel, SequenceKey:DateFirstSeen) > CurrentDate, CurrentDate, MIN(CountsModel, SequenceKey:DateFirstSeen));
 PersonVehicle: => VehicleMinDate := IF(ISVALIDDATE(DateFirstSeenCapped), DATETOSTRING(DateFirstSeenCapped,'%Y%m%d'),PersonVehicle.REC_FOUND_BUT_INVALID);
-PersonVehicle: => DateLastSeenCapped := IF(Automobile:DateLastSeen > CurrentDate, CurrentDate,Automobile:DateLastSeen);
+PersonVehicle: => DateLastSeenCapped := IF(MAX(CountsModel, SequenceKey:DateLastSeen) > CurrentDate, CurrentDate,MAX(CountsModel, SequenceKey:DateLastSeen));
 PersonVehicle: => VehicleMaxDate := IF(ISVALIDDATE(DateLastSeenCapped), DATETOSTRING(DateLastSeenCapped,'%Y%m%d'),PersonVehicle.REC_FOUND_BUT_INVALID);
-PersonVehicle: => DateLastSeenString :=  IF(ISVALIDDATE(Automobile:DateLastSeen), DATETOSTRING(Automobile:DateLastSeen, '%Y%M%D'), PersonVehicle.REC_FOUND_BUT_INVALID);
 
 Person: => AssetVehicleCntEv := IF(LexIDSeen = '0', PersonVehicle.MISSING_INPUT_DATA_INT,
 			BOUNDSFOLD(COUNT(PersonVehicle), 0, 999));
@@ -948,25 +946,25 @@ Person: => AssetVehicleCnt2Y := MAP(
 			
 Person: => AssetNewestVehicleEmrgDtEv := MAP(
 			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND,
+			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND_INT,
 			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID,			
 			DATETOSTRING(MAX(PersonVehicle(VehicleMinDate != PersonVehicle.REC_FOUND_BUT_INVALID),DATE(VehicleMinDate)),'%Y%m%d' ));
 			
 Person: => AssetOldestVehicleEmrgDtEv := MAP(
 			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND, 	
+			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND_INT, 	
 			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID,		
 			DATETOSTRING(MIN(PersonVehicle(VehicleMinDate != PersonVehicle.REC_FOUND_BUT_INVALID),DATE(VehicleMinDate)) ,'%Y%m%d'));
 			
 Person: => AssetNewestVehicleEmrgMsinceEv := MAP(
 			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND,
+			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND_INT,
 			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMaxDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID_INT,	
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetNewestVehicleEmrgDtEv),VehicleBuildCurrentDate),0,999)); 
 			
 Person: => AssetOldestVehicleEmrgMsinceEv := MAP( 
 			LexIDSeen = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
-			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND,
+			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND_INT,
 			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID_INT,	
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetOldestVehicleEmrgDtEv),VehicleBuildCurrentDate),0,999));	
 			
