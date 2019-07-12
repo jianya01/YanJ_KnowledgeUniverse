@@ -77,6 +77,22 @@ Vehicle: NO_DATA_FOUND := '-99998';
 Vehicle: REC_FOUND_BUT_INVALID :=  '-99997';
 Vehicle: REC_FOUND_BUT_INVALID_INT :=  -99997;
 
+PersonVehicle: MISSING_INPUT_DATA_INT := -99999;
+PersonVehicle: MISSING_INPUT_DATA := '-99999';
+PersonVehicle: NO_DATA_FOUND_INT := -99998;
+PersonVehicle: NO_DATA_FOUND := '-99998';
+PersonVehicle: REC_FOUND_BUT_INVALID_INT := -99997;
+PersonVehicle: REC_FOUND_BUT_INVALID := '-99997';
+PersonVehicle: TEN_YEARS_IN_DAYS := 3652;
+PersonVehicle: TWO_YEARS_IN_DAYS := 730;
+
+AircraftOwner: MISSING_INPUT_DATA_INT := -99999;
+AircraftOwner: NO_DATA_FOUND_INT := -99998;
+AircraftOwner: MISSING_INPUT_DATA := '-99999';
+AircraftOwner: NO_DATA_FOUND := '-99998';
+AircraftOwner: REC_FOUND_BUT_INVALID :=  '-99997';
+AircraftOwner: REC_FOUND_BUT_INVALID_INT :=  -99997;
+
 CriminalOffense: MISSING_INPUT_DATA := '-99999';
 CriminalOffense: MISSING_INPUT_DATA_INT := -99999;
 CriminalOffense: NO_DATA_FOUND_CRIM := '-99998';
@@ -912,14 +928,6 @@ Person: => LexIDSeen := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
    //Vehicle Helper Attributes//
    /////////////////////////////
 Person: => VehicleBuildCurrentDate := ONLY(PersonVehicle,CurrentDate);
-PersonVehicle: MISSING_INPUT_DATA_INT := -99999;
-PersonVehicle: MISSING_INPUT_DATA := '-99999';
-PersonVehicle: NO_DATA_FOUND_INT := -99998;
-PersonVehicle: NO_DATA_FOUND := '-99998';
-PersonVehicle: REC_FOUND_BUT_INVALID_INT := -99997;
-PersonVehicle: REC_FOUND_BUT_INVALID := '-99997';
-PersonVehicle: TEN_YEARS_IN_DAYS := 3652;
-PersonVehicle: TWO_YEARS_IN_DAYS := 730;
 PersonVehicle: => Seen_In_Last_Ten_Years := DAYSBETWEEN(Automobile:DateLastSeen,CurrentDate) <= PersonVehicle.TEN_YEARS_IN_DAYS;
 PersonVehicle: => Seen_In_Last_Two_Years := DAYSBETWEEN(Automobile:DateLastSeen,CurrentDate) <= PersonVehicle.TWO_YEARS_IN_DAYS;
 PersonVehicle: => DateFirstSeenCapped := IF(MIN(CountsModel, SequenceKey:DateFirstSeen) > CurrentDate, CurrentDate, MIN(CountsModel, SequenceKey:DateFirstSeen));
@@ -967,7 +975,45 @@ Person: => AssetOldestVehicleEmrgMsinceEv := MAP(
 			AssetVehicleCntEv = 0 => PersonVehicle.NO_DATA_FOUND_INT,
 			AssetVehicleCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID_INT,	
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetOldestVehicleEmrgDtEv),VehicleBuildCurrentDate),0,999));	
+
+//KS-397
+   /////////////////////////////
+   //Aircraft Helper Attributes//
+   /////////////////////////////	 
+Person: => AircraftBuildCurrentDate := ONLY(AircraftOwner,CurrentDate);
+AircraftOwner: => DateFirstSeenCapped := IF(AircraftOwner.Plane:DateFirstSeen > CurrentDate, CurrentDate, AircraftOwner.Plane:DateFirstSeen);
+AircraftOwner: => AircraftMinDate := IF(ISVALIDDATE(DateFirstSeenCapped), DATETOSTRING(DateFirstSeenCapped,'%Y%m%d'), AircraftOwner.REC_FOUND_BUT_INVALID);
+AircraftOwner: => DateLastSeenCapped := IF(AircraftOwner.Plane:DateLastSeen > CurrentDate, CurrentDate, AircraftOwner.Plane:DateLastSeen);
+AircraftOwner: => AircraftMaxDate := IF(ISVALIDDATE(DateLastSeenCapped), DATETOSTRING(DateLastSeenCapped,'%Y%m%d'), AircraftOwner.REC_FOUND_BUT_INVALID);
+
+Person: => AssetAircraftCntEv:= IF(LexIDSeen = '0', AircraftOwner.MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(AircraftOwner), 0, 99));
 			
+Person: => AssetDtOfAircraftEmrgListEv := AircraftOwner{Plane, AircraftFirstSeenDate := AircraftMinDate};
+
+Person: => AssetNewestAircraftEmrgDtEv := MAP(
+				LexIDSeen = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
+   			AssetAircraftCntEv = 0 => AircraftOwner.NO_DATA_FOUND,
+   			AssetAircraftCntEv > 0 AND  ALL(AircraftOwner,AircraftMaxDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID,			
+   			DATETOSTRING(MAX(AircraftOwner(AircraftMaxDate != AircraftOwner.REC_FOUND_BUT_INVALID),DATE(AircraftMaxDate)),'%Y%m%d' ));
+
+Person: => AssetOldestAircraftEmrgDtEv := MAP(
+   			LexIDSeen = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
+   			AssetAircraftCntEv = 0 => AircraftOwner.NO_DATA_FOUND,
+   			AssetAircraftCntEv > 0 AND  ALL(AircraftOwner,AircraftMinDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID,			
+   			DATETOSTRING(MIN(AircraftOwner(AircraftMinDate != AircraftOwner.REC_FOUND_BUT_INVALID),DATE(AircraftMinDate)),'%Y%m%d' ));   			
+
+Person: => AssetNewestAircraftEmrgMsinceEv := MAP(
+				LexIDSeen = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
+				AssetAircraftCntEv = 0 => AircraftOwner.NO_DATA_FOUND,
+				AssetAircraftCntEv > 0 AND  ALL(AircraftOwner,AircraftMaxDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID_INT,	
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetNewestAircraftEmrgDtEv ),AircraftBuildCurrentDate),0,999)); 
+			
+Person: => AssetOldestAircraftEmrgMsinceEv := MAP(
+				LexIDSeen = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
+				AssetAircraftCntEv = 0 => AircraftOwner.NO_DATA_FOUND,
+				AssetAircraftCntEv > 0 AND  ALL(AircraftOwner,AircraftMinDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID_INT,	
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetOldestAircraftEmrgDtEv),AircraftBuildCurrentDate),0,999)); 						
 ////////////////////////////////////
 //Criminal Attributes
 ////////////////////////////////////
