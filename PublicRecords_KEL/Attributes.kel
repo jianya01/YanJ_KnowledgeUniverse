@@ -93,6 +93,13 @@ AircraftOwner: NO_DATA_FOUND := '-99998';
 AircraftOwner: REC_FOUND_BUT_INVALID :=  '-99997';
 AircraftOwner: REC_FOUND_BUT_INVALID_INT :=  -99997;
 
+WatercraftOwner: MISSING_INPUT_DATA_INT := -99999;
+WatercraftOwner: NO_DATA_FOUND_INT := -99998;
+WatercraftOwner: MISSING_INPUT_DATA := '-99999';
+WatercraftOwner: NO_DATA_FOUND := '-99998';
+WatercraftOwner: REC_FOUND_BUT_INVALID :=  '-99997';
+WatercraftOwner: REC_FOUND_BUT_INVALID_INT :=  -99997;
+
 CriminalOffense: MISSING_INPUT_DATA := '-99999';
 CriminalOffense: MISSING_INPUT_DATA_INT := -99999;
 CriminalOffense: NO_DATA_FOUND_CRIM := '-99998';
@@ -1013,7 +1020,47 @@ Person: => AssetOldestAircraftEmrgMsinceEv := MAP(
 				LexIDSeen = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
 				AssetAircraftCntEv = 0 => AircraftOwner.NO_DATA_FOUND,
 				AssetAircraftCntEv > 0 AND  ALL(AircraftOwner,AircraftMinDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID_INT,	
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetOldestAircraftEmrgDtEv),AircraftBuildCurrentDate),0,999)); 						
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetOldestAircraftEmrgDtEv),AircraftBuildCurrentDate),0,999));
+				
+//KS-396
+///////////////////////////////
+//Watercraft Helper Attribute//
+//////////////////////////////			
+Person: => WatercraftBuildCurrentDate := ONLY(WatercraftOwner,CurrentDate);
+WatercraftOwner: => DateFirstSeenCapped := IF(WCraft:DateFirstSeen > CurrentDate, CurrentDate, WCraft:DateFirstSeen);
+WatercraftOwner: => WatercraftMinDate := IF(ISVALIDDATE(DateFirstSeenCapped), DATETOSTRING(DateFirstSeenCapped,'%Y%m%d'), WatercraftOwner.REC_FOUND_BUT_INVALID);
+WatercraftOwner: => DateLastSeenCapped := IF(WCraft:DateLastSeen > CurrentDate, CurrentDate, WCraft:DateLastSeen);
+WatercraftOwner: => WatercraftMaxDate := IF(ISVALIDDATE(DateLastSeenCapped), DATETOSTRING(DateLastSeenCapped,'%Y%m%d'), WatercraftOwner.REC_FOUND_BUT_INVALID);
+            
+Person: => AssetWtrcraftCntEv:= IF(LexIDSeen = '0', WatercraftOwner.MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(WatercraftOwner), 0, 99));
+      			
+Person:	=>	AssetDtOfWtrcraftEmrgListEv := WatercraftOwner{WCraft,WatercraftFirstSeenDate := WatercraftMinDate};
+         
+Person:	=>	AssetNewestWtrcraftEmrgDtEv := MAP(
+				LexIDSeen = '0' => WatercraftOwner.MISSING_INPUT_DATA_INT,
+				AssetWtrcraftCntEv = 0 => WatercraftOwner.NO_DATA_FOUND_INT,
+				AssetWtrcraftCntEv > 0  AND ALL(WatercraftOwner, WatercraftMinDate = WatercraftOwner.REC_FOUND_BUT_INVALID) => WatercraftOwner.REC_FOUND_BUT_INVALID,			
+				DATETOSTRING(MAX(WatercraftOwner(WatercraftMinDate != WatercraftOwner.REC_FOUND_BUT_INVALID), DATE(WatercraftMinDate)),'%Y%m%d'));      
+      
+Person:	=>	AssetOldestWtrcraftEmrgDtEv := MAP(
+				LexIDSeen = '0' => WatercraftOwner.MISSING_INPUT_DATA_INT,
+				AssetWtrcraftCntEv = 0 => WatercraftOwner.NO_DATA_FOUND_INT,
+				AssetWtrcraftCntEv > 0  AND ALL(WatercraftOwner, WatercraftMinDate = WatercraftOwner.REC_FOUND_BUT_INVALID) => WatercraftOwner.REC_FOUND_BUT_INVALID,			
+				DATETOSTRING(MIN(WatercraftOwner(WatercraftMinDate != WatercraftOwner.REC_FOUND_BUT_INVALID), DATE(WatercraftMinDate)),'%Y%m%d'));		   			      
+      
+Person:	=>	AssetNewestWtrcraftEmrgMsinceEv := MAP(
+				LexIDSeen = '0' => WatercraftOwner.MISSING_INPUT_DATA_INT,
+				AssetWtrcraftCntEv = 0 => WatercraftOwner.NO_DATA_FOUND,
+				AssetWtrcraftCntEv > 0 AND  ALL(WatercraftOwner,WatercraftMinDate = WatercraftOwner.REC_FOUND_BUT_INVALID) => WatercraftOwner.REC_FOUND_BUT_INVALID_INT,	
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetNewestWtrcraftEmrgDtEv),WatercraftBuildCurrentDate),0,999));
+      				
+Person:	=>	AssetOldestWtrcraftEmrgMsinceEv:= MAP(
+				LexIDSeen = '0' => WatercraftOwner.MISSING_INPUT_DATA_INT,
+				AssetWtrcraftCntEv = 0 => WatercraftOwner.NO_DATA_FOUND,
+				AssetWtrcraftCntEv > 0 AND  ALL(WatercraftOwner,WatercraftMinDate = WatercraftOwner.REC_FOUND_BUT_INVALID) => WatercraftOwner.REC_FOUND_BUT_INVALID_INT,	
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(AssetOldestWtrcraftEmrgDtEv),WatercraftBuildCurrentDate),0,999));
+
 ////////////////////////////////////
 //Criminal Attributes
 ////////////////////////////////////
