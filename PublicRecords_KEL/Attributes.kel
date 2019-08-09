@@ -117,6 +117,10 @@ Tradeline: NO_DATA_FOUND_TRADELINE_INT := -99998;
 Tradeline: NO_DATA_FOUND_97_INT := -99997;
 Tradeline: NO_DATA_FOUND_97 := '-99997';
 
+ProfessionalLicense: MISSING_INPUT_DATA := '-99999';
+ProfessionalLicense: NO_DATA_FOUND_PROF := '-99998';
+ProfessionalLicense: REC_FOUND_BUT_INVALID := '-99997';
+
 //Input PII input Echo attributes 
 InputPII: => InputAccountValue := IsBlank(InputAccountEcho, MISSING_INPUT_DATA);
 InputPII: => InputLexIDValue := IsZero(InputLexIDEcho, MISSING_INPUT_DATA_INT); 
@@ -2400,3 +2404,54 @@ BusinessSele: => B2bTLBalInOthVol24Mfull := MAP(
 		B2bMonWTLInOthCnt24Mfull = 1 => Tradeline.NO_DATA_FOUND_97_INT,
 		B2bTLInOthCnt24Mfull = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
 		MIN(B2bTLDevationSampleInOth/B2bTLInOthMEAN,2.00));
+
+////////////////////////////////////
+// ProfessionalLicense Helper Attributes
+////////////////////////////////////
+ProfessionalLicense: => HasProfessionalLicense := LicenseNumber <> '';
+Person: => ProfLicExpDtLatest := TOPN(ProfessionalLicensePerson.ProfLic(HasProfessionalLicense).LicenseDates{DateOfExpiration}, 1, -DateOfExpiration);
+Person: => ActiveProfessionalLicenseExpDt := ONLY(ProfLicExpDtLatest, DateOfExpiration);
+Person: => ActiveProfessionalLicenseIssueDt := TOPN(ProfessionalLicensePerson.ProfLic(Person(ActiveProfessionalLicenseExpDt > CurrentDate)).LicenseDates{OriginalDateOfIssuance:= IF(OriginalDateOfIssuance:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(OriginalDateOfIssuance, '%Y%m%d'))}, 1, -OriginalDateOfIssuance);
+Person: => ActiveProfessionalLicenseType := TOPN(ProfessionalLicensePerson.ProfLic(Person(ActiveProfessionalLicenseExpDt > CurrentDate)).LicenseDescription{LicenseDescription := IsBlank(LicenseDescription, ProfessionalLicense.REC_FOUND_BUT_INVALID)}, 1, -LicenseDescription);
+Person: => ActiveProfessionalLicenseOccupation := TOPN(ProfessionalLicensePerson.ProfLic(Person(ActiveProfessionalLicenseExpDt > CurrentDate)).LicenseDescription{Occupation := IsBlank(Occupation, ProfessionalLicense.REC_FOUND_BUT_INVALID)}, 1, -Occupation);
+Person: => ActiveProfessionalLicenseCategory := TOPN(ProfessionalLicensePerson.ProfLic(Person(ActiveProfessionalLicenseExpDt > CurrentDate)).LicenseDescription{LicenseCategory := IF(LicenseCategory = '0', ProfessionalLicense.REC_FOUND_BUT_INVALID, IsBlank(LicenseCategory, ProfessionalLicense.REC_FOUND_BUT_INVALID))}, 1, -LicenseCategory);
+Person: => ActiveProfessionalLicenseSource := TOPN(ProfessionalLicensePerson.ProfLic(Person(ActiveProfessionalLicenseExpDt > CurrentDate)).DataSources{Source := Source}, 1, -Source);
+////////////////////////////////////
+//ProfessionalLicense Attributes
+////////////////////////////////////
+Person: => PL_ProfLicFlagEv := MAP(
+			LexIDSeen = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			ProfessionalLicensePerson(ProfessionalLicense.HasProfessionalLicense) => '1',
+			'0');
+Person: => PL_ProfLicIssueDtListEv := TOPN(ProfessionalLicensePerson.ProfLic(HasProfessionalLicense).LicenseDates{OriginalDateOfIssuance := IF(OriginalDateOfIssuance:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(OriginalDateOfIssuance, '%Y%m%d'))}, 100, OriginalDateOfIssuance);
+Person: => PL_ProfLicExpDtListEv := TOPN(ProfessionalLicensePerson.ProfLic(HasProfessionalLicense).LicenseDates{DateOfExpiration := IF(DateOfExpiration:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(DateOfExpiration, '%Y%m%d'))}, 100, DateOfExpiration);
+Person: => PL_ProfLicIndxByLicListEv := TOPN(ProfessionalLicensePerson.ProfLic(HasProfessionalLicense).LicenseDescription{LicenseCategory := IF(LicenseCategory:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, LicenseCategory)}, 100, LicenseCategory);
+Person: => PL_ProfLicActvFlag := MAP(
+			LexIDSeen = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			ProfessionalLicensePerson.ProfLic(NOT(HasProfessionalLicense))  => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ActiveProfessionalLicenseExpDt > CurrentDate => '1',
+			'0');															
+Person: => PL_ProfLicActvNewIssueDt := MAP(
+			LexIDSeen = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ONLY(ActiveProfessionalLicenseIssueDt, OriginalDateOfIssuance));
+Person: => PL_ProfLicActvNewExpDt := MAP(
+			LexIDSeen = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			DATETOSTRING(ActiveProfessionalLicenseExpDt, '%Y%m%d'));																		 
+Person: => PL_ProfLicActvNewType := MAP(
+			LexIDSeen = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ONLY(ActiveProfessionalLicenseType, LicenseDescription));
+Person: => PL_ProfLicActvNewTitleType := MAP(
+			LexIDSeen = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ONLY(ActiveProfessionalLicenseOccupation, Occupation));
+Person: => PL_ProfLicActvNewIndx := MAP(
+			LexIDSeen = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ONLY(ActiveProfessionalLicenseCategory, LicenseCategory));
+Person: => PL_ProfLicActvNewSrcType := MAP(
+			LexIDSeen = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ONLY(ActiveProfessionalLicenseSource, Source));
