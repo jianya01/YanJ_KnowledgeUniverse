@@ -32,6 +32,15 @@ FUNCTION: GETBUILDDATE(STRING variableName) <= ECL((UNSIGNED8)Risk_Indicators.ge
 FUNCTION: EditDistance(STRING field1, STRING field2) <= ECL(STD.Str.EditDistance(field1, field2)) FROM STD RETURNS INTEGER;
 FUNCTION: FindCount(STRING source, STRING target) <= ECL(STD.Str.FindCount(source, target)) FROM STD RETURNS INTEGER;
 FUNCTION: SourceGroup(STRING RawSource) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.SourceGroup(RawSource)) FROM PublicRecords_KEL RETURNS STRING;
+//function for filter
+FUNCTION: Filter(STRING Source, STRING FilterString) <= ECL(STD.Str.Filter(Source, FilterString)) FROM STD RETURNS STRING;	
+FUNCTION: FilterOut(STRING source, STRING filter) <= ECL(STD.Str.FilterOut(source, filter)) RETURNS STRING;
+//function for check phone is in bad phone list
+FUNCTION: IsBadPhone(STRING Phone) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadPhone(Phone)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
+//function for check ssn is in bad ssn list
+FUNCTION: IsBadSSN(STRING SSN) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadSSN(SSN)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
+//function for check state is in abbreviation state list
+FUNCTION: Fn_Clean_State(STRING State) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_DLState(State)) FROM PublicRecords_KEL RETURNS STRING;	
 
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
 Aircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
@@ -930,6 +939,72 @@ InputBII: => B_Rep5InpClnDOBFlagValue := AuthRep5.P_InpClnDOBFlagValue;
 InputBII: => B_Rep5InpClnEmailFlagValue := AuthRep5.P_InpClnEmailFlagValue; 
 InputBII: => B_Rep5InpClnDLFlagValue := AuthRep5.P_InpClnDLFlagValue;
 InputBII: => B_Rep5InpClnDLStateFlagValue := AuthRep5.P_InpClnDLStateFlagValue; 
+
+InputBII: => B_InpValNameInvalidFlag := MAP(BusInputNameCleanValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
+                                            B_InpClnNameFlagValue = 1 => 0,
+                                            B_InpClnNameFlagValue = 0 => 1);
+InputBII: => B_InpValAltNameInvalidFlag := MAP(BusInputAlternateNameCleanValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,		
+	                                             B_InpClnAltNameFlagValue = 1 => 0,
+						                                   B_InpClnAltNameFlagValue = 0 => 1);
+InputBII: => B_InpValAddrStInvalidFlag := MAP(BusInputStreetCleanValue	= InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
+                			 
+						                                	B_InpClnAddrPrimRngFlagValue = 1  OR
+						                                	B_InpClnAddrPreDirFlagValue = 1 OR
+						                                	B_InpClnAddrPrimNameFlagValue = 1 OR
+						                                 	B_InpClnAddrSffxFlagValue = 1  OR
+							                                B_InpClnAddrPostDirFlagValue = 1 OR
+							                                B_InpClnAddrUnitDesigFlagValue = 1 => 0,
+				                                    	B_InpClnAddrPrimRngFlagValue <> 1  AND
+							                                B_InpClnAddrPreDirFlagValue <> 1  AND
+						                                	B_InpClnAddrPrimNameFlagValue <> 1 AND
+							                                B_InpClnAddrSffxFlagValue <> 1  AND
+							                                B_InpClnAddrPostDirFlagValue <> 1 AND
+						                                	B_InpClnAddrUnitDesigFlagValue <> 1 => 1 );
+InputBII: => B_InpValPhoneInvalidFlag := MAP(BusInputPhoneCleanValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
+                                             B_InpClnPhoneFlagValue = 1 => 0,
+							                               B_InpClnPhoneFlagValue = 0 => 1);
+InputBII: => B_InpValTINInvalidFlag := MAP(BusInputTINCleanValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,	
+                                           B_InpClnTINFlagValue = 1 => 0,
+						                               B_InpClnTINFlagValue = 0 => 1);
+InputBII: => B_InpValEmailInvalidFlag:= MAP(BusInputEmailCleanValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,	
+                                            B_InpClnEmailFlagValue = 1 => 0,
+							                              B_InpClnEmailFlagValue = 0 => 1);
+InputBII: => B_InpZipHelper	:=Filter(BusInputZipEchoValue,'0123456789');			
+InputBII: => B_InpValAddrZipBadLenFlag:= MAP(BusInputZipEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,	
+                                             LENGTH(TRIM( B_InpZipHelper	)) = 5 OR
+							                               LENGTH(TRIM( B_InpZipHelper	)) = 9 => 0,
+                                             LENGTH(TRIM(B_InpZipHelper)) <> 5 AND
+							                               LENGTH(TRIM(B_InpZipHelper)) <>9 => 1);
+InputBII: => B_InpValAddrZipAllZeroFlag:= MAP(BusInputZipEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,	
+					                                    INTEGER(B_InpZipHelper)  = 0 =>1,0);
+//helper attribute to find length of	BusInputStateEchoValue					
+InputBII: => B_InpValAddrStateLength := 	LENGTH(TRIM(BusInputStateEchoValue));
+InputBII: => B_InpValAddrStateBadAbbrFlag:= MAP(BusInputStateEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
+										                            B_InpValAddrStateLength <> 2 => -99998,
+							                                  Fn_Clean_State(BusInputStateEchoValue)='' => 1, 0);
+InputBII: => B_InpValAddrPhoneLength := 	LENGTH(TRIM(BusInputPhoneEchoValue));
+InputBII: => B_InpValPhoneBadCharFlag:= MAP(BusInputPhoneEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,					
+							                              Filter(TRIM(BusInputPhoneEchoValue),'0123456789()-.') = TRIM(BusInputPhoneEchoValue) => 0, 1);
+InputBII: => B_InpValPhoneBadLenFlag:= MAP(BusInputPhoneEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,					
+							                             LENGTH(TRIM(Filter(BusInputPhoneEchoValue, '1234567890'))) = 7 OR
+							                             LENGTH(TRIM(Filter(BusInputPhoneEchoValue, '1234567890')))= 10	=> 0,					
+							                             LENGTH(TRIM(Filter(BusInputPhoneEchoValue, '1234567890'))) <> 7 AND
+							                             LENGTH(TRIM(Filter(BusInputPhoneEchoValue, '1234567890'))) <> 10	=> 1);	
+InputBII: => B_InpValPhoneBogusFlag:= MAP(BusInputPhoneEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,							
+	                                        IsBadPhone(TRIM(BusInputPhoneEchoValue))=> 1,0);
+//helper atrreibute to check tin in 0-9 digits or not
+InputBII: => B_InpTinHelper	:=Filter(BusInputTINEchoValue,'0123456789');				
+InputBII: => B_InpValTINBadCharFlag:= MAP(BusInputTINEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,					
+							                            B_InpTinHelper = TRIM(BusInputTINEchoValue)  => 0, 1); 
+InputBII: => B_InpValTINBadLenFlag:= MAP(BusInputTINEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
+		                                     LENGTH(TRIM(B_InpTinHelper)) = 9 => 0,
+							                           LENGTH(TRIM(B_InpTinHelper)) <> 9	=> 1);		
+InputBII: => B_InpValTINBogusFlag:= MAP(BusInputTINEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,							
+                                        IsBadSSN(BusInputTINEchoValue)=> 1,0);
+							
+
+
+
    /////////////////////
    //Person Attributes//
    /////////////////////
