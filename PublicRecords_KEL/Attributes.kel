@@ -41,6 +41,11 @@ FUNCTION: IsBadPhone(STRING Phone) <= ECL(PublicRecords_KEL.ECL_Functions.Common
 FUNCTION: IsBadSSN(STRING SSN) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadSSN(SSN)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
 //function for check state is in abbreviation state list
 FUNCTION: Fn_Clean_State(STRING State) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_DLState(State)) FROM PublicRecords_KEL RETURNS STRING;	
+FUNCTION: GetCleanEmailDomain(STRING email) <= ECL(Email_Data.Fn_Clean_Email_Domain(email)) FROM Email_Data RETURNS STRING;
+FUNCTION: GetCleanEmailUsername(STRING email) <= ECL(Email_Data.Fn_Clean_Email_Username(email))FROM Email_Data RETURNS STRING;
+FUNCTION: FindLastStringInstance(STRING source, STRING searchString) <= ECL(StringLib.StringFind(source, searchString,StringLib.StringFindCount(source, searchString))) RETURNS INTEGER;
+FUNCTION: BadEmailCheck(STRING email, STRING domain) <= ECL(Email_Data.Fn_InvalidEmail(email,domain)) FROM Email_Data RETURNS INTEGER;
+//FUNCTION: IsBadEmail(STRING email_in) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadEmail(email_in)) FROM PublicRecords_KEL RETURNS BOOLEAN;
 
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
 Aircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
@@ -72,6 +77,7 @@ InputPII: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-99997';
 InputBII: MISSING_INPUT_DATA := '-99999';
 InputBII: MISSING_INPUT_DATA_INT := -99999;
 InputBII: NO_DATA_FOUND := '-99998';
+InputBII: NO_DATA_FOUND_INT := -99998;
 InputBII: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-99997';	 
 
 InputPII: => P_InpAddr := IF(P_InpAddrLine1:Null, '', P_InpAddrLine1 + ' ') +
@@ -995,7 +1001,7 @@ InputBII: => B_InpValAddrStateBadAbbrFlag:= MAP(BusInputStateEchoValue = InputBI
 							                                  Fn_Clean_State(BusInputStateEchoValue)='' => 1, 0);
 InputBII: => B_InpValAddrPhoneLength := 	LENGTH(TRIM(BusInputPhoneEchoValue));
 InputBII: => B_InpValPhoneBadCharFlag:= MAP(BusInputPhoneEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,					
-							                              Filter(TRIM(BusInputPhoneEchoValue),'0123456789()-.') = TRIM(BusInputPhoneEchoValue) => 0, 1);
+							                              Filter(TRIM(BusInputPhoneEchoValue),'0123456789()-.+') = TRIM(BusInputPhoneEchoValue) => 0, 1);
 InputBII: => B_InpValPhoneBadLenFlag:= MAP(BusInputPhoneEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,					
 							                             LENGTH(TRIM(Filter(BusInputPhoneEchoValue, '1234567890'))) = 7 OR
 							                             LENGTH(TRIM(Filter(BusInputPhoneEchoValue, '1234567890')))= 10	=> 0,					
@@ -1004,16 +1010,48 @@ InputBII: => B_InpValPhoneBadLenFlag:= MAP(BusInputPhoneEchoValue = InputBII.MIS
 InputBII: => B_InpValPhoneBogusFlag:= MAP(BusInputPhoneEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,							
 	                                        IsBadPhone(TRIM(BusInputPhoneEchoValue))=> 1,0);
 //helper atrreibute to check tin in 0-9 digits or not
-InputBII: => B_InpTinHelper	:=Filter(BusInputTINEchoValue,'0123456789');				
+InputBII: => B_InpTinHelper	:=Filter(BusInputTINEchoValue,'0123456789()-.');
+InputBII:	=> B_InpTinHelper1 :=Filter(BusInputTINEchoValue,'0123456789');			
 InputBII: => B_InpValTINBadCharFlag:= MAP(BusInputTINEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,					
 							                            B_InpTinHelper = TRIM(BusInputTINEchoValue)  => 0, 1); 
 InputBII: => B_InpValTINBadLenFlag:= MAP(BusInputTINEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
-		                                     LENGTH(TRIM(B_InpTinHelper)) = 9 => 0,
-							                           LENGTH(TRIM(B_InpTinHelper)) <> 9	=> 1);		
+		                                     LENGTH(TRIM(B_InpTinHelper1)) = 9 => 0,
+							                           LENGTH(TRIM(B_InpTinHelper1)) <> 9	=> 1);		
 InputBII: => B_InpValTINBogusFlag:= MAP(BusInputTINEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,							
                                         IsBadSSN(BusInputTINEchoValue)=> 1,0);
 
-   /////////////////////
+
+InputBII: => AtPosition := FindLastStringInstance(B_InpEmail, '@');
+InputBII: => EmailUsername := UPCASE(SUBSTR(B_InpEmail, 1, AtPosition-1));
+InputBII: => EmailUsernameLength := LENGTH(EmailUsername);
+InputBII: => CleanEmailUsername := GetCleanEmailUsername(B_InpEmail);
+InputBII: => CleanEmailUsernameLength := LENGTH(CleanEmailUsername);
+InputBII: => EmailDomain := UPCASE(SUBSTR(B_InpEmail, AtPosition+1, LENGTH(B_InpEmail)));
+InputBII: => EmailDomainLength := LENGTH(EmailDomain);
+InputBII: => CleanEmailDomain := GetCleanEmailDomain(B_InpEmail);
+InputBII: => CleanEmailDomainLength := LENGTH(CleanEmailDomain);
+InputBII: => B_InpValEmailBogusFlag :=         MAP(BusInputEmailEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
+                                              
+                                             BadEmailCheck(B_InpEmail,EmailDomain)= 0 => 0,
+																						  BadEmailCheck(B_InpEmail,EmailDomain)= 1 => 1);
+InputBII: => B_InpValEmailUserAllZeroFlag :=    MAP(BusInputEmailEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
+                                               (AtPosition <= 1 OR BusInputEmailEchoValue =InputBII.NO_DATA_FOUND) =>InputBII.NO_DATA_FOUND_INT,
+                                               (LENGTH(FilterOut(EmailUsername,'0')) = 0 AND EmailUsernameLength > 0) => 1,  
+                                               (LENGTH(FilterOut(EmailUsername,'0')) > 0) => 0 );
+InputBII: => B_InpValEmailUserBadCharFlag :=   MAP(BusInputEmailEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
+														                   (AtPosition <= 1 OR BusInputEmailEchoValue =InputBII.NO_DATA_FOUND) =>InputBII.NO_DATA_FOUND_INT,
+                                               (CleanEmailUsernameLength < EmailUsernameLength AND B_InpValEmailUserAllZeroFlag = 0 ) => 1,  
+                                               (CleanEmailUsernameLength = EmailUsernameLength) => 0 );
+InputBII: => B_InpValEmailDomAllZeroFlag :=     MAP(BusInputEmailEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,                             
+															                  (AtPosition <= 1 OR BusInputEmailEchoValue =InputBII.NO_DATA_FOUND) =>InputBII.NO_DATA_FOUND_INT,
+                                                (LENGTH(FilterOut(EmailDomain,'0')) = 0 AND EmailDomainLength > 0) => 1,  
+                                                (LENGTH(FilterOut(EmailDomain,'0')) > 0) => 0 ); 					
+InputBII: => B_InpValEmailDomBadCharFlag :=     MAP(BusInputEmailEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,																				
+																				  	    (AtPosition <= 1 OR BusInputEmailEchoValue =InputBII.NO_DATA_FOUND) =>InputBII.NO_DATA_FOUND_INT,
+                                                (CleanEmailDomain != EmailDomain AND B_InpValEmailDomAllZeroFlag = 0 ) => 1,  
+                                                (CleanEmailDomain = EmailDomain) => 0 ); 
+
+	 /////////////////////
    //Person Attributes//
    /////////////////////
 Person: => P_LexIDSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
