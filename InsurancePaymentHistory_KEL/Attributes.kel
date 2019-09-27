@@ -1,0 +1,260 @@
+﻿IMPORT KnowledgeUniverse.InsurancePaymentHistory_KEL.Entities;
+IMPORT InsurancePaymentHistory_KEL.Uses;
+
+// Policy: => AEndorsementDate := {PolicyPaymentPlan.EndorsementDate};
+// Policy: => PPEndorsementDate := {PolicyPaymentPlan.Payment.EndorsementDate};
+// Policy: => PPPlanEffectiveDate := {PolicyPaymentPlan.Payment.PlanEffectiveDate};
+// Policy: => PPPolicyTermLengthNonLife := {PolicyPaymentPlan.Payment.PolicyTermLengthNonLife};
+// Policy: => PPPolicyTermLengthLife := {PolicyPaymentPlan.Payment.PolicyTermLengthLife};
+// Policy: => PPPaymentFrequency := {PolicyPaymentPlan.Payment.PaymentFrequency};
+// Policy: => PPPaymentFrequencyOtherReason := {PolicyPaymentPlan.Payment.PaymentFrequencyOtherReason};
+// Policy: => InvoiceTransactionID := {PolicyPaymentPlan.Payment.InvoicePaymentPlan.Invoice.InvoiceTransactionID};
+// Policy: => InvoiceDetails := {PolicyPaymentPlan.Payment.InvoicePaymentPlan.Invoice.InvoiceDetails};
+// Policy: => DetailInvoiceDetails := {PolicyPaymentPlan.Payment.PaymentPlanDetails.Details.InvoiceTransactionID};
+
+Individual: => policy := IndividualPolicy.Policy;
+ 
+
+PaymentPlan: => paymentinvoicetransactionid := ONLY(PaymentDetails, InvoiceTransactionID);
+PaymentPlan: => LineOfBusiness := rPolicy.LineOfBusiness;
+
+PaymentPlan: => PaymentStatusCode := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){PaymentStatusCode}).PaymentStatusCode;
+PaymentPlan: => TermBeginDate := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){TermBeginDate}).TermBeginDate;
+PaymentPlan: => TermEndDate := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){TermEndDate}).TermEndDate;
+PaymentPlan: => PaymentGroupIndicator := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){PaymentGroupIndicator}).PaymentGroupIndicator;
+PaymentPlan: => IsCombinationPolicyPayment := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){IsCombinationPolicyPayment}).IsCombinationPolicyPayment;
+PaymentPlan: => ChangeEffectiveDate := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){ChangeEffectiveDate}).ChangeEffectiveDate;
+PaymentPlan: => CancellationNoticeDate := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){CancellationNoticeDate}).CancellationNoticeDate;
+PaymentPlan: => CancellationDate := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){CancellationDate}).CancellationDate;
+PaymentPlan: => CancellationReasonCode := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){CancellationReasonCode}).CancellationReasonCode;
+PaymentPlan: => PolicyStatus := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){PolicyStatus}).PolicyStatus;
+PaymentPlan: => ReportStartDate := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){ReportStartDate}).ReportStartDate;
+PaymentPlan: => ReportEndDate := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){ReportEndDate}).ReportEndDate;
+PaymentPlan: => GroupNumber := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){GroupNumber}).GroupNumber;
+PaymentPlan: => FirstLoadDate := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){FirstLoadDate}).FirstLoadDate;
+PaymentPlan: => Status := ONLY(rPolicy.Details(EndorsementNumber = PaymentPlan.EndorsementNumber AND EndorsementDate = PaymentPlan.EndorsementDate){Status}).Status;
+// PaymentPlan: => Invoice := rPaymentPlan.Invoice;
+// PaymentPlan: => Invoice := rPaymentPlan.Invoice;
+
+//function
+FUNCTION: CastBL2Int(BOOLEAN statement) <= IF(statement,1,0);//true -> 1, else 0, so null can be transferred to 0
+
+//filter purpose, policy status must be A, all delete flg must be N
+Invoice: => PolicyStatus := rPaymentPlan.PolicyStatus;
+PaymentDetails: => PolicyStatus := rPaymentPlan.PolicyStatus;
+PaymentPlan: => GMOSTermBeginDate := MONTHSBETWEEN(PlanEffectiveDate,CURRENTDATE()); //current date is archive date if use asof, otherwise it is today's date
+Policy.Details: => GMOSTermBeginDate := MONTHSBETWEEN(TermBeginDate,CURRENTDATE());
+Invoice: => GMOSInvoiceDate := MONTHSBETWEEN(InvoiceDate,CURRENTDATE());
+PaymentDetails: => GMOSPaymentReceivedDate := MONTHSBETWEEN(PaymentReceivedDate,CURRENTDATE());
+PaymentDetails: => GMOSLatePaymentRecognitionDate := MONTHSBETWEEN(LatePaymentRecognitionDate,CURRENTDATE());
+PaymentDetails: => GMOSPaymentFailureDate := MONTHSBETWEEN(PaymentFailureDate,CURRENTDATE());
+PaymentDetails: => GMOSPaymentFailureNoticeDate := MONTHSBETWEEN(PaymentFailureNoticeDate,CURRENTDATE());
+PaymentDetails: => GMOSPaymentPolicyReinstatementDate := MONTHSBETWEEN(PolicyReinstatementDate,CURRENTDATE());
+PaymentDetails: => OldestDate := MAX(GMOSPaymentReceivedDate,GMOSLatePaymentRecognitionDate,GMOSPaymentFailureDate,GMOSPaymentFailureNoticeDate,GMOSPaymentPolicyReinstatementDate);
+
+//Globals and constants
+Policy: AUTOLOB := ['PA'];
+Policy: HOMELOB := ['PP'];
+Policy: LIFELOB := ['LI'];
+Policy: ALLLOB := ['LI','PP','PA'];
+Individual: DEFAULT_1 := -1;
+Individual: DEFAULT_3 := -3;
+
+//Exclusion: drop cases we can not use, apply to transaction level. exclude the delete flag = true, term more than 7 years or less than 0 year
+// Policy.Details: => GNOTExcluded := NOT DeleteFlag AND PolicyStatus = 'A' AND GMOSTermBeginDate >= 0 AND GMOSTermBeginDate <= 84;//this DELETE FLAG should be in policy level
+// Policy: => ExitGNOTExcluded := EXISTS(Details(GNOTExcluded));//Effective terms in this policy
+// PaymentPlan: => GNOTExcluded := NOT DeleteFlag AND PolicyStatus = 'A' AND GMOSTermBeginDate >= 0 AND GMOSTermBeginDate <= 84;//this delete flag is paymentplan level
+// PaymentDetails: => GNOTExcluded := rPaymentPlan.GNOTExcluded AND NOT DeleteFlag AND OldestDate >= 0 AND OldestDate <= 84;//all payment details are linked to payment plan, will not generate null, this delete flag is payment details level
+// Invoice: => GNOTExcluded := rPaymentPlan.GNOTExcluded AND NOT DeleteFlag AND GMOSInvoiceDate >= 0 AND GMOSInvoiceDate <= 84;//all invoice are linked to payment plan, will not generate null, this delete flag is invoice level
+
+
+Policy.Details: => GNOTExcluded := PolicyStatus = 'A' AND GMOSTermBeginDate >= 0 AND GMOSTermBeginDate <= 84;//this DELETE FLAG should be in policy level
+Policy: => ExitGNOTExcluded := EXISTS(Details(GNOTExcluded));//Effective terms in this policy
+PaymentPlan: => GNOTExcluded := PolicyStatus = 'A' AND GMOSTermBeginDate >= 0 AND GMOSTermBeginDate <= 84;//this delete flag is paymentplan level
+PaymentDetails: => GNOTExcluded := rPaymentPlan.GNOTExcluded AND OldestDate >= 0 AND OldestDate <= 84;//all payment details are linked to payment plan, will not generate null, this delete flag is payment details level
+Invoice: => GNOTExcluded := rPaymentPlan.GNOTExcluded AND GMOSInvoiceDate >= 0 AND GMOSInvoiceDate <= 84;//all invoice are linked to payment plan, will not generate null, this delete flag is invoice level
+
+
+//*****************************************************//
+//****************Attributes***************************//
+//*****************************************************//
+
+//Indicator of late payment per LOB and per time frame
+PaymentDetails: => GMOSPaymentReceived := MONTHSBETWEEN(PaymentReceivedDate,CURRENTDATE());
+// PaymentPlan: => GMOSPlanEffectiveDate := MONTHSBETWEEN(PlanEffectiveDate,CURRENTDATE());
+
+PaymentPlan: => LatePaymentIndicator84M := EXISTS(PaymentDetails(IsLatePayment AND GMOSPaymentReceived >= 0 AND GMOSPaymentReceived <= 84 AND PaymentReceivedDate > D'19000101' AND GNOTExcluded));
+Policy: => LatePaymentIndicator84M := EXISTS(PaymentPlan(LatePaymentIndicator84M AND GMOSTermBeginDate >= 0 AND GMOSTermBeginDate <= 84 AND GNOTExcluded));
+Individual: => IndicatorLatePaymentAll84M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator84M AND LineOfBusiness IN ALLLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentAuto84M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator84M AND LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentHome84M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator84M AND LineOfBusiness IN HOMELOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentLife84M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator84M AND LineOfBusiness IN LIFELOB AND ExitGNOTExcluded))));
+
+PaymentPlan: => LatePaymentIndicator72M := EXISTS(PaymentDetails(IsLatePayment AND GMOSPaymentReceived >= 0 AND GMOSPaymentReceived <= 72 AND PaymentReceivedDate > D'19000101' AND GNOTExcluded));
+Policy: => LatePaymentIndicator72M := EXISTS(PaymentPlan(LatePaymentIndicator72M AND GNOTExcluded));
+Individual: => IndicatorLatePaymentAll72M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator72M AND LineOfBusiness IN ALLLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentAuto72M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator72M AND LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentHome72M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator72M AND LineOfBusiness IN HOMELOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentLife72M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator72M AND LineOfBusiness IN LIFELOB AND ExitGNOTExcluded))));
+
+PaymentPlan: => LatePaymentIndicator60M := EXISTS(PaymentDetails(IsLatePayment AND GMOSPaymentReceived >= 0 AND GMOSPaymentReceived <= 72 AND PaymentReceivedDate > D'19000101' AND GNOTExcluded));
+Policy: => LatePaymentIndicator60M := EXISTS(PaymentPlan(LatePaymentIndicator60M AND GNOTExcluded));
+Individual: => IndicatorLatePaymentAll60M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator60M AND LineOfBusiness IN ALLLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentAuto60M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator60M AND LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentHome60M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator60M AND LineOfBusiness IN HOMELOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentLife60M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator60M AND LineOfBusiness IN LIFELOB AND ExitGNOTExcluded))));
+
+PaymentPlan: => LatePaymentIndicator48M := EXISTS(PaymentDetails(IsLatePayment AND GMOSPaymentReceived >= 0 AND GMOSPaymentReceived <= 48 AND PaymentReceivedDate > D'19000101' AND GNOTExcluded));
+Policy: => LatePaymentIndicator48M := EXISTS(PaymentPlan(LatePaymentIndicator48M AND GNOTExcluded));
+Individual: => IndicatorLatePaymentAll48M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator48M AND LineOfBusiness IN ALLLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentAuto48M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator48M AND LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentHome48M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator48M AND LineOfBusiness IN HOMELOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentLife48M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator48M AND LineOfBusiness IN LIFELOB AND ExitGNOTExcluded))));
+
+PaymentPlan: => LatePaymentIndicator32M := EXISTS(PaymentDetails(IsLatePayment AND GMOSPaymentReceived >= 0 AND GMOSPaymentReceived <= 32 AND PaymentReceivedDate > D'19000101' AND GNOTExcluded));
+Policy: => LatePaymentIndicator32M := EXISTS(PaymentPlan(LatePaymentIndicator32M AND GNOTExcluded));
+Individual: => IndicatorLatePaymentAll32M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator32M AND LineOfBusiness IN ALLLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentAuto32M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator32M AND LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentHome32M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator32M AND LineOfBusiness IN HOMELOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentLife32M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator32M AND LineOfBusiness IN LIFELOB AND ExitGNOTExcluded))));
+
+PaymentPlan: => LatePaymentIndicator24M := EXISTS(PaymentDetails(IsLatePayment AND GMOSPaymentReceived >= 0 AND GMOSPaymentReceived <= 24 AND PaymentReceivedDate > D'19000101' AND GNOTExcluded));
+Policy: => LatePaymentIndicator24M := EXISTS(PaymentPlan(LatePaymentIndicator24M AND GNOTExcluded));
+Individual: => IndicatorLatePaymentAll24M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator24M AND LineOfBusiness IN ALLLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentAuto24M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator24M AND LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentHome24M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator24M AND LineOfBusiness IN HOMELOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentLife24M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator24M AND LineOfBusiness IN LIFELOB AND ExitGNOTExcluded))));
+
+PaymentPlan: => LatePaymentIndicator12M := EXISTS(PaymentDetails(IsLatePayment AND GMOSPaymentReceived >= 0 AND GMOSPaymentReceived <= 12 AND PaymentReceivedDate > D'19000101' AND GNOTExcluded));
+Policy: => LatePaymentIndicator12M := EXISTS(PaymentPlan(LatePaymentIndicator12M AND GNOTExcluded));
+Individual: => IndicatorLatePaymentAll12M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator12M AND LineOfBusiness IN ALLLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentAuto12M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator12M AND LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentHome12M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator12M AND LineOfBusiness IN HOMELOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentLife12M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator12M AND LineOfBusiness IN LIFELOB AND ExitGNOTExcluded))));
+
+PaymentPlan: => LatePaymentIndicator06M := EXISTS(PaymentDetails(IsLatePayment AND GMOSPaymentReceived >= 0 AND GMOSPaymentReceived <= 6 AND PaymentReceivedDate > D'19000101' AND GNOTExcluded));
+Policy: => LatePaymentIndicator06M := EXISTS(PaymentPlan(LatePaymentIndicator06M AND GNOTExcluded));
+Individual: => IndicatorLatePaymentAll06M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator06M AND LineOfBusiness IN ALLLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentAuto06M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator06M AND LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentHome06M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator06M AND LineOfBusiness IN HOMELOB AND ExitGNOTExcluded))));
+Individual: => IndicatorLatePaymentLife06M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,CastBL2Int(EXISTS(IndividualPolicy.Policy(LatePaymentIndicator06M AND LineOfBusiness IN LIFELOB AND ExitGNOTExcluded))));
+
+//MonthsSinceLastPolicyCancelledByCarrierDTPBLOB
+Policy.Details: => GMOSCancellationDate := MONTHSBETWEEN(CancellationDate,CURRENTDATE());
+// Policy.Details: => GMOSReportStartDate := MONTHSBETWEEN(ReportStartDate,CURRENTDATE());
+Policy: => MonthsSinceLastTermCanceledbyCarrier := MIN(Details(GNOTExcluded AND CancellationDate > D'19000101' AND GMOSCancellationDate >= 0 AND CancellationReasonCode IN ['LAPS','NONP','NPDP','RTCK','INSF','CCDN']),GMOSCancellationDate);
+Individual: => MonthsSinceLastPolicyCancelledByCarrierDPBAll := MAP(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)) => DEFAULT_1,
+																																		NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded AND NOT MonthsSinceLastTermCanceledbyCarrier:Null AND MonthsSinceLastTermCanceledbyCarrier >= 0)) => DEFAULT_3,//no cancelled or with future cancellation
+																																		MAX(MIN(IndividualPolicy(IsPrimaryPolicyOwner).Policy, MonthsSinceLastTermCanceledbyCarrier),999));
+																																		
+Individual: => MonthsSinceLastPolicyCancelledByCarrierDPBAuto := MAP(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)) => DEFAULT_1,
+																																		 NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded AND NOT MonthsSinceLastTermCanceledbyCarrier:Null AND MonthsSinceLastTermCanceledbyCarrier >= 0)) => DEFAULT_3,
+																																		 MAX(MIN(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB), MonthsSinceLastTermCanceledbyCarrier),999));
+																																		 
+Individual: => MonthsSinceLastPolicyCancelledByCarrierDPBHome := MAP(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)) => DEFAULT_1,
+																																		 NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded AND NOT MonthsSinceLastTermCanceledbyCarrier:Null AND MonthsSinceLastTermCanceledbyCarrier >= 0)) => DEFAULT_3,
+																																		 MAX(MIN(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB), MonthsSinceLastTermCanceledbyCarrier),999));
+																																		 
+Individual: => MonthsSinceLastPolicyCancelledByCarrierDPBLife := MAP(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)) => DEFAULT_1,
+																																		 NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded AND NOT MonthsSinceLastTermCanceledbyCarrier:Null AND MonthsSinceLastTermCanceledbyCarrier >= 0)) => DEFAULT_3,
+																																		 MAX(MIN(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB), MonthsSinceLastTermCanceledbyCarrier),999));
+																																		 
+
+//NumberCancellationNotice##LOB: true 0, no cancellation notice at all; cancellation is out of this time frame.
+Policy.Details: => GMOSCancellationNoticeDate := MONTHSBETWEEN(CancellationNoticeDate,CURRENTDATE());
+
+Policy: => NumCancellationNoticePerPolicy84M := COUNT(Sequence.Dedup(Details(GNOTExcluded AND CancellationNoticeDate > D'19000101' AND GMOSCancellationNoticeDate >= 0 AND GMOSCancellationNoticeDate <= 84 AND PaymentStatusCode IN ['PN'] AND GNOTExcluded),LEFT.CancellationNoticeDate = RIGHT.CancellationNoticeDate AND LEFT.PaymentStatusCode = RIGHT.PaymentStatusCode AND LEFT.TermBeginDate = RIGHT.TermBeginDate,Details.TermBeginDate));
+Individual: => NumberCancellationNoticeAll84M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy84M),999));
+Individual: => NumberCancellationNoticeAuto84M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy84M),999));
+Individual: => NumberCancellationNoticeHome84M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy84M),999));
+Individual: => NumberCancellationNoticeLife84M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy84M),999));
+
+Policy: => NumCancellationNoticePerPolicy72M := COUNT(Sequence.Dedup(Details(GNOTExcluded AND CancellationNoticeDate > D'19000101' AND GMOSCancellationNoticeDate >= 0 AND GMOSCancellationNoticeDate <= 72 AND PaymentStatusCode IN ['PN'] AND GNOTExcluded),LEFT.CancellationNoticeDate = RIGHT.CancellationNoticeDate AND LEFT.PaymentStatusCode = RIGHT.PaymentStatusCode AND LEFT.TermBeginDate = RIGHT.TermBeginDate,TermBeginDate));
+Individual: => NumberCancellationNoticeAll72M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy72M),999));
+Individual: => NumberCancellationNoticeAuto72M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy72M),999));
+Individual: => NumberCancellationNoticeHome72M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy72M),999));
+Individual: => NumberCancellationNoticeLife72M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy72M),999));
+
+Policy: => NumCancellationNoticePerPolicy60M := COUNT(Sequence.Dedup(Details(GNOTExcluded AND CancellationNoticeDate > D'19000101' AND GMOSCancellationNoticeDate >= 0 AND GMOSCancellationNoticeDate <= 60 AND PaymentStatusCode IN ['PN'] AND GNOTExcluded),LEFT.CancellationNoticeDate = RIGHT.CancellationNoticeDate AND LEFT.PaymentStatusCode = RIGHT.PaymentStatusCode AND LEFT.TermBeginDate = RIGHT.TermBeginDate,TermBeginDate));
+Individual: => NumberCancellationNoticeAll60M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy60M),999));
+Individual: => NumberCancellationNoticeAuto60M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy60M),999));
+Individual: => NumberCancellationNoticeHome60M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy60M),999));
+Individual: => NumberCancellationNoticeLife60M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy60M),999));
+
+Policy: => NumCancellationNoticePerPolicy48M := COUNT(Sequence.Dedup(Details(GNOTExcluded AND CancellationNoticeDate > D'19000101' AND GMOSCancellationNoticeDate >= 0 AND GMOSCancellationNoticeDate <= 48 AND PaymentStatusCode IN ['PN'] AND GNOTExcluded),LEFT.CancellationNoticeDate = RIGHT.CancellationNoticeDate AND LEFT.PaymentStatusCode = RIGHT.PaymentStatusCode AND LEFT.TermBeginDate = RIGHT.TermBeginDate,TermBeginDate));
+Individual: => NumberCancellationNoticeAll48M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy48M),999));
+Individual: => NumberCancellationNoticeAuto48M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy48M),999));
+Individual: => NumberCancellationNoticeHome48M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy48M),999));
+Individual: => NumberCancellationNoticeLife48M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy48M),999));
+
+Policy: => NumCancellationNoticePerPolicy36M := COUNT(Sequence.Dedup(Details(GNOTExcluded AND CancellationNoticeDate > D'19000101' AND GMOSCancellationNoticeDate >= 0 AND GMOSCancellationNoticeDate <= 36 AND PaymentStatusCode IN ['PN'] AND GNOTExcluded),LEFT.CancellationNoticeDate = RIGHT.CancellationNoticeDate AND LEFT.PaymentStatusCode = RIGHT.PaymentStatusCode AND LEFT.TermBeginDate = RIGHT.TermBeginDate,TermBeginDate));
+Individual: => NumberCancellationNoticeAll36M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy36M),999));
+Individual: => NumberCancellationNoticeAuto36M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy36M),999));
+Individual: => NumberCancellationNoticeHome36M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy36M),999));
+Individual: => NumberCancellationNoticeLife36M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy36M),999));
+
+Policy: => NumCancellationNoticePerPolicy24M := COUNT(Sequence.Dedup(Details(GNOTExcluded AND CancellationNoticeDate > D'19000101' AND GMOSCancellationNoticeDate >= 0 AND GMOSCancellationNoticeDate <= 24 AND PaymentStatusCode IN ['PN'] AND GNOTExcluded),LEFT.CancellationNoticeDate = RIGHT.CancellationNoticeDate AND LEFT.PaymentStatusCode = RIGHT.PaymentStatusCode AND LEFT.TermBeginDate = RIGHT.TermBeginDate,TermBeginDate));
+Individual: => NumberCancellationNoticeAll24M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy24M),999));
+Individual: => NumberCancellationNoticeAuto24M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy24M),999));
+Individual: => NumberCancellationNoticeHome24M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy24M),999));
+Individual: => NumberCancellationNoticeLife24M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy24M),999));
+
+Policy: => NumCancellationNoticePerPolicy12M := COUNT(Sequence.Dedup(Details(GNOTExcluded AND CancellationNoticeDate > D'19000101' AND GMOSCancellationNoticeDate >= 0 AND GMOSCancellationNoticeDate <= 12 AND PaymentStatusCode IN ['PN'] AND GNOTExcluded),LEFT.CancellationNoticeDate = RIGHT.CancellationNoticeDate AND LEFT.PaymentStatusCode = RIGHT.PaymentStatusCode AND LEFT.TermBeginDate = RIGHT.TermBeginDate,TermBeginDate));
+Individual: => NumberCancellationNoticeAll12M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy12M),999));
+Individual: => NumberCancellationNoticeAuto12M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy12M),999));
+Individual: => NumberCancellationNoticeHome12M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy12M),999));
+Individual: => NumberCancellationNoticeLife12M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy12M),999));
+
+Policy: => NumCancellationNoticePerPolicy06M := COUNT(Sequence.Dedup(Details(GNOTExcluded AND CancellationNoticeDate > D'19000101' AND GMOSCancellationNoticeDate >= 0 AND GMOSCancellationNoticeDate <= 6 AND PaymentStatusCode IN ['PN'] AND GNOTExcluded),LEFT.CancellationNoticeDate = RIGHT.CancellationNoticeDate AND LEFT.PaymentStatusCode = RIGHT.PaymentStatusCode AND LEFT.TermBeginDate = RIGHT.TermBeginDate,TermBeginDate));
+Individual: => NumberCancellationNoticeAll06M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN ALLLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy06M),999));
+Individual: => NumberCancellationNoticeAuto06M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN AUTOLOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy06M),999));
+Individual: => NumberCancellationNoticeHome06M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN HOMELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy06M),999));
+Individual: => NumberCancellationNoticeLife06M := IF(NOT EXISTS(IndividualPolicy(IsPrimaryPolicyOwner).Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded)),DEFAULT_1,MAX(SUM(IndividualPolicy.Policy(LineOfBusiness IN LIFELOB AND ExitGNOTExcluded),NumCancellationNoticePerPolicy06M),999));
+
+
+// NumberCOMPCancellation##LOB
+
+// NumberCUSTCancellation##LOB
+
+
+//NumberLAPSCancellation##LOB
+
+//NumberMISRCancellation##LOB
+
+// NumberNONPCancellation##LOB
+// NumberNPDPCancellation##LOB
+// NumberOTHRCancellation##LOB
+// NumberRTCKCancellation##LOB
+// NumberTRANCancellation##LOB
+// NumberSOLDCancellation##LOB
+// NumberSUSPCancellation##LOB
+// NumberREWRCancellation##LOB
+// NumberINSFCancellation##LOB
+// NumberCCDNCancellation##LOB
+// NumberCancellation##LOB
+
+// IndicatorPaymentTypeEFT##LOB
+// IndicatorPaymentTypeCC##LOB
+// IndicatorPaymentTypePAPL##LOB
+// IndicatorPaymentTypePAYD##LOB
+// IndicatorPaymentTypeCHK##LOB
+// IndicatorPaymentTypeCKPH##LOB
+// IndicatorPaymentTypeACH##LOB
+// IndicatorPaymentTypeESC##LOB
+// IndicatorPaymentTypeSAV##LOB
+// IndicatorPaymentTypeCSH##LOB
+// IndicatorPaymentTypeOTH##LOB
+// IndicatorPaymentTypeMix##LOB
+// IndicatorInitiallyPaidInFull##LOB
+// IndicatorInstallmentPlan##LOB
+
+// NumberPoliciesPayWeekly##LOB
+// NumberPoliciesPayBiWeekly##LOB
+// NumberPoliciesPayBiMonthly##LOB
+// NumberPoliciesPayMonthly##LOB
+// NumberPoliciesPaySemiAnnually##LOB
+// NumberPoliciesPayAnnually##LOB
+// NumberPoliciesPayQuarterly##LOB
+// NumberPoliciesPayOther##LOB
+// NumberPoliciesReinstated##LOB
+// IndicatorPartialPayment##LOB
