@@ -1,16 +1,20 @@
 ﻿// Defining the ERA to allow for ASOF functionality
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
-ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
+ERA sevenyears DURING(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
+// ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
-//PERMITS FCRA, NonFCRA;
-
-Policy := ENTITY(FLAT(UID(PolicyNumber),
+PERMITS FCRA, // 1
+		NonFCRA, // 2
+		Both, // 3
+		Neither; // 4
+		
+Policy := ENTITY(FLAT(UID(PolicyNumber, PolicyPlan, AMBestNumber),
 		STRING PolicyNumber,
 		STRING PolicyPlan,
 		STRING LineOfBusiness,
 		INTEGER AMBestNumber,
 		INTEGER EndorsementNumber,
-		DATE EndorsementDate,
+		STRING EndorsementDate,
 		INTEGER GroupNumber,
 		STRING OPolicyNumber,	//No idea what this is
 		INTEGER ProductUsage,	//??
@@ -28,10 +32,31 @@ Policy := ENTITY(FLAT(UID(PolicyNumber),
 		DATE TermEndDate,
 		DATE ChangeEffectiveDate,
 		DATE CancellationNoticeDate,
-		DATE CancelliationDate,
+		DATE CancellationDate,
 		STRING CancellationReasonCode,
 		STRING PaymentExtractExclusion,
 		STRING PolicyStatus,
+		STRING IsUsage,
+		DATE FirstLoadDate,
+		//BOOLEAN DeleteFlag,
+		STRING BatchID,
+		STRING Status),
+	MODEL(UID,
+		PolicyNumber, PolicyPlan, LineOfBusiness, AMBestNumber, OPolicyNumber,
+		ProductUsage, NumberOfPolicies, 
+		CompanyName, NAICCode, PolicyState, OriginationDate, IsUsage,
+		Details{TermBeginDate, TermEndDate, PaymentGroupIndicator, PaymentStatusCode, IsCombinationPolicyPayment,
+			ChangeEffectiveDate, CancellationNoticeDate, CancellationDate, CancellationReasonCode, 
+			PolicyStatus, EndorsementNumber, EndorsementDate, ReportStartDate, ReportEndDate, GroupNumber, FirstLoadDate, BatchID, Status},
+		PaymentSpecialProjects{PaymentExtractExclusion}));
+
+PaymentPlan := ENTITY(FLAT(UID(PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
+		Policy rPolicy = UID(PolicyNumber, PolicyPlan, AMBestNumber),
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber,
+		INTEGER EndorsementNumber,
+		STRING EndorsementDate/*=FORMAT('YYYYMMDD...')*/,
 		DATE PlanEffectiveDate,
 		INTEGER PolicyTermLengthNonLife,
 		INTEGER PolicyTermLengthLife,
@@ -42,40 +67,41 @@ Policy := ENTITY(FLAT(UID(PolicyNumber),
 		REAL InstallmentPaymentPercentageAmount=NULL(''),
 		BOOLEAN IsAccountSetupForAutoDebit,
 		STRING BillType,
-		STRING BillTypeIfOther,
-		STRING IsUsage,
-		DATE FirstLoadDate,
-		BOOLEAN DeleteFlag,
-		STRING BatchID,
-		STRING Status),
-	MODEL(UID,
-		PolicyNumber, PolicyPlan, LineOfBusiness, AMBestNumber, OPolicyNumber,
-		ProductUsage, NumberOfPolicies, 
-		CompanyName, NAICCode, PolicyState, OriginationDate, IsUsage, 
-		DataSource{FirstLoadDate, DeleteFlag, BatchID, Status},
-		Details{TermBeginDate, TermEndDate, PaymentGroupIndicator, PaymentStatusCode, IsCombinationPolicyPayment,
-			ChangeEffectiveDate, CancellationNoticeDate, CancelliationDate, CancellationReasonCode, 
-			PolicyStatus, EndorsementNumber, EndorsementDate, GroupNumber},
-		ReportDates{ReportStartDate, ReportEndDate},
-		PaymentSpecialProjects{PaymentExtractExclusion},
-		PaymentPlans{PlanEffectiveDate, PolicyTermLengthNonLife, PolicyTermLengthLife, PaymentFrequency, PaymentFrequencyOtherReason, DownPaymentPercentage,
-			NumberOfInstallmentPayments, InstallmentPaymentPercentageAmount, IsAccountSetupForAutoDebit, BillType, BillTypeIfOther}));
+		STRING BillTypeIfOther), 
+	MODEL(UID, rPolicy,
+		PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate,
+		PlanEffectiveDate, PolicyTermLengthNonLife, PolicyTermLengthLife, PaymentFrequency, PaymentFrequencyOtherReason, DownPaymentPercentage,
+		NumberOfInstallmentPayments, InstallmentPaymentPercentageAmount, IsAccountSetupForAutoDebit, BillType, BillTypeIfOther));
 
-Invoice := ENTITY(FLAT(UID(InvoiceTransactionID),
+Invoice := ENTITY(FLAT(UID(InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
+		PaymentPlan rPaymentPlan = UID(PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
 		STRING InvoiceTransactionID,
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber,
+		INTEGER EndorsementNumber,
+		STRING EndorsementDate/*=FORMAT('YYYYMMDD...')*/,
 		DATE InvoiceDate,
 		DATE DueDate,
 		BOOLEAN IsReturnMail,
 		STRING ReturnMailReason,
 		DATE ReturnMailDate), 
-	MODEL(UID,
-		InvoiceTransactionID, 
-		InvoiceDates{InvoiceDate, DueDate},
-		IsReturnMail, ReturnMailReason, ReturnMailDate));
+	MODEL(UID, rPaymentPlan,
+		InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate,
+		InvoiceDate, DueDate, IsReturnMail, ReturnMailReason, ReturnMailDate));
 		
-PaymentDetails := ENTITY(FLAT(UID(InvoiceTransactionID, PolicyNumber),
+		
+//InvoicePaymentPlan := ASSOCIATION(FLAT(Invoice Invoice=UID(InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate), PaymentPlan Payment=UID(PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate), STRING EndorsementDate/*=FORMAT('YYYYMMDD...')*/));
+//PolicyPaymentPlan := ASSOCIATION(FLAT(PaymentPlan Payment=UID(PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate), Policy Policy=UID(PolicyNumber, PolicyPlan, AMBestNumber),STRING EndorsementDate/*=FORMAT('YYYYMMDD...')*/));
+		
+PaymentDetails := ENTITY(FLAT(UID(InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
+		PaymentPlan rPaymentPlan = UID(PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
 		STRING InvoiceTransactionID,
 		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber,
+		INTEGER EndorsementNumber,
+		STRING EndorsementDate/*=FORMAT('YYYYMMDD...')*/,
 		STRING PaymentReceivedMethod,
 		STRING PaymentReceivedType,
 		STRING PaymentReceivedTypeIfOther,
@@ -96,14 +122,13 @@ PaymentDetails := ENTITY(FLAT(UID(InvoiceTransactionID, PolicyNumber),
 		DATE PolicyReinstatementDate,
 		BOOLEAN IsPaidInFull,
 		DATE PaidInFullDate),
-	MODEL(UID,
-		InvoiceTransactionID, PolicyNumber,
-		PaymentReceived{PaymentReceivedMethod, PaymentReceivedType, PaymentReceivedTypeIfOther, TransactionPaymentReceivedPercentage, TotalPaymentReceivedPercentage, PaymentReceivedDate,
-			PolicyInEquityIndicator, IsPaymentPercentageDueNotPaidInFull, IsPaymentClearance, PaymentClearanceIndicatorReason},
-		LatePayment{IsLatePayment, LatePaymentRecognitionDate},
-		PaymentFailure{IsPaymentFailure, PaymentFailureDate, IsPaymentFailureNotice, PaymentFailureNoticeDate},
-		PolicyReinstatement{IsPolicyReinstatement, PolicyReinstatementDate},
-		PaidInFull{IsPaidInFull, PaidInFullDate}));
+	MODEL(UID, rPaymentPlan,
+		InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate,
+		PaymentReceivedMethod, PaymentReceivedType, PaymentReceivedTypeIfOther, TransactionPaymentReceivedPercentage, TotalPaymentReceivedPercentage, PaymentReceivedDate,
+		PolicyInEquityIndicator, IsPaymentPercentageDueNotPaidInFull, IsPaymentClearance, PaymentClearanceIndicatorReason, IsLatePayment, LatePaymentRecognitionDate, 
+		IsPaymentFailure, PaymentFailureDate, IsPaymentFailureNotice, PaymentFailureNoticeDate, IsPolicyReinstatement, PolicyReinstatementDate, IsPaidInFull, PaidInFullDate));
+		
+//PaymentPlanDetails := ASSOCIATION(FLAT(PaymentDetails Details=UID(InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate), PaymentPlan Payment=UID(PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),STRING EndorsementDate/*=FORMAT('YYYYMMDD...')*/));		
 		
 Agency := ENTITY(FLAT(UID(CompanyProducerNumber),
 		STRING CompanyProducerNumber,
@@ -129,7 +154,6 @@ Individual := ENTITY(FLAT(UID = LexID,
 		STRING NameSuffix,
 		STRING ProfessionalSuffix,
 		STRING NameIndicator,			// Individual, Business, Turstee (Possibly not required)
-		BOOLEAN IsPrimaryPolicyOwner,
 		DATE DateOfBirth,
 		STRING EmailAddress,
 		INTEGER SocialSecurityNumber,
@@ -139,7 +163,7 @@ Individual := ENTITY(FLAT(UID = LexID,
 	MODEL(UID,
 		OwnerID, IndividualNameID, IndividualAddressID, Source, SourceRID,
 		FullName{Title, FirstName, MiddleName, LastName, NameSuffix, ProfessionalSuffix},
-		NameIndicator, IsPrimaryPolicyOwner, 
+		NameIndicator,
 		ReportedDatesOfBirth{DateOfBirth},
 		ReportedEmailAddresses{EmailAddress},
 		ReportedSocialSecurityNumbers{SocialSecurityNumber},
@@ -150,7 +174,7 @@ Individual := ENTITY(FLAT(UID = LexID,
 
 Trustee := ENTITY(FLAT(UID = ownerid,
 		INTEGER OwnerID,
-		Policy rPolicy=UID(PolicyNumber),
+		Policy rPolicy=UID(PolicyNumber, PolicyPlan, AMBestNumber),
 		INTEGER TrusteeAddressID,
 		STRING TrusteeName,
 		STRING NameIndicator,			// Individual, Business, Turstee (Possibly not required)
@@ -240,21 +264,21 @@ DriversLicense := ENTITY(FLAT(UID(DriversLicenseNumber,IssuingState),
 	MODEL(UID,
 		DriversLicenseNumber, IssuingState));
 
-AgencyPolicy := ASSOCIATION(FLAT(Agency Company = UID(CompanyProducerNumber), Policy Policy = UID(PolicyNumber)));
+AgencyPolicy := ASSOCIATION(FLAT(Agency Company = UID(CompanyProducerNumber), Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber)));
 
-IndividualPolicy := ASSOCIATION(FLAT(Individual Person, Policy Policy = UID(PolicyNumber)));
+IndividualPolicy := ASSOCIATION(FLAT(Individual Person, Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber), BOOLEAN IsPrimaryPolicyOwner));
 IndividualAddress := ASSOCIATION(FLAT(Individual Person, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
 IndividualPhone := ASSOCIATION(FLAT(Individual Person, Phone PhoneNumber));
 IndividualDriversLicense := ASSOCIATION(FLAT(Individual Person, DriversLicense LicenseInformation=UID(DriversLicenseNumber, IssuingState)));
 
-PolicyTrustee	:= ASSOCIATION(FLAT(Trustee Trustee, Policy Policy = UID(PolicyNumber)));
+PolicyTrustee	:= ASSOCIATION(FLAT(Trustee Trustee, Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber)));
 TrusteePhone := ASSOCIATION(FLAT(Trustee Trustee, Phone PhoneNumber));
 TrusteeAddress := ASSOCIATION(FLAT(Trustee Trustee, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
 
-BusinessPolicy	:= ASSOCIATION(FLAT(Business Company, Policy Policy = UID(PolicyNumber)));
+BusinessPolicy	:= ASSOCIATION(FLAT(Business Company, Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber)));
 BusinessPhone := ASSOCIATION(FLAT(Business Company, Phone PhoneNumber));
 BusinessAddress := ASSOCIATION(FLAT(Business Company, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
 
-InvoicePolicy	:= ASSOCIATION(FLAT(Invoice Bill=UID(InvoiceTransactionID), Policy Policy = UID(PolicyNumber)));
-InvoicePaymentDetails := ASSOCIATION(FLAT(Invoice Bill=UID(InvoiceTransactionID), PaymentDetails Payments = UID(InvoiceTransactionID,PolicyNumber)));
-PolicyPaymentDetails := ASSOCIATION(FLAT(Policy Policy=UID(PolicyNumber), PaymentDetails Payments = UID(InvoiceTransactionID,PolicyNumber)));
+//InvoicePolicy	:= ASSOCIATION(FLAT(Invoice Bill=UID(InvoiceTransactionID), Policy Policy = UID(PolicyNumber)));
+//InvoicePaymentDetails := ASSOCIATION(FLAT(Invoice Bill=UID(InvoiceTransactionID), PaymentDetails Payments = UID(InvoiceTransactionID,PolicyNumber)));
+//PolicyPaymentDetails := ASSOCIATION(FLAT(Policy Policy=UID(PolicyNumber), PaymentDetails Payments = UID(InvoiceTransactionID,PolicyNumber)));
