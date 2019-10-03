@@ -124,18 +124,12 @@ Phone := ENTITY(FLAT(UID=Phone10,
 		STRING OmitIndicator,		//Customer asked to omit his phone number in products
 		STRING CurrentFlag,
 		STRING BusinessFlag,
-		STRING PhoneQuality, //this field is from P.Header R-# replaced by gong hist #, E-# enchanced by gong hist #, N-area code is from nxx match to tmp, P-property phone that was cleaned, A added Apt number
-		STRING TNT, 		//p.Header N = name+address not in gong, Y = Name+Address in Gong, P = Name+Address+Phone in gong, D=Dead
 		STRING RecordType,
 		INTEGER SourceFile, 
 		INTEGER IverIndicator, 
 		STRING PhoneType,
 		STRING ValidationFlag,
 		STRING ValidationDate,
-		BOOLEAN IsPhoneMarketable,
-		INTEGER PhoneMarketabilityScore,
-		DATE DateVendorFirstReported,
-		DATE DateVendorLastReported,
 		STRING Source,//phones plus source
 		STRING OriginalSource), //source from Dataset originalsource
 	MODEL(UID,
@@ -152,7 +146,6 @@ Phone := ENTITY(FLAT(UID=Phone10,
 		PhoneUse, 
 		NoSolicitCode, 
 		OmitIndicator,
-		HeaderPhoneQuality{PhoneQuality,TNT},
 		SourceFile,
 		IverIndicator,
 		ValidationFlag,
@@ -163,7 +156,6 @@ Phone := ENTITY(FLAT(UID=Phone10,
 		ConfidenceScores{ConfidenceScore,MaximumConfidenceScore,MinimumConfidenceScore},
 		ListingTypes{ListingType,Source},
 		PhoneTypes{PhoneType,Source},
-		Marketability{IsPhoneMarketable, PhoneMarketabilityScore, DateVendorFirstReported, DateVendorLastReported, Source},
 		RecordTypes{RecordType,Source},
 		DataSources{Source, OriginalSource}));
 
@@ -448,6 +440,7 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		STRING Address_Type,
 		STRING Address_Desc,
 		BOOLEAN HeaderHitFlag,
+		BOOLEAN FDNIndicator,
 		STRING Source),
 	MODEL(UID,
 		PrimaryRange, 
@@ -477,7 +470,7 @@ Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Po
 		ThrowBack{ThrowBackIndicator},
 		Vacancy{VacancyIndicator},
 		Vacation{NumberOfCurrentVacationMonths, MaxVacationMonths, VacationPeriodsCount, VacationBeginDate, VacationEndDate},
-		DataSources{Source, HeaderHitFlag}));
+		DataSources{Source, HeaderHitFlag,FDNIndicator}));
 
 Property := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
 		STRING PrimaryRange,
@@ -2006,14 +1999,8 @@ UCC := ENTITY(FLAT(UID(TMSID),
 			DateVendorFirstReported},
 		DataSources{Source}));		
 
-TIN := ENTITY(FLAT(UID=TIN,
-		DATE DateVendorLastReported,
-		DATE DateVendorFirstReported,
-		STRING Source),
-	MODEL(UID, 
-		DateVendorLastReported,
-		DateVendorFirstReported,
-		DataSources{Source}));		
+TIN := ENTITY(FLAT(UID=TIN),
+	MODEL(UID));		
 
 // ProxTIN is being added so that Best TaxID can be tracked at the ProxID level. Generally, TaxIDs belong at the SeleID level.
 ProxTIN := ASSOCIATION(FLAT(
@@ -2199,13 +2186,60 @@ PersonPhone := ASSOCIATION(FLAT(
 		Phone PhoneNumber, 
 		INTEGER OwnerFlag,
 		BOOLEAN HeaderHitFlag,
+		STRING PhoneQuality, //this field is from P.Header R-# replaced by gong hist #, E-# enchanced by gong hist #, N-area code is from nxx match to tmp, P-property phone that was cleaned, A added Apt number
+		STRING TNT, 		//p.Header N = name+address not in gong, Y = Name+Address in Gong, P = Name+Address+Phone in gong, D=Dead
+		STRING PriorAreaCode,
+		STRING CurrentFlag,
+		STRING BusinessFlag,
+		STRING PublishCode,
+		STRING ListingType,
+		STRING IsActive,
+		STRING OmitIndicator,		//Customer asked to omit his phone number in products
+		STRING NoSolicitCode,	
+		STRING RecordType,
+		STRING PhoneType,
+		STRING ValidationFlag,
+		STRING ValidationDate,	
+		INTEGER ConfidenceScore,
+		INTEGER IverIndicator, 
+		INTEGER SourceFile, 
 		STRING Source, 
 		STRING OriginalSource),
 	MODEL(
 		Subject, 
 		PhoneNumber, 
-		OwnerFlag,
+		HeaderPhoneQuality{PhoneQuality,TNT},
+		Owner{OwnerFlag},
+		PhoneDetails{PriorAreaCode,CurrentFlag,BusinessFlag,PublishCode,ListingType,IsActive,OmitIndicator,
+									ConfidenceScore,NoSolicitCode,RecordType,PhoneType,ValidationFlag,ValidationDate,
+									SourceFile,IverIndicator,Source},
 		DataSources{Source, OriginalSource, HeaderHitFlag}));
+
+HouseHoldPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Household Household, 
+		STRING PriorAreaCode,
+		STRING CurrentFlag,
+		STRING BusinessFlag,
+		STRING PublishCode,
+		STRING ListingType,
+		STRING IsActive,
+		STRING OmitIndicator,		//Customer asked to omit his phone number in products	
+		STRING NoSolicitCode,	
+		STRING RecordType,
+		STRING PhoneType,
+		STRING ValidationFlag,
+		STRING ValidationDate,	
+		INTEGER ConfidenceScore,
+		INTEGER IverIndicator, 
+		INTEGER SourceFile, 
+		STRING Source, 
+		STRING OriginalSource),
+	MODEL(
+		PhoneNumber, 
+		Household, 
+		PhoneDetails{PriorAreaCode,CurrentFlag,BusinessFlag,PublishCode,ListingType,IsActive,OmitIndicator,
+									ConfidenceScore,NoSolicitCode,RecordType,PhoneType,ValidationFlag,ValidationDate,
+									SourceFile,IverIndicator,Source},
+		DataSources{Source, OriginalSource}));
 
 AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
 	INTEGER BestAddressMatchFlag, 
@@ -2216,6 +2250,13 @@ AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(Primary
 	STRING Postdirectional,
 	STRING SecondaryRange,
 	ZipCode ZIP5,
+	STRING PriorAreaCode,
+	STRING CurrentFlag,
+	STRING BusinessFlag,
+	STRING PublishCode,
+	STRING ListingType,
+	STRING IsActive,
+	STRING OmitIndicator,		//Customer asked to omit his phone number in products
 	STRING Source,
 	STRING OriginalSource), 
 	MODEL(
@@ -2228,8 +2269,10 @@ AddressPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Address Location=UID(Primary
 		Postdirectional, 
 		ZIP5, 
 		SecondaryRange,
-		BestAddressMatchFlag, 
+		BestAddressMatchFlags{BestAddressMatchFlag}, 
+		GongPhoneDetails{PriorAreaCode,CurrentFlag,BusinessFlag,PublishCode,ListingType,IsActive,OmitIndicator,Source},
 		DataSources{Source, OriginalSource}));
+		
 PersonOffenses := ASSOCIATION(FLAT(Person Subject, CriminalOffense Offense=UID(OffenderKey), STRING Source),
 	MODEL(Subject, Offense, DataSources{Source}));
 CriminalDetails := ASSOCIATION(FLAT(CriminalOffender Offender = UID(OffenderKey), CriminalOffense Offense = UID(OffenderKey), CriminalPunishment Punishment = UID(OffenderKey), STRING Source),
@@ -2277,8 +2320,6 @@ SSNAddress := ASSOCIATION(FLAT(SocialSecurityNumber Social, Address Location=UID
 		SecondaryRange,	
 		DataSources{Source, HeaderHitFlag}));
 SSNBankruptcy := ASSOCIATION(FLAT(SocialSecurityNumber Social, Bankruptcy Bankrupt=UID(TMSID, Court_Code, Case_Number, DID), STRING Source),	MODEL(Social, Bankrupt, DataSources{Source}));
-PhoneSSN := ASSOCIATION(FLAT(Phone PhoneNumber, SocialSecurityNumber Social, STRING Source),
-	MODEL(PhoneNumber, Social, DataSources{Source}));
 
 PersonInquiry := ASSOCIATION(FLAT(Person Subject, Inquiry Inquiry=UID(TransactionID, SequenceNumber), STRING Source),
 	MODEL(Subject, Inquiry, DataSources{Source}));
@@ -2311,26 +2352,7 @@ DriversLicenseInquiry := ASSOCIATION(FLAT(DriversLicense LicenseInformation=UID(
 
 PersonDriversLicense := ASSOCIATION(FLAT(Person Subject, DriversLicense License=UID(DriversLicenseNumber,IssuingState), STRING Source),
 	MODEL(Subject, License, DataSources{Source}));
-AddressDriversLicense := ASSOCIATION(FLAT(Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), DriversLicense License=UID(DriversLicenseNumber,IssuingState), 
-	STRING PrimaryRange,
-	STRING Predirectional,
-	STRING PrimaryName,
-	STRING Suffix,
-	STRING Postdirectional,
-	STRING SecondaryRange,
-	ZipCode ZIP5,
-	STRING Source),
-	MODEL(
-		Location,
-		PrimaryRange, 
-		Predirectional, 
-		PrimaryName, 
-		Suffix, 
-		Postdirectional, 
-		ZIP5, 
-		SecondaryRange,
-		License, 
-		DataSources{Source}));
+
 // Define a first degree and second degree associations
 FirstDegreeAssociations := ASSOCIATION(FLAT(Person Subject=LexID, Person FirstDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
 SecondDegreeAssociations := ASSOCIATION(FLAT(Person FirstDegreeAssociation=LexID, Person SecondDegreeAssociation=LexID, INTEGER Title, STRING RelationshipType, STRING RelationshipConfidence, INTEGER RelationshipScore, STRING Generation, STRING RelationshipDateFirstSeen, STRING RelationshipDateLastSeen));
@@ -2546,8 +2568,7 @@ SelePropertyEvent := ASSOCIATION(FLAT(BusinessSele Legal=UID(UltID,OrgID,SeleID)
 		VendorSourceCode,
 		DataSources{Source}));
 		
-// ProxAddress := ASSOCIATION(FLAT(Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), BusinessProx Company=UID(UltID, OrgID, SeleID, ProxID), STRING Source),//best with prox I think
-// MODEL(Location, Company, DataSources{Source}));
+
 PersonEducation := ASSOCIATION(FLAT( 
 	Person Subject, Education Edu =UID(Sequence, Key, RawAID),
 	STRING DID,
@@ -2575,6 +2596,7 @@ PersonEducation := ASSOCIATION(FLAT(
 		HeadOfHouseholdGender,
 		RawAID,
 		DataSources{Source}));
+		
 EducationSSN := ASSOCIATION(FLAT( Education Edu =UID(Sequence, Key, RawAID), SocialSecurityNumber Social, STRING Source),
 	MODEL(Edu, Social, DataSources{Source}));
 
@@ -2607,13 +2629,10 @@ UtilityAddress := ASSOCIATION(FLAT(Utility Util, Address Location = UID(PrimaryR
 		ZIP5, 
 		SecondaryRange,
 		DataSources{Source}));
+		
 UtilityPerson := ASSOCIATION(FLAT(Utility Util, Person Subject, STRING Source),
 	MODEL(Util, Subject, DataSources{Source}));
-UtilityPhone := ASSOCIATION(FLAT(Utility Util, Phone PhoneNumber, STRING Source),
-	MODEL(Util, PhoneNumber, DataSources{Source}));
-	
-ProfessionalLicensePhone := ASSOCIATION(FLAT(ProfessionalLicense ProfLic=UID(LicenseNumber,LicenseState,LexID), Phone PhoneNumber, STRING Source),
-	MODEL(ProfLic, PhoneNumber, DataSources{Source})); 
+	 
 ProfessionalLicensePerson := ASSOCIATION(FLAT(ProfessionalLicense ProfLic=UID(LicenseNumber,LicenseState,LexID), Person Subject, STRING Source),
 	MODEL(ProfLic, Subject, DataSources{Source})); 
 
@@ -2714,10 +2733,7 @@ PersonAccident := ASSOCIATION(FLAT(Person Subject, Accident Acc=UID(AccidentNumb
 		
 SeleTradeline := ASSOCIATION(FLAT(BusinessSele Company=UID(UltID, OrgID, SeleID), Tradeline Account=UID(UltID, OrgID, SeleID, AccountKey), STRING Source),
 	MODEL(Company, Account, DataSources{Source}));
-
-HouseHoldPhone := ASSOCIATION(FLAT(Phone PhoneNumber, Household Household, STRING Source, STRING OriginalSource),
-	MODEL(PhoneNumber, Household, DataSources{Source, OriginalSource}));
-		
+	
 ProxPerson := ASSOCIATION(FLAT(
 		BusinessProx Site=UID(UltID,OrgID,SeleID,ProxID), 
 		Person Contact,
@@ -2746,8 +2762,14 @@ ProxAddress := ASSOCIATION(FLAT(
 		STRING PrimaryName,
 		STRING Suffix,
 		STRING Postdirectional,
+		STRING UnitDesignation=NULL(),
 		STRING SecondaryRange,
+		STRING PostalCity=NULL(),
+		STRING VanityCity=NULL(),
+		STRING State=NULL(),
 		ZipCode ZIP5,
+		INTEGER ZIP4=NULL(),
+		INTEGER MetropolitanStatisticalArea=NULL(),
 		STRING SICCode, 
 		STRING NAICSCode, 
 		STRING BestPrimaryRange,
@@ -2763,7 +2785,10 @@ ProxAddress := ASSOCIATION(FLAT(
 		ZipCode BestZip5,
 		INTEGER BestZip4,
 		STRING BestCounty,
-		INTEGER BestAddressRank,		
+		INTEGER BestAddressRank,	
+		STRING CompanyAddressTypeRaw,
+		STRING CompanyAddressTypeDerived,
+		STRING AddressTypeDerived,
 		DATE DateVendorLastReported,
 		DATE DateVendorFirstReported,
 		DATE DateFirstSeenCompanyAddress, 
@@ -2772,13 +2797,9 @@ ProxAddress := ASSOCIATION(FLAT(
 	MODEL(
 		Site,
 		Location,
-		PrimaryRange, 
-		Predirectional, 
-		PrimaryName, 
-		Suffix, 
-		Postdirectional, 
-		SecondaryRange,
-		ZIP5, 
+		PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, SecondaryRange,ZIP5,
+		OtherLocationDetails{UnitDesignation,PostalCity,VanityCity,State,ZIP4,MetropolitanStatisticalArea},
+		AddressTypes{CompanyAddressTypeRaw,CompanyAddressTypeDerived,AddressTypeDerived},
 		SICCodes{SICCode, DateVendorFirstReported, DateVendorLastReported, Source},
 		NAICSCodes{NAICSCode, DateVendorFirstReported, DateVendorLastReported, Source},
 		BestAddresses{BestPrimaryRange, BestPredirectional, BestPrimaryName, BestSuffix, BestPostdirectional, BestUnitDesignation, BestSecondaryRange, BestPostalCity, BestVanityCity, BestState, BestZip5, BestZip4, BestCounty, BestAddressRank},
@@ -2829,13 +2850,28 @@ ProxPhoneNumber := ASSOCIATION(FLAT(
 		STRING SICCode, 
 		STRING NAICSCode, 
 		STRING BestPhone,
-		INTEGER BestPhoneRank,		
+		INTEGER BestPhoneRank,	
+		STRING PriorAreaCode,
+		STRING CurrentFlag,
+		STRING BusinessFlag,
+		STRING PublishCode,
+		STRING ListingType,
+		STRING IsActive,
+		STRING NoSolicitCode,	
+		STRING RecordType,
+		STRING OmitIndicator,		//Customer asked to omit his phone number in products		
+		BOOLEAN IsPhoneMarketable,
+		INTEGER PhoneMarketabilityScore,	
+		DATE DateVendorFirstReported,
+		DATE DateVendorLastReported,
 		STRING Source),
 	MODEL(
 		Site,
 		PhoneNumber,
 		BestPhone,
 		BestPhoneRank,		
+		PhoneDetails{PriorAreaCode,CurrentFlag,BusinessFlag,PublishCode,ListingType,IsActive,OmitIndicator,NoSolicitCode,RecordType,Source},
+		Marketability{IsPhoneMarketable, PhoneMarketabilityScore, DateVendorFirstReported,DateVendorLastReported,Source},
 		SICCodes{SICCode, Source},
 		NAICSCodes{NAICSCode, Source},
 		DataSources{Source}));
