@@ -51,7 +51,7 @@ OUTPUT(header_quick.Key_Did_FCRA((unsigned6)DID IN _Control.LexIDFilterSet), NAM
 //QUERY: PersonByLexID(SearchForLexID) <= Person(UID=SearchForLexID);
 OUTPUT(KELGlobal.Q_Person_By_Lex_I_D(LexID).Res0, NAMED('Personrecords')); //ssncount per lexid
 OUTPUT(Death_Master.Key_ssn_ssa((unsigned6)DID IN _Control.LexIDFilterSet), NAMED('ssnssaRawrecords'));
-OUTPUT(doxie.Key_FCRA_Header((unsigned6)DID IN _Control.LexIDFilterSet), NAMED('HeaderRawrecords'));
+OUTPUT(dx_Header.key_header(data_services.data_env.iFCRA)((unsigned6)DID IN _Control.LexIDFilterSet), NAMED('HeaderRawrecords'));
 
 OUTPUT(KELGlobal.Q_S_S_N_Count_Test(LexID).Res0, NAMED('SSNCounttestrecs'));
 
