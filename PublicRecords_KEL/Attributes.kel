@@ -52,6 +52,7 @@ Aircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE()
 AircraftOwner: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
 Bankruptcy: => CurrentDate := MIN(GETBUILDDATE('bankruptcy_daily'), CURRENTDATE());
 PersonBankruptcy: => CurrentDate := MIN(GETBUILDDATE('bankruptcy_daily'), CURRENTDATE());
+SeleBankruptcy: => CurrentDate := MIN(GETBUILDDATE('bankruptcy_daily'), CURRENTDATE());
 BusinessSele: => CurrentDate := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
 CriminalOffense: => CurrentDate := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
 CriminalOffender: => CurrentDate := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
@@ -67,6 +68,10 @@ Watercraft: => CurrentDate := MIN(GETBUILDDATE('watercraft_build_version'), CURR
 Vehicle: => CurrentDate :=  MIN(GETBUILDDATE('vehicle_build_version'), CURRENTDATE());
 PersonVehicle: => CurrentDate :=  MIN(GETBUILDDATE('vehicle_build_version'), CURRENTDATE());
 WatercraftOwner: => CurrentDate :=  MIN(GETBUILDDATE('watercraft_build_version'), CURRENTDATE());
+SeleVehicle: => CurrentDate :=MIN(GETBUILDDATE('vehicle_build_version'), CURRENTDATE());
+SeleWatercraft: => CurrentDate :=  MIN(GETBUILDDATE('watercraft_build_version'), CURRENTDATE());
+SeleAircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
+
 					
 // Global Constant Definitions for MAS
 InputPII: MISSING_INPUT_DATA := '-99999';
@@ -102,6 +107,23 @@ PersonVehicle: REC_FOUND_BUT_INVALID_INT := -99997;
 PersonVehicle: REC_FOUND_BUT_INVALID := '-99997';
 PersonVehicle: TEN_YEARS_IN_DAYS := 3652;
 PersonVehicle: TWO_YEARS_IN_DAYS := 730;
+
+SeleVehicle: MISSING_INPUT_DATA_INT := -99999;
+SeleVehicle: MISSING_INPUT_DATA := '-99999';
+SeleVehicle: NO_DATA_FOUND_INT := -99998;
+SeleVehicle: NO_DATA_FOUND := '-99998';
+SeleVehicle: REC_FOUND_BUT_INVALID_INT := -99997;
+SeleVehicle: REC_FOUND_BUT_INVALID := '-99997';
+SeleVehicle: TEN_YEARS_IN_DAYS := 3652;
+SeleVehicle: TWO_YEARS_IN_DAYS := 730;
+SeleVehicle: SET_PRIVATE_VEHICLE_CODES := [ 'ANQ','DAV','HCP','MH','PRV'];
+SeleVehicle: SET_COMMERCIAL_VEHICLE_CODES := [ 'AG','AR','CLG','CML','DE','DLR','EA','EMR','ENV','FGV','FNL','FOR','LGV','LIV','MFG','MIL','MUB','OFF','POL','SCB','SGV','TAX' ];
+SeleVehicle: SET_UNKNOWN_TYPE_VEHICLE_CODES := [ 'BOT','EXT','MOT','OTH','TRL','UNK','VAN','XSR' ];
+SeleAircraft: MISSING_INPUT_DATA := '-99999';     
+SeleAircraft: MISSING_INPUT_DATA_INT := -99999;     
+SeleWatercraft: MISSING_INPUT_DATA := '-99999';   
+SeleWatercraft: MISSING_INPUT_DATA_INT := -99999; 
+
 
 AircraftOwner: MISSING_INPUT_DATA_INT := -99999;
 AircraftOwner: NO_DATA_FOUND_INT := -99998;
@@ -2507,7 +2529,51 @@ BusinessSele: => BE_B2BOthBalVol24Mc := MAP(
 		BE_B2BOthRecFlagByMonSum24Mc = 1 => Tradeline.NO_DATA_FOUND_97_INT,
 		BE_B2BOthCnt24Mc = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
 		MIN(B2bTLDevationSampleInOth/B2bTLInOthMEAN,2.00));
+		
+	
+//Business asset vehicle attributes//
 
+BusinessSele: => VehicleBuildCurrentDate := ONLY(SeleVehicle,CurrentDate);
+BusinessSele: => AircraftBuildCurrentDate := ONLY(SeleAircraft,CurrentDate);
+BusinessSele: => WatercraftBuildCurrentDate := ONLY(SeleWatercraft,CurrentDate);
+SeleVehicle: => DateFirstSeenCapped := IF(MIN(CountsModel, SequenceKey:DateFirstSeen) > CurrentDate, CurrentDate, MIN(CountsModel, SequenceKey:DateFirstSeen));
+SeleVehicle: => VehicleMinDate := IF(ISVALIDDATE(DateFirstSeenCapped), DATETOSTRING(DateFirstSeenCapped,'%Y%m%d') ,SeleVehicle.REC_FOUND_BUT_INVALID);
+SeleVehicle: => DateLastSeenCapped := IF(MAX(CountsModel, SequenceKey:DateLastSeen) > CurrentDate, CurrentDate, MAX(CountsModel, SequenceKey:DateLastSeen));
+SeleVehicle: => VehicleMaxDate := IF(ISVALIDDATE(DateLastSeenCapped), DATETOSTRING(DateLastSeenCapped,'%Y%m%d'), SeleVehicle.REC_FOUND_BUT_INVALID);
+SeleVehicle: => Seen_In_Last_Ten_Years := DAYSBETWEEN(DateLastSeenCapped ,CurrentDate) <= SeleVehicle.TEN_YEARS_IN_DAYS;
+SeleVehicle: => Seen_In_Last_Two_Years := DAYSBETWEEN(DateLastSeenCapped ,CurrentDate) <= SeleVehicle.TWO_YEARS_IN_DAYS;
+SeleVehicle: => VehicleTypeCode := ONLY(TOPN(Registration, 1, -RegistrationLicensePlateTypeCode:DateLastSeen), RegistrationLicensePlateTypeCode);
+SeleVehicle: => CommercialType := VehicleTypeCode IN SET_COMMERCIAL_VEHICLE_CODES;
+SeleVehicle: => PrivateType := VehicleTypeCode IN SET_PRIVATE_VEHICLE_CODES;
+SeleVehicle: => OtherType := VehicleTypeCode  IN SET_UNKNOWN_TYPE_VEHICLE_CODES OR  VehicleTypeCode = '' OR VehicleTypeCode:Null;
+BusinessSele: => BE_AstVehAutoCntEv := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleVehicle.MISSING_INPUT_DATA,SeleVehicle.MISSING_INPUT_DATA_INT,
+		                                   BOUNDSFOLD(COUNT(SeleVehicle), 0, 999999));
+BusinessSele: => BE_AstVehAirCntEv:= IF(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleAircraft.MISSING_INPUT_DATA, SeleAircraft.MISSING_INPUT_DATA_INT,
+		                                 BOUNDSFOLD(COUNT(SeleAircraft), 0, 999999));
+BusinessSele: => BE_AstVehWtrCntEv:= IF(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleWatercraft.MISSING_INPUT_DATA, SeleWatercraft.MISSING_INPUT_DATA_INT,
+		                                 BOUNDSFOLD(COUNT(SeleWatercraft), 0, 999999));
+BusinessSele: => BE_AstVehAutoCnt2Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID =SeleVehicle.MISSING_INPUT_DATA, SeleVehicle.MISSING_INPUT_DATA_INT,
+		                                   BOUNDSFOLD(COUNT(SeleVehicle(Seen_In_Last_Two_Years)),0,999999));
+BusinessSele: => BE_AstVehAutoPersCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleVehicle.MISSING_INPUT_DATA => SeleVehicle.MISSING_INPUT_DATA_INT,
+                                           BE_AstVehAutoCnt2Y = '0' => SeleVehicle.NO_DATA_FOUND_INT,
+		                                       BOUNDSFOLD(COUNT(SeleVehicle(PrivateType AND Seen_In_Last_Two_Years)),0,999999));
+BusinessSele: => BE_AstVehAutoCommCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleVehicle.MISSING_INPUT_DATA => SeleVehicle.MISSING_INPUT_DATA_INT,
+                                           BE_AstVehAutoCnt2Y = '0' => SeleVehicle.NO_DATA_FOUND_INT,
+		                                       BOUNDSFOLD(COUNT(SeleVehicle(CommercialType AND Seen_In_Last_Two_Years)),0,999999));
+BusinessSele: => BE_AstVehAutoOtherCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleVehicle.MISSING_INPUT_DATA => SeleVehicle.MISSING_INPUT_DATA_INT,
+                                            BE_AstVehAutoCnt2Y = '0' => SeleVehicle.NO_DATA_FOUND_INT,
+		                                        BOUNDSFOLD(COUNT(SeleVehicle(OtherType AND Seen_In_Last_Two_Years)),0,999999));
+BusinessSele: => BE_AstVehAutoValTot2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleVehicle.MISSING_INPUT_DATA => SeleVehicle.MISSING_INPUT_DATA_INT,
+                                           BE_AstVehAutoCnt2Y = '0' => SeleVehicle.NO_DATA_FOUND_INT,
+                                           BOUNDSFOLD(SUM(SeleVehicle(Seen_In_Last_Two_Years).Automobile(VinaPrice>0),VinaPrice),0,999999999));
+BusinessSele: => BE_AstVehAutoEmrgNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleVehicle.MISSING_INPUT_DATA => SeleVehicle.MISSING_INPUT_DATA,
+			                                       BE_AstVehAutoCntEv = '0' => SeleVehicle.NO_DATA_FOUND,
+			                                       ALL(SeleVehicle,VehicleMinDate = SeleVehicle.REC_FOUND_BUT_INVALID) => SeleVehicle.REC_FOUND_BUT_INVALID,	
+			                                       DATETOSTRING(MAX(SeleVehicle(VehicleMinDate != SeleVehicle.REC_FOUND_BUT_INVALID),DATE(VehicleMinDate)),'%Y%m%d' ));
+BusinessSele: => BE_AstVehAutoEmrgNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleVehicle.MISSING_INPUT_DATA => SeleVehicle.MISSING_INPUT_DATA_INT,
+			                                         BE_AstVehAutoCntEv = '0' => SeleVehicle.NO_DATA_FOUND_INT,
+			                                         ALL(SeleVehicle,VehicleMinDate = SeleVehicle.REC_FOUND_BUT_INVALID) => SeleVehicle.REC_FOUND_BUT_INVALID_INT,	
+			                                         BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_AstVehAutoEmrgNewDtEv),VehicleBuildCurrentDate),0,9999)); 
 ////////////////////////////////////
 // ProfessionalLicense Helper Attributes
 ////////////////////////////////////
