@@ -1381,6 +1381,16 @@ Bankruptcy.BestChildRecord: => Chapter11 := OriginalChapter = '11';
 Bankruptcy.BestChildRecord: => Chapter12 := OriginalChapter = '12';
 Bankruptcy.BestChildRecord: => Chapter13 := OriginalChapter = '13';
 Bankruptcy.BestChildRecord: => Chapter15 := OriginalChapter = '15';
+
+Bankruptcy.BestChildRecord: => BusChangeChapter :=IF(OriginalChapter ='304','15',OriginalChapter);//for business 304 will be converted to chapter 15 per Sam Shepler
+Bankruptcy.BestChildRecord: => BusChapterType := BusChangeChapter IN ['7','9','11','12','13','15'];
+Bankruptcy.BestChildRecord: => BusChapter7 := BusChangeChapter = '7';
+Bankruptcy.BestChildRecord: => BusChapter9 := BusChangeChapter = '9';
+Bankruptcy.BestChildRecord: => BusChapter11 := BusChangeChapter = '11';
+Bankruptcy.BestChildRecord: => BusChapter12 := BusChangeChapter = '12';
+Bankruptcy.BestChildRecord: => BusChapter13 := BusChangeChapter = '13';
+Bankruptcy.BestChildRecord: => BusChapter15 := BusChangeChapter = '15';
+
 Bankruptcy.BestChildRecord: => IsBankruptcy := Bankruptcy.HasCaseNumber AND EXISTS(CaseDetails(CaseID <> ''));
 Bankruptcy.BestChildRecord: => IsDisposed := NOT Disposition:Null;
 Bankruptcy.BestChildRecord: => Banko1Year := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null);
@@ -2573,7 +2583,76 @@ BusinessSele: => BE_AstVehAutoEmrgNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR  
 BusinessSele: => BE_AstVehAutoEmrgNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleVehicle.MISSING_INPUT_DATA => SeleVehicle.MISSING_INPUT_DATA_INT,
 			                                         BE_AstVehAutoCntEv = '0' => SeleVehicle.NO_DATA_FOUND_INT,
 			                                         ALL(SeleVehicle,VehicleMinDate = SeleVehicle.REC_FOUND_BUT_INVALID) => SeleVehicle.REC_FOUND_BUT_INVALID_INT,	
-			                                         BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_AstVehAutoEmrgNewDtEv),VehicleBuildCurrentDate),0,9999)); 
+                                               BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_AstVehAutoEmrgNewDtEv),VehicleBuildCurrentDate),0,9999));
+/////////////////////////																							 
+//Business Bankruptcy Helper Attributes//
+/////////////////////////
+BusinessSele: => Ch7Cnt10Y := BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.BusChapter7)), 0, 999);
+BusinessSele: => Ch11Cnt10Y := BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.BusChapter11)), 0, 999);			
+BusinessSele: => Ch13Cnt10Y := BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.BusChapter13)), 0, 999);
+BusinessSele: => BkCnt10yNoChpt := BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND NOT BestChildRecord.BusChapterType)), 0, 99);
+BusinessSele: => Top1Chapter10YListWithNull := TOPN(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year){OriginalChapter:=BestChildRecord.BusChangeChapter, BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+BusinessSele: => MostRecentChapter10YWithNull := ONLY(Top1Chapter10YListWithNull,OriginalChapter);
+BusinessSele: => MostRecentChapter10YList := TOPN(SeleBankruptcy.Bankrupt.BestChildRecord(Banko10Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,BusChangeChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+BusinessSele: => MostRecentChapter10Y := ONLY(MostRecentChapter10YList,OriginalChapter);
+BusinessSele: => MostRecentUpdateBks10Y := TOPN(SeleBankruptcy.Bankrupt.BestChildRecord(Banko10YearUpdateFilter){BankruptcyDate,LastStatusUpdate, DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled);
+BusinessSele: => MostRecentUpdate10Y := ONLY(MostRecentUpdateBks10Y,STRING(LastStatusUpdate));
+BusinessSele: => MostRecentDispoList10Y := TOPN(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year){ModDisposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,BestChildRecord.ModifiedDisposition), BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled); 
+BusinessSele: => MostRecentDispo10Y := ONLY(MostRecentDispoList10Y,ModDisposition);
+/////////////////////////																							 
+//Business Bankruptcy Attributes//
+/////////////////////////
+BusinessSele: => BE_DrgBkCnt1Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt.BestChildRecord(Banko1Year)), 0, 999));		
+BusinessSele: => BE_DrgBkCnt7Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt.BestChildRecord(Banko7Year)), 0, 999));		
+BusinessSele: => BE_DrgBkCnt10Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt.BestChildRecord(Banko10Year)), 0, 999));		
+BusinessSele: => BE_DrgBkOldDt10Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MIN(SeleBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+BusinessSele: => BE_DrgBkOldMsnc10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                 BE_DrgBkOldDt10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			                                 BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_DrgBkOldDt10Y), ONLY(SeleBankruptcy.Bankrupt, SeleBankruptcy.CurrentDate)), 0, 120));	
+BusinessSele: => BE_DrgBkNewDt10Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MAX(SeleBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+BusinessSele: => BE_DrgBkNewMsnc10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+																			 BE_DrgBkNewDt10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+																			 BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_DrgBkNewDt10Y), ONLY(SeleBankruptcy.Bankrupt, SeleBankruptcy.CurrentDate)), 0, 120));	
+BusinessSele: => BE_DrgBkUpdtNewDt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                   (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			                                   (MostRecentUpdate10Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
+			                                    MostRecentUpdate10Y); 		
+BusinessSele: => BE_DrgBkUpdtNewMsnc10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                     (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+		                                       (MostRecentUpdate10Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
+			                                     BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentUpdate10Y), ONLY(SeleBankruptcy.Bankrupt, CurrentDate)), 0, 120)); 
+BusinessSele: => BE_DrgBkDispCnt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                 (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+		                                  	BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.IsDisposed)), 0, 999));			
+BusinessSele: => BE_DrgBkDschCnt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+                                      (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			                                (BE_DrgBkCnt10Y > 0 AND BE_DrgBkDispCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
+		                                 	 BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.ModifiedDisposition = 'DISCHARGED')), 0, 999)); 
+BusinessSele: => BE_DrgBkDsmsCnt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                 (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			                                 (BE_DrgBkCnt10Y > 0 AND BE_DrgBkDispCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			                                  BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.ModifiedDisposition = 'DISMISSED')), 0, 999)); 
+BusinessSele: => BE_DrgBkNewDispType10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                     (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			                                      MostRecentDispo10Y = Bankruptcy.NO_DATA_FOUND_97 => Bankruptcy.NO_DATA_FOUND_97,
+			                                      MostRecentDispo10Y);
+BusinessSele: => BE_DrgBkCh7Cnt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			                                (BE_DrgBkCnt10Y > 0 AND BkCnt10yNoChpt > 0 AND BE_DrgBkCnt10Y = BkCnt10yNoChpt) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			                                 Ch7Cnt10Y);
+BusinessSele: => BE_DrgBkCh13Cnt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                 (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			                                 (BE_DrgBkCnt10Y > 0 AND BkCnt10yNoChpt > 0 AND BE_DrgBkCnt10Y = BkCnt10yNoChpt) => Bankruptcy.NO_DATA_FOUND_97_INT,
+																			  Ch13Cnt10Y); 
+BusinessSele: => BE_DrgBkCh11Cnt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                 (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			                                 (BE_DrgBkCnt10Y > 0 AND BkCnt10yNoChpt > 0 AND BE_DrgBkCnt10Y = BkCnt10yNoChpt) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			                                  Ch11Cnt10Y); 
+BusinessSele: => BE_DrgBkNewChType10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+			                                   (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			                                    MostRecentChapter10YWithNull = Bankruptcy.NO_DATA_FOUND_97_INT => Bankruptcy.NO_DATA_FOUND_97_INT,
+		                                    	MostRecentChapter10Y); 					
+
 ////////////////////////////////////
 // ProfessionalLicense Helper Attributes
 ////////////////////////////////////
