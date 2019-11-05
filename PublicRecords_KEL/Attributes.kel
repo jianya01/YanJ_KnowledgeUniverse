@@ -2799,18 +2799,18 @@ BusinessSele: => BE_DrgBkNewChType10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleI
 // ProfessionalLicense Helper Attributes
 ////////////////////////////////////
 ProfessionalLicense: => ValidProfessionalLicense := LicenseNumber <> '' AND (MaxIssueDate < CurrentDate OR MaxIssueDate:Null) ;
-ProfessionalLicense: => MaxIssueDate := MAX(LicenseDates, OriginalDateOfIssuance);
+ProfessionalLicense: => MaxIssueDate := MAX(LicenseDates, IF(OriginalDateOfIssuance < DATE('19000101'),DATE(''),OriginalDateOfIssuance));
 ProfessionalLicense: => MaxExpireDate := MAX(LicenseDates, DateOfExpiration);
+ProfessionalLicense: => IsActive := MaxExpireDate > CurrentDate;
 Person: => ProfessionalLicenseDates := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 100, MaxIssueDate, -MaxExpireDate);
-Person: => ActiveProfessionalLicenseIssueExpDate := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
+Person: => ActiveProfessionalLicenseIssueExpDate := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseIssueDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxIssueDate);
 Person: => ActiveProfessionalLicenseExpDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxExpireDate);
-Person: => ActiveProfessionalLicenseIssueExpDateGroup := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, LicenseDates.LicenseDescription, LicenseDates.Occupation, LicenseDates.LicenseCategory, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
+Person: => ActiveProfessionalLicenseIssueExpDateGroup := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, LicenseDates.LicenseDescription, LicenseDates.Occupation, LicenseDates.LicenseCategory, DataSources.Source, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseType := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseDescription, ProfessionalLicense.REC_FOUND_BUT_INVALID));
 Person: => ActiveProfessionalLicenseOccupation := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Occupation, ProfessionalLicense.REC_FOUND_BUT_INVALID));
 Person: => ActiveProfessionalLicenseCategory := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseCategory, ProfessionalLicense.REC_FOUND_BUT_INVALID));
-Person: => ActiveProfessionalLicenseSource := TOPN(ProfessionalLicensePerson.ProfLic(Person.ActiveProfessionalLicenseExpDt > DATETOSTRING(CurrentDate, '%Y%m%d') AND Person.ActiveProfessionalLicenseExpDt = STRING(MaxExpireDate)).DataSources{Source := Source}, 1, -Source);
-
+Person: => ActiveProfessionalLicenseSource :=ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Source, ProfessionalLicense.REC_FOUND_BUT_INVALID));
 ////////////////////////////////////
 //ProfessionalLicense Attributes
 ////////////////////////////////////
@@ -2820,8 +2820,7 @@ Person: => PL_ProfLicFlagEv := MAP(
 			'0');
 Person: => PL_ProfLicIssueDtListEv := ProfessionalLicenseDates{ProfLicUID, MaxIssueDate};
 Person: => PL_ProfLicExpDtListEv := ProfessionalLicenseDates{ProfLicUID, MaxExpireDate};
-Person: => PL_ProfLicIndxByLicListEv := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense).LicenseDescription{LicenseCategory := IF(LicenseCategory:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, LicenseCategory)}, 100, LicenseCategory);
-
+Person: => PL_ProfLicIndxByLicListEv := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID,LicenseCategory := IF(LicenseDescription.LicenseCategory:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, LicenseDescription.LicenseCategory)}, 100, LicenseCategory);
 Person: => PL_ProfLicActvFlag := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,	
 			NOT(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense)) => ProfessionalLicense.NO_DATA_FOUND_PROF,			
@@ -2850,9 +2849,4 @@ Person: => PL_ProfLicActvNewIndx := MAP(
 Person: => PL_ProfLicActvNewSrcType := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
 			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
-			ONLY(ActiveProfessionalLicenseSource, Source));
-			
-			
-			
-			
-			
+			ActiveProfessionalLicenseSource);
