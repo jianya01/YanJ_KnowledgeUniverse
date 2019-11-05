@@ -45,7 +45,7 @@ FUNCTION: GetCleanEmailDomain(STRING email) <= ECL(Email_Data.Fn_Clean_Email_Dom
 FUNCTION: GetCleanEmailUsername(STRING email) <= ECL(Email_Data.Fn_Clean_Email_Username(email))FROM Email_Data RETURNS STRING;
 FUNCTION: FindLastStringInstance(STRING source, STRING searchString) <= ECL(StringLib.StringFind(source, searchString,StringLib.StringFindCount(source, searchString))) RETURNS INTEGER;
 FUNCTION: BadEmailCheck(STRING email, STRING domain) <= ECL(Email_Data.Fn_InvalidEmail(email,domain)) FROM Email_Data RETURNS INTEGER;
-//FUNCTION: IsBadEmail(STRING email_in) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadEmail(email_in)) FROM PublicRecords_KEL RETURNS BOOLEAN;
+
 
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
 Aircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
@@ -77,6 +77,7 @@ SeleAircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDA
 InputPII: MISSING_INPUT_DATA := '-99999';
 InputPII: MISSING_INPUT_DATA_INT := -99999;
 InputPII: NO_DATA_FOUND := '-99998';
+InputPII: NO_DATA_FOUND_INT := -99998;
 InputPII: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-99997';	
 
 InputBII: MISSING_INPUT_DATA := '-99999';
@@ -333,6 +334,145 @@ InputPII: => P_InpClnPhoneWorkFlagValue:= IsCleanPopulated(InputWorkPhoneCleanVa
 InputPII: => P_InpClnEmailFlagValue:= IsCleanPopulated(InputEmailCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnArchDtFlagValue :=  IsEchoPopulated(P_InpClnArchDt); // This only returns 0/1, so using the IsEchoPopulatedFunction to check the clean archive date.
 
+
+
+//////////////////////////////////////
+//Input Validation Helper Attributes//
+//////////////////////////////////////
+InputPII: US_TERRITORIES := ['AL','AK','AS','AZ','AR','CA','CO','CT','DE','DC','FM','FL','GA','GU','HI','ID','IL','IN','IA','KS','KY','LA','ME','MH','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','MP','OH','OK','OR','PW','PA','PR','RI','SC','SD','TN','TX','UT','VT','VI','VA','WA','WV','WI','WY','AE','AP','AA'];
+InputPII: ITIN_FOURTH_AND_FIFTH_NUMS := [50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,90,91,92,94,95,96,97,98,99];
+
+///////////////////////////////
+//Input Validation Attributes//
+///////////////////////////////
+//KS-1044
+InputPII: => CleanedZip := Filter(P_InpAddrZip, '0123456789'); //removes all non-numeric characters eg.'-'
+
+InputPII: => CleanedZipInt := INTEGER(CleanedZip);  //used to check for all zero
+
+InputPII: => ZipLengthValue := IF(InputZipValue = MISSING_INPUT_DATA, 0,  //Zip already marked invalid
+				LENGTH(CleanedZip));  //Get length of full zip code, could be up to 9 numbers. 
+
+InputPII: => P_InpValAddrZipBadLenFlagValue := MAP(
+				(ZipLengthValue = 0) => MISSING_INPUT_DATA_INT, //Zip5 contains 0 numbers
+				(ZipLengthValue = 5 OR ZipLengthValue = 9) => 0, //Zip5 contains 5 or 9 numbers
+				1 //Zip5 doesnt contain 5 or 9 numbers
+				); 
+				
+InputPII: => P_InpValAddrZipAllZeroFlagValue := MAP(
+				(ZipLengthValue = 0) => MISSING_INPUT_DATA_INT, //Zip contains no numbers
+				(CleanedZipInt = 0) => 1, //Zip contains all zeros
+				(CleanedZipInt > 0) => 0 //Zip contains numbers
+				);
+
+InputPII: => P_InpValAddrStateBadAbbrFlagValue := MAP(
+				(P_InpAddrState:Null OR TRIM(P_InpAddrState) = '' OR TRIM(P_InpAddrState) = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT, //State missing
+				(LENGTH(TRIM(P_InpAddrState)) != 2) => NO_DATA_FOUND_INT, //State not 2 letter abbreviation
+				(NOT TRIM(P_InpAddrState) IN US_TERRITORIES) => 1, //State not in list of US_TERRITORIES
+				(TRIM(P_InpAddrState) IN US_TERRITORIES) => 0 //State is in list of US_TERRITORIES
+				);
+							
+//KS-1046
+InputPII: => CleanSSN := Filter(P_InpSSN, '0123456789()-.');
+InputPII: => NumericSSN := Filter(P_InpSSN, '0123456789');
+
+InputPII: => P_InpValSSNBadCharFlagValue := MAP(
+				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
+				P_InpSSN = CleanSSN => 0, //SSN Contains only Numeric, dashes, parentheses, or dots
+				1 //SSN Contains bad characters
+				);
+				
+InputPII: => P_InpValSSNBadLenFlagValue := MAP(
+				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
+				LENGTH(NumericSSN) = 9 => 0, //SSN Contains 9 Numbers
+				1  //SSN doesn't contain 9 numbers
+				);
+				
+InputPII: => P_InpValSSNBogusFlagValue := MAP(
+				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
+				IsBadSSN(NumericSSN) => 1, //SSN in ut.Set_BadSSN
+				0  //SSN not in ut.Set_BadSSN
+				);
+				
+InputPII: => P_InpValSSNNonSSAFlagValue := MAP(
+				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
+				LENGTH(NumericSSN) != 9 => NO_DATA_FOUND_INT,  //No Data found
+				SUBSTR(NumericSSN,1,3) IN ['000','666'] => 1,  //bad according to SSA standards
+				INTEGER(SUBSTR(NumericSSN,1,3)) >= 900 AND INTEGER(SUBSTR(NumericSSN,1,3)) <= 999 => 1,  //bad according to SSA standards
+				SUBSTR(NumericSSN,4,5) = '00' => 1,  //bad according to SSA standards
+				SUBSTR(NumericSSN,6,9) = '0000' => 1,  //bad according to SSA standards
+				0  //good according to SSA standards
+				);
+				
+InputPII: => Numeric45SSN := INTEGER(SUBSTR(NumericSSN,4,5));
+
+InputPII: => P_InpValSSNIsITINFlagValue := MAP(
+				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
+				LENGTH(NumericSSN) != 9 => NO_DATA_FOUND_INT,  //No Data found
+				SUBSTR(NumericSSN,1,1) = '9' AND (Numeric45SSN IN ITIN_FOURTH_AND_FIFTH_NUMS)  => 1,  //Likely to be an ITIN
+				0  //Not likely to be an ITIN
+				);
+
+//KS-1048
+//Get Email Username and length
+InputPII: => AtPosition := FindLastStringInstance(TRIM(P_InpEmail), '@');
+InputPII: => EmailUsername := UPCASE(SUBSTR(TRIM(P_InpEmail), 1, AtPosition-1));
+InputPII: => EmailUsernameLength := LENGTH(EmailUsername);
+
+//Get Clean Email Username and length						
+InputPII: => CleanEmailUsername := GetCleanEmailUsername(P_InpEmail);
+InputPII: => CleanEmailUsernameLength := LENGTH(CleanEmailUsername);
+
+//All zero check
+InputPII: => P_InpValEmailUserAllZeroFlagValue := MAP(
+				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT,  //Missing Email
+				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
+				(LENGTH(FilterOut(EmailUsername,'0')) = 0 AND EmailUsernameLength > 0) => 1,  //Email Username all zeros
+				(LENGTH(FilterOut(EmailUsername,'0')) > 0) => 0  //Email Username not all zeros
+				);
+				
+//Bad Character check
+InputPII: => P_InpValEmailUserBadCharFlagValue := MAP(
+				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT,  //Missing Email
+				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
+				(CleanEmailUsername != EmailUsername AND P_InpValEmailUserAllZeroFlagValue = 0) => 1,  //Bad characters found
+				(CleanEmailUsername = EmailUsername) => 0 //No bad characters found
+				);
+
+//Get Email Domain and length
+InputPII: => EmailDomain := UPCASE(SUBSTR(P_InpEmail, AtPosition+1, LENGTH(P_InpEmail)));
+InputPII: => EmailDomainLength := LENGTH(EmailDomain);
+
+//Get Clean Email Domain and length						
+InputPII: => CleanEmailDomain := GetCleanEmailDomain(P_InpEmail);
+InputPII: => CleanEmailDomainLength := LENGTH(CleanEmailDomain);
+
+//Email Domain all zero check
+InputPII: => P_InpValEmailDomAllZeroFlagValue := MAP(
+				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT,  //Missing Email
+				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
+				(LENGTH(FilterOut(EmailDomain,'0')) = 0 AND EmailDomainLength > 0) => 1,  //Email Domain all zeros
+				(LENGTH(FilterOut(EmailDomain,'0')) > 0) => 0  //Email Domain not all zeros
+				);
+				
+//Email Domain Bad Character check
+InputPII: => P_InpValEmailDomBadCharFlagValue := MAP(
+				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT,  //Missing Email
+				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
+				(CleanEmailDomain != EmailDomain AND P_InpValEmailDomAllZeroFlagValue = 0) => 1,  //Bad characters found
+				(CleanEmailDomain = EmailDomain) => 0 //No bad characters found
+				);
+				
+InputPII: => InvalidEmail := BadEmailCheck(P_InpEmail,EmailDomain);
+
+InputPII: => P_InpValEmailBogusFlagValue := MAP(
+				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT, //Email Missing
+				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
+				(InvalidEmail = 0) => 0,  //Email Valid
+				(InvalidEmail = 1) => 1  //Email Invalid
+				);
+				
+				
 //For each Rep, it'll apply the PII input Echo attributes
 InputBII: => AuthRep1 := ONLY(InputBIIInputPII.PII(RepNumber = 1));
 InputBII: => AuthRep2 := ONLY(InputBIIInputPII.PII(RepNumber = 2));
@@ -1077,6 +1217,8 @@ InputBII: => B_InpValEmailDomBadCharFlag :=     MAP(BusInputEmailEchoValue = Inp
    //Person Attributes//
    /////////////////////
 Person: => P_LexIDSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
+				
+				
 
    /////////////////////////////
    //Vehicle Helper Attributes//
