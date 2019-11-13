@@ -1,0 +1,66 @@
+﻿IMPORT KnowledgeUniverse.ClaimsCompassEcrash_KEL.Entities;
+IMPORT ClaimsCompassEcrash_KEL.Uses;
+
+
+
+//CONSTANTS
+Accident: VALIDDATE := D'19000101';
+Accident: VALIDSTATE := ['AK','AL','AR','AZ','BC','CA','CO','CT','DC','DE','FL','GA','GU','HI','IA','ID',
+'IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','MT','NB','NC','ND',
+'NE','NH','NJ','NM','NS','NV','NY','OH','OK','ON','OR','PA','PE','QC','PR','RI',
+'SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY','AB','MB','NL','NT','SK','VI','YT','NU'];
+
+//GLOBALS: need check case_identifer
+Accident: => ValidRecords := (LossState IN VALIDSTATE) AND (DateOfAccident > VALIDDATE);
+// Accident: => InputDate := D'20191024'; // need pull the 
+Accident: => MostRecentAccident := MAX(Accident(CaseIdentifier = Accident.CaseIdentifier, DateOfAccident = Accident.DateOfAccident, LossState = Accident.LossState),DateOfAccident);
+Accident: => GMOSAccidentDate := MONTHSBETWEEN(DateOfAccident, MostRecentAccident);
+// Accident: => DidScore := ONLY(PersonAccident.Person{DidScore}).DidScore;
+
+// Person: => PersonAccidentkeys := PersonAccident{CaseIdentifier, DateOfAccident, LossState};
+//*********************Attributes********************************//
+
+// Party_PoliceReportsCount_6months (add DidScore >= 75 in query)
+Person: => Party_PoliceReportsCount_6months := MAP(EXISTS(PersonAccident.Incident) AND NOT EXISTS(PersonAccident.Incident(ValidRecords)) => -1, //ALL Records were dropped because of invalid state, case_identifier, and so on.
+																									 // EXISTS(PersonAccident.Incident(ValidRecords)) AND NOT EXISTS(PersonAccident.Incident(ValidRecords AND GMOSAccidentDate <= 6)) => -2, //there is valid case, but more than 6 month ago. 
+																										COUNT(PersonAccident.Incident(ValidRecords AND GMOSAccidentDate <= 6){DateOfAccident}));//True 0, this person does not have any policy reports before
+
+// Party_PoliceReportsCount_1year
+// Party_PoliceReportsCount_2year
+// Party_PoliceReportsCount_3year
+// Party_PoliceReportsCount_4year
+// Party_PoliceReportsCount_5year
+
+
+
+
+// VIN_PoliceReportsCount_6months
+Vehicle: => VIN_PoliceReportsCount_6months := MAP(EXISTS(VehicleAccident.Incident) AND NOT EXISTS(VehicleAccident.Incident(ValidRecords)) => -1,
+																									COUNT(VehicleAccident.Incident(ValidRecords AND GMOSAccidentDate <= 6){DateOfAccident}));
+
+
+// VIN_PoliceReportsCount_1year
+// VIN_PoliceReportsCount_2year
+// VIN_PoliceReportsCount_3year
+// VIN_PoliceReportsCount_4year
+// VIN_PoliceReportsCount_5year
+
+
+
+
+// VIN_StolenPoliceReportsCount_6months
+Vehicle: => VIN_StolenPoliceReportsCount_6months := MAP(EXISTS(VehicleAccident.Incident) AND NOT EXISTS(VehicleAccident.Incident(ValidRecords)) => -1,
+																									COUNT(VehicleAccident.Incident(ValidRecords AND GMOSAccidentDate <= 6 AND ReportCodeDescription = 'Auto Theft'){DateOfAccident})); // is that possible with difference case? 
+
+
+// VIN_StolenPoliceReportsCount_1year
+// VIN_StolenPoliceReportsCount_2year
+// VIN_StolenPoliceReportsCount_3year
+// VIN_StolenPoliceReportsCount_4year
+// VIN_StolenPoliceReportsCount_5year
+
+
+
+
+
+
