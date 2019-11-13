@@ -34,7 +34,7 @@ FUNCTION: FindCount(STRING source, STRING target) <= ECL(STD.Str.FindCount(sourc
 FUNCTION: SourceGroup(STRING RawSource) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.SourceGroup(RawSource)) FROM PublicRecords_KEL RETURNS STRING;
 //function for filter
 FUNCTION: Filter(STRING Source, STRING FilterString) <= ECL(STD.Str.Filter(Source, FilterString)) FROM STD RETURNS STRING;	
-FUNCTION: FilterOut(STRING source, STRING filter) <= ECL(STD.Str.FilterOut(source, filter)) RETURNS STRING;
+FUNCTION: FilterOut(STRING source, STRING filter) <= ECL(STD.Str.FilterOut(source, filter)) FROM STD RETURNS STRING;
 //function for check phone is in bad phone list
 FUNCTION: IsBadPhone(STRING Phone) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadPhone(Phone)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
 //function for check ssn is in bad ssn list
@@ -45,6 +45,15 @@ FUNCTION: GetCleanEmailDomain(STRING email) <= ECL(Email_Data.Fn_Clean_Email_Dom
 FUNCTION: GetCleanEmailUsername(STRING email) <= ECL(Email_Data.Fn_Clean_Email_Username(email))FROM Email_Data RETURNS STRING;
 FUNCTION: FindLastStringInstance(STRING source, STRING searchString) <= ECL(StringLib.StringFind(source, searchString,StringLib.StringFindCount(source, searchString))) RETURNS INTEGER;
 FUNCTION: BadEmailCheck(STRING email, STRING domain) <= ECL(Email_Data.Fn_InvalidEmail(email,domain)) FROM Email_Data RETURNS INTEGER;
+
+//Remove all characters not in filter
+FUNCTION: ValidateFlag(STRING FieldToCheck) <=
+	  MAP(FieldToCheck:Null OR FieldToCheck = '' => InputBII.MISSING_INPUT_DATA_INT,
+	        FilterOut(UPCASE(FieldToCheck), 
+	            '!"#$%&()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`{|}~') != '' => '1',
+	            '0');
+FUNCTION: fnBogusNames(STRING sNameFirst, STRING sNameMid, STRING sNameLast) <= ECL(header.BogusNames(sNameFirst, sNameMid, sNameLast)) FROM header RETURNS STRING;
+FUNCTION: fnCleanPhone(STRING P_InpPhoneHome) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Phone(P_InpPhoneHome)) FROM PublicRecords_KEL.ECL_Functions RETURNS BOOLEAN;
 
 
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
@@ -472,6 +481,41 @@ InputPII: => P_InpValEmailBogusFlagValue := MAP(
 				(InvalidEmail = 1) => 1  //Email Invalid
 				);
 				
+InputPII: => P_InpValNameFirstBogusFlag := MAP(InputFirstNameValue=NO_DATA_FOUND =>  MISSING_INPUT_DATA,
+	fnBogusNames('',UPCASE(InputFirstNameValue),'') = '' => 1, 
+	0);
+InputPII: => P_InpValNameMidBogusFlag := MAP(InputMiddleNameValue=NO_DATA_FOUND =>  MISSING_INPUT_DATA,
+	fnBogusNames('',UPCASE(InputMiddleNameValue),'') = '' => 1, 
+	0);
+InputPII: => P_InpValNameLastBogusFlag := MAP(InputLastNameValue=NO_DATA_FOUND =>  MISSING_INPUT_DATA,
+	fnBogusNames('',UPCASE(InputLastNameValue),'') = '' => 1, 
+	0);	
+InputPII: => P_InpValPhoneHomeBadCharFlag := 
+		MAP(InputHomePhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,					
+			Filter(TRIM(P_InpPhoneHome),'0123456789()-.+') = TRIM(P_InpPhoneHome) => 0, 1);				
+InputPII: => P_InpValPhoneHomeBadLenFlag := 
+		MAP(InputHomePhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,					
+			 LENGTH(TRIM(Filter(InputHomePhoneValue, '1234567890'))) = 7 OR
+			 LENGTH(TRIM(Filter(InputHomePhoneValue, '1234567890')))= 10	=> 0,					
+			 LENGTH(TRIM(Filter(InputHomePhoneValue, '1234567890'))) <> 7 AND
+			 LENGTH(TRIM(Filter(InputHomePhoneValue, '1234567890'))) <> 10	=> 1);	
+		
+InputPII: => P_InpValPhoneHomeBogusFlag := 
+		MAP(InputHomePhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,							
+	      IsBadPhone(TRIM(P_InpPhoneHome))=> 1,0);
+InputPII: => P_InpValPhoneWorkBadCharFlag := 
+		MAP(InputWorkPhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,					
+			Filter(TRIM(P_InpPhoneWork),'0123456789()-.+') = TRIM(P_InpPhoneWork) => 0, 1);
+InputPII: => P_InpValPhoneWorkBadLenFlag := 
+		MAP(InputWorkPhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,					
+			 LENGTH(TRIM(Filter(InputWorkPhoneValue, '1234567890'))) = 7 OR
+			 LENGTH(TRIM(Filter(InputWorkPhoneValue, '1234567890')))= 10	=> 0,					
+			 LENGTH(TRIM(Filter(InputWorkPhoneValue, '1234567890'))) <> 7 AND
+			 LENGTH(TRIM(Filter(InputWorkPhoneValue, '1234567890'))) <> 10	=> 1);
+InputPII: => P_InpValPhoneWorkBogusFlag := 
+		MAP(InputWorkPhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,							
+	      IsBadPhone(TRIM(P_InpPhoneWork))=> 1,0);
+	
 				
 //For each Rep, it'll apply the PII input Echo attributes
 InputBII: => AuthRep1 := ONLY(InputBIIInputPII.PII(RepNumber = 1));
@@ -1118,6 +1162,13 @@ InputBII: => B_Rep5InpClnDOBFlagValue := AuthRep5.P_InpClnDOBFlagValue;
 InputBII: => B_Rep5InpClnEmailFlagValue := AuthRep5.P_InpClnEmailFlagValue; 
 InputBII: => B_Rep5InpClnDLFlagValue := AuthRep5.P_InpClnDLFlagValue;
 InputBII: => B_Rep5InpClnDLStateFlagValue := AuthRep5.P_InpClnDLStateFlagValue; 
+
+
+InputBII: => B_InpValNameBadCharFlag := ValidateFlag(BusInputNameEchoValue);	
+InputBII: => B_InpValAltNameBadCharFlag := ValidateFlag(BusInputAlternateNameEchoValue);
+InputBII: => B_InpValNameMatchesAltNameFlag := MAP(B_InpClnNameFlagValue != 1 OR B_InpClnAltNameFlagValue !=1 => InputBII.MISSING_INPUT_DATA_INT,
+               BusInputNameCleanValue != BusInputAlternateNameCleanValue  => 0,
+               BusInputNameCleanValue = BusInputAlternateNameCleanValue  => 1);
 
 InputBII: => B_InpValNameInvalidFlag := MAP(BusInputNameCleanValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
                                             B_InpClnNameFlagValue = 1 => 0,
