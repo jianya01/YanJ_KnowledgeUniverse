@@ -80,7 +80,7 @@ WatercraftOwner: => CurrentDate :=  MIN(GETBUILDDATE('watercraft_build_version')
 SeleVehicle: => CurrentDate :=MIN(GETBUILDDATE('vehicle_build_version'), CURRENTDATE());
 SeleWatercraft: => CurrentDate :=  MIN(GETBUILDDATE('watercraft_build_version'), CURRENTDATE());
 SeleAircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
-
+BusinessSele: => CurrentDateSOS := MIN(GETBUILDDATE( 'Corp_build_version'), CURRENTDATE());
 					
 // Global Constant Definitions for MAS
 InputPII: MISSING_INPUT_DATA := '-99999';
@@ -117,6 +117,13 @@ PersonVehicle: REC_FOUND_BUT_INVALID_INT := -99997;
 PersonVehicle: REC_FOUND_BUT_INVALID := '-99997';
 PersonVehicle: TEN_YEARS_IN_DAYS := 3652;
 PersonVehicle: TWO_YEARS_IN_DAYS := 730;
+
+BusinessSele: MISSING_INPUT_DATA := '-99999';
+BusinessSele: MISSING_INPUT_DATA_INT := -99999;
+BusinessSele: NO_DATA_FOUND := '-99998';
+BusinessSele: NO_DATA_FOUND_INT := -99998;
+BusinessSele: NO_DATA_FOUND_97_INT := -99997;
+BusinessSele: NO_DATA_FOUND_97 := '-99997';
 
 SeleVehicle: MISSING_INPUT_DATA_INT := -99999;
 SeleVehicle: MISSING_INPUT_DATA := '-99999';
@@ -2844,7 +2851,94 @@ BusinessSele: => BE_DrgBkCh11Cnt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID 
 BusinessSele: => BE_DrgBkNewChType10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
 			                                   (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			                                    MostRecentChapter10YWithNull = Bankruptcy.NO_DATA_FOUND_97_INT => Bankruptcy.NO_DATA_FOUND_97_INT,
-		                                    	MostRecentChapter10Y); 					
+		                                    	MostRecentChapter10Y); 	
+																					
+
+////////////////////////////////////
+//SOS Filing Helper Attributes//
+///////////////////////////////////																					
+BusinessSele: => SOSDomesticFilingCount := COUNT(SOSIncorporation(SOSIncorporationState <> '' AND NOT SOSIncorporationState:Null ));
+BusinessSele: => SOSForeignFilingCount := COUNT(SOSForeignInformation(SOSForeignStateCode <> '' AND NOT SOSForeignStateCode:Null));
+BusinessSele: => SOSDomDateFirstSeenCapped :=IF(MIN(SOSIncorporation, SOSIncorporationDate) > CurrentDateSOS, CurrentDateSOS, MIN(SOSIncorporation, SOSIncorporationDate));
+BusinessSele: => SOSDomFilingMinDate := IF(ISVALIDDATE(SOSDomDateFirstSeenCapped), DATETOSTRING(SOSDomDateFirstSeenCapped,'%Y%m%d') ,BusinessSele.NO_DATA_FOUND_97);
+BusinessSele: => SOSDomDateLastSeenCapped :=IF(MAX(SOSIncorporation, SOSIncorporationDate) > CurrentDateSOS, CurrentDateSOS, MAX(SOSIncorporation, SOSIncorporationDate));
+BusinessSele: => SOSDomFilingMaxDate := IF(ISVALIDDATE(SOSDomDateLastSeenCapped), DATETOSTRING(SOSDomDateLastSeenCapped,'%Y%m%d') ,BusinessSele.NO_DATA_FOUND_97);
+BusinessSele: => SOSFrgnDateFirstSeenCapped :=IF(MIN(SOSForeignInformation, SOSForeignStateDate) > CurrentDateSOS, CurrentDateSOS, MIN(SOSForeignInformation, SOSForeignStateDate));
+BusinessSele: => SOSFrgnFilingMinDate := IF(ISVALIDDATE(SOSFrgnDateFirstSeenCapped), DATETOSTRING(SOSFrgnDateFirstSeenCapped,'%Y%m%d') ,BusinessSele.NO_DATA_FOUND_97);
+BusinessSele: => SOSFrgnDateLastSeenCapped :=IF(MAX(SOSForeignInformation, SOSForeignStateDate) > CurrentDateSOS, CurrentDateSOS, MAX(SOSForeignInformation, SOSForeignStateDate));
+BusinessSele: => SOSFrgnFilingMaxDate := IF(ISVALIDDATE(SOSFrgnDateLastSeenCapped), DATETOSTRING(SOSFrgnDateLastSeenCapped,'%Y%m%d') ,BusinessSele.NO_DATA_FOUND_97);
+BusinessSele: => SOSFilingTotalCount :=SOSDomesticFilingCount + SOSForeignFilingCount ;
+BusinessSele: => SOSIncorporationOldDate := IF(MIN(SOSDomFilingMinDate,SOSFrgnFilingMinDate)=BusinessSele.NO_DATA_FOUND_97,MAX(SOSDomFilingMinDate,SOSFrgnFilingMinDate),MIN(SOSDomFilingMinDate,SOSFrgnFilingMinDate));
+BusinessSele: => SOSIncorporationNewDate := IF(MAX(SOSDomFilingMaxDate,SOSFrgnFilingMaxDate)=BusinessSele.NO_DATA_FOUND_97,BusinessSele.NO_DATA_FOUND_97,MAX(SOSDomFilingMaxDate,SOSFrgnFilingMaxDate));
+BusinessSele: => SosForeignStates:=SOSForeignInformation{SOSForeignStateCode};
+BusinessSele: => SosDomesticStates:=SOSIncorporation{SOSIncorporationState};
+BusinessSele: => SOSFilingStatesCountDups := COUNT(SosForeignStates(EXISTS(SosDomesticStates(SOSIncorporationState=BusinessSele.SosForeignStates.SOSForeignStateCode))));
+BusinessSele: => SOSUniqueStateCount := COUNT(SosForeignStates)+COUNT(SosDomesticStates)-SOSFilingStatesCountDups;
+////////////////////////////////////
+//SOS Filing Attributes//
+///////////////////////////////////
+
+BusinessSele: => BE_SOSCntEv :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA,BusinessSele.MISSING_INPUT_DATA_INT,
+                                  BOUNDSFOLD((SOSFilingTotalCount), 0, 999));
+BusinessSele: => BE_SOSNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
+			                                BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND,
+			                                BE_SOSCntEv > 0 AND SOSIncorporationNewDate = BusinessSele.NO_DATA_FOUND_97 => BusinessSele.NO_DATA_FOUND_97,
+																			DATETOSTRING(DATE(SOSIncorporationNewDate),'%Y%m%d' ));
+BusinessSele: => BE_SOSOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
+			                                BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND,
+			                                BE_SOSCntEv > 0 AND SOSIncorporationOldDate = BusinessSele.NO_DATA_FOUND_97 => BusinessSele.NO_DATA_FOUND_97,
+																			DATETOSTRING(DATE(SOSIncorporationOldDate),'%Y%m%d' ));
+BusinessSele: => BE_SOSNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+		                                    BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+			                                  (BE_SOSNewDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
+			                                  BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSNewDtEv),CurrentDateSOS),0,960)); 
+BusinessSele: => BE_SOSOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+		                                    BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+			                                 (BE_SOSOldDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
+			                                  BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSOldDtEv),CurrentDateSOS),0,960)); 
+BusinessSele: => BE_SOSStateCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+                                        BE_SOSCntEv = 0 =>  BusinessSele.NO_DATA_FOUND_INT,
+																			  BE_SOSCntEv > 0 AND (ALL(SOSIncorporation, SOSIncorporationState:Null OR SOSIncorporationState = '') AND ALL(SOSForeignInformation, SOSForeignStateCode:Null OR SOSForeignStateCode = '') ) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
+                                        BOUNDSFOLD(SOSUniqueStateCount, 1, 52));
+BusinessSele: => BE_SOSDomCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+                                      BE_SOSCntEv = 0 =>  BusinessSele.NO_DATA_FOUND_INT,
+																		  BOUNDSFOLD(SOSDomesticFilingCount, 0, 999));
+BusinessSele: => BE_SOSDomNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
+			                                   BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+			                                   BE_SOSDomCntEv > 0 AND SOSDomFilingMaxDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
+			                                   DATETOSTRING(DATE(SOSDomFilingMaxDate),'%Y%m%d' ));
+BusinessSele: => BE_SOSDomOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
+			                                   BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+			                                   BE_SOSDomCntEv > 0 AND 
+																				 SOSDomFilingMinDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
+			                                   DATETOSTRING(DATE(SOSDomFilingMinDate),'%Y%m%d' ));
+BusinessSele: => BE_SOSDomNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+			                                     BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
+			                                     (BE_SOSDomNewDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
+			                                     BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSDomNewDtEv),CurrentDateSOS),0,960)); 
+BusinessSele: => BE_SOSDomOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+			                                     BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
+			                                    (BE_SOSDomOldDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
+			                                     BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSDomOldDtEv),CurrentDateSOS),0,960)); 
+BusinessSele: => BE_SOSFrgnCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+                                       BE_SOSCntEv = 0 =>  BusinessSele.NO_DATA_FOUND_INT,
+                                       BOUNDSFOLD(SOSForeignFilingCount, 0, 999));
+BusinessSele: => BE_SOSFrgnNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
+			                                    BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+			                                    BE_SOSFrgnCntEv > 0 AND  SOSFrgnFilingMaxDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
+			                                    DATETOSTRING(DATE(SOSFrgnFilingMaxDate),'%Y%m%d' ));
+BusinessSele: => BE_SOSFrgnOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
+			                                    BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+			                                    BE_SOSFrgnCntEv > 0 AND SOSFrgnFilingMinDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
+                                          DATETOSTRING(DATE(SOSFrgnFilingMinDate),'%Y%m%d' ));
+BusinessSele: => BE_SOSFrgnNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+			                                      BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
+			                                     (BE_SOSFrgnNewDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
+			                                      BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSFrgnNewDtEv),CurrentDateSOS),0,960)); 
+BusinessSele: => BE_SOSFrgnOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+			                                      BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
+			                                     (BE_SOSFrgnOldDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
+			                                      BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSFrgnOldDtEv),CurrentDateSOS),0,960));
 
 ////////////////////////////////////
 // ProfessionalLicense Helper Attributes
