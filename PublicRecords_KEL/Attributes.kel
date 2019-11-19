@@ -2856,24 +2856,26 @@ BusinessSele: => BE_DrgBkNewChType10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleI
 
 ////////////////////////////////////
 //SOS Filing Helper Attributes//
-///////////////////////////////////																					
-BusinessSele: => SOSDomesticFilingCount := COUNT(SOSIncorporation(SOSIncorporationState <> '' AND NOT SOSIncorporationState:Null ));
-BusinessSele: => SOSForeignFilingCount := COUNT(SOSForeignInformation(SOSForeignStateCode <> '' AND NOT SOSForeignStateCode:Null));
-BusinessSele: => SOSDomDateFirstSeenCapped :=IF(MIN(SOSIncorporation, SOSIncorporationDate) > CurrentDateSOS, CurrentDateSOS, MIN(SOSIncorporation, SOSIncorporationDate));
-BusinessSele: => SOSDomFilingMinDate := IF(ISVALIDDATE(SOSDomDateFirstSeenCapped), DATETOSTRING(SOSDomDateFirstSeenCapped,'%Y%m%d') ,BusinessSele.NO_DATA_FOUND_97);
-BusinessSele: => SOSDomDateLastSeenCapped :=IF(MAX(SOSIncorporation, SOSIncorporationDate) > CurrentDateSOS, CurrentDateSOS, MAX(SOSIncorporation, SOSIncorporationDate));
-BusinessSele: => SOSDomFilingMaxDate := IF(ISVALIDDATE(SOSDomDateLastSeenCapped), DATETOSTRING(SOSDomDateLastSeenCapped,'%Y%m%d') ,BusinessSele.NO_DATA_FOUND_97);
-BusinessSele: => SOSFrgnDateFirstSeenCapped :=IF(MIN(SOSForeignInformation, SOSForeignStateDate) > CurrentDateSOS, CurrentDateSOS, MIN(SOSForeignInformation, SOSForeignStateDate));
-BusinessSele: => SOSFrgnFilingMinDate := IF(ISVALIDDATE(SOSFrgnDateFirstSeenCapped), DATETOSTRING(SOSFrgnDateFirstSeenCapped,'%Y%m%d') ,BusinessSele.NO_DATA_FOUND_97);
-BusinessSele: => SOSFrgnDateLastSeenCapped :=IF(MAX(SOSForeignInformation, SOSForeignStateDate) > CurrentDateSOS, CurrentDateSOS, MAX(SOSForeignInformation, SOSForeignStateDate));
-BusinessSele: => SOSFrgnFilingMaxDate := IF(ISVALIDDATE(SOSFrgnDateLastSeenCapped), DATETOSTRING(SOSFrgnDateLastSeenCapped,'%Y%m%d') ,BusinessSele.NO_DATA_FOUND_97);
-BusinessSele: => SOSFilingTotalCount :=SOSDomesticFilingCount + SOSForeignFilingCount ;
-BusinessSele: => SOSIncorporationOldDate := IF(MIN(SOSDomFilingMinDate,SOSFrgnFilingMinDate)=BusinessSele.NO_DATA_FOUND_97,MAX(SOSDomFilingMinDate,SOSFrgnFilingMinDate),MIN(SOSDomFilingMinDate,SOSFrgnFilingMinDate));
-BusinessSele: => SOSIncorporationNewDate := IF(MAX(SOSDomFilingMaxDate,SOSFrgnFilingMaxDate)=BusinessSele.NO_DATA_FOUND_97,BusinessSele.NO_DATA_FOUND_97,MAX(SOSDomFilingMaxDate,SOSFrgnFilingMaxDate));
-BusinessSele: => SosForeignStates:=SOSForeignInformation{SOSForeignStateCode};
-BusinessSele: => SosDomesticStates:=SOSIncorporation{SOSIncorporationState};
-BusinessSele: => SOSFilingStatesCountDups := COUNT(SosForeignStates(EXISTS(SosDomesticStates(SOSIncorporationState=BusinessSele.SosForeignStates.SOSForeignStateCode))));
-BusinessSele: => SOSUniqueStateCount := COUNT(SosForeignStates)+COUNT(SosDomesticStates)-SOSFilingStatesCountDups;
+///////////////////////////////////
+BusinessSele: => SOSDomesticFiling := SOSIncorporationDetails(NOT SOSIncorporationState:Null AND SOSIncorporationState <> '' AND SOSForeignDomesticIndicator = 'D');
+BusinessSele: => SOSForeignFiling := SOSIncorporationDetails(NOT SOSForeignStateCode:Null AND SOSForeignStateCode <> '' AND SOSForeignDomesticIndicator = 'F'); 
+BusinessSele: => SOSDomesticFilingCount := COUNT(SOSDomesticFiling{SOSKey, SOSIncorporationState});
+BusinessSele: => SOSForeignFilingCount := COUNT(SOSForeignFiling{SOSKey, SOSForeignStateCode});
+BusinessSele: => SOSDomDateFirstSeenCapped := IF(MIN(SOSDomesticFiling, SOSIncorporationDate) > CurrentDateSOS, CurrentDateSOS, MIN(SOSDomesticFiling, SOSIncorporationDate));
+BusinessSele: => SOSDomFilingMinDate := IF(ISVALIDDATE(SOSDomDateFirstSeenCapped), DATETOSTRING(SOSDomDateFirstSeenCapped, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97);
+BusinessSele: => SOSDomDateLastSeenCapped := IF(MAX(SOSDomesticFiling, SOSIncorporationDate) > CurrentDateSOS, CurrentDateSOS, MAX(SOSDomesticFiling, SOSIncorporationDate));
+BusinessSele: => SOSDomFilingMaxDate := IF(ISVALIDDATE(SOSDomDateLastSeenCapped), DATETOSTRING(SOSDomDateLastSeenCapped, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97);
+BusinessSele: => SOSFrgnDateFirstSeenCapped := IF(MIN(SOSForeignFiling, SOSForeignStateDate) > CurrentDateSOS, CurrentDateSOS, MIN(SOSForeignFiling, SOSForeignStateDate));
+BusinessSele: => SOSFrgnFilingMinDate := IF(ISVALIDDATE(SOSFrgnDateFirstSeenCapped), DATETOSTRING(SOSFrgnDateFirstSeenCapped, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97);
+BusinessSele: => SOSFrgnDateLastSeenCapped := IF(MAX(SOSForeignFiling, SOSForeignStateDate) > CurrentDateSOS, CurrentDateSOS, MAX(SOSForeignFiling, SOSForeignStateDate));
+BusinessSele: => SOSFrgnFilingMaxDate := IF(ISVALIDDATE(SOSFrgnDateLastSeenCapped), DATETOSTRING(SOSFrgnDateLastSeenCapped, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97);
+BusinessSele: => SOSFilingTotalCount := SOSDomesticFilingCount + SOSForeignFilingCount ;
+BusinessSele: => SOSIncorporationOldDate := IF(MIN(SOSDomFilingMinDate, SOSFrgnFilingMinDate) = BusinessSele.NO_DATA_FOUND_97, MAX(SOSDomFilingMinDate, SOSFrgnFilingMinDate), MIN(SOSDomFilingMinDate, SOSFrgnFilingMinDate));
+BusinessSele: => SOSIncorporationNewDate := IF(MAX(SOSDomFilingMaxDate, SOSFrgnFilingMaxDate) = BusinessSele.NO_DATA_FOUND_97, BusinessSele.NO_DATA_FOUND_97, MAX(SOSDomFilingMaxDate, SOSFrgnFilingMaxDate));
+BusinessSele: => SOSForeignStates := SOSForeignFiling{SOSIncorporationState};
+BusinessSele: => SOSDomesticStates := SOSDomesticFiling{SOSIncorporationState};
+BusinessSele: => SOSFilingStatesCountDups := COUNT(SOSForeignStates(EXISTS(SOSDomesticStates(SOSIncorporationState = BusinessSele.SOSForeignStates.SOSIncorporationState))));
+BusinessSele: => SOSUniqueStateCount := COUNT(SOSForeignStates) + COUNT(SOSDomesticStates) - SOSFilingStatesCountDups;
 ////////////////////////////////////
 //SOS Filing Attributes//
 ///////////////////////////////////
@@ -2898,7 +2900,7 @@ BusinessSele: => BE_SOSOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= Bu
 			                                  BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSOldDtEv),CurrentDateSOS),0,960)); 
 BusinessSele: => BE_SOSStateCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
                                         BE_SOSCntEv = 0 =>  BusinessSele.NO_DATA_FOUND_INT,
-																			  BE_SOSCntEv > 0 AND (ALL(SOSIncorporation, SOSIncorporationState:Null OR SOSIncorporationState = '') AND ALL(SOSForeignInformation, SOSForeignStateCode:Null OR SOSForeignStateCode = '') ) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
+																			  BE_SOSCntEv > 0 AND (ALL(SOSIncorporationDetails, SOSIncorporationState:Null OR SOSIncorporationState = '')) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
                                         BOUNDSFOLD(SOSUniqueStateCount, 1, 52));
 BusinessSele: => BE_SOSDomCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
                                       BE_SOSCntEv = 0 =>  BusinessSele.NO_DATA_FOUND_INT,
