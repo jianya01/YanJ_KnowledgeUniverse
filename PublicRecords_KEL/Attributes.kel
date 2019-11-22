@@ -54,7 +54,8 @@ FUNCTION: ValidateFlag(STRING FieldToCheck) <=
 	            '0');
 FUNCTION: fnBogusNames(STRING sNameFirst, STRING sNameMid, STRING sNameLast) <= ECL(header.BogusNames(sNameFirst, sNameMid, sNameLast)) FROM header RETURNS STRING;
 FUNCTION: fnCleanPhone(STRING P_InpPhoneHome) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Phone(P_InpPhoneHome)) FROM PublicRecords_KEL.ECL_Functions RETURNS BOOLEAN;
-
+FUNCTION: AppendLocationID(STRING PrimRange, STRING Predir, STRING PrimName, STRING Suffix, STRING Postdir, STRING SecRange, STRING City, STRING State, STRING ZIP) <= 
+          ECL(PublicRecords_KEL.ECL_Functions.Fn_Append_LocationID(PrimRange, Predir, PrimName, Suffix, Postdir, SecRange, City, State, ZIP)) FROM PublicRecords_KEL.ECL_Functions RETURNS INTEGER;
 
 // Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
 Aircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
@@ -81,6 +82,7 @@ SeleVehicle: => CurrentDate :=MIN(GETBUILDDATE('vehicle_build_version'), CURRENT
 SeleWatercraft: => CurrentDate :=  MIN(GETBUILDDATE('watercraft_build_version'), CURRENTDATE());
 SeleAircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
 BusinessSele: => CurrentDateSOS := MIN(GETBUILDDATE( 'Corp_build_version'), CURRENTDATE());
+LienJudgment: => CurrentDate := MIN(GETBUILDDATE('liens_build_version'), CURRENTDATE());
 					
 // Global Constant Definitions for MAS
 InputPII: MISSING_INPUT_DATA := '-99999';
@@ -124,6 +126,26 @@ BusinessSele: NO_DATA_FOUND := '-99998';
 BusinessSele: NO_DATA_FOUND_INT := -99998;
 BusinessSele: NO_DATA_FOUND_97_INT := -99997;
 BusinessSele: NO_DATA_FOUND_97 := '-99997';
+
+SeleAddress: MISSING_INPUT_DATA := '-99999';
+SeleAddress: MISSING_INPUT_DATA_INT := -99999;
+SeleAddress: NO_DATA_FOUND := '-99998';
+SeleAddress: NO_DATA_FOUND_INT := -99998;
+SeleTIN: MISSING_INPUT_DATA := '-99999';
+SeleTIN: NO_DATA_FOUND := '-99998';
+SelePhoneNumber: MISSING_INPUT_DATA := '-99999';
+SelePhoneNumber: NO_DATA_FOUND := '-99998';
+
+BusinessProx: MISSING_INPUT_DATA := '-99999';
+BusinessProx: NO_DATA_FOUND := '-99998';
+ProxAddress: MISSING_INPUT_DATA := '-99999';
+ProxAddress: MISSING_INPUT_DATA_INT := -99999;
+ProxAddress: NO_DATA_FOUND := '-99998';
+ProxAddress: NO_DATA_FOUND_INT := -99998;
+ProxTIN: MISSING_INPUT_DATA := '-99999';
+ProxTIN: NO_DATA_FOUND := '-99998';
+ProxPhoneNumber: MISSING_INPUT_DATA := '-99999';
+ProxPhoneNumber: NO_DATA_FOUND := '-99998';
 
 SeleVehicle: MISSING_INPUT_DATA_INT := -99999;
 SeleVehicle: MISSING_INPUT_DATA := '-99999';
@@ -1932,7 +1954,7 @@ BusinessSele: => B_LexIDLegalSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), 
 
 BusinessSele.DataSources: => TranslatedSourceCode := SourceGroup(Source);
 BusinessSele: => TranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode};
-BusinessSele: => BE_VerSrcList := TOPN(TranslatedSources{
+BusinessSele: => BE_VerSrcListEv := TOPN(TranslatedSources{
 	TranslatedSourceCode := TranslatedSourceCode,
 	SourceDateFirstSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), INTEGER(TranslatedSourceCode:DateFirstSeen), 0), INTEGER(CurrentDate)),
 	SourceDateLastSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), INTEGER(TranslatedSourceCode:DateLastSeen), 0), INTEGER(CurrentDate))
@@ -2941,6 +2963,133 @@ BusinessSele: => BE_SOSFrgnOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID
 			                                      BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
 			                                     (BE_SOSFrgnOldDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
 			                                      BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSFrgnOldDtEv),CurrentDateSOS),0,960));
+																					
+//////////////////////////////////
+//Best BII Sele Helper Attributes//
+/////////////////////////////////																					
+BusinessSele: => BestBusinessNamesSorted := TOPN(BestCompanyNames, 1, BestCompanyNameRank);
+BusinessSele: => OnlyBestBusinessName := ONLY(BestBusinessNamesSorted);
+BusinessSele: => BestBusinessAddress := TOPN(SeleAddress.BestAddresses, 1, BestAddressRank);
+BusinessSele: => OnlyBestBusinessAddress := ONLY(BestBusinessAddress);
+BusinessSele: => BestBusinessTin := TOPN(SeleTIN, 1, BestTINRank);
+BusinessSele: => OnlyBestBusinessTin := ONLY(BestBusinessTin);
+BusinessSele: => BestBusinessPhone := TOPN(SelePhoneNumber.BestPhoneDetails, 1, BestPhoneRank);
+BusinessSele: => OnlyBestBusinessPhone := ONLY(BestBusinessPhone);
+BusinessSele: => BestSeleAddress:= IF(NOT OnlyBestBusinessAddress.BestPrimaryRange:Null, TRIM(OnlyBestBusinessAddress.BestPrimaryRange) + ' ', '') + 
+																	 IF(NOT OnlyBestBusinessAddress.BestPredirectional:Null, TRIM(OnlyBestBusinessAddress.BestPredirectional) + ' ', '') +
+																	 IF(NOT OnlyBestBusinessAddress.BestPrimaryName:Null, TRIM(OnlyBestBusinessAddress.BestPrimaryName) + ' ', '') +
+																	 IF(NOT OnlyBestBusinessAddress.BestSuffix:Null, TRIM(OnlyBestBusinessAddress.BestSuffix) + ' ', '') +
+																	 IF(NOT OnlyBestBusinessAddress.BestPostdirectional:Null, TRIM(OnlyBestBusinessAddress.BestPostdirectional) + ' ', '') +
+																	 IF(NOT OnlyBestBusinessAddress.BestUnitDesignation:Null, TRIM(OnlyBestBusinessAddress.BestUnitDesignation) + ' ', '') +
+																	 IF(NOT OnlyBestBusinessAddress.BestSecondaryRange:Null, TRIM(OnlyBestBusinessAddress.BestSecondaryRange), '');
+																	 
+BusinessSele: => BusinessSeleLocationID := AppendLocationID(
+    IF(OnlyBestBusinessAddress.BestPrimaryRange:Null, '', OnlyBestBusinessAddress.BestPrimaryRange),
+    IF(OnlyBestBusinessAddress.BestPredirectional:Null, '', OnlyBestBusinessAddress.BestPredirectional),
+    IF(OnlyBestBusinessAddress.BestPrimaryName:Null, '', OnlyBestBusinessAddress.BestPrimaryName),
+    IF(OnlyBestBusinessAddress.BestSuffix:Null, '', OnlyBestBusinessAddress.BestSuffix),
+    IF(OnlyBestBusinessAddress.BestPostdirectional:Null, '', OnlyBestBusinessAddress.BestPostdirectional),
+    IF(OnlyBestBusinessAddress.BestSecondaryRange:Null, '', OnlyBestBusinessAddress.BestSecondaryRange),
+    IF(OnlyBestBusinessAddress.BestVanityCity:Null, '', OnlyBestBusinessAddress.BestVanityCity),
+    IF(OnlyBestBusinessAddress.BestState:Null, '', OnlyBestBusinessAddress.BestState),
+    IF(OnlyBestBusinessAddress.BestZip5:Null, '', OnlyBestBusinessAddress.BestZip5));
+////////////////////////////////
+//Best BII Sele  Attributes//
+/////////////////////////////////																							
+BusinessSele: => BE_BestName :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+                                  		OnlyBestBusinessName.BestCompanyName:Null OR OnlyBestBusinessName.BestCompanyName = '' => BusinessSele.NO_DATA_FOUND,
+                                      OnlyBestBusinessName.BestCompanyName);
+BusinessSele: => BE_BestAddrLocID :=	 MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleAddress.MISSING_INPUT_DATA => SeleAddress.MISSING_INPUT_DATA_INT,
+                                       BusinessSeleLocationID = 0  => SeleAddress.NO_DATA_FOUND_INT,
+																		    BusinessSeleLocationID);
+BusinessSele: => BE_BestAddrSt := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleAddress.MISSING_INPUT_DATA => SeleAddress.MISSING_INPUT_DATA,
+                                       BestSeleAddress:Null OR BestSeleAddress = '' OR BE_BestAddrLocID = SeleAddress.NO_DATA_FOUND =>SeleAddress.NO_DATA_FOUND,
+																			 BestSeleAddress);
+																	
+BusinessSele: => BE_BestAddrCity := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleAddress.MISSING_INPUT_DATA => SeleAddress.MISSING_INPUT_DATA,
+                                       OnlyBestBusinessAddress.BestVanityCity:Null OR OnlyBestBusinessAddress.BestVanityCity = '' OR BE_BestAddrLocID = SeleAddress.NO_DATA_FOUND  =>SeleAddress.NO_DATA_FOUND,
+																				OnlyBestBusinessAddress.BestVanityCity);
+BusinessSele: => BE_BestAddrCityPost :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleAddress.MISSING_INPUT_DATA => SeleAddress.MISSING_INPUT_DATA,
+                                            OnlyBestBusinessAddress.BestPostalCity:Null OR OnlyBestBusinessAddress.BestPostalCity = ''  OR BE_BestAddrLocID = SeleAddress.NO_DATA_FOUND =>SeleAddress.NO_DATA_FOUND,
+                                           OnlyBestBusinessAddress.BestPostalCity);
+BusinessSele: => BE_BestAddrState := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleAddress.MISSING_INPUT_DATA => SeleAddress.MISSING_INPUT_DATA,
+                                          OnlyBestBusinessAddress.BestState:Null OR OnlyBestBusinessAddress.BestState = ''  OR BE_BestAddrLocID = SeleAddress.NO_DATA_FOUND =>SeleAddress.NO_DATA_FOUND,
+                                        OnlyBestBusinessAddress.BestState);
+BusinessSele: => BE_BestAddrZip := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleAddress.MISSING_INPUT_DATA => SeleAddress.MISSING_INPUT_DATA,
+                                         OnlyBestBusinessAddress.BestZip5:Null OR OnlyBestBusinessAddress.BestZip5 = ''  OR BE_BestAddrLocID = SeleAddress.NO_DATA_FOUND =>SeleAddress.NO_DATA_FOUND,                                         
+																					 OnlyBestBusinessAddress.BestZip5);
+BusinessSele: => BE_BestTIN := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleTIN.MISSING_INPUT_DATA => SeleTIN.MISSING_INPUT_DATA,
+                                      OnlyBestBusinessTin.BestTIN:Null OR OnlyBestBusinessTin.BestTIN	= '' =>SeleTIN.NO_DATA_FOUND,															 
+																		 OnlyBestBusinessTin.BestTIN);
+BusinessSele: => BE_BestPhone := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SelePhoneNumber.MISSING_INPUT_DATA => SelePhoneNumber.MISSING_INPUT_DATA,
+																				OnlyBestBusinessPhone.BestPhone:Null OR OnlyBestBusinessPhone.BestPhone = '' =>SelePhoneNumber.NO_DATA_FOUND,
+																				OnlyBestBusinessPhone.BestPhone);
+																																							
+////////////////////////////////////
+// Business Prox Attributes
+////////////////////////////////////
+BusinessProx: => B_LexIDLocSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
+
+//////////////////////////////////
+//Best BII Prox Helper Attributes//
+/////////////////////////////////																																									
+BusinessProx: => BestBusinessProxNamesSorted := TOPN(BestCompanyNames, 1, BestCompanyNameRank);
+BusinessProx: => OnlyBestBusinessProxName := ONLY(BestBusinessProxNamesSorted);
+BusinessProx: => BestBusinessProxAddress := TOPN(ProxAddress.BestAddresses, 1, BestAddressRank);
+BusinessProx: => OnlyBestBusinessProxAddress := ONLY(BestBusinessProxAddress);
+BusinessProx: => BestBusinessProxTin := TOPN(ProxTIN, 1, BestTINRank);
+BusinessProx: => OnlyBestBusinessProxTin := ONLY(BestBusinessProxTin);
+BusinessProx: => BestBusinessProxPhone := TOPN(ProxPhoneNumber.BestPhoneDetails, 1, BestPhoneRank);
+BusinessProx: => OnlyBestBusinessProxPhone := ONLY(BestBusinessProxPhone);
+BusinessProx: =>BestProxAddress :=IF(NOT OnlyBestBusinessProxAddress.BestPrimaryRange:Null, TRIM(OnlyBestBusinessProxAddress.BestPrimaryRange) + ' ', '') + 
+																	IF(NOT OnlyBestBusinessProxAddress.BestPredirectional:Null, TRIM(OnlyBestBusinessProxAddress.BestPredirectional) + ' ', '') +
+																	IF(NOT OnlyBestBusinessProxAddress.BestPrimaryName:Null, TRIM(OnlyBestBusinessProxAddress.BestPrimaryName) + ' ', '') +
+																	IF(NOT OnlyBestBusinessProxAddress.BestSuffix:Null, TRIM(OnlyBestBusinessProxAddress.BestSuffix) + ' ', '') +
+																	IF(NOT OnlyBestBusinessProxAddress.BestPostdirectional:Null, TRIM(OnlyBestBusinessProxAddress.BestPostdirectional) + ' ', '') +
+																	IF(NOT OnlyBestBusinessProxAddress.BestUnitDesignation:Null, TRIM(OnlyBestBusinessProxAddress.BestUnitDesignation) + ' ', '') +
+																	IF(NOT OnlyBestBusinessProxAddress.BestSecondaryRange:Null, TRIM(OnlyBestBusinessProxAddress.BestSecondaryRange), '');
+//BusinessProx: => BusinessProxLocationID := 	AppendLocationID(BestPrimaryRange, BestPredirectional, BestPrimaryName, BestSuffix,BestPostdirectional, BestSecondaryRange, BestVanityCity, BestState, BestZip5);																				
+BusinessProx: => BusinessProxLocationID := AppendLocationID(
+    IF(OnlyBestBusinessProxAddress.BestPrimaryRange:Null, '', OnlyBestBusinessProxAddress.BestPrimaryRange),
+    IF(OnlyBestBusinessProxAddress.BestPredirectional:Null, '', OnlyBestBusinessProxAddress.BestPredirectional),
+    IF(OnlyBestBusinessProxAddress.BestPrimaryName:Null, '', OnlyBestBusinessProxAddress.BestPrimaryName),
+    IF(OnlyBestBusinessProxAddress.BestSuffix:Null, '', OnlyBestBusinessProxAddress.BestSuffix),
+    IF(OnlyBestBusinessProxAddress.BestPostdirectional:Null, '', OnlyBestBusinessProxAddress.BestPostdirectional),
+    IF(OnlyBestBusinessProxAddress.BestSecondaryRange:Null, '', OnlyBestBusinessProxAddress.BestSecondaryRange),
+    IF(OnlyBestBusinessProxAddress.BestVanityCity:Null, '', OnlyBestBusinessProxAddress.BestVanityCity),
+    IF(OnlyBestBusinessProxAddress.BestState:Null, '', OnlyBestBusinessProxAddress.BestState),
+    IF(OnlyBestBusinessProxAddress.BestZip5:Null, '', OnlyBestBusinessProxAddress.BestZip5));
+//////////////////////////////////
+//Best BII Prox Attributes//
+/////////////////////////////////
+BusinessProx: => BP_BestName :=  MAP(B_LexIDLocSeenFlag = '0' OR ProxID = BusinessProx.MISSING_INPUT_DATA => BusinessProx.MISSING_INPUT_DATA,
+                                   	OnlyBestBusinessProxName.BestCompanyName:Null OR OnlyBestBusinessProxName.BestCompanyName = '' => BusinessProx.NO_DATA_FOUND,
+																			OnlyBestBusinessProxName.BestCompanyName);
+BusinessProx: => BP_BestAddrLocID := MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxAddress.MISSING_INPUT_DATA => ProxAddress.MISSING_INPUT_DATA_INT,
+                                         BusinessProxLocationID = 0  => ProxAddress.NO_DATA_FOUND_INT,
+																		    BusinessProxLocationID);
+BusinessProx: => BP_BestAddrSt := MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxAddress.MISSING_INPUT_DATA => ProxAddress.MISSING_INPUT_DATA,
+                                       BestProxAddress:Null OR BestProxAddress = '' OR BP_BestAddrLocID = ProxAddress.NO_DATA_FOUND =>ProxAddress.NO_DATA_FOUND,
+																			 BestProxAddress);
+BusinessProx: => BP_BestAddrCity := MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxAddress.MISSING_INPUT_DATA => ProxAddress.MISSING_INPUT_DATA,
+                                        OnlyBestBusinessProxAddress.BestVanityCity:Null OR OnlyBestBusinessProxAddress.BestVanityCity = '' OR BP_BestAddrLocID = ProxAddress.NO_DATA_FOUND => ProxAddress.NO_DATA_FOUND,
+																				OnlyBestBusinessProxAddress.BestVanityCity);
+BusinessProx: => BP_BestAddrCityPost :=MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxAddress.MISSING_INPUT_DATA => ProxAddress.MISSING_INPUT_DATA,
+                                          OnlyBestBusinessProxAddress.BestPostalCity:Null OR OnlyBestBusinessProxAddress.BestPostalCity = '' OR BP_BestAddrLocID = ProxAddress.NO_DATA_FOUND => ProxAddress.NO_DATA_FOUND,
+                                           OnlyBestBusinessProxAddress.BestPostalCity);
+BusinessProx: => BP_BestAddrState := MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxAddress.MISSING_INPUT_DATA => ProxAddress.MISSING_INPUT_DATA,
+                                          OnlyBestBusinessProxAddress.BestState:Null OR OnlyBestBusinessProxAddress.BestState = '' OR BP_BestAddrLocID = ProxAddress.NO_DATA_FOUND => ProxAddress.NO_DATA_FOUND,
+                                        OnlyBestBusinessProxAddress.BestState);
+BusinessProx: => BP_BestAddrZip := MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxAddress.MISSING_INPUT_DATA => ProxAddress.MISSING_INPUT_DATA,
+                                        OnlyBestBusinessProxAddress.BestZip5:Null OR OnlyBestBusinessProxAddress.BestZip5 = '' OR BP_BestAddrLocID = ProxAddress.NO_DATA_FOUND => ProxAddress.NO_DATA_FOUND,                                         
+																					 OnlyBestBusinessProxAddress.BestZip5);
+BusinessProx: => BP_BestTIN := MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxTIN.MISSING_INPUT_DATA => ProxTIN.MISSING_INPUT_DATA,
+                                     OnlyBestBusinessProxTin.BestTIN:Null OR OnlyBestBusinessProxTin.BestTIN	= '' => ProxTIN.NO_DATA_FOUND,															 
+																		 OnlyBestBusinessProxTin.BestTIN);
+BusinessProx: => BP_BestPhone := MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxPhoneNumber.MISSING_INPUT_DATA => ProxPhoneNumber.MISSING_INPUT_DATA,
+																				OnlyBestBusinessProxPhone.BestPhone:Null OR OnlyBestBusinessProxPhone.BestPhone = '' => ProxPhoneNumber.NO_DATA_FOUND,
+																				OnlyBestBusinessProxPhone.BestPhone);																			
+																						
 
 ////////////////////////////////////
 // ProfessionalLicense Helper Attributes
