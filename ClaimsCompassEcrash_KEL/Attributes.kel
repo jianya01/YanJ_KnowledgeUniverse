@@ -11,8 +11,8 @@ Accident: VALIDSTATE := ['AK','AL','AR','AZ','BC','CA','CO','CT','DC','DE','FL',
 'SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY','AB','MB','NL','NT','SK','VI','YT','NU'];
 Person: => CAP := 10;
 Vehicle: => CAP := 10;
-Vehicle: => AUDITDATE := D'20191112';
-Person: => AUDITDATE := D'20191112';
+// Vehicle: => AUDITDATE := D'20191112';
+// Person: => AUDITDATE := D'20191112';
 
 //GLOBALS: need check case_identifer
 Accident: => ValidCaseIdentifierHelper := LENGTH(TRIMBOTH(CaseIdentifier));
@@ -20,14 +20,14 @@ Accident: => ValidCaseIdentifier := LENGTH(TRIMBOTH(CaseIdentifier)) > 1 AND NOT
 Accident: => ValidRecords := (LossState IN VALIDSTATE) AND (DateOfAccident > VALIDDATE) AND ValidCaseIdentifier AND WorkTypeID = 3 AND ReportCode = 'EA';
 
 Person: => AccidentPerPerson := PersonAccident.Incident(ValidRecords){DateOfAccident,ReportTypeID,AgencyName,AgencyReportNumber};
-Person: => Audit := PersonAccident.Incident{CaseIdentifier,LossState,WorkTypeID,ReportCode,DateOfAccident,ReportTypeID,AgencyName,AgencyReportNumber};
+Person: => Audit := PersonAccident.Incident{CaseIdentifier,LossState,WorkTypeID,ReportCode,DateOfAccident,ReportTypeID,AgencyName,AgencyReportNumber,ValidRecords,ValidCaseIdentifierHelper};
 // Person: => MostRecentAccidentPerson := MAX(PersonAccident.Incident(ValidRecords){DateOfAccident}, DateOfAccident); // calucalte the most recent data of accident per Person
-// Person.AccidentPerPerson: => GMOSAccidentDatePerson := IF(DateOfAccident > AUDITDATE, -9999, MONTHSBETWEEN(DateOfAccident, CURRENTDATE()));
-Person.AccidentPerPerson: => GMOSAccidentDatePerson := IF(DateOfAccident > AUDITDATE, -9999, MONTHSBETWEEN(DateOfAccident, AUDITDATE));
-Person: => CntReturnedInf := COUNT(AccidentPerPerson);
-Person: => CntReturnedInf5year := COUNT(AccidentPerPerson(GMOSAccidentDatePerson < 60));
-Person: => WithIncident := EXISTS(PersonAccident.Incident);
-Person: => WithValidIncident := EXISTS(PersonAccident.Incident(ValidRecords));
+Person.AccidentPerPerson: => GMOSAccidentDatePerson := IF(DateOfAccident > CURRENTDATE(), -9999, MONTHSBETWEEN(DateOfAccident, CURRENTDATE()));
+// Person.AccidentPerPerson: => GMOSAccidentDatePerson := IF(DateOfAccident > AUDITDATE, -9999, MONTHSBETWEEN(DateOfAccident, AUDITDATE));
+// Person: => CntReturnedInf := COUNT(AccidentPerPerson);
+// Person: => CntReturnedInf5year := COUNT(AccidentPerPerson(GMOSAccidentDatePerson < 60));
+// Person: => WithIncident := EXISTS(PersonAccident.Incident);
+// Person: => WithValidIncident := EXISTS(PersonAccident.Incident(ValidRecords));
 Person: => DidScore := MAX(DidScores,DidScore);
 
 // *********************Attributes********************************//
@@ -41,10 +41,12 @@ Person: => Party_PoliceReportsCount5Y := MIN(Party_PoliceReportsCount5Y_tmp, CAP
 Person: => Party_PoliceReportsCount5YAccidents := IF(Party_PoliceReportsCount5Y > 0, TOPN(AccidentPerPerson(GMOSAccidentDatePerson < 60 AND GMOSAccidentDatePerson >= 0){ReportTypeID,AgencyName,DateOfAccident,AgencyReportNumber}, 10, -DateOfAccident));
  
 // VIN_PoliceReportsCount_5year
-Vehicle: => AccidentPerVehicle := VehicleAccident.Incident(ValidRecords){DateOfAccident,ReportTypeID,AgencyName,AgencyReportNumber,ReportCodeDescription};
-Vehicle: => Audit := VehicleAccident.Incident{CaseIdentifier,LossState,WorkTypeID,ReportCode,DateOfAccident,ReportTypeID,AgencyName,AgencyReportNumber,ReportCodeDescription,ValidRecords,ValidCaseIdentifierHelper};
-Vehicle.AccidentPerVehicle: => GMOSAccidentDateVIN := IF(DateOfAccident > AUDITDATE, -9999, MONTHSBETWEEN(DateOfAccident, AUDITDATE));
-// Vehicle.AccidentPerVehicle: => GMOSAccidentDateVIN := IF(DateOfAccident > AUDITDATE, -9999, MONTHSBETWEEN(DateOfAccident, CURRENTDATE()));
+// Vehicle: => AccidentPerVehicle := VehicleAccident.Incident(ValidRecords){DateOfAccident,ReportTypeID,AgencyName,AgencyReportNumber,ReportCodeDescription};
+Accident: => AutoTheft := EXISTS(ReportCodeDescriptions(ReportCodeDescription = 'Auto Theft'));
+Vehicle: => AccidentPerVehicle := VehicleAccident.Incident(ValidRecords){DateOfAccident,ReportTypeID,AgencyName,AgencyReportNumber,ReportCodeDescriptions,AutoTheft};
+Vehicle: => Audit := VehicleAccident.Incident{CaseIdentifier,LossState,WorkTypeID,ReportCode,DateOfAccident,ReportTypeID,AgencyName,AgencyReportNumber,ReportCodeDescriptions,ValidRecords,ValidCaseIdentifierHelper};
+// Vehicle.AccidentPerVehicle: => GMOSAccidentDateVIN := IF(DateOfAccident > AUDITDATE, -9999, MONTHSBETWEEN(DateOfAccident, AUDITDATE));
+Vehicle.AccidentPerVehicle: => GMOSAccidentDateVIN := IF(DateOfAccident > CURRENTDATE(), -9999, MONTHSBETWEEN(DateOfAccident, CURRENTDATE()));
 
 
 Vehicle: => VIN_PoliceReportsCount5Y_tmp := MAP(EXISTS(VehicleAccident.Incident) AND NOT EXISTS(VehicleAccident.Incident(ValidRecords)) => -99,
@@ -55,11 +57,11 @@ Vehicle: => VIN_PoliceReportsCount5YAccidents := IF(VIN_PoliceReportsCount5Y > 0
 
 // VIN_StolenPoliceReportsCount_5year
 Vehicle: => VIN_StolenPoliceReportsCount5Y_tmp := MAP(EXISTS(VehicleAccident.Incident) AND NOT EXISTS(VehicleAccident.Incident(ValidRecords)) => -99,
-																									COUNT(AccidentPerVehicle(GMOSAccidentDateVIN < 60 AND GMOSAccidentDateVIN >= 0 AND ReportCodeDescription = 'Auto Theft'){DateOfAccident})); // is that possible with difference case? 
+																									COUNT(AccidentPerVehicle(GMOSAccidentDateVIN < 60 AND GMOSAccidentDateVIN >= 0 AND EXISTS(ReportCodeDescriptions (ReportCodeDescription = 'Auto Theft'))){DateOfAccident})); // is that possible with difference case? 
 
 Vehicle: => VIN_StolenPoliceReportsCount5Y := MIN(VIN_StolenPoliceReportsCount5Y_tmp, CAP);
 
-Vehicle: => VIN_StolenPoliceReportsCount5YAccidents := IF(VIN_StolenPoliceReportsCount5Y > 0, TOPN(AccidentPerVehicle(GMOSAccidentDateVIN < 60 AND GMOSAccidentDateVIN >= 0 AND ReportCodeDescription = 'Auto Theft'){ReportTypeID,AgencyName,DateOfAccident,AgencyReportNumber}, 10, -DateOfAccident));
+Vehicle: => VIN_StolenPoliceReportsCount5YAccidents := IF(VIN_StolenPoliceReportsCount5Y > 0, TOPN(AccidentPerVehicle(GMOSAccidentDateVIN < 60 AND GMOSAccidentDateVIN >= 0 AND AutoTheft){ReportTypeID,AgencyName,DateOfAccident,AgencyReportNumber}, 10, -DateOfAccident));
 
 //return the count of damage
 // CountOfDamage_5year_multiple
@@ -93,5 +95,21 @@ Vehicle: => topnhelper := VehicleAccident(GMOSAccidentToQueryDate < 60 AND GMOSA
 Vehicle: => CountOfDamage5YMutipleAccidents := IF(CountOfDamage5YMutiple > 0, TOPN(topnhelper(NormalizedDamagedArea1 = 'MULTIPLE'){ReportTypeID,AgencyName,DateOfAccident,AgencyReportNumber}, 10, -DateOfAccident)); 
 
 Vehicle: => CountOfDamage5YAccidents := IF(CountOfDamage5Y > 0, TOPN(topnhelper(NormalizedDamagedArea1 = UPCASE(InputVehicleDamagedArea)){ReportTypeID,AgencyName,DateOfAccident,AgencyReportNumber}, 10, -DateOfAccident));
+													
+
+
+Vehicle: => CountOfDamage1Y_tmp := MAP(EXISTS(VehicleAccident.Incident) AND NOT EXISTS(VehicleAccident.Incident(ValidRecords)) => -99,
+																		COUNT(VehicleAccident(NormalizedDamagedArea1 = UPCASE(InputVehicleDamagedArea) AND GMOSAccidentToQueryDate < 12 AND GMOSAccidentToQueryDate >= 0 AND ValidRecords){DateOfAccident}));
+Vehicle: => CountOfDamage1Y := MIN(CountOfDamage1Y_tmp, CAP);
+
+
+Vehicle: => CountOfDamage1YMultiple_tmp := MAP(EXISTS(VehicleAccident.Incident) AND NOT EXISTS(VehicleAccident.Incident(ValidRecords)) => -99,
+																		COUNT(VehicleAccident(NormalizedDamagedArea1 = 'MULTIPLE' AND GMOSAccidentToQueryDate < 12 AND GMOSAccidentToQueryDate >= 0 AND ValidRecords){DateOfAccident}));
+Vehicle: => CountOfDamage1YMutiple := MIN(CountOfDamage1YMultiple_tmp, CAP);
+Vehicle: => topnhelper12 := VehicleAccident(GMOSAccidentToQueryDate < 12 AND GMOSAccidentToQueryDate >= 0 AND ValidRecords){ReportTypeID,AgencyName,DateOfAccident,AgencyReportNumber,NormalizedDamagedArea1,InputVehicleDamagedArea};
+
+Vehicle: => CountOfDamage1YMutipleAccidents := IF(CountOfDamage1YMutiple > 0, TOPN(topnhelper12(NormalizedDamagedArea1 = 'MULTIPLE'){ReportTypeID,AgencyName,DateOfAccident,AgencyReportNumber}, 10, -DateOfAccident)); 
+
+Vehicle: => CountOfDamage1YAccidents := IF(CountOfDamage1Y > 0, TOPN(topnhelper12(NormalizedDamagedArea1 = UPCASE(InputVehicleDamagedArea)){ReportTypeID,AgencyName,DateOfAccident,AgencyReportNumber}, 10, -DateOfAccident));
 													
 
