@@ -3,6 +3,18 @@ IMPORT PublicRecords_KEL.Uses;
 
 IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
 
+
+
+/**************************************************************************/
+/**************************************************************************/
+/*                                                                        */
+/*                                                                        */
+/*               Helper Functions                                         */
+/*                                                                        */
+/*                                                                        */
+/**************************************************************************/
+/**************************************************************************/
+
 FUNCTION: IsBlank(STRING FieldToCheck, STRING DefaultVal) <= IF(FieldToCheck:Null OR FieldToCheck = '', DefaultVal, FieldToCheck);
 FUNCTION: IsZero(INTEGER FieldToCheck, INTEGER DefaultVal) <= IF(FieldToCheck:Null OR FieldToCheck = 0, DefaultVal, FieldToCheck);
 FUNCTION: IsBlank2Fields(STRING Field1ToCheck, STRING Default1Val, STRING Field2ToCheck, Default2Val) <=
@@ -23,41 +35,50 @@ FUNCTION: CityStateZipNotPopulatedCheck(STRING City, STRING State, STRING Zip) <
 
 FUNCTION: CityStateZipNotPopulatedCheck(STRING City, STRING State, STRING Zip) <= (Zip:Null OR Zip = '') AND ((City:Null OR City = '') OR (State:Null OR State = ''));
 						
-//Input Echo return 0/1 if populated						
+/*		Input Echo return 0/1 if populated		*/						
 FUNCTION: IsEchoPopulated(STRING FieldToCheck) <= IF(FieldToCheck:Null OR FieldToCheck = '', '0', '1');
-//Input Cleaned returns -99999/0/1 if cleaned attributes are populated
+/*		Input Cleaned returns -99999/0/1 if cleaned attributes are populated		*/
 FUNCTION: IsCleanPopulated(STRING FieldToCheck, STRING DefaultVal1, STRING DefaultVal2) <= IF(FieldToCheck = DefaultVal1, DefaultVal1,
 					IF(FieldToCheck = DefaultVal2, '0', '1'));
 FUNCTION: GETBUILDDATE(STRING variableName) <= ECL((UNSIGNED8)Risk_Indicators.get_Build_date(variableName)) FROM Risk_Indicators RETURNS DATE;
 FUNCTION: EditDistance(STRING field1, STRING field2) <= ECL(STD.Str.EditDistance(field1, field2)) FROM STD RETURNS INTEGER;
 FUNCTION: FindCount(STRING source, STRING target) <= ECL(STD.Str.FindCount(source, target)) FROM STD RETURNS INTEGER;
 FUNCTION: SourceGroup(STRING RawSource) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.SourceGroup(RawSource)) FROM PublicRecords_KEL RETURNS STRING;
-//function for filter
+/*		function for filter		*/
 FUNCTION: Filter(STRING Source, STRING FilterString) <= ECL(STD.Str.Filter(Source, FilterString)) FROM STD RETURNS STRING;	
 FUNCTION: FilterOut(STRING source, STRING filter) <= ECL(STD.Str.FilterOut(source, filter)) FROM STD RETURNS STRING;
-//function for check phone is in bad phone list
+/*		function for check phone is in bad phone list		*/
 FUNCTION: IsBadPhone(STRING Phone) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadPhone(Phone)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
-//function for check ssn is in bad ssn list
+/*		function for check ssn is in bad ssn list		*/
 FUNCTION: IsBadSSN(STRING SSN) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadSSN(SSN)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
-//function for check state is in abbreviation state list
+/*		function for check state is in abbreviation state list		*/
 FUNCTION: Fn_Clean_State(STRING State) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_DLState(State)) FROM PublicRecords_KEL RETURNS STRING;	
 FUNCTION: GetCleanEmailDomain(STRING email) <= ECL(Email_Data.Fn_Clean_Email_Domain(email)) FROM Email_Data RETURNS STRING;
 FUNCTION: GetCleanEmailUsername(STRING email) <= ECL(Email_Data.Fn_Clean_Email_Username(email))FROM Email_Data RETURNS STRING;
 FUNCTION: FindLastStringInstance(STRING source, STRING searchString) <= ECL(StringLib.StringFind(source, searchString,StringLib.StringFindCount(source, searchString))) RETURNS INTEGER;
 FUNCTION: BadEmailCheck(STRING email, STRING domain) <= ECL(Email_Data.Fn_InvalidEmail(email,domain)) FROM Email_Data RETURNS INTEGER;
-
-//Remove all characters not in filter
+FUNCTION: fnFilterOutValidChars(STRING Field) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_STD_Str_FilterOut_ValidChars(Field)) FROM PublicRecords_KEL RETURNS STRING;	
+/*		Remove all characters not in filter		*/
 FUNCTION: ValidateFlag(STRING FieldToCheck) <=
 	  MAP(FieldToCheck:Null OR FieldToCheck = '' => InputBII.MISSING_INPUT_DATA_INT,
-	        FilterOut(UPCASE(FieldToCheck), 
-	            '!"#$%&()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`{|}~') != '' => '1',
+		fnFilterOutValidChars(UPCASE(FieldToCheck)) = '' => '1',
 	            '0');
 FUNCTION: fnBogusNames(STRING sNameFirst, STRING sNameMid, STRING sNameLast) <= ECL(header.BogusNames(sNameFirst, sNameMid, sNameLast)) FROM header RETURNS STRING;
 FUNCTION: fnCleanPhone(STRING P_InpPhoneHome) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Phone(P_InpPhoneHome)) FROM PublicRecords_KEL.ECL_Functions RETURNS BOOLEAN;
 FUNCTION: AppendLocationID(STRING PrimRange, STRING Predir, STRING PrimName, STRING Suffix, STRING Postdir, STRING SecRange, STRING City, STRING State, STRING ZIP) <= 
           ECL(PublicRecords_KEL.ECL_Functions.Fn_Append_LocationID(PrimRange, Predir, PrimName, Suffix, Postdir, SecRange, City, State, ZIP)) FROM PublicRecords_KEL.ECL_Functions RETURNS INTEGER;
+FUNCTION: fnRemoveSpecialChars(STRING field1, STRING replacement) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_RemoveSpecialChars(field1, replacement)) FROM PublicRecords_KEL RETURNS STRING;	
 
-// Fetch our Build Dates, compare to the Archive Date, and determine which date to utilize for Age calculations
+
+
+/**************************************************************************/
+/*                                                                        */
+/*    Fetch our Build Dates, compare to the Archive Date                  */
+/*    and determine which date to utilize for Age calculations            */
+/*                                                                        */
+/**************************************************************************/
+
+
 Aircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
 AircraftOwner: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
 Bankruptcy: => CurrentDate := MIN(GETBUILDDATE('bankruptcy_daily'), CURRENTDATE());
@@ -83,8 +104,24 @@ SeleWatercraft: => CurrentDate :=  MIN(GETBUILDDATE('watercraft_build_version'),
 SeleAircraft: => CurrentDate := MIN(GETBUILDDATE('faa_build_version'), CURRENTDATE());
 BusinessSele: => CurrentDateSOS := MIN(GETBUILDDATE( 'Corp_build_version'), CURRENTDATE());
 LienJudgment: => CurrentDate := MIN(GETBUILDDATE('liens_build_version'), CURRENTDATE());
-					
-// Global Constant Definitions for MAS
+
+
+
+/***********************************************************************************************************************/
+/***********************************************************************************************************************/
+/*********                                                                                                   ***********/
+/*********                                     Constants Section                                             ***********/
+/*********                                                                                                   ***********/
+/***********************************************************************************************************************/
+/***********************************************************************************************************************/
+
+/**************************************************************************/
+/*                                                                        */
+/*         Constants for MAS                                              */
+/*                                                                        */
+/**************************************************************************/
+
+
 InputPII: MISSING_INPUT_DATA := '-99999';
 InputPII: MISSING_INPUT_DATA_INT := -99999;
 InputPII: NO_DATA_FOUND := '-99998';
@@ -163,7 +200,6 @@ SeleAircraft: MISSING_INPUT_DATA_INT := -99999;
 SeleWatercraft: MISSING_INPUT_DATA := '-99999';   
 SeleWatercraft: MISSING_INPUT_DATA_INT := -99999; 
 
-
 AircraftOwner: MISSING_INPUT_DATA_INT := -99999;
 AircraftOwner: NO_DATA_FOUND_INT := -99998;
 AircraftOwner: MISSING_INPUT_DATA := '-99999';
@@ -206,7 +242,22 @@ LienJudgment: NO_DATA_FOUND_LIEN_INT := -99998;
 LienJudgment: REC_FOUND_BUT_INVALID := '-99997';
 LienJudgment: REC_FOUND_BUT_INVALID_INT := -99997;
 
-//Input PII input Echo attributes 
+
+/**********************************************************************************************************************/
+/**********************************************************************************************************************/
+/*********                                                                                                  ***********/
+/*********                        Attributes Section                                                        ***********/
+/*********                                                                                                  ***********/
+/**********************************************************************************************************************/
+/**********************************************************************************************************************/ 
+
+
+/**************************************************************************/
+/*                                                                        */
+/*         Input PII input Echo attributes                                */
+/*                                                                        */
+/**************************************************************************/
+
 InputPII: => InputAccountValue := IsBlank(P_InpAcct, MISSING_INPUT_DATA);
 InputPII: => InputLexIDValue := IsZero(P_InpLexID, MISSING_INPUT_DATA_INT); 
 InputPII: => InputFirstNameValue := IsBlank(P_InpNameFirst, MISSING_INPUT_DATA);
@@ -227,7 +278,14 @@ InputPII: => InputEmailValue := IsBlank(P_InpEmail, MISSING_INPUT_DATA);
 InputPII: => InputArchiveDateValue := IsBlank(P_InpArchDt, MISSING_INPUT_DATA);
 InputPII: => IRepNumberValue := RepNumber;
 
-//Input PII input Echo Populated attributes 
+
+/**************************************************************************/
+/*                                                                        */
+/*            Input PII input Echo Populated attributes                   */
+/*                                                                        */
+/**************************************************************************/
+
+
 InputPII: => P_InpAcctFlagValue := IsEchoPopulated(P_InpAcct);
 InputPII: => P_InpLexIDFlagValue := IsEchoPopulated(P_InpLexID);
 InputPII: => P_InpNameFirstFlagValue := IsEchoPopulated(P_InpNameFirst);
@@ -246,7 +304,14 @@ InputPII: => P_InpPhoneWorkFlagValue := IsEchoPopulated(P_InpPhoneWork);
 InputPII: => P_InpEmailFlagValue := IsEchoPopulated(P_InpEmail);
 InputPII: => P_InpArchDtFlagValue := IsEchoPopulated(P_InpArchDt);
 
-//Input PII input Clean attributes 
+
+/**************************************************************************/
+/*                                                                        */
+/*                    Input PII input Clean attributes                    */
+/*                                                                        */
+/**************************************************************************/
+
+
 InputPII: => InputPrefixCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNamePrfx, NO_DATA_FOUND));
 InputPII: => InputFirstNameCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameFirst, NO_DATA_FOUND));
 InputPII: => InputMiddleNameCleanValue := IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameMid, NO_DATA_FOUND));
@@ -343,8 +408,14 @@ InputPII: => InputWorkPhoneCleanValue := IsBlank2Fields(P_InpPhoneWork, MISSING_
 InputPII: => InputEmailCleanValue := IsBlank2Fields(P_InpEmail, MISSING_INPUT_DATA, P_InpClnEmail, NO_DATA_FOUND); 
 InputPII: => InputArchiveDateCleanValue := IsBlank(P_InpClnArchDt, NO_DATA_FOUND);
 
-			
-//Input PII input Clean Populated attributes 
+
+/**************************************************************************/
+/*                                                                        */
+/*          Input PII input Clean Populated attributes                    */
+/*                                                                        */
+/**************************************************************************/
+
+
 InputPII: => P_InpClnNamePrfxFlagValue := IsCleanPopulated(InputPrefixCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnNameFirstFlagValue := IsCleanPopulated(InputFirstNameCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnNameMidFlagValue := IsCleanPopulated(InputMiddleNameCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
@@ -379,65 +450,61 @@ InputPII: => P_InpClnEmailFlagValue:= IsCleanPopulated(InputEmailCleanValue, MIS
 InputPII: => P_InpClnArchDtFlagValue :=  IsEchoPopulated(P_InpClnArchDt); // This only returns 0/1, so using the IsEchoPopulatedFunction to check the clean archive date.
 
 
+/**************************************************************************/
+/*                                                                        */
+/*               Input Validation Helper Attributes                       */
+/*                                                                        */
+/**************************************************************************/
 
-//////////////////////////////////////
-//Input Validation Helper Attributes//
-//////////////////////////////////////
+
 InputPII: US_TERRITORIES := ['AL','AK','AS','AZ','AR','CA','CO','CT','DE','DC','FM','FL','GA','GU','HI','ID','IL','IN','IA','KS','KY','LA','ME','MH','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','MP','OH','OK','OR','PW','PA','PR','RI','SC','SD','TN','TX','UT','VT','VI','VA','WA','WV','WI','WY','AE','AP','AA'];
 InputPII: ITIN_FOURTH_AND_FIFTH_NUMS := [50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,90,91,92,94,95,96,97,98,99];
 
-///////////////////////////////
-//Input Validation Attributes//
-///////////////////////////////
-//KS-1044
+
+/**************************************************************************/
+/*                                                                        */
+/*              Input Validation Attributes                               */
+/*                                                                        */
+/**************************************************************************/
+
+
 InputPII: => CleanedZip := Filter(P_InpAddrZip, '0123456789'); //removes all non-numeric characters eg.'-'
-
 InputPII: => CleanedZipInt := INTEGER(CleanedZip);  //used to check for all zero
-
 InputPII: => ZipLengthValue := IF(InputZipValue = MISSING_INPUT_DATA, 0,  //Zip already marked invalid
 				LENGTH(CleanedZip));  //Get length of full zip code, could be up to 9 numbers. 
-
 InputPII: => P_InpValAddrZipBadLenFlagValue := MAP(
 				(ZipLengthValue = 0) => MISSING_INPUT_DATA_INT, //Zip5 contains 0 numbers
 				(ZipLengthValue = 5 OR ZipLengthValue = 9) => 0, //Zip5 contains 5 or 9 numbers
 				1 //Zip5 doesnt contain 5 or 9 numbers
 				); 
-				
 InputPII: => P_InpValAddrZipAllZeroFlagValue := MAP(
 				(ZipLengthValue = 0) => MISSING_INPUT_DATA_INT, //Zip contains no numbers
 				(CleanedZipInt = 0) => 1, //Zip contains all zeros
 				(CleanedZipInt > 0) => 0 //Zip contains numbers
 				);
-
 InputPII: => P_InpValAddrStateBadAbbrFlagValue := MAP(
 				(P_InpAddrState:Null OR TRIM(P_InpAddrState) = '' OR TRIM(P_InpAddrState) = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT, //State missing
 				(LENGTH(TRIM(P_InpAddrState)) != 2) => NO_DATA_FOUND_INT, //State not 2 letter abbreviation
 				(NOT TRIM(P_InpAddrState) IN US_TERRITORIES) => 1, //State not in list of US_TERRITORIES
 				(TRIM(P_InpAddrState) IN US_TERRITORIES) => 0 //State is in list of US_TERRITORIES
 				);
-							
-//KS-1046
 InputPII: => CleanSSN := Filter(P_InpSSN, '0123456789()-.');
 InputPII: => NumericSSN := Filter(P_InpSSN, '0123456789');
-
 InputPII: => P_InpValSSNBadCharFlagValue := MAP(
 				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
 				P_InpSSN = CleanSSN => 0, //SSN Contains only Numeric, dashes, parentheses, or dots
 				1 //SSN Contains bad characters
 				);
-				
 InputPII: => P_InpValSSNBadLenFlagValue := MAP(
 				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
 				LENGTH(NumericSSN) = 9 => 0, //SSN Contains 9 Numbers
 				1  //SSN doesn't contain 9 numbers
 				);
-				
 InputPII: => P_InpValSSNBogusFlagValue := MAP(
 				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
 				IsBadSSN(NumericSSN) => 1, //SSN in ut.Set_BadSSN
 				0  //SSN not in ut.Set_BadSSN
 				);
-				
 InputPII: => P_InpValSSNNonSSAFlagValue := MAP(
 				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
 				LENGTH(NumericSSN) != 9 => NO_DATA_FOUND_INT,  //No Data found
@@ -447,75 +514,61 @@ InputPII: => P_InpValSSNNonSSAFlagValue := MAP(
 				SUBSTR(NumericSSN,6,9) = '0000' => 1,  //bad according to SSA standards
 				0  //good according to SSA standards
 				);
-				
 InputPII: => Numeric45SSN := INTEGER(SUBSTR(NumericSSN,4,5));
-
 InputPII: => P_InpValSSNIsITINFlagValue := MAP(
 				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
 				LENGTH(NumericSSN) != 9 => NO_DATA_FOUND_INT,  //No Data found
 				SUBSTR(NumericSSN,1,1) = '9' AND (Numeric45SSN IN ITIN_FOURTH_AND_FIFTH_NUMS)  => 1,  //Likely to be an ITIN
 				0  //Not likely to be an ITIN
 				);
-
-//KS-1048
-//Get Email Username and length
+/*		Get Email Username and length		*/
 InputPII: => AtPosition := FindLastStringInstance(TRIM(P_InpEmail), '@');
 InputPII: => EmailUsername := UPCASE(SUBSTR(TRIM(P_InpEmail), 1, AtPosition-1));
 InputPII: => EmailUsernameLength := LENGTH(EmailUsername);
-
-//Get Clean Email Username and length						
+/*		Get Clean Email Username and length		*/						
 InputPII: => CleanEmailUsername := GetCleanEmailUsername(P_InpEmail);
 InputPII: => CleanEmailUsernameLength := LENGTH(CleanEmailUsername);
-
-//All zero check
+/*		All zero check		*/
 InputPII: => P_InpValEmailUserAllZeroFlagValue := MAP(
 				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT,  //Missing Email
 				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
 				(LENGTH(FilterOut(EmailUsername,'0')) = 0 AND EmailUsernameLength > 0) => 1,  //Email Username all zeros
 				(LENGTH(FilterOut(EmailUsername,'0')) > 0) => 0  //Email Username not all zeros
 				);
-				
-//Bad Character check
+/*		Bad Character check		*/
 InputPII: => P_InpValEmailUserBadCharFlagValue := MAP(
 				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT,  //Missing Email
 				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
 				(CleanEmailUsername != EmailUsername AND P_InpValEmailUserAllZeroFlagValue = 0) => 1,  //Bad characters found
 				(CleanEmailUsername = EmailUsername) => 0 //No bad characters found
 				);
-
-//Get Email Domain and length
+/*		Get Email Domain and length		*/
 InputPII: => EmailDomain := UPCASE(SUBSTR(P_InpEmail, AtPosition+1, LENGTH(P_InpEmail)));
 InputPII: => EmailDomainLength := LENGTH(EmailDomain);
-
-//Get Clean Email Domain and length						
+/*		Get Clean Email Domain and length		*/						
 InputPII: => CleanEmailDomain := GetCleanEmailDomain(P_InpEmail);
 InputPII: => CleanEmailDomainLength := LENGTH(CleanEmailDomain);
-
-//Email Domain all zero check
+/*		Email Domain all zero check		*/
 InputPII: => P_InpValEmailDomAllZeroFlagValue := MAP(
 				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT,  //Missing Email
 				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
 				(LENGTH(FilterOut(EmailDomain,'0')) = 0 AND EmailDomainLength > 0) => 1,  //Email Domain all zeros
 				(LENGTH(FilterOut(EmailDomain,'0')) > 0) => 0  //Email Domain not all zeros
 				);
-				
-//Email Domain Bad Character check
+/*		Email Domain Bad Character check		*/
 InputPII: => P_InpValEmailDomBadCharFlagValue := MAP(
 				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT,  //Missing Email
 				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
 				(CleanEmailDomain != EmailDomain AND P_InpValEmailDomAllZeroFlagValue = 0) => 1,  //Bad characters found
 				(CleanEmailDomain = EmailDomain) => 0 //No bad characters found
 				);
-				
 InputPII: => InvalidEmail := BadEmailCheck(P_InpEmail,EmailDomain);
-
 InputPII: => P_InpValEmailBogusFlagValue := MAP(
 				(InputEmailValue = MISSING_INPUT_DATA) => MISSING_INPUT_DATA_INT, //Email Missing
 				(AtPosition <= 1 OR InputEmailValue = NO_DATA_FOUND) => NO_DATA_FOUND_INT, //No data found or @ missing
 				(InvalidEmail = 0) => 0,  //Email Valid
 				(InvalidEmail = 1) => 1  //Email Invalid
 				);
-				
 InputPII: => P_InpValNameFirstBogusFlag := MAP(InputFirstNameValue=NO_DATA_FOUND =>  MISSING_INPUT_DATA,
 	fnBogusNames('',UPCASE(InputFirstNameValue),'') = '' => 1, 
 	0);
@@ -534,7 +587,6 @@ InputPII: => P_InpValPhoneHomeBadLenFlag :=
 			 LENGTH(TRIM(Filter(InputHomePhoneValue, '1234567890')))= 10	=> 0,					
 			 LENGTH(TRIM(Filter(InputHomePhoneValue, '1234567890'))) <> 7 AND
 			 LENGTH(TRIM(Filter(InputHomePhoneValue, '1234567890'))) <> 10	=> 1);	
-		
 InputPII: => P_InpValPhoneHomeBogusFlag := 
 		MAP(InputHomePhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,							
 	      IsBadPhone(TRIM(P_InpPhoneHome))=> 1,0);
@@ -550,15 +602,29 @@ InputPII: => P_InpValPhoneWorkBadLenFlag :=
 InputPII: => P_InpValPhoneWorkBogusFlag := 
 		MAP(InputWorkPhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,							
 	      IsBadPhone(TRIM(P_InpPhoneWork))=> 1,0);
-	
-				
-//For each Rep, it'll apply the PII input Echo attributes
+
+
+/**************************************************************************/
+/*                                                                        */
+/*    For each Rep, it'll apply the PII input Echo attributes             */
+/*                                                                        */
+/**************************************************************************/
+
+
 InputBII: => AuthRep1 := ONLY(InputBIIInputPII.PII(RepNumber = 1));
 InputBII: => AuthRep2 := ONLY(InputBIIInputPII.PII(RepNumber = 2));
 InputBII: => AuthRep3 := ONLY(InputBIIInputPII.PII(RepNumber = 3));
 InputBII: => AuthRep4 := ONLY(InputBIIInputPII.PII(RepNumber = 4));
 InputBII: => AuthRep5 := ONLY(InputBIIInputPII.PII(RepNumber = 5));
-//Business Echo 
+
+
+/**************************************************************************/
+/*                                                                        */
+/*                    Business Echo                                       */
+/*                                                                        */
+/**************************************************************************/
+
+
 InputBII: => B_InpLexIDUltValue := IsZero(B_InpLexIDUlt, MISSING_INPUT_DATA_INT);
 InputBII: => B_InpLexIDOrgValue := IsZero(B_InpLexIDOrg, MISSING_INPUT_DATA_INT);
 InputBII: => B_InpLexIDLegalValue := IsZero(B_InpLexIDLegal, MISSING_INPUT_DATA_INT);
@@ -579,7 +645,7 @@ InputBII: => BusInputTINEchoValue := IsBlank(B_InpTIN, MISSING_INPUT_DATA);
 InputBII: => BusInputSICCodeEchoValue := IsBlank(B_InpSICCode, MISSING_INPUT_DATA);
 InputBII: => BusInputNAICSCodeEchoValue := IsBlank(B_InpNAICSCode, MISSING_INPUT_DATA);
 InputBII: => BusInputArchiveDateEchoValue := IsBlank(B_InpArchDt, MISSING_INPUT_DATA);
-//AuthRep 1 input Echo attributes
+/*		AuthRep 1 input Echo attributes		*/
 InputBII: => BusInputAccountEchoValue := AuthRep1.InputAccountValue; 
 InputBII: => BusInputRep1LexIDEchoValue := AuthRep1.InputLexIDValue;
 InputBII: => BusInputRep1FirstNameEchoValue := AuthRep1.InputFirstNameValue;
@@ -596,7 +662,7 @@ InputBII: => BusInputRep1DOBEchoValue := AuthRep1.InputDOBValue;
 InputBII: => BusInputRep1EmailEchoValue := AuthRep1.InputEmailValue;
 InputBII: => BusInputRep1DLEchoValue := AuthRep1.InputDLValue;
 InputBII: => BusInputRep1DLStateEchoValue := AuthRep1.InputDLStateValue;
-//AuthRep 2 input Echo attributes
+/*		AuthRep 2 input Echo attributes		*/
 InputBII: => BusInputRep2LexIDEchoValue := AuthRep2.InputLexIDValue;
 InputBII: => BusInputRep2FirstNameEchoValue := AuthRep2.InputFirstNameValue;
 InputBII: => BusInputRep2MiddleNameEchoValue := AuthRep2.InputMiddleNameValue; 
@@ -612,7 +678,7 @@ InputBII: => BusInputRep2DOBEchoValue := AuthRep2.InputDOBValue;
 InputBII: => BusInputRep2EmailEchoValue := AuthRep2.InputEmailValue;
 InputBII: => BusInputRep2DLEchoValue := AuthRep2.InputDLValue;
 InputBII: => BusInputRep2DLStateEchoValue := AuthRep2.InputDLStateValue;
-//AuthRep 3 input Echo attributes
+/*		AuthRep 3 input Echo attributes		*/
 InputBII: => BusInputRep3LexIDEchoValue := AuthRep3.InputLexIDValue;
 InputBII: => BusInputRep3FirstNameEchoValue := AuthRep3.InputFirstNameValue;
 InputBII: => BusInputRep3MiddleNameEchoValue := AuthRep3.InputMiddleNameValue; 
@@ -628,7 +694,7 @@ InputBII: => BusInputRep3DOBEchoValue := AuthRep3.InputDOBValue;
 InputBII: => BusInputRep3EmailEchoValue := AuthRep3.InputEmailValue;
 InputBII: => BusInputRep3DLEchoValue := AuthRep3.InputDLValue;
 InputBII: => BusInputRep3DLStateEchoValue := AuthRep3.InputDLStateValue;
-//AuthRep 4 input Echo attributes
+/*		AuthRep 4 input Echo attributes		*/
 InputBII: => BusInputRep4LexIDEchoValue := AuthRep4.InputLexIDValue;
 InputBII: => BusInputRep4FirstNameEchoValue := AuthRep4.InputFirstNameValue;
 InputBII: => BusInputRep4MiddleNameEchoValue := AuthRep4.InputMiddleNameValue; 
@@ -644,7 +710,7 @@ InputBII: => BusInputRep4DOBEchoValue := AuthRep4.InputDOBValue;
 InputBII: => BusInputRep4EmailEchoValue := AuthRep4.InputEmailValue;
 InputBII: => BusInputRep4DLEchoValue := AuthRep4.InputDLValue;
 InputBII: => BusInputRep4DLStateEchoValue := AuthRep4.InputDLStateValue;
-//AuthRep 5 input Echo attributes
+/*		AuthRep 5 input Echo attributes		*/
 InputBII: => BusInputRep5LexIDEchoValue := AuthRep5.InputLexIDValue;
 InputBII: => BusInputRep5FirstNameEchoValue := AuthRep5.InputFirstNameValue;
 InputBII: => BusInputRep5MiddleNameEchoValue := AuthRep5.InputMiddleNameValue; 
@@ -660,7 +726,7 @@ InputBII: => BusInputRep5DOBEchoValue := AuthRep5.InputDOBValue;
 InputBII: => BusInputRep5EmailEchoValue := AuthRep5.InputEmailValue;
 InputBII: => BusInputRep5DLEchoValue := AuthRep5.InputDLValue;
 InputBII: => BusInputRep5DLStateEchoValue := AuthRep5.InputDLStateValue;
-//Input BII input Echo Populated attributes 
+/*		Input BII input Echo Populated attributes		*/
 InputBII: => B_InpArchDtFlagValue := IsEchoPopulated(B_InpArchDt);
 InputBII: => B_InpNameFlagValue := IsEchoPopulated(B_InpName);
 InputBII: => B_InpAltNameFlagValue := IsEchoPopulated(B_InpAltName);
@@ -672,7 +738,7 @@ InputBII: => B_InpPhoneFlagValue := IsEchoPopulated(B_InpPhone);
 InputBII: => B_InpTINFlagValue := IsEchoPopulated(B_InpTIN);
 InputBII: => B_InpSICCodeFlagValue := IsEchoPopulated(B_InpSICCode);
 InputBII: => B_InpNAICSCodeFlagValue := IsEchoPopulated(B_InpNAICSCode);
-// Auth Rep 1 Echo Pop Attributes
+/*		Auth Rep 1 Echo Pop Attributes		*/
 InputBII: => B_Rep1InpLexIDFlagValue := AuthRep1.P_InpLexIDFlagValue;
 InputBII: => B_Rep1InpNameFirstFlagValue := AuthRep1.P_InpNameFirstFlagValue;
 InputBII: => B_Rep1InpNameMidFlagValue := AuthRep1.P_InpNameMidFlagValue;
@@ -687,7 +753,7 @@ InputBII: => B_Rep1InpDOBFlagValue := AuthRep1.P_InpDOBFlagValue;
 InputBII: => B_Rep1InpEmailFlagValue := AuthRep1.P_InpEmailFlagValue;
 InputBII: => B_Rep1InpDLFlagValue := AuthRep1.P_InpDLFlagValue;
 InputBII: => B_Rep1InpDLStateFlagValue := AuthRep1.P_InpDLStateFlagValue;
-// Auth Rep 2 Echo Pop Attributes
+/*		Auth Rep 2 Echo Pop Attributes		*/
 InputBII: => B_Rep2InpLexIDFlagValue := AuthRep2.P_InpLexIDFlagValue;
 InputBII: => B_Rep2InpNameFirstFlagValue := AuthRep2.P_InpNameFirstFlagValue;
 InputBII: => B_Rep2InpNameMidFlagValue := AuthRep2.P_InpNameMidFlagValue;
@@ -702,7 +768,7 @@ InputBII: => B_Rep2InpDOBFlagValue := AuthRep2.P_InpDOBFlagValue;
 InputBII: => B_Rep2InpEmailFlagValue := AuthRep2.P_InpEmailFlagValue;
 InputBII: => B_Rep2InpDLFlagValue := AuthRep2.P_InpDLFlagValue;
 InputBII: => B_Rep2InpDLStateFlagValue := AuthRep2.P_InpDLStateFlagValue;
-// Auth Rep 3 Echo Pop Attributes
+/*		Auth Rep 3 Echo Pop Attributes		*/
 InputBII: => B_Rep3InpLexIDFlagValue := AuthRep3.P_InpLexIDFlagValue;
 InputBII: => B_Rep3InpNameFirstFlagValue := AuthRep3.P_InpNameFirstFlagValue;
 InputBII: => B_Rep3InpNameMidFlagValue := AuthRep3.P_InpNameMidFlagValue;
@@ -717,7 +783,7 @@ InputBII: => B_Rep3InpDOBFlagValue := AuthRep3.P_InpDOBFlagValue;
 InputBII: => B_Rep3InpEmailFlagValue := AuthRep3.P_InpEmailFlagValue;
 InputBII: => B_Rep3InpDLFlagValue := AuthRep3.P_InpDLFlagValue;
 InputBII: => B_Rep3InpDLStateFlagValue := AuthRep3.P_InpDLStateFlagValue;
-// Auth Rep 4 Echo Pop Attributes
+/*		Auth Rep 4 Echo Pop Attributes		*/
 InputBII: => B_Rep4InpLexIDFlagValue := AuthRep4.P_InpLexIDFlagValue;
 InputBII: => B_Rep4InpNameFirstFlagValue := AuthRep4.P_InpNameFirstFlagValue;
 InputBII: => B_Rep4InpNameMidFlagValue := AuthRep4.P_InpNameMidFlagValue;
@@ -732,7 +798,7 @@ InputBII: => B_Rep4InpDOBFlagValue := AuthRep4.P_InpDOBFlagValue;
 InputBII: => B_Rep4InpEmailFlagValue := AuthRep4.P_InpEmailFlagValue;
 InputBII: => B_Rep4InpDLFlagValue := AuthRep4.P_InpDLFlagValue;
 InputBII: => B_Rep4InpDLStateFlagValue := AuthRep4.P_InpDLStateFlagValue;
-// Auth Rep 5 Echo Pop Attributes
+/*		Auth Rep 5 Echo Pop Attributes		*/
 InputBII: => B_Rep5InpLexIDFlagValue := AuthRep5.P_InpLexIDFlagValue;
 InputBII: => B_Rep5InpNameFirstFlagValue := AuthRep5.P_InpNameFirstFlagValue;
 InputBII: => B_Rep5InpNameMidFlagValue := AuthRep5.P_InpNameMidFlagValue;
@@ -747,7 +813,15 @@ InputBII: => B_Rep5InpDOBFlagValue := AuthRep5.P_InpDOBFlagValue;
 InputBII: => B_Rep5InpEmailFlagValue := AuthRep5.P_InpEmailFlagValue;
 InputBII: => B_Rep5InpDLFlagValue := AuthRep5.P_InpDLFlagValue;
 InputBII: => B_Rep5InpDLStateFlagValue := AuthRep5.P_InpDLStateFlagValue;
-//Clean Business Input Attributes
+
+
+/**************************************************************************/
+/*                                                                        */
+/*            Clean Business Input Attributes                             */
+/*                                                                        */
+/**************************************************************************/
+
+
 InputBII: => B_LexIDUltValue := IsZero(B_LexIDUlt, MISSING_INPUT_DATA_INT);
 InputBII: => B_LexIDOrgValue := IsZero(B_LexIDOrg, MISSING_INPUT_DATA_INT);
 InputBII: => B_LexIDLegalValue := IsZero(B_LexIDLegal, MISSING_INPUT_DATA_INT);
@@ -755,7 +829,6 @@ InputBII: => B_LexIDSiteValue := IsZero(B_LexIDSite, MISSING_INPUT_DATA_INT);
 InputBII: => B_LexIDLocValue := IsZero(B_LexIDLoc, MISSING_INPUT_DATA_INT);
 InputBII: => B_LexIDLegalScoreValue := IsZero(BOUNDSCLIP(B_LexIDLegalScore, 51, 100), MISSING_INPUT_DATA_INT);
 InputBII: => B_LexIDLegalWgtValue := IsZero(BOUNDSCLIP(B_LexIDLegalWgt, 27, 999), MISSING_INPUT_DATA_INT);
-
 InputBII: => B_InpAddr := IF(B_InpAddrLine1:Null, '', B_InpAddrLine1 + ' ') +
 													IF(B_InpAddrLine2:Null, '', B_InpAddrLine2);
 InputBII: => AddrNotPopulated := IsNotEnoughToClean(B_InpAddr);
@@ -849,8 +922,7 @@ InputBII: => BusInputPhoneCleanValue := IsBlank2Fields(B_InpPhone, MISSING_INPUT
 InputBII: => BusInputTINCleanValue := IsBlank2Fields(B_InpTIN, MISSING_INPUT_DATA, B_InpClnTIN, NO_DATA_FOUND);
 InputBII: => BusInputEmailCleanValue := IsBlank2Fields(B_InpEmail, MISSING_INPUT_DATA, B_InpClnEmail, NO_DATA_FOUND);
 InputBII: => BusInputArchiveDateCleanValue := IsBlank(B_InpClnArchDt, NO_DATA_FOUND);
-
-// Auth Rep 1 Clean Input Attributes
+/*		Auth Rep 1 Clean Input Attributes		*/
 InputBII: => B_Rep1LexID := AuthRep1.P_LexID;
 InputBII: => B_Rep1LexIDScore := AuthRep1.P_LexIDScore;
 InputBII: => B_Rep1InpClnNamePrfx := AuthRep1.InputPrefixCleanValue;
@@ -883,7 +955,7 @@ InputBII: => B_Rep1InpClnDOB := AuthRep1.InputDOBCleanValue;
 InputBII: => B_Rep1InpClnDL := AuthRep1.InputDLCleanValue;
 InputBII: => B_Rep1InpClnDLState := AuthRep1.InputDLStateCleanValue;
 InputBII: => B_Rep1InpClnEmail := AuthRep1.InputEmailCleanValue;
-// Auth Rep 2 Clean Input Attributes
+/*		Auth Rep 2 Clean Input Attributes		*/
 InputBII: => B_Rep2LexID := 				AuthRep2.P_LexID;
 InputBII: => B_Rep2LexIDScore := 			AuthRep2.P_LexIDScore;
 InputBII: => B_Rep2InpClnNamePrfx := 		AuthRep2.InputPrefixCleanValue;
@@ -916,7 +988,7 @@ InputBII: => B_Rep2InpClnDOB := 			AuthRep2.InputDOBCleanValue;
 InputBII: => B_Rep2InpClnDL := 				AuthRep2.InputDLCleanValue;
 InputBII: => B_Rep2InpClnDLState := 		AuthRep2.InputDLStateCleanValue;
 InputBII: => B_Rep2InpClnEmail := 			AuthRep2.InputEmailCleanValue;
-// Auth Rep 3 Clean Input Attributes
+/*		Auth Rep 3 Clean Input Attributes		*/
 InputBII: => B_Rep3LexID := 				AuthRep3.P_LexID;
 InputBII: => B_Rep3LexIDScore := 			AuthRep3.P_LexIDScore;
 InputBII: => B_Rep3InpClnNamePrfx := 		AuthRep3.InputPrefixCleanValue;
@@ -949,7 +1021,7 @@ InputBII: => B_Rep3InpClnDOB := 			AuthRep3.InputDOBCleanValue;
 InputBII: => B_Rep3InpClnDL := 				AuthRep3.InputDLCleanValue;
 InputBII: => B_Rep3InpClnDLState := 		AuthRep3.InputDLStateCleanValue;
 InputBII: => B_Rep3InpClnEmail := 			AuthRep3.InputEmailCleanValue;
-// Auth Rep 4 Clean Input Attributes
+/*		Auth Rep 4 Clean Input Attributes		*/
 InputBII: => B_Rep4LexID := 				AuthRep4.P_LexID;
 InputBII: => B_Rep4LexIDScore := 			AuthRep4.P_LexIDScore;
 InputBII: => B_Rep4InpClnNamePrfx := 		AuthRep4.InputPrefixCleanValue;
@@ -982,7 +1054,7 @@ InputBII: => B_Rep4InpClnDOB := 			AuthRep4.InputDOBCleanValue;
 InputBII: => B_Rep4InpClnDL := 				AuthRep4.InputDLCleanValue;
 InputBII: => B_Rep4InpClnDLState := 		AuthRep4.InputDLStateCleanValue;
 InputBII: => B_Rep4InpClnEmail := 			AuthRep4.InputEmailCleanValue;
-// Auth Rep 5 Clean Input Attributes
+/*		Auth Rep 5 Clean Input Attributes		*/
 InputBII: => B_Rep5LexID := 				AuthRep5.P_LexID;
 InputBII: => B_Rep5LexIDScore := 			AuthRep5.P_LexIDScore;
 InputBII: => B_Rep5InpClnNamePrfx := 		AuthRep5.InputPrefixCleanValue;
@@ -1015,7 +1087,15 @@ InputBII: => B_Rep5InpClnDOB := 			AuthRep5.InputDOBCleanValue;
 InputBII: => B_Rep5InpClnDL := 				AuthRep5.InputDLCleanValue;
 InputBII: => B_Rep5InpClnDLState := 		AuthRep5.InputDLStateCleanValue;
 InputBII: => B_Rep5InpClnEmail := 			AuthRep5.InputEmailCleanValue;
-//Input PII input Clean Populated attributes 
+
+
+/**************************************************************************/
+/*                                                                        */
+/*     Input PII input Clean Populated attribute                          */
+/*                                                                        */
+/**************************************************************************/
+
+ 
 InputBII: => B_InpClnNameFlagValue := IsCleanPopulated(BusInputNameCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnAltNameFlagValue := IsCleanPopulated(BusInputAlternateNameCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnAddrPrimRngFlagValue := IsCleanPopulated(BusInputPrimRangeCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
@@ -1041,8 +1121,7 @@ InputBII: => B_InpClnPhoneFlagValue := IsCleanPopulated(BusInputPhoneCleanValue,
 InputBII: => B_InpClnTINFlagValue := IsCleanPopulated(BusInputTINCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnEmailFlagValue := IsCleanPopulated(BusInputEmailCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnArchDtFlagValue :=  IsEchoPopulated(B_InpClnArchDt); // This only returns 0/1, so using the IsEchoPopulated Function to check the clean archive date.
-
-// Auth Rep 1 Clean Pop Attributes
+/*		Auth Rep 1 Clean Pop Attributes		*/
 InputBII: => B_Rep1InpClnNamePrfxFlagValue := AuthRep1.P_InpClnNamePrfxFlagValue;
 InputBII: => B_Rep1InpClnNameFirstFlagValue := AuthRep1.P_InpClnNameFirstFlagValue; 
 InputBII: => B_Rep1InpClnNameMidFlagValue := AuthRep1.P_InpClnNameMidFlagValue; 
@@ -1073,7 +1152,7 @@ InputBII: => B_Rep1InpClnDOBFlagValue := AuthRep1.P_InpClnDOBFlagValue;
 InputBII: => B_Rep1InpClnEmailFlagValue := AuthRep1.P_InpClnEmailFlagValue; 
 InputBII: => B_Rep1InpClnDLFlagValue := AuthRep1.P_InpClnDLFlagValue;
 InputBII: => B_Rep1InpClnDLStateFlagValue := AuthRep1.P_InpClnDLStateFlagValue; 
-// Auth Rep 2 Clean Pop Attributes
+/*		Auth Rep 2 Clean Pop Attributes		*/
 InputBII: => B_Rep2InpClnNamePrfxFlagValue := AuthRep2.P_InpClnNamePrfxFlagValue;
 InputBII: => B_Rep2InpClnNameFirstFlagValue := AuthRep2.P_InpClnNameFirstFlagValue; 
 InputBII: => B_Rep2InpClnNameMidFlagValue := AuthRep2.P_InpClnNameMidFlagValue; 
@@ -1104,7 +1183,7 @@ InputBII: => B_Rep2InpClnDOBFlagValue := AuthRep2.P_InpClnDOBFlagValue;
 InputBII: => B_Rep2InpClnEmailFlagValue := AuthRep2.P_InpClnEmailFlagValue; 
 InputBII: => B_Rep2InpClnDLFlagValue := AuthRep2.P_InpClnDLFlagValue;
 InputBII: => B_Rep2InpClnDLStateFlagValue := AuthRep2.P_InpClnDLStateFlagValue; 
-// Auth Rep 3 Clean Pop Attributes
+/*		Auth Rep 3 Clean Pop Attributes		*/
 InputBII: => B_Rep3InpClnNamePrfxFlagValue := AuthRep3.P_InpClnNamePrfxFlagValue;
 InputBII: => B_Rep3InpClnNameFirstFlagValue := AuthRep3.P_InpClnNameFirstFlagValue; 
 InputBII: => B_Rep3InpClnNameMidFlagValue := AuthRep3.P_InpClnNameMidFlagValue; 
@@ -1135,7 +1214,7 @@ InputBII: => B_Rep3InpClnDOBFlagValue := AuthRep3.P_InpClnDOBFlagValue;
 InputBII: => B_Rep3InpClnEmailFlagValue := AuthRep3.P_InpClnEmailFlagValue; 
 InputBII: => B_Rep3InpClnDLFlagValue := AuthRep3.P_InpClnDLFlagValue;
 InputBII: => B_Rep3InpClnDLStateFlagValue := AuthRep3.P_InpClnDLStateFlagValue; 
-// Auth Rep 4 Clean Pop Attributes
+/*		Auth Rep 4 Clean Pop Attributes		*/
 InputBII: => B_Rep4InpClnNamePrfxFlagValue := AuthRep4.P_InpClnNamePrfxFlagValue;
 InputBII: => B_Rep4InpClnNameFirstFlagValue := AuthRep4.P_InpClnNameFirstFlagValue; 
 InputBII: => B_Rep4InpClnNameMidFlagValue := AuthRep4.P_InpClnNameMidFlagValue; 
@@ -1166,7 +1245,7 @@ InputBII: => B_Rep4InpClnDOBFlagValue := AuthRep4.P_InpClnDOBFlagValue;
 InputBII: => B_Rep4InpClnEmailFlagValue := AuthRep4.P_InpClnEmailFlagValue; 
 InputBII: => B_Rep4InpClnDLFlagValue := AuthRep4.P_InpClnDLFlagValue;
 InputBII: => B_Rep4InpClnDLStateFlagValue := AuthRep4.P_InpClnDLStateFlagValue; 
-// Auth Rep 5 Clean Pop Attributes
+/*		Auth Rep 5 Clean Pop Attributes		*/
 InputBII: => B_Rep5InpClnNamePrfxFlagValue := AuthRep5.P_InpClnNamePrfxFlagValue;
 InputBII: => B_Rep5InpClnNameFirstFlagValue := AuthRep5.P_InpClnNameFirstFlagValue; 
 InputBII: => B_Rep5InpClnNameMidFlagValue := AuthRep5.P_InpClnNameMidFlagValue; 
@@ -1197,14 +1276,11 @@ InputBII: => B_Rep5InpClnDOBFlagValue := AuthRep5.P_InpClnDOBFlagValue;
 InputBII: => B_Rep5InpClnEmailFlagValue := AuthRep5.P_InpClnEmailFlagValue; 
 InputBII: => B_Rep5InpClnDLFlagValue := AuthRep5.P_InpClnDLFlagValue;
 InputBII: => B_Rep5InpClnDLStateFlagValue := AuthRep5.P_InpClnDLStateFlagValue; 
-
-
 InputBII: => B_InpValNameBadCharFlag := ValidateFlag(BusInputNameEchoValue);	
 InputBII: => B_InpValAltNameBadCharFlag := ValidateFlag(BusInputAlternateNameEchoValue);
 InputBII: => B_InpValNameMatchesAltNameFlag := MAP(B_InpClnNameFlagValue != 1 OR B_InpClnAltNameFlagValue !=1 => InputBII.MISSING_INPUT_DATA_INT,
                BusInputNameCleanValue != BusInputAlternateNameCleanValue  => 0,
                BusInputNameCleanValue = BusInputAlternateNameCleanValue  => 1);
-
 InputBII: => B_InpValNameInvalidFlag := MAP(BusInputNameCleanValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
                                             B_InpClnNameFlagValue = 1 => 0,
                                             B_InpClnNameFlagValue = 0 => 1);
@@ -1212,7 +1288,6 @@ InputBII: => B_InpValAltNameInvalidFlag := MAP(BusInputAlternateNameCleanValue =
 	                                             B_InpClnAltNameFlagValue = 1 => 0,
 						                                   B_InpClnAltNameFlagValue = 0 => 1);
 InputBII: => B_InpValAddrStInvalidFlag := MAP(BusInputStreetCleanValue	= InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
-                			 
 						                                	B_InpClnAddrPrimRngFlagValue = 1  OR
 						                                	B_InpClnAddrPreDirFlagValue = 1 OR
 						                                	B_InpClnAddrPrimNameFlagValue = 1 OR
@@ -1242,7 +1317,7 @@ InputBII: => B_InpValAddrZipBadLenFlag:= MAP(BusInputZipEchoValue = InputBII.MIS
 							                               LENGTH(TRIM(B_InpZipHelper)) <>9 => 1);
 InputBII: => B_InpValAddrZipAllZeroFlag:= MAP(BusInputZipEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,	
 					                                    INTEGER(B_InpZipHelper)  = 0 =>1,0);
-//helper attribute to find length of	BusInputStateEchoValue					
+/*		helper attribute to find length of	BusInputStateEchoValue		*/					
 InputBII: => B_InpValAddrStateLength := 	LENGTH(TRIM(BusInputStateEchoValue));
 InputBII: => B_InpValAddrStateBadAbbrFlag:= MAP(BusInputStateEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,
 										                            B_InpValAddrStateLength <> 2 => -99998,
@@ -1257,7 +1332,7 @@ InputBII: => B_InpValPhoneBadLenFlag:= MAP(BusInputPhoneEchoValue = InputBII.MIS
 							                             LENGTH(TRIM(Filter(BusInputPhoneEchoValue, '1234567890'))) <> 10	=> 1);	
 InputBII: => B_InpValPhoneBogusFlag:= MAP(BusInputPhoneEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,							
 	                                        IsBadPhone(TRIM(BusInputPhoneEchoValue))=> 1,0);
-//helper atrreibute to check tin in 0-9 digits or not
+/*		helper attributes to check tin in 0-9 digits or not		*/
 InputBII: => B_InpTinHelper	:=Filter(BusInputTINEchoValue,'0123456789()-.');
 InputBII:	=> B_InpTinHelper1 :=Filter(BusInputTINEchoValue,'0123456789');			
 InputBII: => B_InpValTINBadCharFlag:= MAP(BusInputTINEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,					
@@ -1267,8 +1342,6 @@ InputBII: => B_InpValTINBadLenFlag:= MAP(BusInputTINEchoValue = InputBII.MISSING
 							                           LENGTH(TRIM(B_InpTinHelper1)) <> 9	=> 1);		
 InputBII: => B_InpValTINBogusFlag:= MAP(BusInputTINEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA_INT,							
                                         IsBadSSN(BusInputTINEchoValue)=> 1,0);
-
-
 InputBII: => AtPosition := FindLastStringInstance(B_InpEmail, '@');
 InputBII: => EmailUsername := UPCASE(SUBSTR(B_InpEmail, 1, AtPosition-1));
 InputBII: => EmailUsernameLength := LENGTH(EmailUsername);
@@ -1299,16 +1372,24 @@ InputBII: => B_InpValEmailDomBadCharFlag :=     MAP(BusInputEmailEchoValue = Inp
                                                 (CleanEmailDomain != EmailDomain AND B_InpValEmailDomAllZeroFlag = 0 ) => 1,  
                                                 (CleanEmailDomain = EmailDomain) => 0 ); 
 
-	 /////////////////////
-   //Person Attributes//
-   /////////////////////
-Person: => P_LexIDSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
-				
-				
 
-   /////////////////////////////
-   //Vehicle Helper Attributes//
-   /////////////////////////////
+/**************************************************************************/
+/*                                                                        */
+/*                  Person Attributes                                     */
+/*                                                                        */
+/**************************************************************************/
+
+
+Person: => P_LexIDSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
+
+
+/**************************************************************************/
+/*                                                                        */
+/*                  Vehicle Helper Attributes                             */
+/*                                                                        */
+/**************************************************************************/
+
+
 Person: => VehicleBuildCurrentDate := ONLY(PersonVehicle,CurrentDate);
 PersonVehicle: => DateFirstSeenCapped := IF(MIN(CountsModel, SequenceKey:DateFirstSeen) > CurrentDate, CurrentDate, MIN(CountsModel, SequenceKey:DateFirstSeen));
 PersonVehicle: => VehicleMinDate := IF(ISVALIDDATE(DateFirstSeenCapped), DATETOSTRING(DateFirstSeenCapped,'%Y%m%d') ,PersonVehicle.REC_FOUND_BUT_INVALID);
@@ -1349,53 +1430,56 @@ Person: => PL_AstVehAutoEmrgOldMsncEv := MAP(
 			PL_AstVehAutoCntEv > 0 AND  ALL(PersonVehicle,VehicleMinDate = PersonVehicle.REC_FOUND_BUT_INVALID) => PersonVehicle.REC_FOUND_BUT_INVALID_INT,	
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstVehAutoEmrgOldDtEv),VehicleBuildCurrentDate),0,999));	
 
-   /////////////////////////////
-   //Aircraft Helper Attributes//
-   /////////////////////////////	 
+
+/**************************************************************************/
+/*                                                                        */
+/*                Aircraft Helper Attributes                              */
+/*                                                                        */
+/**************************************************************************/
+
+ 
 Person: => AircraftBuildCurrentDate := ONLY(AircraftOwner,CurrentDate);
 AircraftOwner: => DateFirstSeenCapped := IF(AircraftOwner.Plane:DateFirstSeen > CurrentDate, CurrentDate, AircraftOwner.Plane:DateFirstSeen);
 AircraftOwner: => AircraftMinDate := IF(ISVALIDDATE(DateFirstSeenCapped), DATETOSTRING(DateFirstSeenCapped,'%Y%m%d'), AircraftOwner.REC_FOUND_BUT_INVALID);
 AircraftOwner: => DateLastSeenCapped := IF(AircraftOwner.Plane:DateLastSeen > CurrentDate, CurrentDate, AircraftOwner.Plane:DateLastSeen);
 AircraftOwner: => AircraftMaxDate := IF(ISVALIDDATE(DateLastSeenCapped), DATETOSTRING(DateLastSeenCapped,'%Y%m%d'), AircraftOwner.REC_FOUND_BUT_INVALID);
-
 Person: => PL_AstVehAirCntEv:= IF(P_LexIDSeenFlag = '0', AircraftOwner.MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(COUNT(AircraftOwner), 0, 99));
-			
 Person: => PL_AstVehAirEmrgDtListEv := TOPN(AircraftOwner{Plane, AircraftFirstSeenDate := (AircraftMinDate)},999,-AircraftFirstSeenDate);
-
 Person: => PL_AstVehAirEmrgNewDtEv := MAP(
 				P_LexIDSeenFlag = '0' => AircraftOwner.MISSING_INPUT_DATA,
    			PL_AstVehAirCntEv = 0 => AircraftOwner.NO_DATA_FOUND,
    			PL_AstVehAirCntEv > 0 AND  ALL(AircraftOwner,AircraftMinDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID,
    			DATETOSTRING(MAX(AircraftOwner(AircraftMinDate != AircraftOwner.REC_FOUND_BUT_INVALID),DATE(AircraftMinDate)),'%Y%m%d' ));
-
 Person: => PL_AstVehAirEmrgOldDtEv := MAP(
    			P_LexIDSeenFlag = '0' => AircraftOwner.MISSING_INPUT_DATA,
    			PL_AstVehAirCntEv = 0 => AircraftOwner.NO_DATA_FOUND,
    			PL_AstVehAirCntEv > 0 AND  ALL(AircraftOwner,AircraftMinDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID,			
    			DATETOSTRING(MIN(AircraftOwner(AircraftMinDate != AircraftOwner.REC_FOUND_BUT_INVALID),DATE(AircraftMinDate)),'%Y%m%d' ));   
-
 Person: => PL_AstVehAirEmrgNewMsncEv := MAP(
 				P_LexIDSeenFlag = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
 				PL_AstVehAirCntEv = 0 => AircraftOwner.NO_DATA_FOUND_INT,
 				PL_AstVehAirCntEv > 0 AND  ALL(AircraftOwner,AircraftMinDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID_INT,	
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstVehAirEmrgNewDtEv ),AircraftBuildCurrentDate),0,999)); 
-			
 Person: => PL_AstVehAirEmrgOldMsncEv := MAP(
 				P_LexIDSeenFlag = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
 				PL_AstVehAirCntEv = 0 => AircraftOwner.NO_DATA_FOUND_INT,
 				PL_AstVehAirCntEv > 0 AND  ALL(AircraftOwner,AircraftMinDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID_INT,	
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstVehAirEmrgOldDtEv),AircraftBuildCurrentDate),0,999));
 
-///////////////////////////////
-//Watercraft Helper Attribute//
-//////////////////////////////			
+
+/**************************************************************************/
+/*                                                                        */
+/*               Watercraft Helper Attribute                              */
+/*                                                                        */
+/**************************************************************************/
+
+
 Person: => WatercraftBuildCurrentDate := ONLY(WatercraftOwner,CurrentDate);
 WatercraftOwner: => DateFirstSeenCapped := IF(WCraft:DateFirstSeen > CurrentDate, CurrentDate, WCraft:DateFirstSeen);
 WatercraftOwner: => WatercraftMinDate := IF(ISVALIDDATE(DateFirstSeenCapped), DATETOSTRING(DateFirstSeenCapped,'%Y%m%d'), WatercraftOwner.REC_FOUND_BUT_INVALID);
 WatercraftOwner: => DateLastSeenCapped := IF(WCraft:DateLastSeen > CurrentDate, CurrentDate, WCraft:DateLastSeen);
 WatercraftOwner: => WatercraftMaxDate := IF(ISVALIDDATE(DateLastSeenCapped), DATETOSTRING(DateLastSeenCapped,'%Y%m%d'), WatercraftOwner.REC_FOUND_BUT_INVALID);
-            
 Person: => PL_AstVehWtrCntEv:= IF(P_LexIDSeenFlag = '0', WatercraftOwner.MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(COUNT(WatercraftOwner), 0, 99));
 Person:	=>	PL_AstVehWtrEmrgDtListEv := TOPN(WatercraftOwner{WCraft,WatercraftFirstSeenDate := (WatercraftMinDate)},999,-WatercraftFirstSeenDate);
@@ -1420,9 +1504,14 @@ Person:	=>	PL_AstVehWtrEmrgOldMsncEv:= MAP(
 				PL_AstVehWtrCntEv > 0 AND  ALL(WatercraftOwner,WatercraftMinDate = WatercraftOwner.REC_FOUND_BUT_INVALID) => WatercraftOwner.REC_FOUND_BUT_INVALID_INT,	
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstVehWtrEmrgOldDtEv),WatercraftBuildCurrentDate),0,999));
 
-////////////////////////////////////
-//Criminal Attributes
-////////////////////////////////////
+
+/**************************************************************************/
+/*                                                                        */
+/*                 Criminal Attributes                                    */
+/*                                                                        */
+/**************************************************************************/
+
+
 CriminalOffense: ONE_MONTH_IN_DAYS := 30;
 CriminalOffense: THREE_MONTHS_IN_DAYS := 90;
 CriminalOffense: SIX_MONTHS_IN_DAYS := 180;
@@ -1434,14 +1523,12 @@ CriminalOffense: FIVE_YEARS_IN_DAYS := 1826;
 CriminalOffense: SIX_YEARS_IN_DAYS := 2191;
 CriminalOffense: SEVEN_YEARS_IN_DAYS := 2556;
 CriminalOffense: TEN_YEARS_IN_DAYS := 3652;
-
 CriminalOffense.OffenseCharges: => CriminalDate := CaseNumber:DateFirstSeen;
 CriminalOffense: => RecentOffenderLevel := ONLY(TOPN(OffenderLevel, 1, -OffenderLevel:DateFirstSeen),OffenderLevel);
 CriminalOffense.OffenseCharges: => DismissedCharges := IF(CourtDispositionDescription:Null, FALSE, CourtDispositionDescription='DISMISSED') 
 																										OR IF(CourtAdditionalDispositionDescription:Null, FALSE, CourtAdditionalDispositionDescription = 'DISMISSED'); 
 CriminalOffense.OffenseCharges: => IsFelony := NOT DismissedCharges AND IF(OffenseScore:Null,FALSE, OffenseScore = 'F') AND (RecentOffenderLevel = '4' OR RecentOffenderLevel:Null);
 CriminalOffense.OffenseCharges: => AgeInDays := ABSDAYSBETWEEN(CriminalDate , CurrentDate);
-
 Person: => PL_DrgCrimFelCnt1Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99));
 Person: => PL_DrgCrimFelCnt7Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsFelony = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999));
 Person: => PL_DrgCrimFelNewDt1Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsFelony = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
@@ -1464,10 +1551,8 @@ Person: => PL_DrgCrimFelOldMsnc7Y := MAP(
 			P_LexIDSeenFlag = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
 			PL_DrgCrimFelOldDt7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_DrgCrimFelOldDt7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
-
-//Person Attributes Derog - Criminal History - NonFelony
+/*		Person Attributes Derog - Criminal History - NonFelony		*/
 CriminalOffense.OffenseCharges: => IsNonFelonyRecords := NOT DismissedCharges AND NOT OffenseScore = 'F'; 
-
 Person: => PL_DrgCrimNfelCnt1Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99));
 Person: => PL_DrgCrimNfelCnt7Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsNonFelonyRecords = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999));
 Person: => PL_DrgCrimNfelNewDt1Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsNonFelonyRecords = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
@@ -1490,10 +1575,8 @@ Person: => PL_DrgCrimNfelOldMsnc7Y := MAP(
 			P_LexIDSeenFlag = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
 			PL_DrgCrimNfelOldDt7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_DrgCrimNfelOldDt7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
-
-//Person Attributes Derog - Criminal History - Arrest
+/*		Person Attributes Derog - Criminal History - Arrest		*/
 CriminalOffense.OffenseCharges: => IsArrest := DataType = '5';
-
 Person: => PL_DrgArstCnt1Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99));
 Person: => PL_DrgArstCnt7Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsArrest = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999));
 Person: => PL_DrgArstNewDt1Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsArrest = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
@@ -1516,10 +1599,8 @@ Person: => PL_DrgArstOldMsnc7Y := MAP(
 			P_LexIDSeenFlag = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
 			PL_DrgArstOldDt7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_DrgArstOldDt7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
-
-//Person Attributes Derog - Criminal History - Criminal Conviction
+/*		Person Attributes Derog - Criminal History - Criminal Conviction		*/
 CriminalOffense.OffenseCharges: => IsCriminalCount := NOT DismissedCharges; 
-
 Person: => PL_DrgCrimCnt1Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 99));
 Person: => PL_DrgCrimCnt7Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null)), 0, 999));
 Person: => PL_DrgCrimNewDt1Y := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonOffenses.Offense.OffenseCharges(IsCriminalCount = TRUE AND AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null), CriminalDate)),CriminalOffense.NO_DATA_FOUND_CRIM));
@@ -1542,8 +1623,7 @@ Person: => PL_DrgCrimOldMsnc7Y := MAP(
 			P_LexIDSeenFlag = '0' => CriminalOffense.MISSING_INPUT_DATA_INT,
 			PL_DrgCrimOldDt7Y = CriminalOffense.NO_DATA_FOUND_CRIM => CriminalOffense.NO_DATA_FOUND_CRIM_INT,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_DrgCrimOldDt7Y), ONLY(PersonOffenses.Offense, CurrentDate)), 0, 84));
-
-//Person Attributes Derog - Criminal History - Others
+/*		Person Attributes Derog - Criminal History - Others		*/
 Person: => PL_DrgCrimSeverityIndx7Y := MAP(
 			P_LexIDSeenFlag = '0' => CriminalOffense.MISSING_INPUT_DATA,
 			PL_DrgCrimCnt7Y = 0 => '0 - 0',
@@ -1557,7 +1637,6 @@ Person: => PL_DrgCrimSeverityIndx7Y := MAP(
 			(PL_DrgCrimCnt7Y >= 3 AND PL_DrgCrimFelCnt7Y = 2) => '3 - 2',
 			(PL_DrgCrimCnt7Y >= 3 AND PL_DrgCrimFelCnt7Y >= 3) => '3 - 3'
 			); 
-
 Person: => PL_DrgCrimBehaviorIndx7Y := MAP(
 			P_LexIDSeenFlag = '0' => CriminalOffense.MISSING_INPUT_DATA,
 			(PL_DrgCrimFelCnt7Y > 0 AND PL_DrgCrimFelNewMsnc7Y >= 0 AND PL_DrgCrimFelNewMsnc7Y <= 12) => '6',
@@ -1568,9 +1647,15 @@ Person: => PL_DrgCrimBehaviorIndx7Y := MAP(
 			(PL_DrgCrimCnt7Y = 1) => '1',
 			(PL_DrgCrimCnt7Y = 0) => '0'
 			); 
-////////////////////////////////////
-// Bankruptcy Helper Attributes
-////////////////////////////////////
+
+
+/**************************************************************************/
+/*                                                                        */
+/*                Bankruptcy Helper Attributes                            */
+/*                                                                        */
+/**************************************************************************/
+
+
 Bankruptcy: ONE_MONTH_IN_DAYS := 30;
 Bankruptcy: THREE_MONTHS_IN_DAYS := 90;
 Bankruptcy: SIX_MONTHS_IN_DAYS := 180;
@@ -1582,8 +1667,7 @@ Bankruptcy: FIVE_YEARS_IN_DAYS := 1826;
 Bankruptcy: SIX_YEARS_IN_DAYS := 2191;
 Bankruptcy: SEVEN_YEARS_IN_DAYS := 2556;
 Bankruptcy: TEN_YEARS_IN_DAYS := 3652;
-
-// Secondary sort logic for picking best child record.
+/*		Secondary sort logic for picking best child record.		*/
 Bankruptcy.Records: => ChildSortList := MAP( 
 			Disposition:Null => 1,
 			Disposition = 'Dismissed' => 2,
@@ -1593,9 +1677,8 @@ Bankruptcy.Records: => ChildSortList := MAP(
 			Disposition = 'Closed' => 6,			
 			7
 			); 
-// Create submodel that will only populate the best child.
+/*		Create submodel that will only populate the best child.		*/
 Bankruptcy: => BestChildRecord := TOPN(Records,1,-Records.DateFiled,-Records.LastStatusUpdate, Records.ChildSortList);
-
 Bankruptcy: => HasCaseNumber := TRIMALL(CaseNumber) <> '' AND NOT CaseNumber:Null;
 Bankruptcy.BestChildRecord: => TMSID := Bankruptcy.TMSID; 
 Bankruptcy.BestChildRecord: => CourtCode := Bankruptcy.CourtCode; 
@@ -1609,7 +1692,6 @@ Bankruptcy.BestChildRecord: => Chapter11 := OriginalChapter = '11';
 Bankruptcy.BestChildRecord: => Chapter12 := OriginalChapter = '12';
 Bankruptcy.BestChildRecord: => Chapter13 := OriginalChapter = '13';
 Bankruptcy.BestChildRecord: => Chapter15 := OriginalChapter = '15';
-
 Bankruptcy.BestChildRecord: => BusChangeChapter :=IF(OriginalChapter ='304','15',OriginalChapter);//for business 304 will be converted to chapter 15 per Sam Shepler
 Bankruptcy.BestChildRecord: => BusChapterType := BusChangeChapter IN ['7','9','11','12','13','15'];
 Bankruptcy.BestChildRecord: => BusChapter7 := BusChangeChapter = '7';
@@ -1618,7 +1700,6 @@ Bankruptcy.BestChildRecord: => BusChapter11 := BusChangeChapter = '11';
 Bankruptcy.BestChildRecord: => BusChapter12 := BusChangeChapter = '12';
 Bankruptcy.BestChildRecord: => BusChapter13 := BusChangeChapter = '13';
 Bankruptcy.BestChildRecord: => BusChapter15 := BusChangeChapter = '15';
-
 Bankruptcy.BestChildRecord: => IsBankruptcy := Bankruptcy.HasCaseNumber AND EXISTS(CaseDetails(CaseID <> ''));
 Bankruptcy.BestChildRecord: => IsDisposed := NOT Disposition:Null;
 Bankruptcy.BestChildRecord: => Banko1Year := (IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null);
@@ -1686,9 +1767,14 @@ Person: => MostRecentDispoDte1Y := ONLY(MostRecentDispoList1Y,STRING(BankruptcyD
 Person: => MostRecentDispoDte7Y := ONLY(MostRecentDispoList7Y,STRING(BankruptcyDate));
 Person: => MostRecentDispoDte10Y := ONLY(MostRecentDispoList10Y,STRING(BankruptcyDate));
 
-////////////////////////////////////
-// Bankruptcy Attributes
-////////////////////////////////////
+
+/**************************************************************************/
+/*                                                                        */
+/*                   Bankruptcy Attributes                                */
+/*                                                                        */
+/**************************************************************************/
+
+
 Person: => PL_DrgBkCnt1Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year)), 0, 99));			
 Person: => PL_DrgBkCnt7Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year)), 0, 999));
 Person: => PL_DrgBkCnt10Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year)), 0, 999));
@@ -1701,7 +1787,6 @@ Person: => PL_DrgBkNewDt10Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPU
 Person: => PL_DrgBkOldDt1Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
 Person: => PL_DrgBkOldDt7Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
 Person: => PL_DrgBkOldDt10Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
-
 Person: => PL_DrgBkNewMsnc1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			PL_DrgBkNewDt1Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
@@ -1952,12 +2037,16 @@ Person: => PL_DrgBkSeverityIndx10Y := MAP(
 			'1'
 			); 	
 
-////////////////////////////////////
-// Business Attributes
-////////////////////////////////////
+
+/**************************************************************************/
+/*                                                                        */
+/*                   Business Attributes                                  */
+/*                                                                        */
+/**************************************************************************/
+
+
 BusinessSele: => B_LexIDLegalRstdOnlyFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '0', '1');
 BusinessSele: => B_LexIDLegalSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
-
 BusinessSele.DataSources: => TranslatedSourceCode := SourceGroup(Source);
 BusinessSele: => TranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode};
 BusinessSele: => BE_VerSrcListEv := TOPN(TranslatedSources{
@@ -1965,8 +2054,7 @@ BusinessSele: => BE_VerSrcListEv := TOPN(TranslatedSources{
 	SourceDateFirstSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), INTEGER(TranslatedSourceCode:DateFirstSeen), 0), INTEGER(CurrentDate)),
 	SourceDateLastSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), INTEGER(TranslatedSourceCode:DateLastSeen), 0), INTEGER(CurrentDate))
 	}, 1000, SourceDateFirstSeen = 0, SourceDateFirstSeen, SourceDateLastSeen = 0, SourceDateLastSeen, TranslatedSourceCode);
-	
-//Tradline Helper Attributes
+/*		Tradline Helper Attributes		*/
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
 Tradeline: SIX_MONTHS_IN_DAYS := 180;
@@ -1997,113 +2085,95 @@ Tradeline.Records: => OperationsSegment:= SegmentID IN [26,27,28,29,30,31,32,33,
 Tradeline: => IsOperationsSegment := EXISTS(Tradeline.Records(OperationsSegment));
 Tradeline.Records: => OtherSegment:= NOT (CarrierSegment OR FleetSegment OR MaterialsSegment OR OperationsSegment);
 Tradeline: => IsOtherSegment := EXISTS(Tradeline.Records(OtherSegment));
-
-//For the Cortera attribute calculation, we will calculate the  ‘LN’ version for some of the fields provided by Cortera in specific . 
-//Then use the ‘LN’ version fields to build the attributes.  Current_AR any NULL or negative balance will be set at zero.
-//Any aging bucket that has a NULL vaule will be set as zero
+/*		For the Cortera attribute calculation, we will calculate the  ‘LN’ version for some of the fields provided by Cortera in specific. 
+/*		Then use the ‘LN’ version fields to build the attributes.  Current_AR any NULL or negative balance will be set at zero.
+/*		Any aging bucket that has a NULL vaule will be set as zero		*/
 Tradeline.Records: => CurrentARLN := IF(CurrentAR:Null OR CurrentAR < 0,0,CurrentAR);
 Tradeline.Records: => Aging1To30LN := IF(Aging1To30:Null OR Aging1To30 < 0,0,Aging1To30);
 Tradeline.Records: => Aging31To60LN := IF(Aging31To60:Null OR Aging31To60 < 0,0,Aging31To60);
 Tradeline.Records: => Aging61To90LN := IF(Aging61To90:Null OR Aging61To90 < 0,0,Aging61To90);
 Tradeline.Records: => Aging91PlusLN := IF(Aging91Plus:Null OR Aging91Plus < 0,0,Aging91Plus); 
 Tradeline.Records: => TotalARLN := CurrentARLN + Aging1To30LN + Aging31To60LN + Aging61To90LN  + Aging91PlusLN;
-
 Tradeline: => TotalARLN := ONLY(Records(RecordAgeInDays = MIN(Records,RecordAgeInDays)), TotalARLN);
 Tradeline.Records: => DPD1Total := Aging1To30LN + Aging31To60LN + Aging61To90LN + Aging91PlusLN;																				
 Tradeline.Records: => DPD31Total := Aging31To60LN + Aging61To90LN + Aging91PlusLN;																				
 Tradeline.Records: => DPD61Total := Aging61To90LN + Aging91PlusLN;																				
 Tradeline.Records: => DPD91Total := Aging91PlusLN;																				
-
 Tradeline.Records: => PerfLevel := MAP(
 																			Aging91PlusLN > 0 => 4,
 																			Aging61To90LN > 0 => 3,
 																			Aging31To60LN > 0 => 2, 
 																			Aging1To30LN  > 0 => 1, 0);
-
-// Helper attributes for calculating B2b*24MFull attributes. 
-// This type of attribute counts tradelines per calendar month over the past two years, not including the current month.
-// For example, if the archive date is 02/13/2019, this type of attribute looks at records from 2/01/2017 to 01/31/2019. 
+/*		Helper attributes for calculating B2b*24MFull attributes. 
+/*		This type of attribute counts tradelines per calendar month over the past two years, not including the current month.
+/*		For example, if the archive date is 02/13/2019, this type of attribute looks at records from 2/01/2017 to 01/31/2019.		*/ 
 Tradeline: => CurrentYear := YEAR(CurrentDate);
 Tradeline: => CurrentMonth := MONTH(CurrentDate);
 Tradeline: => CurrentDateFirstOfMonth := DATEFROMPARTS(CurrentYear, CurrentMonth, 1);
 Tradeline: => TwoYearFullDate := ADJUSTCALENDAR(CurrentDateFirstOfMonth, -2, 0, 0);
 Tradeline.Records: => IsTwoYearFullRecord := RecordDate < Tradeline.CurrentDateFirstOfMonth AND RecordDate >= Tradeline.TwoYearFullDate;
 Tradeline.Records: => MonthsFromFirstOfCurrentMonth := MONTHSBETWEEN(RecordDate, CurrentDateFirstOfMonth) + 1;
-
-// Helper attributes for calculating tradeline attributes asof one year before the Currentdate (B2b*Arch1Y* attributes).
+/*		Helper attributes for calculating tradeline attributes asof one year before the Currentdate (B2b*Arch1Y* attributes).		*/
 Tradeline.Records: => Is1YRecord := RecordAgeInDays >= ONE_YEAR_IN_DAYS;
-//If record is at least 1 year old, find the number of days old it was AS OF 1 year ago. If it is not at least a year old, RecordAgeInDays1Y will be null.
+/*		If record is at least 1 year old, find the number of days old it was AS OF 1 year ago. If it is not at least a year old, RecordAgeInDays1Y will be null.		*/
 Tradeline.Records: Is1YRecord => RecordAgeInDays1Y := ABSDAYSBETWEEN(RecordDate, ADJUSTCALENDAR(CurrentDate, -1, 0, 0));
 Tradeline: => NewestRecordAgeInDays1Y := MIN(Records,RecordAgeInDays1Y);
 Tradeline: => IsActive1Y := NewestRecordAgeInDays1Y <= THREE_MONTHS_IN_DAYS;
 Tradeline.Records: => IsMostRecentActiveRecord1Y := IsActive1Y AND ARDate = MAX(Tradeline.Records(Is1YRecord), ARDate);
-
 BusinessSele: => BE_B2BCnt2YNoCap := COUNT(SeleTradeline.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS));
 BusinessSele: => BE_B2BCarrCnt2YNoCap := COUNT(SeleTradeline.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND IsCarrierSegment));
 BusinessSele: => BE_B2BFltCnt2YNoCap := COUNT(SeleTradeline.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND IsFleetSegment));
 BusinessSele: => BE_B2BMatCnt2YNoCap := COUNT(SeleTradeline.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND IsMaterialsSegment));
 BusinessSele: => BE_B2BOpsCnt2YNoCap := COUNT(SeleTradeline.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND IsOperationsSegment));
 BusinessSele: => BE_B2BOthCnt2YNoCap := COUNT(SeleTradeline.Account(NewestRecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND IsOtherSegment));
-
 BusinessSele: => BE_B2BActvCntNoCap := COUNT(SeleTradeline.Account(IsActive));
 BusinessSele: => BE_B2BActvCarrCntNoCap := COUNT(SeleTradeline.Account(IsActive AND IsCarrierSegment));
 BusinessSele: => BE_B2BActvFltCntNoCap := COUNT(SeleTradeline.Account(IsActive AND IsFleetSegment));
 BusinessSele: => BE_B2BActvMatCntNoCap := COUNT(SeleTradeline.Account(IsActive AND IsMaterialsSegment));
 BusinessSele: => BE_B2BActvOpsCntNoCap := COUNT(SeleTradeline.Account(IsActive AND IsOperationsSegment));
 BusinessSele: => BE_B2BActvOthCntNoCap := COUNT(SeleTradeline.Account(IsActive AND IsOtherSegment));
-
 BusinessSele: => BE_B2BActvBalTotNoCap := SUM(SeleTradeline.Account(IsActive),TotalARLN);
 BusinessSele: => BE_B2BActvCarrBalTotNoCap := SUM(SeleTradeline.Account(IsActive AND IsCarrierSegment),TotalARLN);
 BusinessSele: => BE_B2BActvFltBalTotNoCap := SUM(SeleTradeline.Account(IsActive AND IsFleetSegment),TotalARLN);
 BusinessSele: => BE_B2BActvMatBalTotNoCap := SUM(SeleTradeline.Account(IsActive AND IsMaterialsSegment),TotalARLN);
 BusinessSele: => BE_B2BActvOpsBalTotNoCap := SUM(SeleTradeline.Account(IsActive AND IsOperationsSegment),TotalARLN);
 BusinessSele: => BE_B2BActvOthBalTotNoCap := SUM(SeleTradeline.Account(IsActive AND IsOtherSegment),TotalARLN);
-
 BusinessSele: => BE_B2BActvCntA1YNoCap := COUNT(SeleTradeline.Account(IsActive1Y));
 BusinessSele: => BE_B2BActvCarrCntA1YNoCap := COUNT(SeleTradeline.Account(IsActive1Y AND IsCarrierSegment));
 BusinessSele: => BE_B2BActvFltCntA1YNoCap := COUNT(SeleTradeline.Account(IsActive1Y AND IsFleetSegment));
 BusinessSele: => BE_B2BActvMatCntA1YNoCap := COUNT(SeleTradeline.Account(IsActive1Y AND IsMaterialsSegment));
 BusinessSele: => BE_B2BActvOpsCntA1YNoCap := COUNT(SeleTradeline.Account(IsActive1Y AND IsOperationsSegment));
 BusinessSele: => BE_B2BActvOthCntA1YNoCap := COUNT(SeleTradeline.Account(IsActive1Y AND IsOtherSegment));
-
 BusinessSele: => BE_B2BActv1pDpdCntNoCap := COUNT(SeleTradeline.Account.Records(IsMostRecentActiveRecord AND PerfLevel >= 1));
 BusinessSele: => BE_B2BActv31pDpdCntNoCap := COUNT(SeleTradeline.Account.Records(IsMostRecentActiveRecord AND PerfLevel >= 2));
 BusinessSele: => BE_B2BActv61pDpdCntNoCap := COUNT(SeleTradeline.Account.Records(IsMostRecentActiveRecord AND PerfLevel >= 3));
 BusinessSele: => BE_B2BActv91pDpdCntNoCap := COUNT(SeleTradeline.Account.Records(IsMostRecentActiveRecord AND PerfLevel = 4));
-
 BusinessSele: => BE_B2BActv1pDpdBalTotNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord), DPD1Total);
 BusinessSele: => BE_B2BActv31pDpdBalTotNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord), DPD31Total);
 BusinessSele: => BE_B2BActv61pDpdBalTotNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord), DPD61Total);
 BusinessSele: => BE_B2BActv91pDpdBalTotNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord), DPD91Total);
-
 BusinessSele: => BE_B2BActv1pDpdBalTotA1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y), DPD1Total);
 BusinessSele: => BE_B2BActv31pDpdBalTotA1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y), DPD31Total);
 BusinessSele: => BE_B2BActv61pDpdBalTotA1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y), DPD61Total);
 BusinessSele: => BE_B2BActv91pDpdBalTotA1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y), DPD91Total);
-
-
 BusinessSele: => B2bTLBalNewestDate2Y := TOPN(SeleTradeline.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
 BusinessSele: => B2bTLBalInCarrNewestDate2Y := TOPN(SeleTradeline.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND CarrierSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
 BusinessSele: => B2bTLBalInFltNewestDate2Y := TOPN(SeleTradeline.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND FleetSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
 BusinessSele: => B2bTLBalInMatNewestDate2Y := TOPN(SeleTradeline.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND MaterialsSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
 BusinessSele: => B2bTLBalInOpsNewestDate2Y := TOPN(SeleTradeline.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND OperationsSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
 BusinessSele: => B2bTLBalInOthNewestDate2Y := TOPN(SeleTradeline.Account.Records(RecordAgeInDays <= Tradeline.TWO_YEARS_IN_DAYS AND OtherSegment){TotalARLN,ARDate}, 1, -TotalARLN,-ARDate);
-
 BusinessSele: => BE_B2BBalMax2YNoCap := ONLY(B2bTLBalNewestDate2Y,TotalARLN);
 BusinessSele: => BE_B2BCarrBalMax2YNoCap := ONLY(B2bTLBalInCarrNewestDate2Y,TotalARLN);
 BusinessSele: => BE_B2BFltBalMax2YNoCap := ONLY(B2bTLBalInFltNewestDate2Y,TotalARLN);
 BusinessSele: => BE_B2BMatBalMax2YNoCap := ONLY(B2bTLBalInMatNewestDate2Y,TotalARLN); 
 BusinessSele: => BE_B2BOpsBalMax2YNoCap := ONLY(B2bTLBalInOpsNewestDate2Y,TotalARLN);
 BusinessSele: => BE_B2BOthBalMax2YNoCap := ONLY(B2bTLBalInOthNewestDate2Y,TotalARLN);
-
-
 BusinessSele: => BE_B2BActvBalTotArch1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y),TotalARLN);
 BusinessSele: => BE_B2BActvCarrBalTotArch1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y AND CarrierSegment),TotalARLN);
 BusinessSele: => BE_B2BActvFltBalTotArch1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y AND FleetSegment),TotalARLN);
 BusinessSele: => BE_B2BActvMatBalTotArch1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y AND MaterialsSegment),TotalARLN);
 BusinessSele: => BE_B2BActvOpsBalTotArch1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y AND OperationsSegment),TotalARLN);
 BusinessSele: => BE_B2BActvOthBalTotArch1YNoCap := SUM(SeleTradeline.Account.Records(IsMostRecentActiveRecord1Y AND OtherSegment),TotalARLN);
-
 BusinessSele: => BE_B2BBalMaxSegType2YMapCarr := IF(BE_B2BCarrBalMax2YNoCap = BE_B2BBalMax2YNoCap,1,0);
 BusinessSele: => BE_B2BBalMaxSegType2YMapFlt := IF(BE_B2BFltBalMax2YNoCap = BE_B2BBalMax2YNoCap,1,0);
 BusinessSele: => BE_B2BBalMaxSegType2YMapMat := IF(BE_B2BMatBalMax2YNoCap = BE_B2BBalMax2YNoCap,1,0);
@@ -2124,7 +2194,7 @@ BusinessSele: => B2bTLInMatBal24MfullNoCap := SUM(SeleTradeline.Account.Records(
 BusinessSele: => B2bTLInOpsBal24MfullNoCap := SUM(SeleTradeline.Account.Records(IsTwoYearFullRecord AND OperationsSegment),TotalARLN);
 BusinessSele: => B2bTLInOthBal24MfullNoCap := SUM(SeleTradeline.Account.Records(IsTwoYearFullRecord AND OtherSegment),TotalARLN);
 																				
-//Tradline Attributes
+/*		Tradline Attributes		*/
 BusinessSele: => BE_B2BCntEv := BOUNDSFOLD(COUNT(SeleTradeline.TradeAccount), 0, 9999);
 BusinessSele: => BE_B2BCnt2Y := BOUNDSFOLD(BE_B2BCnt2YNoCap, 0, 999);
 BusinessSele: => BE_B2BCarrCnt2Y := BOUNDSFOLD(BE_B2BCarrCnt2YNoCap, 0, 999);
@@ -2200,7 +2270,7 @@ BusinessSele: => BE_B2BActvFltCntA1Y := BOUNDSFOLD(BE_B2BActvFltCntA1YNoCap, 0, 
 BusinessSele: => BE_B2BActvMatCntA1Y := BOUNDSFOLD(BE_B2BActvMatCntA1YNoCap, 0, 999);
 BusinessSele: => BE_B2BActvOpsCntA1Y := BOUNDSFOLD(BE_B2BActvOpsCntA1YNoCap, 0, 999);
 BusinessSele: => BE_B2BActvOthCntA1Y := BOUNDSFOLD(BE_B2BActvOthCntA1YNoCap, 0, 999);
-// Using MIN() instead of BOUNDSFOLD() for these attributes because BOUNDSFOLD truncates REALs and we only need to worry about exceeding an upper bound for these.
+/*		Using MIN() instead of BOUNDSFOLD() for these attributes because BOUNDSFOLD truncates REALs and we only need to worry about exceeding an upper bound for these.		*/
 BusinessSele: => BE_B2BActvCntGrow1Y := IF(BE_B2BActvCntA1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(BE_B2BActvCntNoCap/BE_B2BActvCntA1YNoCap, 999.9999));
 BusinessSele: => BE_B2BActvCarrCntGrow1Y := IF(BE_B2BActvCarrCntA1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(BE_B2BActvCarrCntNoCap/BE_B2BActvCarrCntA1YNoCap, 999.9999));
 BusinessSele: => BE_B2BActvFltCntGrow1Y := IF(BE_B2BActvFltCntA1Y = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, MIN(BE_B2BActvFltCntNoCap/BE_B2BActvFltCntA1YNoCap, 999.9999));
@@ -2705,7 +2775,7 @@ BusinessSele: => BE_B2BMatRecFlagByMonSum24Mc := IF(BE_B2BMatCnt24Mc = 0, Tradel
 BusinessSele: => BE_B2BOpsRecFlagByMonSum24Mc := IF(BE_B2BOpsCnt24Mc = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(BE_B2BOpsRecFlagByMonStr24Mc, '1'));
 BusinessSele: => BE_B2BOthRecFlagByMonSum24Mc := IF(BE_B2BOthCnt24Mc = 0, Tradeline.NO_DATA_FOUND_TRADELINE_INT, FindCount(BE_B2BOthRecFlagByMonStr24Mc, '1'));
 
-//Need means for all segments
+/*		Need means for all segments		*/
 BusinessSele: => B2bTLMEAN := (B2bTLBal24MfullNoCap/BE_B2BRecFlagByMonSum24Mc);
 BusinessSele: => B2bTLInCarrMEAN := (B2bTLInCarrBal24MfullNoCap/BE_B2BCarrRecFlagByMonSum24Mc);
 BusinessSele: => B2bTLInFltMEAN := (B2bTLInFltBal24MfullNoCap/BE_B2BFltRecFlagByMonSum24Mc);
@@ -2714,28 +2784,28 @@ BusinessSele: => B2bTLInOpsMEAN := (B2bTLInOpsBal24MfullNoCap/BE_B2BOpsRecFlagBy
 BusinessSele: => B2bTLInOthMEAN := (B2bTLInOthBal24MfullNoCap/BE_B2BOthRecFlagByMonSum24Mc);
 
 Tradeline.Records: => ARDateGroup:= DATEFROMPARTS(YEAR(ARDate), MONTH(ARDate), 0);
-//TotalARLN summed and grouped by month
+/*		TotalARLN summed and grouped by month		*/
 BusinessSele: => B2bTLGroupTotalARLNSum := SeleTradeline.Account.Records(IsTwoYearFullRecord){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
 BusinessSele: => B2bTLGroupCarrTotalARLNSum := SeleTradeline.Account.Records(IsTwoYearFullRecord AND CarrierSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
 BusinessSele: => B2bTLGroupFltTotalARLNSum := SeleTradeline.Account.Records(IsTwoYearFullRecord AND FleetSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
 BusinessSele: => B2bTLGroupMatTotalARLNSum := SeleTradeline.Account.Records(IsTwoYearFullRecord AND MaterialsSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
 BusinessSele: => B2bTLGroupOpsTotalARLNSum := SeleTradeline.Account.Records(IsTwoYearFullRecord AND OperationsSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
 BusinessSele: => B2bTLGroupOthTotalARLNSum := SeleTradeline.Account.Records(IsTwoYearFullRecord AND OtherSegment){ARDateGroup, TotalARLNSum := SUM(GROUP, TotalARLN)};
-//Standard deviation uses Population not sample size
+/*		Standard deviation uses Population not sample size		*/
 BusinessSele: => B2bTLSTDDevationPopulation := STDDEV(B2bTLGroupTotalARLNSum, TotalARLNSum); 
 BusinessSele: => B2bTLSTDDevationPopulationInCarr := STDDEV(B2bTLGroupCarrTotalARLNSum, TotalARLNSum); 
 BusinessSele: => B2bTLSTDDevationPopulationInFlt := STDDEV(B2bTLGroupFltTotalARLNSum, TotalARLNSum); 
 BusinessSele: => B2bTLSTDDevationPopulationInMat := STDDEV(B2bTLGroupMatTotalARLNSum, TotalARLNSum); 
 BusinessSele: => B2bTLSTDDevationPopulationInOps := STDDEV(B2bTLGroupOpsTotalARLNSum, TotalARLNSum);    
 BusinessSele: => B2bTLSTDDevationPopulationInOth := STDDEV(B2bTLGroupOthTotalARLNSum, TotalARLNSum); 
-//Difference from Standard deviation population to sample zie
+/*		Difference from Standard deviation population to sample size		*/
 BusinessSele: => B2bTLModifiedNCount := SQRT(BE_B2BRecFlagByMonSum24Mc/(BE_B2BRecFlagByMonSum24Mc - 1));
 BusinessSele: => B2bTLModifiedNCountInCarr := SQRT(BE_B2BCarrRecFlagByMonSum24Mc/(BE_B2BCarrRecFlagByMonSum24Mc - 1));
 BusinessSele: => B2bTLModifiedNCountInFlt := SQRT(BE_B2BFltRecFlagByMonSum24Mc/(BE_B2BFltRecFlagByMonSum24Mc - 1));
 BusinessSele: => B2bTLModifiedNCountInMat := SQRT(BE_B2BMatRecFlagByMonSum24Mc/(BE_B2BMatRecFlagByMonSum24Mc - 1));
 BusinessSele: => B2bTLModifiedNCountInOps := SQRT(BE_B2BOpsRecFlagByMonSum24Mc/(BE_B2BOpsRecFlagByMonSum24Mc - 1));
 BusinessSele: => B2bTLModifiedNCountInOth := SQRT(BE_B2BOthRecFlagByMonSum24Mc/(BE_B2BOthRecFlagByMonSum24Mc - 1));
-//Standard Deviation using sample size 
+/*		Standard Deviation using sample size		*/ 
 BusinessSele: => B2bTLDevationSample := B2bTLSTDDevationPopulation * B2bTLModifiedNCount;
 BusinessSele: => B2bTLDevationSampleInCarr := B2bTLSTDDevationPopulationInCarr * B2bTLModifiedNCountInCarr;
 BusinessSele: => B2bTLDevationSampleInFlt := B2bTLSTDDevationPopulationInFlt * B2bTLModifiedNCountInFlt;
@@ -2767,9 +2837,14 @@ BusinessSele: => BE_B2BOthBalVol24Mc := MAP(
 		BE_B2BOthRecFlagByMonSum24Mc = 1 => Tradeline.NO_DATA_FOUND_97_INT,
 		BE_B2BOthCnt24Mc = 0 => Tradeline.NO_DATA_FOUND_TRADELINE_INT,
 		MIN(B2bTLDevationSampleInOth/B2bTLInOthMEAN,2.00));
-		
-	
-//Business asset vehicle attributes//
+
+
+/**************************************************************************/
+/*                                                                        */
+/*           Business asset vehicle attributes                            */
+/*                                                                        */
+/**************************************************************************/	
+
 
 BusinessSele: => VehicleBuildCurrentDate := ONLY(SeleVehicle,CurrentDate);
 BusinessSele: => AircraftBuildCurrentDate := ONLY(SeleAircraft,CurrentDate);
@@ -2812,9 +2887,15 @@ BusinessSele: => BE_AstVehAutoEmrgNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR
 			                                         BE_AstVehAutoCntEv = '0' => SeleVehicle.NO_DATA_FOUND_INT,
 			                                         ALL(SeleVehicle,VehicleMinDate = SeleVehicle.REC_FOUND_BUT_INVALID) => SeleVehicle.REC_FOUND_BUT_INVALID_INT,	
                                                BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_AstVehAutoEmrgNewDtEv),VehicleBuildCurrentDate),0,9999));
-/////////////////////////																							 
-//Business Bankruptcy Helper Attributes//
-/////////////////////////
+
+
+/**************************************************************************/
+/*                                                                        */
+/*            Business Bankruptcy Helper Attributes                       */
+/*                                                                        */
+/**************************************************************************/
+
+
 BusinessSele: => Ch7Cnt10Y := BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.BusChapter7)), 0, 999);
 BusinessSele: => Ch11Cnt10Y := BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.BusChapter11)), 0, 999);			
 BusinessSele: => Ch13Cnt10Y := BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.BusChapter13)), 0, 999);
@@ -2827,9 +2908,15 @@ BusinessSele: => MostRecentUpdateBks10Y := TOPN(SeleBankruptcy.Bankrupt.BestChil
 BusinessSele: => MostRecentUpdate10Y := ONLY(MostRecentUpdateBks10Y,STRING(LastStatusUpdate));
 BusinessSele: => MostRecentDispoList10Y := TOPN(SeleBankruptcy.Bankrupt(BestChildRecord.Banko10Year){ModDisposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,BestChildRecord.ModifiedDisposition), BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, 1, -BankruptcyDate,-LastStatusUpdate,-DateFiled); 
 BusinessSele: => MostRecentDispo10Y := ONLY(MostRecentDispoList10Y,ModDisposition);
-/////////////////////////																							 
-//Business Bankruptcy Attributes//
-/////////////////////////
+
+
+/**************************************************************************/
+/*                                                                        */
+/*              Business Bankruptcy Attributes                            */
+/*                                                                        */
+/**************************************************************************/
+
+
 BusinessSele: => BE_DrgBkCnt1Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt.BestChildRecord(Banko1Year)), 0, 999));		
 BusinessSele: => BE_DrgBkCnt7Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt.BestChildRecord(Banko7Year)), 0, 999));		
 BusinessSele: => BE_DrgBkCnt10Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt.BestChildRecord(Banko10Year)), 0, 999));		
@@ -2880,11 +2967,15 @@ BusinessSele: => BE_DrgBkNewChType10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleI
 			                                   (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			                                    MostRecentChapter10YWithNull = Bankruptcy.NO_DATA_FOUND_97_INT => Bankruptcy.NO_DATA_FOUND_97_INT,
 		                                    	MostRecentChapter10Y); 	
-																					
 
-////////////////////////////////////
-//SOS Filing Helper Attributes//
-///////////////////////////////////
+
+/**************************************************************************/
+/*                                                                        */
+/*               SOS Filing Helper Attributes                             */
+/*                                                                        */
+/**************************************************************************/	
+
+
 BusinessSele: => SOSDomesticFiling := SOSIncorporationDetails(NOT SOSIncorporationState:Null AND SOSIncorporationState <> '' AND SOSForeignDomesticIndicator = 'D');
 BusinessSele: => SOSForeignFiling := SOSIncorporationDetails(NOT SOSForeignStateCode:Null AND SOSForeignStateCode <> '' AND SOSForeignDomesticIndicator = 'F'); 
 BusinessSele: => SOSDomesticFilingCount := COUNT(SOSDomesticFiling{SOSKey, SOSIncorporationState});
@@ -2904,9 +2995,14 @@ BusinessSele: => SOSForeignStates := SOSForeignFiling{SOSIncorporationState};
 BusinessSele: => SOSDomesticStates := SOSDomesticFiling{SOSIncorporationState};
 BusinessSele: => SOSFilingStatesCountDups := COUNT(SOSForeignStates(EXISTS(SOSDomesticStates(SOSIncorporationState = BusinessSele.SOSForeignStates.SOSIncorporationState))));
 BusinessSele: => SOSUniqueStateCount := COUNT(SOSForeignStates) + COUNT(SOSDomesticStates) - SOSFilingStatesCountDups;
-////////////////////////////////////
-//SOS Filing Attributes//
-///////////////////////////////////
+
+
+/**************************************************************************/
+/*                                                                        */
+/*               SOS Filing Attributes                                    */
+/*                                                                        */
+/**************************************************************************/	
+
 
 BusinessSele: => BE_SOSCntEv :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA,BusinessSele.MISSING_INPUT_DATA_INT,
                                   BOUNDSFOLD((SOSFilingTotalCount), 0, 999));
@@ -2969,11 +3065,16 @@ BusinessSele: => BE_SOSFrgnOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID
 			                                      BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
 			                                     (BE_SOSFrgnOldDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
 			                                      BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSFrgnOldDtEv),CurrentDateSOS),0,960));
-																					
-//////////////////////////////////
-//Best BII Sele Helper Attributes//
-/////////////////////////////////																					
-BusinessSele: => BestBusinessNamesSorted := TOPN(BestCompanyNames, 1, BestCompanyNameRank);
+
+
+/**************************************************************************/
+/*                                                                        */
+/*              Best BII Sele Helper Attributes                           */
+/*                                                                        */
+/**************************************************************************/	
+
+
+BusinessSele: => BestBusinessNamesSorted := TOPN(BestCompanyNames, 1, fnRemoveSpecialChars(BestCompanyNameRank,''));
 BusinessSele: => OnlyBestBusinessName := ONLY(BestBusinessNamesSorted);
 BusinessSele: => BestBusinessAddress := SeleAddress.BestAddresses(BestAddressRank=MIN(BusinessSele.SeleAddress.BestAddresses, BestAddressRank));//KS-435
 BusinessSele: => OnlyBestBusinessAddress := ONLY(BestBusinessAddress);
@@ -2999,9 +3100,15 @@ BusinessSele: => BusinessSeleLocationID := AppendLocationID(
     IF(OnlyBestBusinessAddress.BestVanityCity:Null, '', OnlyBestBusinessAddress.BestVanityCity),
     IF(OnlyBestBusinessAddress.BestState:Null, '', OnlyBestBusinessAddress.BestState),
     IF(OnlyBestBusinessAddress.BestZip5:Null, '', OnlyBestBusinessAddress.BestZip5));
-////////////////////////////////
-//Best BII Sele  Attributes//
-/////////////////////////////////																							
+
+
+/**************************************************************************/
+/*                                                                        */
+/*               Best BII Sele  Attributes                                */
+/*                                                                        */
+/**************************************************************************/	
+
+
 BusinessSele: => BE_BestName :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
                                   		OnlyBestBusinessName.BestCompanyName:Null OR OnlyBestBusinessName.BestCompanyName = '' => BusinessSele.NO_DATA_FOUND,
                                       OnlyBestBusinessName.BestCompanyName);
@@ -3030,15 +3137,25 @@ BusinessSele: => BE_BestTIN := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleTI
 BusinessSele: => BE_BestPhone := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SelePhoneNumber.MISSING_INPUT_DATA => SelePhoneNumber.MISSING_INPUT_DATA,
 																				OnlyBestBusinessPhone.BestPhone:Null OR OnlyBestBusinessPhone.BestPhone = '' =>SelePhoneNumber.NO_DATA_FOUND,
 																				OnlyBestBusinessPhone.BestPhone);
-																																							
-////////////////////////////////////
-// Business Prox Attributes
-////////////////////////////////////
+
+
+/**************************************************************************/
+/*                                                                        */
+/*          Business Prox Attributes                                      */
+/*                                                                        */
+/**************************************************************************/	
+
+
 BusinessProx: => B_LexIDLocSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
 
-//////////////////////////////////
-//Best BII Prox Helper Attributes//
-/////////////////////////////////																																									
+
+/**************************************************************************/
+/*                                                                        */
+/*           Best BII Prox Helper Attributes                              */
+/*                                                                        */
+/**************************************************************************/	
+
+
 BusinessProx: => BestBusinessProxNamesSorted := TOPN(BestCompanyNames, 1, BestCompanyNameRank);
 BusinessProx: => OnlyBestBusinessProxName := ONLY(BestBusinessProxNamesSorted);
 BusinessProx: => BestBusinessProxAddress := TOPN(ProxAddress.BestAddresses, 1, BestAddressRank);
@@ -3065,9 +3182,15 @@ BusinessProx: => BusinessProxLocationID := AppendLocationID(
     IF(OnlyBestBusinessProxAddress.BestVanityCity:Null, '', OnlyBestBusinessProxAddress.BestVanityCity),
     IF(OnlyBestBusinessProxAddress.BestState:Null, '', OnlyBestBusinessProxAddress.BestState),
     IF(OnlyBestBusinessProxAddress.BestZip5:Null, '', OnlyBestBusinessProxAddress.BestZip5));
-//////////////////////////////////
-//Best BII Prox Attributes//
-/////////////////////////////////
+
+
+/**************************************************************************/
+/*                                                                        */
+/*              Best BII Prox Attributes                                  */
+/*                                                                        */
+/**************************************************************************/	
+
+
 BusinessProx: => BP_BestName :=  MAP(B_LexIDLocSeenFlag = '0' OR ProxID = BusinessProx.MISSING_INPUT_DATA => BusinessProx.MISSING_INPUT_DATA,
                                    	OnlyBestBusinessProxName.BestCompanyName:Null OR OnlyBestBusinessProxName.BestCompanyName = '' => BusinessProx.NO_DATA_FOUND,
 																			OnlyBestBusinessProxName.BestCompanyName);
@@ -3095,21 +3218,43 @@ BusinessProx: => BP_BestTIN := MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxTIN.
 BusinessProx: => BP_BestPhone := MAP(B_LexIDLocSeenFlag = '0' OR ProxID = ProxPhoneNumber.MISSING_INPUT_DATA => ProxPhoneNumber.MISSING_INPUT_DATA,
 																				OnlyBestBusinessProxPhone.BestPhone:Null OR OnlyBestBusinessProxPhone.BestPhone = '' => ProxPhoneNumber.NO_DATA_FOUND,
 																				OnlyBestBusinessProxPhone.BestPhone);																			
-																						
 
-//Government Debarred Attribute//
+
+/**************************************************************************/
+/*                                                                        */
+/*           Government Debarred Attribute                                */
+/*                                                                        */
+/**************************************************************************/	
+
+
 BusinessSele: => IsGovernmentDebarred := COUNT(GovernmentDebarred) > 0;
 BusinessSele: => BE_DrgGovDebarredFlagEv :=	MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
                                                 IsGovernmentDebarred = TRUE => 1,
 																								IsGovernmentDebarred = FALSE => 0);
-//Business LeinJudgment Helper Attributes//
+
+
+/**************************************************************************/
+/*                                                                        */
+/*             Business LeinJudgment Helper Attributes                    */
+/*                                                                        */
+/**************************************************************************/	
+
+
 LienJudgment: ONE_YEAR_IN_DAYS := 365;
 LienJudgment: SEVEN_YEAR_IN_DAYS := 2556;
 LienJudgment: => LANDLORD_TENANT_DISPUTE_LIENS :=['FORCIBLE ENTRY/DETAINER','LANDLORD TENANT JUDGMENT','FORCIBLE ENTRY/DETAINER RELEAS','FORCIBLE ENTRY/DETAINER RELEASE'];
 LienJudgment.Filing: => AgeInDays := ABSDAYSBETWEEN(OriginalFilingDate, CurrentDate);
 LienJudgment.Filing: => Seen_In_Seven_Years := ABSDAYSBETWEEN(OriginalFilingDate, CurrentDate) <= LienJudgment.SEVEN_YEAR_IN_DAYS;
 LienJudgment.Filing: => IsLandlordTenantDispute := LandlordTenantDisputeFlag = 'Y' OR FilingTypeDescription IN LANDLORD_TENANT_DISPUTE_LIENS;
-//Business LeinJudgment Attributes//
+
+
+/**************************************************************************/
+/*                                                                        */
+/*              Business LeinJudgment Attributes                          */
+/*                                                                        */
+/**************************************************************************/	
+
+
 BusinessSele: => BL_DrgLTDCnt1Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA,LienJudgment.MISSING_INPUT_DATA_INT,
                                      BOUNDSFOLD(COUNT(SeleLienJudgment.Lien.Filing( AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null AND  IsLandlordTenantDispute )),0,99999));
 BusinessSele: => BL_DrgLTDCnt7Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA,LienJudgment.MISSING_INPUT_DATA_INT,
@@ -3136,9 +3281,15 @@ BusinessSele: => BL_DrgLTDOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID 
 			                                     BL_DrgLTDCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 			                                     BL_DrgLTDOldDt7Y = LienJudgment.REC_FOUND_BUT_INVALID =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
                                            BOUNDSFOLD(MONTHSBETWEEN(DATE(BL_DrgLTDOldDt7Y), ONLY(SeleLienJudgment.Lien, CurrentDate)), 0, 84));
-////////////////////////////////////
-// ProfessionalLicense Helper Attributes
-////////////////////////////////////
+
+
+/**************************************************************************/
+/*                                                                        */
+/*            ProfessionalLicense Helper Attributes                       */
+/*                                                                        */
+/**************************************************************************/	
+
+
 ProfessionalLicense: => ValidProfessionalLicense := LicenseNumber <> '' AND (MaxIssueDate < CurrentDate OR MaxIssueDate:Null) ;
 ProfessionalLicense: => MaxIssueDate := MAX(LicenseDates, IF(OriginalDateOfIssuance < DATE('19000101'),DATE(''),OriginalDateOfIssuance));
 ProfessionalLicense: => MaxExpireDate := MAX(LicenseDates, DateOfExpiration);
@@ -3152,9 +3303,15 @@ Person: => ActiveProfessionalLicenseType := ONLY(ActiveProfessionalLicenseIssueE
 Person: => ActiveProfessionalLicenseOccupation := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Occupation, ProfessionalLicense.REC_FOUND_BUT_INVALID));
 Person: => ActiveProfessionalLicenseCategory := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseCategory, ProfessionalLicense.REC_FOUND_BUT_INVALID));
 Person: => ActiveProfessionalLicenseSource :=ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Source, ProfessionalLicense.REC_FOUND_BUT_INVALID));
-////////////////////////////////////
-//ProfessionalLicense Attributes
-////////////////////////////////////
+
+
+/**************************************************************************/
+/*                                                                        */
+/*             ProfessionalLicense Attributes                             */
+/*                                                                        */
+/**************************************************************************/	
+
+
 Person: => PL_ProfLicFlagEv := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
 			ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense) => '1',
