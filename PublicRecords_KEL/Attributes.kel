@@ -2037,6 +2037,70 @@ Person: => PL_DrgBkSeverityIndx10Y := MAP(
 			'1'
 			); 	
 
+/**************************************************************************/
+/*                                                                        */
+/*            ProfessionalLicense Helper Attributes                       */
+/*                                                                        */
+/**************************************************************************/	
+
+
+ProfessionalLicense: => ValidProfessionalLicense := LicenseNumber <> '' AND (MaxIssueDate < CurrentDate OR MaxIssueDate:Null) ;
+ProfessionalLicense: => MaxIssueDate := MAX(LicenseDates, IF(OriginalDateOfIssuance < DATE('19000101'),DATE(''),OriginalDateOfIssuance));
+ProfessionalLicense: => MaxExpireDate := MAX(LicenseDates, DateOfExpiration);
+ProfessionalLicense: => IsActive := MaxExpireDate > CurrentDate;
+Person: => ProfessionalLicenseDates := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 100, MaxIssueDate, -MaxExpireDate);
+Person: => ActiveProfessionalLicenseIssueExpDate := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
+Person: => ActiveProfessionalLicenseIssueDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxIssueDate);
+Person: => ActiveProfessionalLicenseExpDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxExpireDate);
+Person: => ActiveProfessionalLicenseIssueExpDateGroup := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, LicenseDates.LicenseDescription, LicenseDates.Occupation, LicenseDates.LicenseCategory, DataSources.Source, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
+Person: => ActiveProfessionalLicenseType := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseDescription, ProfessionalLicense.REC_FOUND_BUT_INVALID));
+Person: => ActiveProfessionalLicenseOccupation := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Occupation, ProfessionalLicense.REC_FOUND_BUT_INVALID));
+Person: => ActiveProfessionalLicenseCategory := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseCategory, ProfessionalLicense.REC_FOUND_BUT_INVALID));
+Person: => ActiveProfessionalLicenseSource :=ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Source, ProfessionalLicense.REC_FOUND_BUT_INVALID));
+
+
+/**************************************************************************/
+/*                                                                        */
+/*             ProfessionalLicense Attributes                             */
+/*                                                                        */
+/**************************************************************************/
+
+Person: => PL_ProfLicFlagEv := MAP(
+			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense) => '1',
+			'0');
+Person: => PL_ProfLicIssueDtListEv := ProfessionalLicenseDates{ProfLicUID, MaxIssueDate};
+Person: => PL_ProfLicExpDtListEv := ProfessionalLicenseDates{ProfLicUID, MaxExpireDate};
+Person: => PL_ProfLicIndxByLicListEv := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID,LicenseCategory := IF(LicenseDescription.LicenseCategory:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, LicenseDescription.LicenseCategory)}, 100, LicenseCategory);
+Person: => PL_ProfLicActvFlag := MAP(
+			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,	
+			NOT(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense)) => ProfessionalLicense.NO_DATA_FOUND_PROF,			
+			ActiveProfessionalLicenseExpDt > STRING(CurrentDate) => '1',
+			'0');
+Person: => PL_ProfLicActvNewIssueDt := MAP(
+			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ActiveProfessionalLicenseIssueDt);
+Person: => PL_ProfLicActvNewExpDt := MAP(
+			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,	
+			ActiveProfessionalLicenseExpDt);
+Person: => PL_ProfLicActvNewType := MAP(
+			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ActiveProfessionalLicenseType);			
+Person: => PL_ProfLicActvNewTitleType := MAP(
+			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ActiveProfessionalLicenseOccupation);			
+Person: => PL_ProfLicActvNewIndx := MAP(
+			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ActiveProfessionalLicenseCategory);			
+Person: => PL_ProfLicActvNewSrcType := MAP(
+			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
+			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
+			ActiveProfessionalLicenseSource);
 
 /**************************************************************************/
 /*                                                                        */
@@ -2975,24 +3039,36 @@ BusinessSele: => BE_DrgBkNewChType10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleI
 /*                                                                        */
 /**************************************************************************/	
 
-
 BusinessSele: => SOSDomesticFiling := SOSIncorporationDetails(NOT SOSIncorporationState:Null AND SOSIncorporationState <> '' AND SOSForeignDomesticIndicator = 'D');
 BusinessSele: => SOSForeignFiling := SOSIncorporationDetails(NOT SOSForeignStateCode:Null AND SOSForeignStateCode <> '' AND SOSForeignDomesticIndicator = 'F'); 
+
 BusinessSele: => SOSDomesticFilingCount := COUNT(SOSDomesticFiling{SOSKey, SOSIncorporationState});
 BusinessSele: => SOSForeignFilingCount := COUNT(SOSForeignFiling{SOSKey, SOSForeignStateCode});
-BusinessSele: => SOSDomDateFirstSeenCapped := IF(MIN(SOSDomesticFiling, SOSIncorporationDate) > CurrentDateSOS, CurrentDateSOS, MIN(SOSDomesticFiling, SOSIncorporationDate));
+
+BusinessSele: => SOSDomDateFirstSeen := MIN(SOSDomesticFiling, SOSIncorporationDate);
+BusinessSele: => SOSDomDateFirstSeenCapped := BOUNDSFOLD(SOSDomDateFirstSeen, DATE('19000101'), CurrentDateSOS);
 BusinessSele: => SOSDomFilingMinDate := IF(ISVALIDDATE(SOSDomDateFirstSeenCapped), DATETOSTRING(SOSDomDateFirstSeenCapped, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97);
-BusinessSele: => SOSDomDateLastSeenCapped := IF(MAX(SOSDomesticFiling, SOSIncorporationDate) > CurrentDateSOS, CurrentDateSOS, MAX(SOSDomesticFiling, SOSIncorporationDate));
+
+BusinessSele: => SOSDomDateLastSeen := MAX(SOSDomesticFiling, SOSIncorporationDate);
+BusinessSele: => SOSDomDateLastSeenCapped := BOUNDSFOLD(SOSDomDateLastSeen, DATE('19000101'), CurrentDateSOS);
 BusinessSele: => SOSDomFilingMaxDate := IF(ISVALIDDATE(SOSDomDateLastSeenCapped), DATETOSTRING(SOSDomDateLastSeenCapped, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97);
-BusinessSele: => SOSFrgnDateFirstSeenCapped := IF(MIN(SOSForeignFiling, SOSForeignStateDate) > CurrentDateSOS, CurrentDateSOS, MIN(SOSForeignFiling, SOSForeignStateDate));
+
+BusinessSele: => SOSFrgnDateFirstSeen := MIN(SOSForeignFiling, SOSForeignStateDate);
+BusinessSele: => SOSFrgnDateFirstSeenCapped := BOUNDSFOLD(SOSFrgnDateFirstSeen, DATE('19000101'), CurrentDateSOS);
 BusinessSele: => SOSFrgnFilingMinDate := IF(ISVALIDDATE(SOSFrgnDateFirstSeenCapped), DATETOSTRING(SOSFrgnDateFirstSeenCapped, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97);
-BusinessSele: => SOSFrgnDateLastSeenCapped := IF(MAX(SOSForeignFiling, SOSForeignStateDate) > CurrentDateSOS, CurrentDateSOS, MAX(SOSForeignFiling, SOSForeignStateDate));
+
+BusinessSele: => SOSFrgnDateLastSeen := MAX(SOSForeignFiling, SOSForeignStateDate);
+BusinessSele: => SOSFrgnDateLastSeenCapped := BOUNDSFOLD(SOSFrgnDateLastSeen, DATE('19000101'), CurrentDateSOS);
 BusinessSele: => SOSFrgnFilingMaxDate := IF(ISVALIDDATE(SOSFrgnDateLastSeenCapped), DATETOSTRING(SOSFrgnDateLastSeenCapped, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97);
+
 BusinessSele: => SOSFilingTotalCount := SOSDomesticFilingCount + SOSForeignFilingCount ;
-BusinessSele: => SOSIncorporationOldDate := IF(MIN(SOSDomFilingMinDate, SOSFrgnFilingMinDate) = BusinessSele.NO_DATA_FOUND_97, MAX(SOSDomFilingMinDate, SOSFrgnFilingMinDate), MIN(SOSDomFilingMinDate, SOSFrgnFilingMinDate));
-BusinessSele: => SOSIncorporationNewDate := IF(MAX(SOSDomFilingMaxDate, SOSFrgnFilingMaxDate) = BusinessSele.NO_DATA_FOUND_97, BusinessSele.NO_DATA_FOUND_97, MAX(SOSDomFilingMaxDate, SOSFrgnFilingMaxDate));
+
+BusinessSele: => SOSIncorporationOldDate := IF(MIN(INTEGER(SOSDomFilingMinDate), INTEGER(SOSFrgnFilingMinDate)) = BusinessSele.NO_DATA_FOUND_97, MAX(INTEGER(SOSDomFilingMinDate), INTEGER(SOSFrgnFilingMinDate)), MIN(INTEGER(SOSDomFilingMinDate), INTEGER(SOSFrgnFilingMinDate)));
+BusinessSele: => SOSIncorporationNewDate := MAX(INTEGER(SOSDomFilingMaxDate), INTEGER(SOSFrgnFilingMaxDate));
+
 BusinessSele: => SOSForeignStates := SOSForeignFiling{SOSIncorporationState};
 BusinessSele: => SOSDomesticStates := SOSDomesticFiling{SOSIncorporationState};
+
 BusinessSele: => SOSFilingStatesCountDups := COUNT(SOSForeignStates(EXISTS(SOSDomesticStates(SOSIncorporationState = BusinessSele.SOSForeignStates.SOSIncorporationState))));
 BusinessSele: => SOSUniqueStateCount := COUNT(SOSForeignStates) + COUNT(SOSDomesticStates) - SOSFilingStatesCountDups;
 
@@ -3002,70 +3078,66 @@ BusinessSele: => SOSUniqueStateCount := COUNT(SOSForeignStates) + COUNT(SOSDomes
 /*               SOS Filing Attributes                                    */
 /*                                                                        */
 /**************************************************************************/	
-
-
-BusinessSele: => BE_SOSCntEv :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA,BusinessSele.MISSING_INPUT_DATA_INT,
-                                  BOUNDSFOLD((SOSFilingTotalCount), 0, 999));
-BusinessSele: => BE_SOSNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
-			                                BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND,
-			                                BE_SOSCntEv > 0 AND SOSIncorporationNewDate = BusinessSele.NO_DATA_FOUND_97 => BusinessSele.NO_DATA_FOUND_97,
-																			DATETOSTRING(DATE(SOSIncorporationNewDate),'%Y%m%d' ));
-BusinessSele: => BE_SOSOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
-			                                BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND,
-			                                BE_SOSCntEv > 0 AND SOSIncorporationOldDate = BusinessSele.NO_DATA_FOUND_97 => BusinessSele.NO_DATA_FOUND_97,
-																			DATETOSTRING(DATE(SOSIncorporationOldDate),'%Y%m%d' ));
-BusinessSele: => BE_SOSNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
-		                                    BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
-			                                  (BE_SOSNewDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
-			                                  BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSNewDtEv),CurrentDateSOS),0,960)); 
-BusinessSele: => BE_SOSOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
-		                                    BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
-			                                 (BE_SOSOldDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
-			                                  BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSOldDtEv),CurrentDateSOS),0,960)); 
-BusinessSele: => BE_SOSStateCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
-                                        BE_SOSCntEv = 0 =>  BusinessSele.NO_DATA_FOUND_INT,
-																			  BE_SOSCntEv > 0 AND (ALL(SOSIncorporationDetails, SOSIncorporationState:Null OR SOSIncorporationState = '')) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
-                                        BOUNDSFOLD(SOSUniqueStateCount, 1, 52));
-BusinessSele: => BE_SOSDomCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
-                                      BE_SOSCntEv = 0 =>  BusinessSele.NO_DATA_FOUND_INT,
-																		  BOUNDSFOLD(SOSDomesticFilingCount, 0, 999));
-BusinessSele: => BE_SOSDomNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
-			                                   BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
-			                                   BE_SOSDomCntEv > 0 AND SOSDomFilingMaxDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
-			                                   DATETOSTRING(DATE(SOSDomFilingMaxDate),'%Y%m%d' ));
-BusinessSele: => BE_SOSDomOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
-			                                   BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
-			                                   BE_SOSDomCntEv > 0 AND 
-																				 SOSDomFilingMinDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
-			                                   DATETOSTRING(DATE(SOSDomFilingMinDate),'%Y%m%d' ));
-BusinessSele: => BE_SOSDomNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
-			                                     BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
-			                                     (BE_SOSDomNewDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
-			                                     BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSDomNewDtEv),CurrentDateSOS),0,960)); 
-BusinessSele: => BE_SOSDomOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
-			                                     BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
-			                                    (BE_SOSDomOldDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
-			                                     BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSDomOldDtEv),CurrentDateSOS),0,960)); 
-BusinessSele: => BE_SOSFrgnCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
-                                       BE_SOSCntEv = 0 =>  BusinessSele.NO_DATA_FOUND_INT,
-                                       BOUNDSFOLD(SOSForeignFilingCount, 0, 999));
-BusinessSele: => BE_SOSFrgnNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
-			                                    BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
-			                                    BE_SOSFrgnCntEv > 0 AND  SOSFrgnFilingMaxDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
-			                                    DATETOSTRING(DATE(SOSFrgnFilingMaxDate),'%Y%m%d' ));
-BusinessSele: => BE_SOSFrgnOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA,
-			                                    BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
-			                                    BE_SOSFrgnCntEv > 0 AND SOSFrgnFilingMinDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
-                                          DATETOSTRING(DATE(SOSFrgnFilingMinDate),'%Y%m%d' ));
-BusinessSele: => BE_SOSFrgnNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
-			                                      BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
-			                                     (BE_SOSFrgnNewDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
-			                                      BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSFrgnNewDtEv),CurrentDateSOS),0,960)); 
-BusinessSele: => BE_SOSFrgnOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID= BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
-			                                      BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
-			                                     (BE_SOSFrgnOldDtEv = BusinessSele.NO_DATA_FOUND_97) =>  BusinessSele.NO_DATA_FOUND_97_INT,		
-			                                      BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_SOSFrgnOldDtEv),CurrentDateSOS),0,960));
-
+BusinessSele: => BE_SOSCntEv := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA, BusinessSele.MISSING_INPUT_DATA_INT,
+																			BOUNDSFOLD((SOSFilingTotalCount), 0, 999));
+BusinessSele: => BE_SOSNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																			BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND,
+																			BE_SOSCntEv > 0 AND SOSIncorporationNewDate = BusinessSele.NO_DATA_FOUND_97 => BusinessSele.NO_DATA_FOUND_97,
+																			DATETOSTRING(DATE(SOSIncorporationNewDate), '%Y%m%d'));
+BusinessSele: => BE_SOSOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																			BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND,
+																			BE_SOSCntEv > 0 AND SOSIncorporationOldDate = BusinessSele.NO_DATA_FOUND_97 => BusinessSele.NO_DATA_FOUND_97,
+																			DATETOSTRING(DATE(SOSIncorporationOldDate), '%Y%m%d'));
+BusinessSele: => BE_SOSNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																			BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																			BE_SOSNewDtEv = BusinessSele.NO_DATA_FOUND_97 => BusinessSele.NO_DATA_FOUND_97_INT,		
+																			BOUNDSFOLD(MONTHSBETWEEN(DATE(SOSIncorporationNewDate), CurrentDateSOS), 0, 960)); 
+BusinessSele: => BE_SOSOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																			BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																			BE_SOSOldDtEv = BusinessSele.NO_DATA_FOUND_97 => BusinessSele.NO_DATA_FOUND_97_INT,		
+																			BOUNDSFOLD(MONTHSBETWEEN(DATE(SOSIncorporationOldDate), CurrentDateSOS), 0, 960)); 
+BusinessSele: => BE_SOSStateCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																			BE_SOSCntEv = 0 =>  BusinessSele.NO_DATA_FOUND_INT,
+																			BE_SOSCntEv > 0 AND (ALL(SOSIncorporationDetails, SOSIncorporationState:Null OR SOSIncorporationState = '')) => BusinessSele.NO_DATA_FOUND_97_INT,		
+																			BOUNDSFOLD(SOSUniqueStateCount, 1, 52));
+BusinessSele: => BE_SOSDomCntEv :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																			BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																			BOUNDSFOLD(SOSDomesticFilingCount, 0, 999));
+BusinessSele: => BE_SOSDomNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																			BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																			BE_SOSDomCntEv > 0 AND SOSDomFilingMaxDate = BusinessSele.NO_DATA_FOUND_97 => BusinessSele.NO_DATA_FOUND_97,			
+																			DATETOSTRING(DATE(SOSDomFilingMaxDate), '%Y%m%d'));
+BusinessSele: => BE_SOSDomOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																			BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																			BE_SOSDomCntEv > 0 AND SOSDomFilingMinDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
+																			DATETOSTRING(DATE(SOSDomFilingMinDate), '%Y%m%d'));
+BusinessSele: => BE_SOSDomNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																			BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
+																			(BE_SOSDomNewDtEv = BusinessSele.NO_DATA_FOUND_97) => BusinessSele.NO_DATA_FOUND_97_INT,		
+																			BOUNDSFOLD(MONTHSBETWEEN(SOSDomDateLastSeenCapped, CurrentDateSOS), 0, 960)); 
+BusinessSele: => BE_SOSDomOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																			BE_SOSDomCntEv = 0 OR BE_SOSDomCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
+																			(BE_SOSDomOldDtEv = BusinessSele.NO_DATA_FOUND_97) => BusinessSele.NO_DATA_FOUND_97_INT,		
+																			BOUNDSFOLD(MONTHSBETWEEN(SOSDomDateFirstSeenCapped, CurrentDateSOS), 0, 960)); 
+BusinessSele: => BE_SOSFrgnCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																			BE_SOSCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																			BOUNDSFOLD(SOSForeignFilingCount, 0, 999));
+BusinessSele: => BE_SOSFrgnNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																			BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																			BE_SOSFrgnCntEv > 0 AND  SOSFrgnFilingMaxDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
+																			DATETOSTRING(DATE(SOSFrgnFilingMaxDate), '%Y%m%d'));
+BusinessSele: => BE_SOSFrgnOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																			BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																			BE_SOSFrgnCntEv > 0 AND SOSFrgnFilingMinDate = BusinessSele.NO_DATA_FOUND_97 =>  BusinessSele.NO_DATA_FOUND_97,			
+																			DATETOSTRING(DATE(SOSFrgnFilingMinDate), '%Y%m%d'));
+BusinessSele: => BE_SOSFrgnNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																			BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
+																			(BE_SOSFrgnNewDtEv = BusinessSele.NO_DATA_FOUND_97) => BusinessSele.NO_DATA_FOUND_97_INT,		
+																			BOUNDSFOLD(MONTHSBETWEEN(SOSFrgnDateLastSeenCapped, CurrentDateSOS), 0, 960)); 
+BusinessSele: => BE_SOSFrgnOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																			BE_SOSFrgnCntEv = 0 OR BE_SOSFrgnCntEv = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND_INT,
+																			(BE_SOSFrgnOldDtEv = BusinessSele.NO_DATA_FOUND_97) => BusinessSele.NO_DATA_FOUND_97_INT,		
+																			BOUNDSFOLD(MONTHSBETWEEN(SOSFrgnDateFirstSeenCapped, CurrentDateSOS), 0, 960));
 
 /**************************************************************************/
 /*                                                                        */
@@ -3250,7 +3322,7 @@ LienJudgment.Filing: => IsLandlordTenantDispute := LandlordTenantDisputeFlag = '
 
 /**************************************************************************/
 /*                                                                        */
-/*              Business LeinJudgment Attributes                          */
+/*              Business LienJudgment Attributes                          */
 /*                                                                        */
 /**************************************************************************/	
 
@@ -3282,69 +3354,3 @@ BusinessSele: => BL_DrgLTDOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID 
 			                                     BL_DrgLTDOldDt7Y = LienJudgment.REC_FOUND_BUT_INVALID =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
                                            BOUNDSFOLD(MONTHSBETWEEN(DATE(BL_DrgLTDOldDt7Y), ONLY(SeleLienJudgment.Lien, CurrentDate)), 0, 84));
 
-
-/**************************************************************************/
-/*                                                                        */
-/*            ProfessionalLicense Helper Attributes                       */
-/*                                                                        */
-/**************************************************************************/	
-
-
-ProfessionalLicense: => ValidProfessionalLicense := LicenseNumber <> '' AND (MaxIssueDate < CurrentDate OR MaxIssueDate:Null) ;
-ProfessionalLicense: => MaxIssueDate := MAX(LicenseDates, IF(OriginalDateOfIssuance < DATE('19000101'),DATE(''),OriginalDateOfIssuance));
-ProfessionalLicense: => MaxExpireDate := MAX(LicenseDates, DateOfExpiration);
-ProfessionalLicense: => IsActive := MaxExpireDate > CurrentDate;
-Person: => ProfessionalLicenseDates := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 100, MaxIssueDate, -MaxExpireDate);
-Person: => ActiveProfessionalLicenseIssueExpDate := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
-Person: => ActiveProfessionalLicenseIssueDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxIssueDate);
-Person: => ActiveProfessionalLicenseExpDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxExpireDate);
-Person: => ActiveProfessionalLicenseIssueExpDateGroup := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, LicenseDates.LicenseDescription, LicenseDates.Occupation, LicenseDates.LicenseCategory, DataSources.Source, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
-Person: => ActiveProfessionalLicenseType := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseDescription, ProfessionalLicense.REC_FOUND_BUT_INVALID));
-Person: => ActiveProfessionalLicenseOccupation := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Occupation, ProfessionalLicense.REC_FOUND_BUT_INVALID));
-Person: => ActiveProfessionalLicenseCategory := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseCategory, ProfessionalLicense.REC_FOUND_BUT_INVALID));
-Person: => ActiveProfessionalLicenseSource :=ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Source, ProfessionalLicense.REC_FOUND_BUT_INVALID));
-
-
-/**************************************************************************/
-/*                                                                        */
-/*             ProfessionalLicense Attributes                             */
-/*                                                                        */
-/**************************************************************************/	
-
-
-Person: => PL_ProfLicFlagEv := MAP(
-			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
-			ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense) => '1',
-			'0');
-Person: => PL_ProfLicIssueDtListEv := ProfessionalLicenseDates{ProfLicUID, MaxIssueDate};
-Person: => PL_ProfLicExpDtListEv := ProfessionalLicenseDates{ProfLicUID, MaxExpireDate};
-Person: => PL_ProfLicIndxByLicListEv := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID,LicenseCategory := IF(LicenseDescription.LicenseCategory:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, LicenseDescription.LicenseCategory)}, 100, LicenseCategory);
-Person: => PL_ProfLicActvFlag := MAP(
-			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,	
-			NOT(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense)) => ProfessionalLicense.NO_DATA_FOUND_PROF,			
-			ActiveProfessionalLicenseExpDt > STRING(CurrentDate) => '1',
-			'0');
-Person: => PL_ProfLicActvNewIssueDt := MAP(
-			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
-			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
-			ActiveProfessionalLicenseIssueDt);
-Person: => PL_ProfLicActvNewExpDt := MAP(
-			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
-			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,	
-			ActiveProfessionalLicenseExpDt);
-Person: => PL_ProfLicActvNewType := MAP(
-			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
-			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
-			ActiveProfessionalLicenseType);			
-Person: => PL_ProfLicActvNewTitleType := MAP(
-			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
-			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
-			ActiveProfessionalLicenseOccupation);			
-Person: => PL_ProfLicActvNewIndx := MAP(
-			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
-			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
-			ActiveProfessionalLicenseCategory);			
-Person: => PL_ProfLicActvNewSrcType := MAP(
-			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
-			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
-			ActiveProfessionalLicenseSource);
