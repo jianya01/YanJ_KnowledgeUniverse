@@ -3325,9 +3325,9 @@ LienJudgment: ONE_YEAR_IN_DAYS := 365;
 LienJudgment: SEVEN_YEAR_IN_DAYS := 2556;
 LienJudgment: => LANDLORD_TENANT_DISPUTE_LIENS :=['FORCIBLE ENTRY/DETAINER','LANDLORD TENANT JUDGMENT','FORCIBLE ENTRY/DETAINER RELEAS','FORCIBLE ENTRY/DETAINER RELEASE'];
 LienJudgment.Filing: => AgeInDays := ABSDAYSBETWEEN(OriginalFilingDate, CurrentDate);
-LienJudgment.Filing: => Seen_In_Seven_Years := ABSDAYSBETWEEN(OriginalFilingDate, CurrentDate) <= LienJudgment.SEVEN_YEAR_IN_DAYS;
-LienJudgment.Filing: => IsLandlordTenantDispute := LandlordTenantDisputeFlag = 'Y' OR FilingTypeDescription IN LANDLORD_TENANT_DISPUTE_LIENS;
-
+LienJudgment.Filing: => Seen_In_Seven_Years := AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS;
+LienJudgment.Filing: => IsLandlordTenantDispute := LandlordTenantDisputeFlag = 'Y' OR FilingTypeDescription IN LANDLORD_TENANT_DISPUTE_LIENS ;
+SeleLienJudgment.Details: => IsDebtor := UPCASE(TRIM(DebtorPlaintiff)) = 'D';
 
 /**************************************************************************/
 /*                                                                        */
@@ -3337,23 +3337,23 @@ LienJudgment.Filing: => IsLandlordTenantDispute := LandlordTenantDisputeFlag = '
 
 
 BusinessSele: => BE_DrgLTDCnt1Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA,LienJudgment.MISSING_INPUT_DATA_INT,
-                                     BOUNDSFOLD(COUNT(SeleLienJudgment.Lien.Filing( AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null AND  IsLandlordTenantDispute )),0,99999));
+                                     BOUNDSFOLD(COUNT(SeleLienJudgment(Details.IsDebtor ).Lien.Filing( AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS AND NOT AgeInDays:Null AND  IsLandlordTenantDispute  )),0,99999));
 BusinessSele: => BE_DrgLTDCnt7Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA,LienJudgment.MISSING_INPUT_DATA_INT,
-																		 BOUNDSFOLD(COUNT(SeleLienJudgment.Lien.Filing( AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS AND NOT AgeInDays:Null AND  IsLandlordTenantDispute  )),0,99999));
+																		 BOUNDSFOLD(COUNT(SeleLienJudgment(Details.IsDebtor ).Lien.Filing( AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS AND NOT AgeInDays:Null AND  IsLandlordTenantDispute  )),0,99999));
 BusinessSele: => BE_DrgLTDAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
                                          BE_DrgLTDCnt7Y = '0'  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
-								                         BE_DrgLTDCnt7Y > 0 AND SUM(SeleLienJudgment.Lien.Filing(Seen_In_Seven_Years AND  IsLandlordTenantDispute),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-								                         BOUNDSFOLD(SUM(SeleLienJudgment.Lien.Filing(Seen_In_Seven_Years AND  IsLandlordTenantDispute ),Amount),0,99999999));
+								                         BE_DrgLTDCnt7Y > 0 AND SUM(SeleLienJudgment(Details.IsDebtor ).Lien.Filing(Seen_In_Seven_Years AND  IsLandlordTenantDispute),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
+								                         BOUNDSFOLD(SUM(SeleLienJudgment(Details.IsDebtor ).Lien.Filing(Seen_In_Seven_Years AND  IsLandlordTenantDispute ),Amount),0,99999999));
 BusinessSele: => BE_DrgLTDAmtAvg7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
                                          BE_DrgLTDCnt7Y = '0'  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
-								                         BE_DrgLTDCnt7Y > 0 AND SUM(SeleLienJudgment.Lien.Filing(Seen_In_Seven_Years AND  IsLandlordTenantDispute),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-				                                 BOUNDSFOLD((SUM(SeleLienJudgment.Lien.Filing(Seen_In_Seven_Years AND  IsLandlordTenantDispute ),Amount)/BE_DrgLTDCnt7Y),0,99999999));
+								                         BE_DrgLTDCnt7Y > 0 AND SUM(SeleLienJudgment(Details.IsDebtor ).Lien.Filing(Seen_In_Seven_Years AND  IsLandlordTenantDispute),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
+				                                 BOUNDSFOLD((SUM(SeleLienJudgment(Details.IsDebtor ).Lien.Filing(Seen_In_Seven_Years AND  IsLandlordTenantDispute ),Amount)/BE_DrgLTDCnt7Y),0,99999999));
 BusinessSele: =>BE_DrgLTDNewDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA,
                                       BE_DrgLTDCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN,
-                                      IsBlank(STRING(MAX(SeleLienJudgment.Lien.Filing(AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS AND NOT AgeInDays:Null AND  IsLandlordTenantDispute ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
+                                      IsBlank(STRING(MAX(SeleLienJudgment(Details.IsDebtor ).Lien.Filing(AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS AND NOT AgeInDays:Null AND  IsLandlordTenantDispute ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
 BusinessSele: =>BE_DrgLTDOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
                                       BE_DrgLTDCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN,
-                                      IsBlank(STRING(MIN(SeleLienJudgment.Lien.Filing(AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS AND NOT AgeInDays:Null AND  IsLandlordTenantDispute ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
+                                      IsBlank(STRING(MIN(SeleLienJudgment(Details.IsDebtor ).Lien.Filing(AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS AND NOT AgeInDays:Null AND  IsLandlordTenantDispute ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
 BusinessSele: => BE_DrgLTDNewMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
                                            BE_DrgLTDCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 			                                     BE_DrgLTDNewDt7Y = LienJudgment.REC_FOUND_BUT_INVALID =>LienJudgment.REC_FOUND_BUT_INVALID_INT,			
