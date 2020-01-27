@@ -1321,7 +1321,19 @@ QUERY: NonFCRABusinessSeleIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INT
 		// BE_UCCCreditorCntEv,
 		// BE_UCCRoleIndxEv,
 		// BE_UCCActvRoleIndx
-		} 
+		},
+	// This res1 results for NonFCRABusinessSeleIDAttributesV1 is used only to calculate B_LexIDLegalRstdOnlyFlag. 
+	// The intention of this is to check if we can find any records on file for the business given the permissions we have set, regardless of the date on the records.
+	// This is a search on the Business SeleID ENTITY with a history date of the current date used instead of the archive date. 
+	// If we find records on file, we say the business is not restricted.
+	// If no records are found, but we do have a SeleID, then the business must only be seen on restricted sources. This attribute is ONLY used in the master layout,
+	// And therefore should only be calculated when master results are requested so that we do not impact production performance.		
+	BusinessSele(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
+		B_LexIDUlt := UltID,
+		B_LexIDOrg := OrgID,
+		B_LexIDLegal := SeleID,
+		B_LexIDLegalRstdOnlyFlag
+		}		
 	ASOF reportedby(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT,
@@ -1356,21 +1368,6 @@ QUERY: NonFCRABusinessProxIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INT
 			InputPII(UID = G_ProcUID),
 			InputBIIInputPII(PII = G_ProcUID, BII = G_ProcBusUID)),
 		InputBIIDataset(FLAT, InputBII(UID = G_ProcBusUID));
-
-
-// NonFCRABusinessSeleIDNoDatesAttributesV1 is used only to calculate B_LexIDLegalRstdOnlyFlag. 
-// The intention of this is to check if we can find any records on file for the business given the permissions we have set, regardless of the date on the records.
-// This is a search on the Business SeleID ENTITY with no ASOF filtering applied. If we find records on file, we say the business is not restricted.
-// If no records are found, but we do have a SeleID, then the business must only be seen on restricted sources. This attribute is ONLY used in the master layout,
-// And therefore should only be calculated when master results are requested so that we do not impact production performance.
-QUERY: NonFCRABusinessSeleIDNoDatesAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in, 
-					PERMITS DPM) <= BusinessSele(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
-		B_LexIDUlt := UltID,
-		B_LexIDOrg := OrgID,
-		B_LexIDLegal := SeleID,
-		B_LexIDLegalRstdOnlyFlag
-		} 
-	USING DPM;
 
 // --- Index Build QUERY ---
 /* This QUERY Ensures we are generating all of the ECL Code necessary for building any of the ENTITY or ASSOCIATION Indexes at any given time (That KEL doesn't optimize them away completely
