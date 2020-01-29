@@ -15,31 +15,37 @@ Vehicle: => CAP := 10;
 //GLOBALS: need check case_identifer
 Accident: => ValidCaseIdentifierHelper := LENGTH(TRIMBOTH(CaseIdentifier));
 Accident: => ValidCaseIdentifier := LENGTH(TRIMBOTH(CaseIdentifier)) > 1 AND NOT CaseIdentifier IN ['UNK','NA','N/A','UNKNOWN'];
-Accident: => ValidDidScore := DidScore >= 75;
-Accident: => ValidRecords := (LossState IN VALIDSTATE) AND (DateOfAccident > VALIDDATE) AND ValidCaseIdentifier AND WorkTypeID = 3 AND ReportCode = 'EA' AND ValidDidScore;
+Accident: => ValidRecords := (LossState IN VALIDSTATE) AND (DateOfAccident > VALIDDATE) AND ValidCaseIdentifier AND WorkTypeID = 3 AND ReportCode = 'EA';
+// Accident: => ValidDidScore := DidScore >= 75;
+// Accident: => ValidRecords_Party := (LossState IN VALIDSTATE) AND (DateOfAccident > VALIDDATE) AND ValidCaseIdentifier AND WorkTypeID = 3 AND ReportCode = 'EA' AND ValidDidScore;
 
 //step one: get the best CRUAgencyName and Report for each accident 
 PersonAccident: => DateOfAccident := Incident.DateOfAccident;
 PersonAccident: => CaseIdentifier := Incident.CaseIdentifier;
 PersonAccident: => ValidCaseIdentifier := Incident.ValidCaseIdentifier;
 PersonAccident: => ValidRecords := Incident.ValidRecords;//ValidRecords is on accident level
+PersonAccident: => ValidDidScore := MAX(Report, DidScore) >= 75;
+PersonAccident: => ValidRecords_Party := ValidRecords AND ValidDidScore;
 PersonAccident: => BestReturnInfForAccident := ONLY(TOPN(Report, 1, DEFAULT(ReportTypeID,'Z_MISSING'), DEFAULT(CRUAgencyName,'Z_MISSING')));//return the information to accident + did level to get rid of multiple values for a did in single accident.
 PersonAccident: => ReportTypeID := BestReturnInfForAccident.ReportTypeID;
 PersonAccident: => CRUAgencyName := BestReturnInfForAccident.CRUAgencyName;
 PersonAccident: => GMOSAccidentDatePerson := IF(DateOfAccident > CURRENTDATE(), -9999, MONTHSBETWEEN(DateOfAccident, CURRENTDATE()));//future accident, set as -9999, and count will be 0 if all accidents are after retro date. 
 
 //step two: get the best CaseIdentifier,CRUAgencyName,ReportTypeID for each DateOfAccident
-Person: => AccidentPerPerson := PersonAccident(ValidRecords){DateOfAccident,GMOSAccidentDatePerson,CaseIdentifier,CRUAgencyName,ReportTypeID};
+Person: => AccidentPerPerson := PersonAccident(ValidRecords_Party){DateOfAccident,GMOSAccidentDatePerson,CaseIdentifier,CRUAgencyName,ReportTypeID};
 
 Person: => BestReturnAccidentForCrashDate := Sequence.Dedup(AccidentPerPerson,LEFT.DateOfAccident = RIGHT.DateOfAccident,DateOfAccident,GMOSAccidentDatePerson,CaseIdentifier,ReportTypeID,CRUAgencyName){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID,GMOSAccidentDatePerson};
 
 // Person: => Audit := PersonAccident.Incident{CaseIdentifier,LossState,WorkTypeID,DateOfAccident,ValidRecords,ValidCaseIdentifierHelper,Agency};
 //Person.AccidentPerPerson: => GMOSAccidentDatePerson := IF(DateOfAccident > CURRENTDATE(), -9999, MONTHSBETWEEN(DateOfAccident, CURRENTDATE()));
+// Person: => DidScore := MAX(DidScores,DidScore);
+// Person: => DidScore := MAX(PersonAccident.Incident(ValidRecords){DidScore});
+Person: => Accident := PersonAccident.Incident;
 
 // *********************Attributes********************************//
 //NOTE: the following attributes were developed for worktypeID = 3 and reportcode = EA//
 //Party_PoliceReportsCount5YAccidents
-Person: => Party_PoliceReportsCount5Y_tmp := MAP(EXISTS(PersonAccident.Incident) AND NOT EXISTS(PersonAccident.Incident(ValidRecords)) => -99, //ALL Records were dropped because of invalid state, case_identifier, and so on. add did_score < 75
+Person: => Party_PoliceReportsCount5Y_tmp := MAP(EXISTS(PersonAccident.Incident) AND NOT EXISTS(PersonAccident(ValidRecords_Party).Incident) => -99, //ALL Records were dropped because of invalid state, case_identifier, and so on. add did_score < 75
 												COUNT(AccidentPerPerson(GMOSAccidentDatePerson < 60 AND GMOSAccidentDatePerson >= 0){DateOfAccident}));//True 0, this person does not have any policy reports before
 Person: => Party_PoliceReportsCount5Y := MIN(Party_PoliceReportsCount5Y_tmp, CAP);
 
@@ -100,11 +106,11 @@ VehicleAccident: => InputVehicleDate := InputInfo.QueryDate;
 
 VehicleAccident: => GMOSAccidentToQueryDate := IF(DateOfAccident > InputVehicleDate, -9999, MONTHSBETWEEN(DateOfAccident, InputVehicleDate));
 
-VehicleAccident: => NormalizedDamagedArea1 := MAP(UPCASE(DamagedArea1) IN ['FRONT','LEFT FRONT','RIGHT FRONT'] => 'FRONT',
-												UPCASE(DamagedArea1) IN ['LEF SIDE','LEFT S','LEFT SIDE'] => 'LEFT',
-												UPCASE(DamagedArea1) IN ['FRONT & REAR','MULTIPLE'] => 'MULTIPLE',
-												UPCASE(DamagedArea1) IN ['LEFT REAR','REAR','RIGHT REAR'] => 'REAR',
-												UPCASE(DamagedArea1) IN ['RIGHT SIDE'] => 'RIGHT');
+VehicleAccident: => NormalizedDamagedArea1 := MAP(UPCASE(DamagedArea1) IN ['FRONT','LEFT FRONT','RIGHT FRONT','RIGHT FRONT','F','LEFE FRONT'] => 'FRONT',
+												UPCASE(DamagedArea1) IN ['LEF SIDE','LEFT S','LEFT SIDE','L'] => 'LEFT',
+												UPCASE(DamagedArea1) IN ['FRONT & REAR','MULTIPLE','MUTLTIPLE','MUTIPLE'] => 'MULTIPLE',
+												UPCASE(DamagedArea1) IN ['LEFT REAR','REAR','RIGHT REAR','R','RE'] => 'REAR',
+												UPCASE(DamagedArea1) IN ['RIGHT SIDE','FR','RIGHT RIGHT','RIGHR SIDE'] => 'RIGHT');
 
 Vehicle: => CountOfDamage5Y_tmp := MAP(EXISTS(VehicleAccident.Incident) AND NOT EXISTS(VehicleAccident.Incident(ValidRecords)) => -99,
 																		COUNT(VehicleAccident(NormalizedDamagedArea1 = UPCASE(InputVehicleDamagedArea) AND GMOSAccidentToQueryDate < 60 AND GMOSAccidentToQueryDate >= 0 AND ValidRecords){DateOfAccident}));
@@ -118,13 +124,15 @@ Vehicle: => CountOfDamage5YMultiple := MIN(CountOfDamage5YMultiple_tmp, CAP);
 VehicleAccident: => BestReport := ONLY(TOPN(Report, 1, DEFAULT(ReportTypeID,'Z_MISSING'), DEFAULT(CRUAgencyName,'Z_MISSING')));//return the information to accident + vin + damage level to get rid of multiple report description.
 VehicleAccident: => ReportTypeID := BestReport.ReportTypeID;
 VehicleAccident: => CRUAgencyName := BestReport.CRUAgencyName;
+
 Vehicle: => topnhelper := VehicleAccident(GMOSAccidentToQueryDate < 60 AND GMOSAccidentToQueryDate >= 0 AND ValidRecords){ReportTypeID,CRUAgencyName,DateOfAccident,CaseIdentifier,NormalizedDamagedArea1,InputVehicleDamagedArea};
-Vehicle: => dedupe_topnhelper := Sequence.Dedup(topnhelper,LEFT.DateOfAccident = RIGHT.DateOfAccident,DateOfAccident,CaseIdentifier,ReportTypeID,CRUAgencyName){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID,NormalizedDamagedArea1,InputVehicleDamagedArea};
+Vehicle: => dedupe_topnhelper_damageinput := Sequence.Dedup(topnhelper(NormalizedDamagedArea1 = UPCASE(InputVehicleDamagedArea)),LEFT.DateOfAccident = RIGHT.DateOfAccident,DateOfAccident,CaseIdentifier,ReportTypeID,CRUAgencyName){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID,NormalizedDamagedArea1,InputVehicleDamagedArea};
+Vehicle: => dedupe_topnhelper_multiple := Sequence.Dedup(topnhelper(NormalizedDamagedArea1 = 'MULTIPLE'),LEFT.DateOfAccident = RIGHT.DateOfAccident,DateOfAccident,CaseIdentifier,ReportTypeID,CRUAgencyName){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID,NormalizedDamagedArea1,InputVehicleDamagedArea};
 
 
-Vehicle: => CountOfDamage5YMultipleAccidents := IF(CountOfDamage5YMultiple > 0, TOPN(dedupe_topnhelper(NormalizedDamagedArea1 = 'MULTIPLE'){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID}, 10, -DateOfAccident)); 
-
-Vehicle: => CountOfDamage5YAccidents := IF(CountOfDamage5Y > 0, TOPN(dedupe_topnhelper(NormalizedDamagedArea1 = UPCASE(InputVehicleDamagedArea)){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID}, 10, -DateOfAccident));
+// Vehicle: => CountOfDamage5YMultipleAccidents := IF(CountOfDamage5YMultiple > 0, TOPN(dedupe_topnhelper_multiple(NormalizedDamagedArea1 = 'MULTIPLE'){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID}, 10, -DateOfAccident)); 
+Vehicle: => CountOfDamage5YMultipleAccidents := IF(CountOfDamage5YMultiple > 0, TOPN(dedupe_topnhelper_multiple{CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID}, 10, -DateOfAccident)); 
+Vehicle: => CountOfDamage5YAccidents := IF(CountOfDamage5Y > 0, TOPN(dedupe_topnhelper_damageinput(NormalizedDamagedArea1 = UPCASE(InputVehicleDamagedArea)){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID}, 10, -DateOfAccident));
 													
 
 
@@ -136,12 +144,15 @@ Vehicle: => CountOfDamage1Y := MIN(CountOfDamage1Y_tmp, CAP);
 Vehicle: => CountOfDamage1YMultiple_tmp := MAP(EXISTS(VehicleAccident.Incident) AND NOT EXISTS(VehicleAccident.Incident(ValidRecords)) => -99,
 																		COUNT(VehicleAccident(NormalizedDamagedArea1 = 'MULTIPLE' AND GMOSAccidentToQueryDate < 12 AND GMOSAccidentToQueryDate >= 0 AND ValidRecords){DateOfAccident}));
 Vehicle: => CountOfDamage1YMultiple := MIN(CountOfDamage1YMultiple_tmp, CAP);
+
+
 Vehicle: => topnhelper12 := VehicleAccident(GMOSAccidentToQueryDate < 12 AND GMOSAccidentToQueryDate >= 0 AND ValidRecords){ReportTypeID,CRUAgencyName,DateOfAccident,CaseIdentifier,NormalizedDamagedArea1,InputVehicleDamagedArea};
-Vehicle: => dedupe_topnhelper12 := Sequence.Dedup(topnhelper12,LEFT.DateOfAccident = RIGHT.DateOfAccident,DateOfAccident,CaseIdentifier,ReportTypeID,CRUAgencyName){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID,NormalizedDamagedArea1,InputVehicleDamagedArea};
+Vehicle: => dedupe_topnhelper12_damageinput := Sequence.Dedup(topnhelper12(NormalizedDamagedArea1 = UPCASE(InputVehicleDamagedArea)),LEFT.DateOfAccident = RIGHT.DateOfAccident,DateOfAccident,CaseIdentifier,ReportTypeID,CRUAgencyName){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID,NormalizedDamagedArea1,InputVehicleDamagedArea};
+Vehicle: => dedupe_topnhelper12_multiple := Sequence.Dedup(topnhelper12(NormalizedDamagedArea1 = 'MULTIPLE'),LEFT.DateOfAccident = RIGHT.DateOfAccident,DateOfAccident,CaseIdentifier,ReportTypeID,CRUAgencyName){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID,NormalizedDamagedArea1,InputVehicleDamagedArea};
 
 
-Vehicle: => CountOfDamage1YMultipleAccidents := IF(CountOfDamage1YMultiple > 0, TOPN(dedupe_topnhelper12(NormalizedDamagedArea1 = 'MULTIPLE'){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID}, 10, -DateOfAccident)); 
+Vehicle: => CountOfDamage1YMultipleAccidents := IF(CountOfDamage1YMultiple > 0, TOPN(dedupe_topnhelper12_multiple{CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID}, 10, -DateOfAccident)); 
 
-Vehicle: => CountOfDamage1YAccidents := IF(CountOfDamage1Y > 0, TOPN(dedupe_topnhelper12(NormalizedDamagedArea1 = UPCASE(InputVehicleDamagedArea)){CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID}, 10, -DateOfAccident));
+Vehicle: => CountOfDamage1YAccidents := IF(CountOfDamage1Y > 0, TOPN(dedupe_topnhelper12_damageinput{CaseIdentifier,CRUAgencyName,DateOfAccident,ReportTypeID}, 10, -DateOfAccident));
 
 
