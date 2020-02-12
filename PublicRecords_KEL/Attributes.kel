@@ -3507,29 +3507,43 @@ FUNCTION: mapFilingType(STRING filingType) <= MAP(UPCASE(TRIM(filingType)) IN ['
 												UPCASE(TRIM(filingType)) = 'FILING OFFICER STATEMENT' => '6',
 												UPCASE(TRIM(filingType)) = 'INITIAL FILING'           => '7',
 												'7');  //UNKNOWN FILING TYPE IS CONSIDERED INITIAL FILING
-						
 FUNCTION: mapStatusType(STRING StatusType) <= MAP(UPCASE(TRIM(StatusType)) = 'ACTIVE'	=> '1',
 												UPCASE(TRIM(StatusType)) = 'LAPSED'		=> '2',
 												UPCASE(TRIM(StatusType)) = 'TERMINATED'	=> '3',
 												UPCASE(TRIM(StatusType)) = 'DELETED'	=> '4',
 												UPCASE(TRIM(StatusType)) = 'EXPUNGED' 	=> '5',
 												'1');  //UNKNOWN STATUS IS CONSIDERED ACTIVE
-UCC.SubFiling: => MaxFilingDate := MAX(FilingDate,OriginalFilingDate);
-UCC.SubFiling: => FilingTypeFiltered := mapFilingType(FilingType);
-UCC.SubFiling: => InitialFiling := FilingTypeFiltered = '7'; 
-UCC.SubFiling: => StatusTypeFiltered := mapStatusType(StatusType);
-UCC.SubFiling: => ActiveStatus := StatusTypeFiltered = '1'; 
-UCC.SubFiling: => TerminatedFiling := FilingTypeFiltered = '1';
+FUNCTION: mapInferredStatus(filingType) <= IF(filingType = '1', '3',  //TERMINATED
+													'1'); //ACTIVE		
+UCC.SubFiling: => MaxFilingDateSub := MAX(FilingDate,OriginalFilingDate);
+UCC.SubFiling: => FilingDateNonNull := IF(FilingDate:Null, -99999,INTEGERFROMDATE(FilingDate));
+UCC.SubFiling: => FilingTimeNonNull := IF(FilingTime:Null, -99999,FilingTime);
+UCC.SubFiling: => VendorEntryDateNonNull := IF(VendorEntryDate:Null, -99999,INTEGERFROMDATE(VendorEntryDate));
+UCC.SubFiling: => FilingNumberNonNull := IF(FilingNumber:Null, -99999,FilingNumber);
+UCC: => BestChildRecord := TOPN(SubFiling(MaxFilingDateSub < BusinessSele.UCCCURRENT_DATE), 1,-FilingDateNonNull, -FilingTimeNonNull, -VendorEntryDateNonNull, -FilingNumberNonNull, -RMSID); 													
+UCC.BestChildRecord: => MaxFilingDate := MAX(FilingDate,OriginalFilingDate);
+UCC.BestChildRecord: => AgeInDays := ABSDAYSBETWEEN(MaxFilingDate, BusinessSele.UCCCURRENT_DATE);
+UCC.BestChildRecord: => FilingTypeFiltered := mapFilingType(FilingType);
+UCC.BestChildRecord: => InitialFiling := FilingTypeFiltered = '7'; 
+UCC.BestChildRecord: => StatusTypeFiltered := mapStatusType(StatusType);
+UCC: SIX_YEARS_IN_DAYS := 2191;	//ADDED	
+UCC.BestChildRecord: => InferredStatus := MAP(FilingTypeFiltered = '1' => '3', //TERMINATED
+							StatusType = 'ACTIVE' AND AgeInDays > UCC.SIX_YEARS_IN_DAYS => '8', //EXPIRED
+							StatusType != '' => StatusTypeFiltered, //IF STATUS TYPE NOT BLANK, MAP THE STATUS
+							mapInferredStatus(FilingTypeFiltered));
+UCC.BestChildRecord: => ActiveStatus := InferredStatus = '1'; 										
+UCC.BestChildRecord: => TerminatedFiling := FilingTypeFiltered = '1';
 SeleUCC.SubFiling: => Debtor := IF(UPCASE(TRIM(PartyType)) = 'D',TRUE,FALSE);
 SeleUCC.SubFiling: => Creditor := IF(UPCASE(TRIM(PartyType)) IN ['S','C','A'],TRUE,FALSE);
 SeleUCC: => IsCreditor := EXISTS(SubFiling(Creditor));
 SeleUCC: => IsDebtor := EXISTS(SubFiling(Debtor));
-BusinessSele: => InitialDebtorFilingCount := COUNT(SeleUCC(IsDebtor).Filing(SubFiling.InitialFiling AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
-BusinessSele: => InitialCreditorFilingCount := COUNT(SeleUCC(IsCreditor).Filing(SubFiling.InitialFiling AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
-BusinessSele: => ActiveDebtorFilingCount := COUNT(SeleUCC(IsDebtor).Filing(SubFiling.ActiveStatus AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));         
-BusinessSele: => ActiveCreditorFilingCount := COUNT(SeleUCC(IsCreditor).Filing(SubFiling.ActiveStatus AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
-BusinessSele: => TerminatedFilingCount := COUNT(SeleUCC(IsDebtor).Filing(SubFiling.TerminatedFiling AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
-BusinessSele: => OtherFilingCount := COUNT(SeleUCC(IsDebtor).Filing(NOT SubFiling.TerminatedFiling AND NOT SubFiling.InitialFiling AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
+BusinessSele: => InitialDebtorFilingCount := COUNT(SeleUCC(IsDebtor).Filing(BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
+BusinessSele: => InitialCreditorFilingCount := COUNT(SeleUCC(IsCreditor).Filing(BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
+BusinessSele: => ActiveDebtorFilingCount := COUNT(SeleUCC(IsDebtor).Filing(BestChildRecord.ActiveStatus AND BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));         
+BusinessSele: => ActiveCreditorFilingCount := COUNT(SeleUCC(IsCreditor).Filing(BestChildRecord.ActiveStatus AND BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
+BusinessSele: => TerminatedFilingCount := COUNT(SeleUCC(IsDebtor).Filing(BestChildRecord.TerminatedFiling AND BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
+BusinessSele: => OtherFilingCount := COUNT(SeleUCC(IsDebtor).Filing(NOT BestChildRecord.TerminatedFiling AND NOT BestChildRecord.InferredStatus IN ['0','1','3'] AND BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE));
+
 
 
 /**************************************************************************/
@@ -3540,28 +3554,28 @@ BusinessSele: => OtherFilingCount := COUNT(SeleUCC(IsDebtor).Filing(NOT SubFilin
 
 
 BusinessSele: => BE_UCCCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BOUNDSFOLD(COUNT(SeleUCC.Filing(SubFiling.InitialFiling AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE)), 0, 99999));	
+				BOUNDSFOLD(COUNT(SeleUCC.Filing(BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE)), 0, 99999));	
 BusinessSele: => BE_UCCDebtorCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BE_UCCCntEv = 0 => SeleUCC.NO_DATA_FOUND_INT,
 				BE_UCCCntEv != 0 AND InitialDebtorFilingCount = 0 AND InitialCreditorFilingCount = 0 => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(InitialDebtorFilingCount, 0, 99999));
 BusinessSele: => BE_UCCDebtorOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT]  => SeleUCC.NO_DATA_FOUND,
-				IsBlank(STRING(MIN(SeleUCC(IsDebtor).Filing(SubFiling.InitialFiling AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),SubFiling.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97));
+				IsBlank(STRING(MIN(SeleUCC(IsDebtor).Filing(BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),BestChildRecord.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97));
 BusinessSele: => BE_UCCDebtorOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
 				BE_UCCDebtorOldDtEv = SeleUCC.NO_DATA_FOUND_97 => SeleUCC.NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_UCCDebtorOldDtEv), BusinessSele.UCCCURRENT_DATE), 0, 960));
 BusinessSele: => BE_UCCDebtorNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT]  => SeleUCC.NO_DATA_FOUND,
-				IsBlank(STRING(MAX(SeleUCC(IsDebtor).Filing(SubFiling.InitialFiling AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),SubFiling.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97));
+				IsBlank(STRING(MAX(SeleUCC(IsDebtor).Filing(BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),BestChildRecord.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97));
 BusinessSele: => BE_UCCDebtorNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
 				BE_UCCDebtorNewDtEv = SeleUCC.NO_DATA_FOUND_97 => SeleUCC.NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_UCCDebtorNewDtEv), BusinessSele.UCCCURRENT_DATE), 0, 960));
 BusinessSele: => BE_UCCActvCnt := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BE_UCCCntEv = 0 => SeleUCC.NO_DATA_FOUND_INT,
-				BOUNDSFOLD(COUNT(SeleUCC.Filing(SubFiling.ActiveStatus AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE)), 0, 99999));
+				BOUNDSFOLD(COUNT(SeleUCC.Filing(BestChildRecord.ActiveStatus AND BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE)), 0, 99999));
 BusinessSele: => BE_UCCDebtorActvCnt := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
 				BOUNDSFOLD(ActiveDebtorFilingCount, 0, 99999));
@@ -3573,19 +3587,16 @@ BusinessSele: => BE_UCCDebtorOtherCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR  Se
 				BOUNDSFOLD(OtherFilingCount, 0, 99999));
 BusinessSele: => BE_UCCDebtorActvPct := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
-				(ActiveDebtorFilingCount / InitialDebtorFilingCount)*100
-				);
+				(ActiveDebtorFilingCount / InitialDebtorFilingCount)*100);
 BusinessSele: => BE_UCCDebtorTermPctEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
-				(TerminatedFilingCount / InitialDebtorFilingCount)*100
-				);
+				(TerminatedFilingCount / InitialDebtorFilingCount)*100);
 BusinessSele: => BE_UCCDebtorOtherPctEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
-				(OtherFilingCount / InitialDebtorFilingCount)*100
-				);
+				(OtherFilingCount / InitialDebtorFilingCount)*100);
 BusinessSele: => BE_UCCDebtorTermNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT]  => SeleUCC.NO_DATA_FOUND,
-				IsBlank(STRING(MAX(SeleUCC(IsDebtor).Filing(SubFiling.TerminatedFiling AND SubFiling.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),SubFiling.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97));
+				IsBlank(STRING(MAX(SeleUCC(IsDebtor).Filing(BestChildRecord.TerminatedFiling AND BestChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),BestChildRecord.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97));
 BusinessSele: => BE_UCCDebtorTermNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
 				BE_UCCDebtorTermNewDtEv = SeleUCC.NO_DATA_FOUND_97 => SeleUCC.NO_DATA_FOUND_97_INT,
@@ -3605,8 +3616,7 @@ BusinessSele: => BE_UCCActvRoleIndx := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID
 				ActiveDebtorFilingCount = 0 AND ActiveCreditorFilingCount = 0 => SeleUCC.NO_DATA_FOUND_97,
 				MAP(ActiveDebtorFilingCount > 0 AND ActiveCreditorFilingCount > 0 => '3',
 					ActiveDebtorFilingCount > 0 AND ActiveCreditorFilingCount = 0 => '2',
-					ActiveDebtorFilingCount = 0 AND ActiveCreditorFilingCount > 0 => '1')
-				);
+					ActiveDebtorFilingCount = 0 AND ActiveCreditorFilingCount > 0 => '1'));
 
 
 /**************************************************************************/
