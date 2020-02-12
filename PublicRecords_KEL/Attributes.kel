@@ -4003,7 +4003,79 @@ Person: => EmergingAddrStateCode :=   Emerging.StateCode;
 Person: => EmergingAddrCnty :=   Emerging.CountyCode;
 Person: => EmergingAddrGeo :=   Emerging.GeoBlk;		
 
+/**************************************************************************/
+/*                                                                        */
+/*             Business LienJudgment Type Attributes                      */
+/*                                                                        */
+/**************************************************************************/	
 
+BusinessSele: =>BE_DrgJudgNewType7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
+		BE_DrgJudgCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN,
+		MAP(BE_DrgJudgCnt7Y > 0 AND BE_DrgJudgCivCrtCnt7Y > 0 AND (BE_DrgJudgNewDt7Y = BE_DrgJudgCivCrtNewDt7Y) => 'CC',
+		BE_DrgJudgCnt7Y > 0 AND BE_DrgJudgFrclCnt7Y > 0 AND (BE_DrgJudgNewDt7Y = BE_DrgJudgFrclNewDt7Y) => 'FC',
+		BE_DrgJudgCnt7Y > 0 AND BE_DrgJudgSmClaimCnt7Y > 0 AND (BE_DrgJudgNewDt7Y = BE_DrgJudgSmClaimNewDt7Y) => 'SC'));
+
+BusinessSele: =>BE_DrgLienNewType7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
+		BE_DrgLienCnt7Y  = 0  => LienJudgment.NO_DATA_FOUND_LIEN,
+		MAP(BE_DrgLienCnt7Y  > 0 AND BE_DrgLienTaxFedCnt7Y > 0 AND (BE_DrgLienNewDt7Y = BE_DrgLienTaxFedNewDt7Y) => 'FT',
+		BE_DrgLienCnt7Y  > 0 AND BE_DrgLienTaxStateCnt7Y > 0 AND (BE_DrgLienNewDt7Y = BE_DrgLienTaxStateNewDt7Y) => 'ST',
+		BE_DrgLienCnt7Y  > 0 AND BE_DrgLienTaxOtherCnt7Y > 0 AND (BE_DrgLienNewDt7Y = BE_DrgLienTaxOtherNewDt7Y) => 'OT',
+		BE_DrgLienCnt7Y  > 0 AND BE_DrgLienOtherCnt7Y > 0 AND (BE_DrgLienNewDt7Y = BE_DrgLienOtherNewDt7Y) => 'O'));
+
+/**************************************************************************/
+/*                                                                        */
+/*             Business OverAll Drg Helper Attributes                     */
+/*                                                                        */
+/**************************************************************************/	
+
+//Created Bankruptcy Date and Months Attributes for 7Years to calculate overall Attributes
+
+BusinessSele: =>BE_DrgBkOldDt7Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MIN(SeleBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+BusinessSele: =>BE_DrgBkNewDt7Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA, Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MAX(SeleBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
+BusinessSele: => BE_DrgBkOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+		BE_DrgBkOldDt7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_DrgBkOldDt7Y), ONLY(SeleBankruptcy.Bankrupt, SeleBankruptcy.CURRENT_DATE)), 0, 120));	
+BusinessSele: => BE_DrgBkNewMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
+		BE_DrgBkNewDt7Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_DrgBkNewDt7Y), ONLY(SeleBankruptcy.Bankrupt, SeleBankruptcy.CURRENT_DATE)), 0, 120));	
+BusinessSele: =>OverAllDrgCnt1Y := BE_DrgLnJCnt1Y + BE_DrgLTDCnt1Y + BE_DrgBkCnt1Y;
+BusinessSele: =>OverAllDrgCnt7Y := BE_DrgLnJCnt7Y + BE_DrgLTDCnt7Y + BE_DrgBkCnt7Y;
+BusinessSele: =>LnJLTDMaxNewDate :=MAX(BE_DrgLnJNewDt7Y,BE_DrgLTDNewDt7Y);
+BusinessSele: =>BKLnJLTDMaxNewDate :=MAX(LnJLTDMaxNewDate,BE_DrgBkNewDt7Y);
+BusinessSele: =>LnJLTDNewDateMinMsnc :=IF(MIN(BE_DrgLnJNewMsnc7Y,BE_DrgLTDNewMsnc7Y)=NO_DATA_FOUND_97_INT OR MIN(BE_DrgLnJNewMsnc7Y,BE_DrgLTDNewMsnc7Y)= NO_DATA_FOUND_INT,MAX(BE_DrgLnJNewMsnc7Y,BE_DrgLTDNewMsnc7Y),MIN(BE_DrgLnJNewMsnc7Y,BE_DrgLTDNewMsnc7Y));
+BusinessSele: =>BKLnJLTDNewDateMinMsnc :=IF(MIN(LnJLTDNewDateMinMsnc,BE_DrgBkNewMsnc7Y) =NO_DATA_FOUND_97_INT OR MIN(LnJLTDNewDateMinMsnc,BE_DrgBkNewMsnc7Y) = NO_DATA_FOUND_INT,MAX(LnJLTDNewDateMinMsnc,BE_DrgBkNewMsnc7Y), MIN(LnJLTDNewDateMinMsnc,BE_DrgBkNewMsnc7Y)) ;
+BusinessSele: =>LnJLTDMinOldDate :=IF(MIN(BE_DrgLnJOldDt7Y,BE_DrgLTDOldDt7Y)= NO_DATA_FOUND_97 OR MIN(BE_DrgLnJOldDt7Y,BE_DrgLTDOldDt7Y)= NO_DATA_FOUND ,MAX(BE_DrgLnJOldDt7Y,BE_DrgLTDOldDt7Y),MIN(BE_DrgLnJOldDt7Y,BE_DrgLTDOldDt7Y));
+BusinessSele: =>BKLnJLTDMinOldDate :=IF(MIN(LnJLTDMinOldDate,BE_DrgBkOldDt7Y)= NO_DATA_FOUND_97 OR MIN(LnJLTDMinOldDate,BE_DrgBkOldDt7Y)= NO_DATA_FOUND,MAX(LnJLTDMinOldDate,BE_DrgBkOldDt7Y),MIN(LnJLTDMinOldDate,BE_DrgBkOldDt7Y));
+BusinessSele: =>LnJLTDOldDateMaxMsnc := MAX(BE_DrgLnJOldMsnc7Y,BE_DrgLTDOldMsnc7Y);
+BusinessSele: =>BKLnJLTDOldDateMaxMsnc := MAX(LnJLTDOldDateMaxMsnc,BE_DrgBkOldMsnc7Y);
+
+/**************************************************************************/
+/*                                                                        */
+/*             Business OverAll Drg Attributes                            */
+/*                                                                        */
+/**************************************************************************/	
+
+BusinessSele: =>BE_DrgCnt1Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA , MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD((OverAllDrgCnt1Y),0,99999));
+BusinessSele: =>BE_DrgCnt7Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA , MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD((OverAllDrgCnt7Y),0,99999));
+BusinessSele: =>BE_DrgFlag7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		BE_DrgCnt7Y = 0 => '0',
+		BE_DrgCnt7Y > 0 => '1');
+BusinessSele: =>BE_DrgNewDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA =>MISSING_INPUT_DATA,
+		BE_DrgCnt7Y  = 0  => NO_DATA_FOUND,
+		IsBlank(BKLnJLTDMaxNewDate,NO_DATA_FOUND_97));	
+BusinessSele: =>BE_DrgNewMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_DrgCnt7Y  = 0  => NO_DATA_FOUND_INT,
+		BE_DrgNewDt7Y = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(BKLnJLTDNewDateMinMsnc, 0, 84));	
+BusinessSele: =>BE_DrgOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA =>MISSING_INPUT_DATA,
+		BE_DrgCnt7Y  = 0  => NO_DATA_FOUND,
+		IsBlank(BKLnJLTDMinOldDate,NO_DATA_FOUND_97));	
+BusinessSele: =>BE_DrgOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_DrgCnt7Y  = 0  => NO_DATA_FOUND_INT,
+		BE_DrgOldDt7Y = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(BKLnJLTDOldDateMaxMsnc, 0, 84));
 
 
 
