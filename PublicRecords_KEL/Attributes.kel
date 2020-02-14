@@ -2321,20 +2321,51 @@ Person: => PL_ProfLicActvNewSrcType := MAP(
 
 /**************************************************************************/
 /*                                                                        */
+/*                   Business Helper Attributes                           */
+/*                                                                        */
+/**************************************************************************/
+
+BusinessSele.DataSources: => TranslatedSourceCode := SourceGroup(Source);
+BusinessSele: => TranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode};
+BusinessSele: => BusinessVerSourceList := TranslatedSources{
+	TranslatedSourceCode := TranslatedSourceCode,
+	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+	
+BusinessSele: => BusinessVerSourceListSorted := TOPN(BusinessVerSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+
+/**************************************************************************/
+/*                                                                        */
 /*                   Business Attributes                                  */
 /*                                                                        */
 /**************************************************************************/
 
-
 BusinessSele: => B_LexIDLegalRstdOnlyFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '0', '1');
 BusinessSele: => B_LexIDLegalSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
-BusinessSele.DataSources: => TranslatedSourceCode := SourceGroup(Source);
-BusinessSele: => TranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode};
-BusinessSele: => BE_VerSrcListEv := TOPN(TranslatedSources{
-	TranslatedSourceCode := TranslatedSourceCode,
-	SourceDateFirstSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), INTEGER(TranslatedSourceCode:DateFirstSeen), 0), INTEGER(CURRENT_DATE)),
-	SourceDateLastSeen := MIN(IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), INTEGER(TranslatedSourceCode:DateLastSeen), 0), INTEGER(CURRENT_DATE))
-	}, 1000, SourceDateFirstSeen = 0, SourceDateFirstSeen, SourceDateLastSeen = 0, SourceDateLastSeen, TranslatedSourceCode);
+BusinessSele: => BE_VerSrcListEv := IF(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' , MISSING_INPUT_DATA, 
+																			 CONCAT(BusinessVerSourceListSorted, TranslatedSourceCode, '|'));
+BusinessSele: => BE_VerSrcCntEv := IF(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' , MISSING_INPUT_DATA_INT,
+																			BOUNDSFOLD(COUNT(BusinessVerSourceListSorted), 1, 34));
+BusinessSele: => BE_VerSrcEmrgDtListEv := IF(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' , MISSING_INPUT_DATA,
+																						 CONCAT(BusinessVerSourceListSorted, SourceDateFirstSeen, '|'));
+BusinessSele: => BE_VerSrcLastDtListEv := IF(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' , MISSING_INPUT_DATA,
+																					   CONCAT(BusinessVerSourceListSorted, SourceDateLastSeen, '|'));
+BusinessSele: => BE_VerSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA,
+																				 ALL(BusinessVerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 	
+																				 DATETOSTRING(MIN(BusinessVerSourceListSorted, DATE(SourceDateFirstSeen)), '%Y%m%d'));
+BusinessSele: => BE_VerSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA,
+																				 ALL(BusinessVerSourceListSorted, SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 
+																				 DATETOSTRING(MAX(BusinessVerSourceListSorted, DATE(SourceDateLastSeen)), '%Y%m%d'));
+BusinessSele: => BE_VerSrcOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																					 ALL(BusinessVerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+																				   BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerSrcOldDtEv), CURRENT_DATE), 0, 960));
+BusinessSele: => BE_VerSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																					 ALL(BusinessVerSourceListSorted, SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+																					 BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerSrcNewDtEv), CURRENT_DATE), 0, 960));
+BusinessSele: => BE_VerSrcRptNewBusFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																					 BE_VerSrcOldMsncEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+																					 IF(BE_VerSrcOldMsncEv > 24, '0', '1'));
+																					 
 /*		Tradline Helper Attributes		*/
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
