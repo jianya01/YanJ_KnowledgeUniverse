@@ -71,8 +71,34 @@ FUNCTION: AppendLocationID(STRING PrimRange, STRING Predir, STRING PrimName, STR
           ECL(PublicRecords_KEL.ECL_Functions.Fn_Append_LocationID(PrimRange, Predir, PrimName, Suffix, Postdir, SecRange, City, State, ZIP)) FROM PublicRecords_KEL.ECL_Functions RETURNS INTEGER;
 FUNCTION: fnRemoveSpecialChars(STRING field1, STRING replacement) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_RemoveSpecialChars(field1, replacement)) FROM PublicRecords_KEL RETURNS STRING;	
 FUNCTION: fnInVotersState(STRING State, BOOLEAN isFCRA) <= ECL(PublicRecords_KEL.ECL_Functions.FN_inVotersState(State,isFCRA))FROM PublicRecords_KEL.ECL_Functions RETURNS BOOLEAN;
- 
- 
+FUNCTION: fnNaicCodeInterpreter(STRING NaicCodeInput) <= ECL(PublicRecords_KEL.ECL_Functions.fn_NaicCodeInterpreter((INTEGER)NaicCodeInput))FROM PublicRecords_KEL.ECL_Functions RETURNS STRING;
+FUNCTION: fnNaicGroupCodeInterpreter(STRING NaicCodeGroup) <= MAP(NaicCodeGroup = '11' => 'Agriculture, Forestry, Fishing and Hunting',
+																																			NaicCodeGroup = '21' => 'Mining',
+																																			NaicCodeGroup = '22' => 'Utilities',
+																																			NaicCodeGroup = '23' => 'Construction',
+																																			NaicCodeGroup = '31' OR  NaicCodeGroup = '32' OR NaicCodeGroup = '33' => 'Manufactuing',
+																																			NaicCodeGroup = '42' => 'Wholesale Trade',
+																																			NaicCodeGroup = '44' OR NaicCodeGroup = '45' => 'Retail Trade',
+																																			NaicCodeGroup = '48' OR NaicCodeGroup = '49'  => 'Transportation and Warehousing',
+																																			NaicCodeGroup = '51' => 'Information',
+																																			NaicCodeGroup = '52' => 'Finance and Insurance',
+																																			NaicCodeGroup = '53' => 'Real Estate and Rental and Leasing',
+																																			NaicCodeGroup = '54' => 'Professional, Scientific, and Technical Services',
+																																			NaicCodeGroup = '55' => 'Management of Companies and Enterprises',
+																																			NaicCodeGroup = '56' => 'Administrative and Waste Management Services',
+																																			NaicCodeGroup = '61' => 'Educational Services',
+																																			NaicCodeGroup = '62' => 'Health Care and Social Assistance',
+																																			NaicCodeGroup = '71' => 'Arts, Entertainment, and Recreation',
+																																			NaicCodeGroup = '72' => 'Accommodation and Food Services',
+																																			NaicCodeGroup = '81' => 'Other Services',
+																																			NaicCodeGroup = '92' => 'Public Administration',
+																																			'Other');
+
+
+
+
+																							
+
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -3338,6 +3364,88 @@ BusinessSele: => BE_BestTIN := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SeleTI
 BusinessSele: => BE_BestPhone := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = SelePhoneNumber.MISSING_INPUT_DATA => SelePhoneNumber.MISSING_INPUT_DATA,
 																				OnlyBestBusinessPhone.BestPhone:Null OR OnlyBestBusinessPhone.BestPhone = '' =>SelePhoneNumber.NO_DATA_FOUND,
 																				OnlyBestBusinessPhone.BestPhone);
+//Temporary BusinessSele Firmographics Location
+
+
+
+BusinessSele.NAICSCodes: => SourcePriority := MAP( Source = 'DF' => 1,
+																									 Source = 'Z1' => 2,
+																									 Source = 'RR' => 3,
+																									 Source = 'C#' => 4,
+																									 Source = 'TX' => 5,
+																									 Source = 'CP' => 6,
+																									 Source = 'C?' => 7,
+																									 Source = 'CI' => 8,
+																									 Source = 'Q3' => 9,
+																									 Source = 'Y'  => 10,
+																									 11);
+
+BusinessSele.NAICSCodes: =>DaysSinceCode :=DAYSBETWEEN(NAICSCodes.NAICSCode:DateFirstSeen, BusinessSele.CURRENT_DATE_SOS);
+BusinessSele.NAICSCodes: => WithinLast24Months := DaysSinceCode < 730;																									 
+//Code 1
+BusinessSele: => BE_BusNAICSCode1 := MAP( B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																						NOT EXISTS(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 1){NAICSCode}) => BusinessSele.NO_DATA_FOUND,
+																						ONLY(TOPN(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6  AND NAICSCodeOrder = 1),1,WithinLast24Months,SourcePriority,DaysSinceCode,NAICSCode),NAICSCode));
+
+
+
+BusinessSele: => BE_BusNAICSCode1Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																							BE_BusNAICSCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																							fnNaicCodeInterpreter(BE_BusNAICSCode1));
+																							
+
+
+BusinessSele: => BE_BusNAICSCode1GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																							BE_BusNAICSCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode1,1,2)));
+//Code 2
+BusinessSele: => BE_BusNAICSCode2 := MAP( B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																						NOT EXISTS(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 2 AND NAICSCode != BE_BusNAICSCode1){NAICSCode}) => BusinessSele.NO_DATA_FOUND,
+																						ONLY(TOPN(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 2 AND NAICSCode != BE_BusNAICSCode1),1,WithinLast24Months,SourcePriority,DaysSinceCode,NAICSCode),NAICSCode));
+
+
+
+BusinessSele: => BE_BusNAICSCode2Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																							BE_BusNAICSCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																							fnNaicCodeInterpreter(BE_BusNAICSCode2));
+																					
+
+BusinessSele: => BE_BusNAICSCode2GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																							BE_BusNAICSCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode2,1,2)));
+
+
+//Code 3
+BusinessSele: => BE_BusNAICSCode3 := MAP( B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																						NOT EXISTS(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 3 AND NAICSCode != BE_BusNAICSCode1 AND NAICSCode != BE_BusNAICSCode2){NAICSCode}) => BusinessSele.NO_DATA_FOUND,
+																						ONLY(TOPN(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 3 AND NAICSCode != BE_BusNAICSCode1 AND NAICSCode != BE_BusNAICSCode2),1,WithinLast24Months,SourcePriority,DaysSinceCode,NAICSCode),NAICSCode));
+
+
+
+BusinessSele: => BE_BusNAICSCode3Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																							BE_BusNAICSCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																							fnNaicCodeInterpreter(BE_BusNAICSCode3));
+																							
+
+BusinessSele: => BE_BusNAICSCode3GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																							BE_BusNAICSCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode3,1,2)));
+
+//Code 4
+BusinessSele: => BE_BusNAICSCode4 := MAP( B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																						NOT EXISTS(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND  LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 4 AND NAICSCode != BE_BusNAICSCode1 AND NAICSCode != BE_BusNAICSCode2 AND NAICSCode != BE_BusNAICSCode3){NAICSCode}) => BusinessSele.NO_DATA_FOUND,
+																					  ONLY(TOPN(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND  LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 4 AND NAICSCode != BE_BusNAICSCode1 AND NAICSCode != BE_BusNAICSCode2 AND NAICSCode != BE_BusNAICSCode3),1,WithinLast24Months,SourcePriority,DaysSinceCode,NAICSCode),NAICSCode));
+
+
+
+BusinessSele: => BE_BusNAICSCode4Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																							BE_BusNAICSCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																							fnNaicCodeInterpreter(BE_BusNAICSCode4));
+																							
+
+BusinessSele: => BE_BusNAICSCode4GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																							BE_BusNAICSCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
+																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode4,1,2)));
 
 
 /**************************************************************************/
