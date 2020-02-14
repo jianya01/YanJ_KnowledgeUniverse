@@ -99,6 +99,10 @@ FUNCTION: fnNaicGroupCodeInterpreter(STRING NaicCodeGroup) <= MAP(NaicCodeGroup 
 
 																							
 
+FUNCTION: fnAddr1FromComponents(STRING PrimaryRange,STRING Predirectional,STRING PrimaryName,STRING Suffix,STRING Postdirectional,STRING UnitDesignation,STRING SecondaryRange) <= ECL(address.Addr1FromComponents(PrimaryRange,Predirectional,PrimaryName,Suffix,Postdirectional,UnitDesignation,SecondaryRange)) FROM address RETURNS STRING;	
+FUNCTION: fnOverrideAddrType(STRING Addr1, STRING AddrType, STRING CarrRTE) <= ECL(risk_indicators.iid_constants.override_addr_type(Addr1,AddrType,CarrRTE)) FROM risk_indicators RETURNS STRING; 
+ 
+ 
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -279,6 +283,11 @@ SeleUCC: NO_DATA_FOUND_97_INT :=  -99997;
 SeleUCC: MISSING_INPUT_DATA := '-99999';
 SeleUCC: NO_DATA_FOUND := '-99998';
 SeleUCC: NO_DATA_FOUND_97 :=  '-99997';
+
+Person: MISSING_INPUT_DATA_INT := -99999;
+Person: MISSING_INPUT_DATA := '-99999';
+Person: NO_DATA_FOUND_INT := -99998;
+Person: NO_DATA_FOUND := '-99998';
 
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
@@ -1491,6 +1500,74 @@ InputBII: => B_InpValEmailDomBadCharFlag :=     MAP(BusInputEmailEchoValue = Inp
                                                 (CleanEmailDomain != EmailDomain AND B_InpValEmailDomAllZeroFlag = 0 ) => 1,  
                                                 (CleanEmailDomain = EmailDomain) => 0 ); 
 
+/**************************************************************************/
+/*                                                                        */
+/*                  Person Helper Attributes                              */
+/*                                                                        */
+/**************************************************************************/
+Person: INVALIDADDRESSRANK := [0, 91, 92, 93, 94, 95, 96, 97, 98, 99];
+Person: BUSADDRESSTYPE := 'BUS';
+Person: => AddressHierarchySet := TOPN(PersonAddress.AddressHierarchy
+                                    {
+                                    AddressRank,
+																		AddressType,
+                                    AddrFull := 
+                                       IF(IsNotEnoughToClean(PrimaryRange) OR PrimaryRange='' OR PrimaryRange:Null,'',TRIM(PrimaryRange)+ ' ')+
+                                       IF(IsNotEnoughToClean(Predirectional) OR Predirectional='' OR Predirectional:Null,'',TRIM(Predirectional)+ ' ')+
+                                       IF(IsNotEnoughToClean(PrimaryName) OR PrimaryName='' OR PrimaryName:Null,'',TRIM(PrimaryName)+ ' ')+
+                                       IF(IsNotEnoughToClean(Suffix) OR Suffix='' OR Suffix:Null,'',TRIM(Suffix)+ ' ')+
+                                       IF(IsNotEnoughToClean(Postdirectional) OR Postdirectional='' OR Postdirectional:Null,'',TRIM(Postdirectional)+ ' ')+
+                                       IF(IsNotEnoughToClean(UnitDesignation) OR UnitDesignation='' OR UnitDesignation:Null,'',TRIM(UnitDesignation)+ ' ')+
+                                       IF(IsNotEnoughToClean(SecondaryRange) OR SecondaryRange='' OR SecondaryRange:Null,'',TRIM(SecondaryRange)+ ' ')+
+                                       IF(IsNotEnoughToClean(PostalCity) OR PostalCity='' OR PostalCity:Null,'',TRIM(PostalCity)+ ' ')+
+                                       IF(IsNotEnoughToClean(State) OR State='' OR State:Null,'',TRIM(State)+ ' ')+
+                                       IF(IsNotEnoughToClean(STRING(ZIP5)) OR ZIP5=0 OR ZIP5:Null,'',TRIM(STRING(ZIP5))+ ' ')+
+                                       IF(IsNotEnoughToClean(STRING(ZIP4)) OR ZIP4=0 OR ZIP4:Null,'',TRIM(STRING(ZIP4))),
+                                    PrimaryRange := IF(IsNotEnoughToClean(PrimaryRange) OR PrimaryRange='' OR PrimaryRange:Null,'',TRIM(PrimaryRange)),
+                                    Predirectional := IF(IsNotEnoughToClean(Predirectional) OR Predirectional='' OR Predirectional:Null,'',TRIM(Predirectional)),
+                                    PrimaryName := IF(IsNotEnoughToClean(PrimaryName) OR PrimaryName='' OR PrimaryName:Null,'',TRIM(PrimaryName)),
+                                    Suffix := IF(IsNotEnoughToClean(Suffix) OR Suffix='' OR Suffix:Null,'',TRIM(Suffix)),
+                                    Postdirectional := IF(IsNotEnoughToClean(Postdirectional) OR Postdirectional='' OR Postdirectional:Null,'',TRIM(Postdirectional)),
+                                    UnitDesignation := IF(IsNotEnoughToClean(UnitDesignation) OR UnitDesignation='' OR UnitDesignation:Null,'',TRIM(UnitDesignation)),
+                                    SecondaryRange := IF(IsNotEnoughToClean(SecondaryRange) OR SecondaryRange='' OR SecondaryRange:Null,'',TRIM(SecondaryRange)),
+                                    PostalCity := IF(IsNotEnoughToClean(PostalCity) OR PostalCity='' OR PostalCity:Null,'',TRIM(PostalCity)),
+                                    State := IF(IsNotEnoughToClean(State) OR State='' OR State:Null,'',TRIM(State)),
+                                    ZIP5 := IF(IsNotEnoughToClean(STRING(ZIP5)) OR ZIP5=0 OR ZIP5:Null,'',TRIM(STRING(ZIP5))),
+                                    ZIP4 := IF(IsNotEnoughToClean(STRING(ZIP4)) OR ZIP4=0 OR ZIP4:Null,'',TRIM(STRING(ZIP4))),
+																		Addr1FromComponents := fnAddr1FromComponents(PrimaryRange,Predirectional,PrimaryName,Suffix,Postdirectional,UnitDesignation,SecondaryRange),
+																		SortField := AddressRank:DateLastSeen
+                                     }, 999, AddressRank, -SortField);
+Person: => RecentAddrFullSet := TOPN(AddressHierarchySet(
+																		 IsNotEnoughToClean(AddressRank)=FALSE AND NOT AddressRank IN Person.INVALIDADDRESSRANK AND 
+                                     (AddressType <> 'BUS' OR AddressType:Null) AND
+                                     (Addr1FromComponents<>'P' 
+																		  OR
+																			Addr1FromComponents:Null
+																		 )	
+                                    ), 2, AddressRank, -SortField);
+Person: => CurrAddrFullSet := TOPN(RecentAddrFullSet,1,AddressRank,-SortField);
+Person: => PersonAddressHierarchyValidCnt := COUNT(RecentAddrFullSet);
+Person: => PersonCurrAddrLocID := AppendLocationID(ONLY(CurrAddrFullSet, PrimaryRange), 
+                                                   ONLY(CurrAddrFullSet, Predirectional),  
+                                                   ONLY(CurrAddrFullSet, PrimaryName), 
+                                                   ONLY(CurrAddrFullSet, Suffix),
+                                                   ONLY(CurrAddrFullSet, Postdirectional), 
+                                                   ONLY(CurrAddrFullSet, SecondaryRange),
+                                                   ONLY(CurrAddrFullSet, PostalCity), 
+                                                   ONLY(CurrAddrFullSet, State),
+                                                   ONLY(CurrAddrFullSet, ZIP5));
+Person: => CurrAddrFull := ONLY(Person.CurrAddrFullSet,AddrFull);
+Person: => PrevAddrFullSet := TOPN(RecentAddrFullSet(AddrFull<>Person.CurrAddrFull),1,-SortField);
+Person: => PersonPrevAddressHierarchyValidCnt := COUNT(PrevAddrFullSet);
+Person: => PersonPrevAddrLocID := AppendLocationID(ONLY(PrevAddrFullSet, PrimaryRange), 
+                                                   ONLY(PrevAddrFullSet, Predirectional),  
+                                                   ONLY(PrevAddrFullSet, PrimaryName), 
+                                                   ONLY(PrevAddrFullSet, Suffix),
+                                                   ONLY(PrevAddrFullSet, Postdirectional), 
+                                                   ONLY(PrevAddrFullSet, SecondaryRange),
+                                                   ONLY(PrevAddrFullSet, PostalCity), 
+                                                   ONLY(PrevAddrFullSet, State),
+                                                   ONLY(PrevAddrFullSet, ZIP5));
 
 /**************************************************************************/
 /*                                                                        */
@@ -1500,6 +1577,28 @@ InputBII: => B_InpValEmailDomBadCharFlag :=     MAP(BusInputEmailEchoValue = Inp
 
 
 Person: => P_LexIDSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
+
+Person: => PL_CurrAddrFull := MAP(
+			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+      PersonAddressHierarchyValidCnt=0 => NO_DATA_FOUND,
+      ONLY(CurrAddrFullSet,AddrFull));
+
+Person: => PL_CurrAddrLocID := MAP(
+      P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+      PL_CurrAddrFull = NO_DATA_FOUND => NO_DATA_FOUND,
+      PersonCurrAddrLocID = 0 => NO_DATA_FOUND,
+      STRING(PersonCurrAddrLocID));
+
+Person: => PL_PrevAddrFull := MAP(
+			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+      PersonPrevAddressHierarchyValidCnt=0 => NO_DATA_FOUND,
+      ONLY(PrevAddrFullSet,AddrFull));
+
+Person: => PL_PrevAddrLocID := MAP(
+      P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+      PL_PrevAddrFull = NO_DATA_FOUND => NO_DATA_FOUND,
+      PersonPrevAddrLocID = 0 => NO_DATA_FOUND,
+      STRING(PersonPrevAddrLocID));
 
 
 /**************************************************************************/
