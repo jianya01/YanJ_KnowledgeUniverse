@@ -139,6 +139,7 @@ LienJudgment:  CURRENT_DATE  := MIN(GETBUILDDATE('liens_build_version'), CURRENT
 UCC:  CURRENT_DATE  := MIN(GETBUILDDATE('ucc_build_version'), CURRENTDATE());
 BusinessSele:  UCCCURRENT_DATE := MIN(GETBUILDDATE('ucc_build_version'), CURRENTDATE());
 BusinessSele: CURRENT_DATE_LIEN := MIN(GETBUILDDATE('liens_build_version'), CURRENTDATE());
+SelePerson:  CURRENT_DATE  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
 
 
 
@@ -4460,6 +4461,72 @@ BusinessSele: =>BE_DrgOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MI
 		BOUNDSFOLD(BKLnJLTDOldDateMaxMsnc, 0, 84));
 
 
+/**************************************************************************/
+/*          Busienss Associates Attributes                                */
+/**************************************************************************/	
 
+SelePerson: TWO_YEAR_IN_DAYS := 730;
+SelePerson: => AssocDate := MAX(ContactInfo, IsExecutive:DateLastSeen);
+SelePerson: => AgeInDays :=ABSDAYSBETWEEN(AssocDate, CURRENT_DATE);
+SelePerson: => TwoYears := AgeInDays <= SelePerson.TWO_YEAR_IN_DAYS;
+SelePerson: => IsExecutiveEver := EXISTS(ContactInfo(IsExecutive = TRUE));
+
+
+//If a lexid has ever been an executive and has ANY record on file within past 2 years, we are counting as an executive within past 2 years no matter what IsExecutive is for that record.
+BusinessSele: => AssocCntEvUnCap := COUNT(SelePerson);
+BusinessSele: => AssocCnt2YUnCap := COUNT(SelePerson(TwoYears));		
+BusinessSele: => AssocExecCntEvUnCap := COUNT(SelePerson(IsExecutiveEver));
+BusinessSele: => AssocExecCnt2YUnCap := COUNT(SelePerson(TwoYears AND IsExecutiveEver));				
+BusinessSele: => AssocNexecCntEvUnCap := COUNT(SelePerson(NOT IsExecutiveEver));
+BusinessSele: => AssocNexecCnt2YUnCap := COUNT(SelePerson(TwoYears AND NOT IsExecutiveEver));	
+
+		
+BusinessSele: => BE_AssocCntEv :=  IF(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA,BusinessSele.MISSING_INPUT_DATA_INT,
+																				BOUNDSFOLD(AssocCntEvUnCap,0,999999));
+BusinessSele: => BE_AssocCnt2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																				BOUNDSFOLD(AssocCnt2YUnCap,0,999999));	
+BusinessSele: => BE_AssocPct2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																				BE_AssocCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																				(AssocCnt2YUnCap/AssocCntEvUnCap)*100);
+
+BusinessSele: => BE_AssocExecCntEv :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocExecCntEvUnCap,0,999999));
+BusinessSele: => BE_AssocExecCnt2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocExecCnt2YUnCap,0,999999));	
+BusinessSele: => BE_AssocExecPct2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocExecCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																					 (AssocExecCnt2YUnCap/AssocExecCntEvUnCap)*100);		
+		
+BusinessSele: => BE_AssocNexecCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,																						
+																						BOUNDSFOLD(AssocNexecCntEvUnCap,0,999999));
+BusinessSele: => BE_AssocNexecCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocNexecCnt2YUnCap,0,999999));	
+BusinessSele: => BE_AssocNexecPct2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocNexecCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																					 (AssocNexecCnt2YUnCap/AssocNexecCntEvUnCap)*100);	
+
+
+/**************************************************************************/	
+/*          Busienss Email Associates Attributes                          */
+/**************************************************************************/	
+BusinessSele: => AssocHasEmail := EXISTS(SelePerson(TwoYears).Contact.PersonEmail);
+BusinessSele: => AssocExecHasEmail := EXISTS(SelePerson(TwoYears AND IsExecutiveEver).Contact.PersonEmail);
+BusinessSele: => AssocNexecHasEmail := EXISTS(SelePerson(TwoYears AND NOT IsExecutiveEver).Contact.PersonEmail);
+
+BusinessSele: => BE_AssocEmailFlag2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND,
+																						AssocHasEmail = TRUE => 1, 0);
+
+BusinessSele: => BE_AssocExecEmailFlag2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																						BE_AssocExecCnt2Y = 0 => BusinessSele.NO_DATA_FOUND,
+																						AssocExecHasEmail = TRUE => 1, 0);
+
+BusinessSele: => BE_AssocNexecEmailFlag2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																						BE_AssocNexecCnt2Y = 0 => BusinessSele.NO_DATA_FOUND,
+																						AssocNexecHasEmail = TRUE => 1, 0);
 
 
