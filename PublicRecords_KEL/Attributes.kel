@@ -2455,6 +2455,8 @@ BusinessSele: => BusinessVerSourceList := TranslatedSources{
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
 	
 BusinessSele: => BusinessVerSourceListSorted := TOPN(BusinessVerSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+BusinessSele: => BusinessCredentialSourceList := BusinessVerSourceListSorted(TranslatedSourceCode IN ['AR', 'BA', 'BR', 'C', 'DA', 'I', 'IN', 'P', 'V2', 'WA']);
+BusinessSele: => BusinessBureauSourceList := BusinessVerSourceListSorted(TranslatedSourceCode IN ['D', 'DN', 'ER', 'Q3', 'EF', 'RR', 'Z1']);
 
 /**************************************************************************/
 /*                                                                        */
@@ -2487,7 +2489,17 @@ BusinessSele: => BE_VerSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_
 BusinessSele: => BE_VerSrcRptNewBusFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																					 BE_VerSrcOldMsncEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
 																					 IF(BE_VerSrcOldMsncEv > 24, '0', '1'));
-																					 
+BusinessSele: => BE_VerSrcCredCntEv := IF(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' , MISSING_INPUT_DATA_INT,
+																			BOUNDSFOLD(BusinessCredentialSourceList:Count, 0, 10));																			
+BusinessSele: => BE_VerSrcBureauFlag := IF(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' , MISSING_INPUT_DATA_INT,
+																			     IF(EXISTS(BusinessBureauSourceList), '1', '0'));
+BusinessSele: => BE_VerSrcBureauOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA,
+																				 ALL(BusinessVerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 	
+																				 DATETOSTRING(MIN(BusinessBureauSourceList, DATE(SourceDateFirstSeen)), '%Y%m%d'));
+BusinessSele: => BE_VerSrcBureauOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																					 ALL(BusinessVerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+																				   BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerSrcBureauOldDtEv), CURRENT_DATE), 0, 960));
+																				 
 /*		Tradline Helper Attributes		*/
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
