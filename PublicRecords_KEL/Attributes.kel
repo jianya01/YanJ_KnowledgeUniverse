@@ -94,7 +94,7 @@ FUNCTION: fnNaicGroupCodeInterpreter(STRING NaicCodeGroup) <= MAP(NaicCodeGroup 
 																																			NaicCodeGroup = '92' => 'Public Administration',
 																																			'Other');
 FUNCTION: FnSICCodeInterpreter(STRING Sic4CodeInput) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_SICCodeInterpreter((INTEGER)Sic4CodeInput)) FROM PublicRecords_KEL.ECL_Functions RETURNS STRING; 
-FUNCTION: FnSICCodeGroupCodeDecoder(STRING SicCodeGroup) <= MAP(			SicCodeGroup IN ['01', '02', '07', '08', '09'] => 'Agriculture, Forestry, Fishing and Hunting',
+FUNCTION: FnSICGroupCodeInterpreter(STRING SicCodeGroup) <= MAP(			SicCodeGroup IN ['01', '02', '07', '08', '09'] => 'Agriculture, Forestry, Fishing and Hunting',
 																																			SicCodeGroup IN ['10', '12', '13', '14'] => 'Mining',
 																																			SicCodeGroup = '49' => 'Utilities',
 																																			SicCodeGroup IN ['15', '16', '17'] => 'Construction',
@@ -4488,6 +4488,11 @@ BusinessSele.SICCodes: => SourcePriority := MAP( 	 Source = 'DF' => 1,
 																									 12);
 BusinessSele.SICCodes: =>DaysSinceCode :=DAYSBETWEEN (SICCodes.SICCode:DateFirstSeen, BusinessSele.CURRENT_DATE_SOS);
 BusinessSele.SICCodes: => WithinLast24Months := DaysSinceCode < 730;	
+BusinessSele.SICCodes: => IsSicCode := SICCode != 0 AND NOT SICCode:Null AND LENGTH(STRING(SICCode)) <= 4;
+BusinessSele: => BestSicCode1Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 1),1,WithinLast24Months,SourcePriority,SICCode);
+BusinessSele: => BestSicCode2Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 2),1,WithinLast24Months,SourcePriority,SICCode);
+BusinessSele: => BestSicCode3Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 3),1,WithinLast24Months,SourcePriority,SICCode);
+BusinessSele: => BestSicCode4Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 4),1,WithinLast24Months,SourcePriority,SICCode);
 BusinessSele.NAICSCodes: => SourcePriority := MAP( Source = 'DF' => 1,
 																									 Source = 'Z1' => 2,
 																									 Source = 'RR' => 3,
@@ -4501,6 +4506,11 @@ BusinessSele.NAICSCodes: => SourcePriority := MAP( Source = 'DF' => 1,
 																									 11);
 BusinessSele.NAICSCodes: =>DaysSinceCode :=DAYSBETWEEN(NAICSCodes.NAICSCode:DateFirstSeen, BusinessSele.CURRENT_DATE_SOS);
 BusinessSele.NAICSCodes: => WithinLast24Months := DaysSinceCode < 730;	
+BusinessSele.NAICSCodes: => IsNAICSCode := NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6;
+BusinessSele: => BestNAICSCode1Set :=	TOPN(NAICSCodes(IsNAICSCode AND NAICSCodeOrder = 1),1,WithinLast24Months,SourcePriority,NAICSCode);
+BusinessSele: => BestNAICSCode2Set :=	TOPN(NAICSCodes(IsNAICSCode AND NAICSCodeOrder = 2),1,WithinLast24Months,SourcePriority,NAICSCode);
+BusinessSele: => BestNAICSCode3Set :=	TOPN(NAICSCodes(IsNAICSCode AND NAICSCodeOrder = 3),1,WithinLast24Months,SourcePriority,NAICSCode);
+BusinessSele: => BestNAICSCode4Set :=	TOPN(NAICSCodes(IsNAICSCode AND NAICSCodeOrder = 4),1,WithinLast24Months,SourcePriority,NAICSCode);
 
 BusinessSele.EmployeeCounts: => DateLastSeenCapped := MIN(TotalEmployees:DateLastSeen, CURRENT_DATE);
 BusinessSele.EmployeeCounts: => AgeInDays := ABSDAYSBETWEEN(DateLastSeenCapped, BusinessSele.CURRENT_DATE);
@@ -4602,72 +4612,64 @@ BusinessSele: => AnnualSalesAmount := MAP(
 /**************************************************************************/
 
 
-BusinessSele: => BE_BusSICCode1 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
-																						NOT EXISTS(SICCodes(FnSICCodeInterpreter(SICCode) != '-99998' AND SICCode != 0 AND NOT SICCode:Null AND LENGTH(STRING(SICCode)) <= 6 AND SICCodeOrder = 1){SICCode}) => BusinessSele.NO_DATA_FOUND,
-																						ONLY(TOPN(SICCodes(FnSICCodeInterpreter(SICCode) != '-99998' AND SICCode != 0 AND NOT SICCode:Null AND LENGTH(STRING(SICCode)) <= 6  AND SICCodeOrder = 1),1,WithinLast24Months,SourcePriority,DaysSinceCode,SICCode),SICCode));
-BusinessSele: => BE_BusSICCode1Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+BusinessSele: => BE_BusSICCode1 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																						IsBlank(ONLY(BestSicCode1Set,INTFORMAT(SICCode,4,1)),BusinessSele.NO_DATA_FOUND));
+BusinessSele: => BE_BusSICCode1Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode1));
-BusinessSele: => BE_BusSICCodeGroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+BusinessSele: => BE_BusSICCode1GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
-																							FnSICCodeGroupCodeDecoder(SUBSTR(BE_BusSICCode1,1,2)));
-BusinessSele: => BE_BusSICCode2 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
-																						NOT EXISTS(SICCodes(FnSICCodeInterpreter(SICCode) != '-99998' AND SICCode != 0 AND NOT SICCode:Null AND LENGTH(STRING(SICCode)) <= 6 AND SICCodeOrder = 2 AND SICCode != BE_BusSICCode1){SICCode}) => BusinessSele.NO_DATA_FOUND,
-																						ONLY(TOPN(SICCodes(FnSICCodeInterpreter(SICCode) != '-99998' AND SICCode != 0 AND NOT SICCode:Null AND LENGTH(STRING(SICCode)) <= 6 AND SICCodeOrder = 2 AND SICCode != BE_BusSICCode1),1,WithinLast24Months,SourcePriority,DaysSinceCode,SICCode),SICCode));
-BusinessSele: => BE_BusSICCode2Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode1,1,2)));
+BusinessSele: => BE_BusSICCode2 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																						IsBlank(ONLY(BestSicCode2Set,INTFORMAT(SICCode,4,1)),BusinessSele.NO_DATA_FOUND));
+BusinessSele: => BE_BusSICCode2Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode2));
-BusinessSele: => BE_BusSICCode2GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+BusinessSele: => BE_BusSICCode2GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
-																							FnSICCodeGroupCodeDecoder(SUBSTR(BE_BusSICCode2,1,2)));
-BusinessSele: => BE_BusSICCode3 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
-																						NOT EXISTS(SICCodes(FnSICCodeInterpreter(SICCode) != '-99998' AND SICCode != 0 AND NOT SICCode:Null AND LENGTH(STRING(SICCode)) <= 6 AND SICCodeOrder = 3 AND SICCode != BE_BusSICCode1 AND SICCode != BE_BusSICCode2){SICCode}) => BusinessSele.NO_DATA_FOUND,
-																						ONLY(TOPN(SICCodes(FnSICCodeInterpreter(SICCode) != '-99998' AND SICCode != 0 AND NOT SICCode:Null AND LENGTH(STRING(SICCode)) <= 6 AND SICCodeOrder = 3 AND SICCode != BE_BusSICCode1 AND SICCode != BE_BusSICCode2),1,WithinLast24Months,SourcePriority,DaysSinceCode,SICCode),SICCode));
-BusinessSele: => BE_BusSICCode3Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode2,1,2)));
+BusinessSele: => BE_BusSICCode3 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																						IsBlank(ONLY(BestSicCode3Set,INTFORMAT(SICCode,4,1)),BusinessSele.NO_DATA_FOUND));
+BusinessSele: => BE_BusSICCode3Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode3));
-BusinessSele: => BE_BusSICCode3GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+BusinessSele: => BE_BusSICCode3GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
-																							FnSICCodeGroupCodeDecoder(SUBSTR(BE_BusSICCode3,1,2)));
-BusinessSele: => BE_BusSICCode4 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
-																						NOT EXISTS(SICCodes(FnSICCodeInterpreter(SICCode) != '-99998' AND SICCode != 0 AND NOT SICCode:Null AND  LENGTH(STRING(SICCode)) <= 6 AND SICCodeOrder = 4 AND SICCode != BE_BusSICCode1 AND SICCode != BE_BusSICCode2 AND SICCode != BE_BusSICCode3){SICCode}) => BusinessSele.NO_DATA_FOUND,
-																					  ONLY(TOPN(SICCodes(FnSICCodeInterpreter(SICCode) != '-99998' AND SICCode != 0 AND NOT SICCode:Null AND  LENGTH(STRING(SICCode)) <= 6 AND SICCodeOrder = 4 AND SICCode != BE_BusSICCode1 AND SICCode != BE_BusSICCode2 AND SICCode != BE_BusSICCode3),1,WithinLast24Months,SourcePriority,DaysSinceCode,SICCode),SICCode));
-BusinessSele: => BE_BusSICCode4Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode3,1,2)));
+BusinessSele: => BE_BusSICCode4 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
+																						IsBlank(ONLY(BestSicCode4Set,INTFORMAT(SICCode,4,1)),BusinessSele.NO_DATA_FOUND));
+BusinessSele: => BE_BusSICCode4Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode4));
-BusinessSele: => BE_BusSICCode4GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+BusinessSele: => BE_BusSICCode4GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
-																							FnSICCodeGroupCodeDecoder(SUBSTR(BE_BusSICCode4,1,2)));
-BusinessSele: => BE_BusNAICSCode1 := MAP( B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-																						NOT EXISTS(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 1){NAICSCode}) => BusinessSele.NO_DATA_FOUND,
-																						ONLY(TOPN(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6  AND NAICSCodeOrder = 1),1,WithinLast24Months,SourcePriority,DaysSinceCode,NAICSCode),NAICSCode));
+																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode4,1,2)));
+BusinessSele: => BE_BusNAICSCode1 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																						IsBlank(ONLY(BestNAICSCode1Set,NAICSCode),BusinessSele.NO_DATA_FOUND));
 BusinessSele: => BE_BusNAICSCode1Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicCodeInterpreter(BE_BusNAICSCode1));
 BusinessSele: => BE_BusNAICSCode1GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode1,1,2)));
-BusinessSele: => BE_BusNAICSCode2 := MAP( B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-																						NOT EXISTS(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 2 AND NAICSCode != BE_BusNAICSCode1){NAICSCode}) => BusinessSele.NO_DATA_FOUND,
-																						ONLY(TOPN(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 2 AND NAICSCode != BE_BusNAICSCode1),1,WithinLast24Months,SourcePriority,DaysSinceCode,NAICSCode),NAICSCode));
+BusinessSele: => BE_BusNAICSCode2 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																						IsBlank(ONLY(BestNAICSCode2Set,NAICSCode),BusinessSele.NO_DATA_FOUND));
 BusinessSele: => BE_BusNAICSCode2Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicCodeInterpreter(BE_BusNAICSCode2));
 BusinessSele: => BE_BusNAICSCode2GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode2,1,2)));
-BusinessSele: => BE_BusNAICSCode3 := MAP( B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-																						NOT EXISTS(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 3 AND NAICSCode != BE_BusNAICSCode1 AND NAICSCode != BE_BusNAICSCode2){NAICSCode}) => BusinessSele.NO_DATA_FOUND,
-																						ONLY(TOPN(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 3 AND NAICSCode != BE_BusNAICSCode1 AND NAICSCode != BE_BusNAICSCode2),1,WithinLast24Months,SourcePriority,DaysSinceCode,NAICSCode),NAICSCode));
+BusinessSele: => BE_BusNAICSCode3 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																						IsBlank(ONLY(BestNAICSCode3Set,NAICSCode),BusinessSele.NO_DATA_FOUND));
 BusinessSele: => BE_BusNAICSCode3Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicCodeInterpreter(BE_BusNAICSCode3));
 BusinessSele: => BE_BusNAICSCode3GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode3,1,2)));
-BusinessSele: => BE_BusNAICSCode4 := MAP( B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-																						NOT EXISTS(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND  LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 4 AND NAICSCode != BE_BusNAICSCode1 AND NAICSCode != BE_BusNAICSCode2 AND NAICSCode != BE_BusNAICSCode3){NAICSCode}) => BusinessSele.NO_DATA_FOUND,
-																					  ONLY(TOPN(NAICSCodes(fnNaicCodeInterpreter(NAICSCode) != '-99998' AND NAICSCode != 0 AND NOT NAICSCode:Null AND  LENGTH(STRING(NAICSCode)) <= 6 AND NAICSCodeOrder = 4 AND NAICSCode != BE_BusNAICSCode1 AND NAICSCode != BE_BusNAICSCode2 AND NAICSCode != BE_BusNAICSCode3),1,WithinLast24Months,SourcePriority,DaysSinceCode,NAICSCode),NAICSCode));
+BusinessSele: => BE_BusNAICSCode4 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+																						IsBlank(ONLY(BestNAICSCode4Set,NAICSCode),BusinessSele.NO_DATA_FOUND));
 BusinessSele: => BE_BusNAICSCode4Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicCodeInterpreter(BE_BusNAICSCode4));
