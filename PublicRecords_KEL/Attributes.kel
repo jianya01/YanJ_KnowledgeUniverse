@@ -215,6 +215,7 @@ BusinessSele: NO_DATA_FOUND := '-99998';
 BusinessSele: NO_DATA_FOUND_INT := -99998;
 BusinessSele: NO_DATA_FOUND_97_INT := -99997;
 BusinessSele: NO_DATA_FOUND_97 := '-99997';
+BusinessSele: TWO_YEARS_IN_DAYS := 730;
 
 SeleAddress: MISSING_INPUT_DATA := '-99999';
 SeleAddress: MISSING_INPUT_DATA_INT := -99999;
@@ -2547,7 +2548,7 @@ BusinessSele: => BE_VerSrcBureauOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT O
 BusinessSele: => BE_VerSrcBureauOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																					 ALL(BusinessVerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
 																				   BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerSrcBureauOldDtEv), CURRENT_DATE), 0, 960));
-																				 
+				
 /*		Tradline Helper Attributes		*/
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
@@ -4501,6 +4502,98 @@ BusinessSele.NAICSCodes: => SourcePriority := MAP( Source = 'DF' => 1,
 BusinessSele.NAICSCodes: =>DaysSinceCode :=DAYSBETWEEN(NAICSCodes.NAICSCode:DateFirstSeen, BusinessSele.CURRENT_DATE_SOS);
 BusinessSele.NAICSCodes: => WithinLast24Months := DaysSinceCode < 730;	
 
+BusinessSele.EmployeeCounts: => DateLastSeenCapped := MIN(TotalEmployees:DateLastSeen, CURRENT_DATE);
+BusinessSele.EmployeeCounts: => AgeInDays := ABSDAYSBETWEEN(DateLastSeenCapped, BusinessSele.CURRENT_DATE);
+BusinessSele.EmployeeCounts: => IsSeenInTwoYears := AgeInDays <= BusinessSele.TWO_YEARS_IN_DAYS;
+// Infutor NARB Employee Codes represents the employee count range the business falls in.
+// For our employee count fields, we calculate the employee count to be the upper limit of this range.
+BusinessSele.EmployeeCounts: => NARBEmployeeEstimate := MAP(
+				NARBEmployeeCode = 'A' => 4, // 1-4 employees
+				NARBEmployeeCode = 'B' => 9, // 5 to 9 employees
+				NARBEmployeeCode = 'C' => 19, // 10 to 19 employees
+				NARBEmployeeCode = 'D' => 49, // 20 to 49 employees
+				NARBEmployeeCode = 'E' => 99, // 50 to 99 employees
+				NARBEmployeeCode = 'F' => 249, // 100 - 249 employees
+				NARBEmployeeCode = 'G' => 499, // 250 - 499 employees
+				NARBEmployeeCode = 'H' => 999 // 500 - 999 employees
+				// NARBEmployeeCode = I => 1000+ employees. Set this code and any other values to Null. 
+				);
+				
+BusinessSele.EmployeeCounts: => IsDCAEmployeeRecord := Source = 'DF' AND IsSeenInTwoYears AND NOT TotalEmployees:Null AND NOT DCAEnterpriseNumber:Null;
+BusinessSele.EmployeeCounts: => DCATotalEmployees := ONLY(TOPN(EmployeeCounts(IsDCAEmployeeRecord AND DCAEnterpriseNumber=BusinessSele.EmployeeCounts.DCAEnterpriseNumber), 1, -DateLastSeenCapped, -TotalEmployees:DateFirstSeen), TotalEmployees);
+BusinessSele: => DCAEmployeeCount := SUM(EmployeeCounts(IsDCAEmployeeRecord){DCAEnterpriseNumber, DCATotalEmployees}, DCATotalEmployees);
+
+BusinessSele.EmployeeCounts: => IsEquifaxEmployeeRecord := Source = 'Z1' AND IsSeenInTwoYears AND NOT EmployeeCount:Null AND NOT EquifaxID:Null;
+BusinessSele.EmployeeCounts: => EquifaxTotalEmployees := ONLY(TOPN(EmployeeCounts(IsEquifaxEmployeeRecord AND EquifaxID=BusinessSele.EmployeeCounts.EquifaxID), 1, -DateLastSeenCapped, -EmployeeCount:DateFirstSeen), EmployeeCount);
+BusinessSele: => EquifaxEmployeeCount := SUM(EmployeeCounts(IsEquifaxEmployeeRecord){EquifaxID, EquifaxTotalEmployees}, EquifaxTotalEmployees);
+
+BusinessSele.EmployeeCounts: => IsCorteraEmployeeRecord := Source = 'RR' AND IsSeenInTwoYears AND NOT TotalEmployees:Null AND NOT CorteraUltimateLinkID:Null;
+BusinessSele.EmployeeCounts: => CorteraTotalEmployees := ONLY(TOPN(EmployeeCounts(IsCorteraEmployeeRecord AND CorteraUltimateLinkID=BusinessSele.EmployeeCounts.CorteraUltimateLinkID), 1, -DateLastSeenCapped, -TotalEmployees:DateFirstSeen), TotalEmployees);
+BusinessSele: => CorteraEmployeeCount := SUM(EmployeeCounts(IsCorteraEmployeeRecord){CorteraUltimateLinkID, CorteraTotalEmployees}, CorteraTotalEmployees);
+
+BusinessSele.EmployeeCounts: => IsInfutorEmployeeRecord := Source = 'Z2' AND IsSeenInTwoYears AND NOT NARBEmployeeEstimate:Null AND NOT NARBRecordID:Null;
+BusinessSele.EmployeeCounts: => InfutorTotalEmployees := ONLY(TOPN(EmployeeCounts(IsInfutorEmployeeRecord AND NARBRecordID=BusinessSele.EmployeeCounts.NARBRecordID), 1, -DateLastSeenCapped, -NARBEmployeeCode:DateFirstSeen), NARBEmployeeEstimate);
+BusinessSele: => InfutorEmployeeCount := SUM(EmployeeCounts(IsInfutorEmployeeRecord){NARBRecordID, InfutorTotalEmployees}, InfutorTotalEmployees);
+
+BusinessSele.EmployeeCounts: => IsEBREmployeeRecord := Source = 'ER' AND IsSeenInTwoYears AND NOT TotalEmployees:Null AND NOT EBRNumber:Null;
+BusinessSele.EmployeeCounts: => EBRTotalEmployees := ONLY(TOPN(EmployeeCounts(IsEBREmployeeRecord AND EBRNumber=BusinessSele.EmployeeCounts.EBRNumber), 1, -DateLastSeenCapped, -TotalEmployees:DateFirstSeen), TotalEmployees);
+BusinessSele: => EBREmployeeCount := SUM(EmployeeCounts(IsEBREmployeeRecord){EBRNumber, EBRTotalEmployees}, EBRTotalEmployees);
+
+BusinessSele: => CurrentEmployeeCount := MAP(
+				EXISTS(EmployeeCounts(IsDCAEmployeeRecord)) => DCAEmployeeCount,
+				EXISTS(EmployeeCounts(IsEquifaxEmployeeRecord)) => EquifaxEmployeeCount,
+				EXISTS(EmployeeCounts(IsCorteraEmployeeRecord)) => CorteraEmployeeCount,
+				EXISTS(EmployeeCounts(IsInfutorEmployeeRecord)) => InfutorEmployeeCount,
+				EXISTS(EmployeeCounts(IsEBREmployeeRecord)) => EBREmployeeCount);
+				
+BusinessSele.SaleAmounts: => DateLastSeenCapped := MIN(TotalSales:DateLastSeen, CURRENT_DATE);
+BusinessSele.SaleAmounts: => AgeInDays := ABSDAYSBETWEEN(DateLastSeenCapped, BusinessSele.CURRENT_DATE);
+BusinessSele.SaleAmounts: => IsSeenInTwoYears := AgeInDays <= BusinessSele.TWO_YEARS_IN_DAYS;
+
+				
+// Infutor NARB Sales Codes represents the sales range the business falls in.
+// For our sales amount fields, we calculate the sales to be the upper limit of this range.
+BusinessSele.SaleAmounts: => NARBSalesEstimate := MAP(
+				NARBSalesCode = 'A' => 499999, // under $500,000
+				NARBSalesCode = 'B' => 999999, // $500,000 to $999,999
+				NARBSalesCode = 'C' => 4999999, // $1,00,000 to $4,999,999
+				NARBSalesCode = 'D' => 9999999, // $5,000,000 to $9,999,999
+				NARBSalesCode = 'E' => 24999999, // $10,000,000 to $24,999,999
+				NARBSalesCode = 'F' => 74999999, // $25,000,000 to $74,999,999
+				NARBSalesCode = 'G' => 199999999, // $75,000,000 to $199,999,999
+				NARBSalesCode = 'H' => 499999999, // $200,000,000 to $499,999,999
+				NARBSalesCode = 'I' => 999999999  // $500,000,000 to $999,999,999
+				// NARBSalesCode = J => over $1,000,000,000. Set this code and any other values to Null. 
+				);
+
+BusinessSele.SaleAmounts: => IsDCASaleRecord := Source = 'DF' AND IsSeenInTwoYears AND NOT TotalSales:Null AND NOT DCAEnterpriseNumber:Null;
+BusinessSele.SaleAmounts: => DCATotalSales := ONLY(TOPN(SaleAmounts(IsDCASaleRecord AND DCAEnterpriseNumber=BusinessSele.SaleAmounts.DCAEnterpriseNumber), 1, -DateLastSeenCapped, -TotalSales:DateFirstSeen), TotalSales);
+BusinessSele: => DCASalesAmount := SUM(SaleAmounts(IsDCASaleRecord){DCAEnterpriseNumber, DCATotalSales}, DCATotalSales);
+
+BusinessSele.SaleAmounts: => IsEquifaxSaleRecord := Source = 'Z1' AND IsSeenInTwoYears AND NOT FinancialAmountFigure:Null AND NOT EquifaxID:Null;
+BusinessSele.SaleAmounts: => EquifaxTotalSales := ONLY(TOPN(SaleAmounts(IsEquifaxSaleRecord AND EquifaxID=BusinessSele.SaleAmounts.EquifaxID), 1, -DateLastSeenCapped, -FinancialAmountFigure:DateFirstSeen), FinancialAmountFigure);
+// Equifax sales needs to be multiplied by 1000 for actual sales amount.
+BusinessSele: => EquifaxSalesAmount := SUM(SaleAmounts(IsEquifaxSaleRecord){EquifaxID, EquifaxTotalSales}, EquifaxTotalSales)*1000;
+
+BusinessSele.SaleAmounts: => IsInfutorSaleRecord := Source = 'Z2' AND IsSeenInTwoYears AND NOT NARBSalesEstimate:Null AND NOT NARBRecordID:Null;
+BusinessSele.SaleAmounts: => InfutorTotalSales := ONLY(TOPN(SaleAmounts(IsInfutorSaleRecord AND NARBRecordID=BusinessSele.SaleAmounts.NARBRecordID), 1, -DateLastSeenCapped, -NARBSalesCode:DateFirstSeen), NARBSalesEstimate);
+BusinessSele: => InfutorSalesAmount := SUM(SaleAmounts(IsInfutorSaleRecord){NARBRecordID, InfutorTotalSales}, InfutorTotalSales);
+
+BusinessSele.SaleAmounts: => IsCorteraSaleRecord := Source = 'RR' AND IsSeenInTwoYears AND NOT TotalSales:Null AND NOT CorteraUltimateLinkID:Null;
+BusinessSele.SaleAmounts: => CorteraTotalSales := ONLY(TOPN(SaleAmounts(IsCorteraSaleRecord AND CorteraUltimateLinkID=BusinessSele.SaleAmounts.CorteraUltimateLinkID), 1, -DateLastSeenCapped, -TotalSales:DateFirstSeen), TotalSales);
+BusinessSele: => CorteraSalesAmount := SUM(SaleAmounts(IsCorteraSaleRecord){CorteraUltimateLinkID, CorteraTotalSales}, CorteraTotalSales);
+
+BusinessSele.SaleAmounts: => IsEBRSaleRecord := Source = 'ER' AND IsSeenInTwoYears AND NOT ReportedSales:Null AND NOT EBRNumber:Null;
+BusinessSele.SaleAmounts: => EBRTotalSales := ONLY(TOPN(SaleAmounts(IsEBRSaleRecord AND EBRNumber=BusinessSele.SaleAmounts.EBRNumber), 1, -DateLastSeenCapped, -ReportedSales:DateFirstSeen), ReportedSales);
+// EBR reported sales needs to be multiplied by 1000 for actual sales amount.
+BusinessSele: => EBRSalesAmount := SUM(SaleAmounts(IsEBRSaleRecord){EBRNumber, EBRTotalSales}, EBRTotalSales)*1000;
+
+BusinessSele: => AnnualSalesAmount := MAP(
+				EXISTS(SaleAmounts(IsDCASaleRecord)) => DCASalesAmount,
+				EXISTS(SaleAmounts(IsEquifaxSaleRecord)) => EquifaxSalesAmount,
+				EXISTS(SaleAmounts(IsInfutorSaleRecord)) => InfutorSalesAmount,
+				EXISTS(SaleAmounts(IsCorteraSaleRecord)) => CorteraSalesAmount,
+				EXISTS(SaleAmounts(IsEBRSaleRecord)) => EBRSalesAmount);
 
 /**************************************************************************/
 /*                                                                        */
@@ -4582,3 +4675,37 @@ BusinessSele: => BE_BusNAICSCode4GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR 
 																							BE_BusNAICSCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode4,1,2)));
 
+BusinessSele: => BE_BusEmplCountCurr := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				CurrentEmployeeCount:Null => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(CurrentEmployeeCount, 0, 999999));
+				
+BusinessSele: => BE_BusEmplCountCurrRnge := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				BE_BusEmplCountCurr = 0 => 0,
+				BE_BusEmplCountCurr = 1 => 10,
+				BE_BusEmplCountCurr >= 2 AND BE_BusEmplCountCurr < 5 => 20,
+				BE_BusEmplCountCurr >= 5 AND BE_BusEmplCountCurr < 10 => 30,
+				BE_BusEmplCountCurr >= 10 AND BE_BusEmplCountCurr < 20 => 40,
+				BE_BusEmplCountCurr >= 20 AND BE_BusEmplCountCurr < 50 => 50,
+				BE_BusEmplCountCurr >= 50 AND BE_BusEmplCountCurr < 100 => 60,
+				BE_BusEmplCountCurr >= 100 AND BE_BusEmplCountCurr < 250 => 70,
+				BE_BusEmplCountCurr >= 250 => 80,
+				NO_DATA_FOUND_INT);
+	
+BusinessSele: => BE_BusAnnualSalesCurr := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				AnnualSalesAmount:Null => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(AnnualSalesAmount, 0, 99999999999 ));
+				
+BusinessSele: => BE_BusAnnualSalesCurrRnge := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				BE_BusAnnualSalesCurr = 0 => '0',
+				BE_BusAnnualSalesCurr > 0 AND BE_BusAnnualSalesCurr < 25000 => '05',
+				BE_BusAnnualSalesCurr >= 25000 AND BE_BusAnnualSalesCurr < 50000 => '10',
+				BE_BusAnnualSalesCurr >= 50000 AND BE_BusAnnualSalesCurr < 100000 => '20',
+				BE_BusAnnualSalesCurr >= 100000 AND BE_BusAnnualSalesCurr < 150000 => '30',
+				BE_BusAnnualSalesCurr >= 150000 AND BE_BusAnnualSalesCurr < 250000 => '40',
+				BE_BusAnnualSalesCurr >= 250000 AND BE_BusAnnualSalesCurr < 500000 => '50',
+				BE_BusAnnualSalesCurr >= 500000 AND BE_BusAnnualSalesCurr < 1000000 => '60',
+				BE_BusAnnualSalesCurr >= 1000000 AND BE_BusAnnualSalesCurr < 2500000 => '70',
+				BE_BusAnnualSalesCurr >= 2500000 AND BE_BusAnnualSalesCurr < 5000000 => '80',
+				BE_BusAnnualSalesCurr >= 5000000 AND BE_BusAnnualSalesCurr < 10000000 => '90',
+				BE_BusAnnualSalesCurr >= 10000000 => '100',
+				NO_DATA_FOUND);
