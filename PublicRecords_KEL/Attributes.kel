@@ -4658,6 +4658,18 @@ BusinessSele: => AnnualSalesAmount := MAP(
 				EXISTS(SaleAmounts(IsInfutorSaleRecord)) => InfutorSalesAmount,
 				EXISTS(SaleAmounts(IsCorteraSaleRecord)) => CorteraSalesAmount,
 				EXISTS(SaleAmounts(IsEBRSaleRecord)) => EBRSalesAmount);
+				
+//Firmographic Flag Helper Attributes
+
+BusinessSele: ONE_YEAR_IN_DAYS := 365;  
+BusinessSele: =>prox :=BusinessProx{UID}; 
+BusinessSele.prox: => Seen_In_Last_One_Year := DAYSBETWEEN(UID:DateFirstSeen ,CURRENT_DATE) <= BusinessSele.ONE_YEAR_IN_DAYS;
+BusinessSele.prox: => Seen_In_Last_Two_Years := DAYSBETWEEN(UID:DateLastSeen ,CURRENT_DATE) <= BusinessSele.TWO_YEARS_IN_DAYS;
+BusinessSele: =>IsNonProfitFlag := EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'IN')) OR ForProfitIndicator = 'N' OR  EXISTS(BusinessProx.BusinessCharacteristics(IsNonProfit));
+BusinessSele: =>IsFranchise :=EXISTS(BusinessCharacteristics(IsFranchise)) OR EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'FN'));
+BusinessSele: =>Is401kOffered :=  EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'I')) ;
+BusinessSele: =>IsSBE :=EXISTS(BusinessProx.BusinessCharacteristics(IsSBE));
+
 
 /**************************************************************************/
 /*                                                                        */
@@ -4765,3 +4777,24 @@ BusinessSele: => BE_BusAnnualSalesCurrRnge := MAP(B_LexIDLegalSeenFlag = '0' OR 
 				BE_BusAnnualSalesCurr >= 5000000 AND BE_BusAnnualSalesCurr < 10000000 => '90',
 				BE_BusAnnualSalesCurr >= 10000000 => '100',
 				NO_DATA_FOUND);
+				
+//Firmographics Flag Attributes
+
+BusinessSele: =>BE_BusIsNonProfitFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsNonProfitFlag => '1',
+		'0');
+BusinessSele: =>BE_BusIsFranchiseFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsFranchise => '1',
+		'0');
+BusinessSele: =>BE_BusOffers401kFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		 Is401kOffered => '1',
+		 '0');
+BusinessSele: =>BE_BusHasNewLocationFlag1Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		prox( Seen_In_Last_One_Year) => '1',
+		'0');
+BusinessSele: =>BE_BusLocActvCnt := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+	 BOUNDSFOLD(COUNT(prox( Seen_In_Last_Two_Years)),0,9999))	;
+BusinessSele: =>BE_BusIsSBEFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsSBE => '1',
+		'0');  
+
