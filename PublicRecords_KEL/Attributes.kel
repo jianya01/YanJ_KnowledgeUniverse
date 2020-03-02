@@ -2543,12 +2543,13 @@ BusinessSele: => BE_VerSrcCredCntEv := IF(SeleID = MISSING_INPUT_DATA_INT OR B_L
 BusinessSele: => BE_VerSrcBureauFlag := IF(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' , MISSING_INPUT_DATA_INT,
 																			     IF(EXISTS(BusinessBureauSourceList), '1', '0'));
 BusinessSele: => BE_VerSrcBureauOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA,
-																				 ALL(BusinessVerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 	
+																				 BE_VerSrcBureauFlag = '0' => NO_DATA_FOUND,	
+																				 ALL(BusinessBureauSourceList, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 	
 																				 DATETOSTRING(MIN(BusinessBureauSourceList, DATE(SourceDateFirstSeen)), '%Y%m%d'));
 BusinessSele: => BE_VerSrcBureauOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-																					 ALL(BusinessVerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
-																				   BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerSrcBureauOldDtEv), CURRENT_DATE), 0, 960));
-				
+																					 BE_VerSrcBureauFlag = '0' => NO_DATA_FOUND_INT,
+																					 ALL(BusinessBureauSourceList, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+																				   BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerSrcBureauOldDtEv), CURRENT_DATE), 0, 960));				
 /*		Tradline Helper Attributes		*/
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
@@ -4421,8 +4422,10 @@ BusinessSele: => AssocNexecCnt2YUnCap := COUNT(SelePerson(TwoYears AND NOT IsExe
 		
 BusinessSele: => BE_AssocCntEv :=  IF(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA,BusinessSele.MISSING_INPUT_DATA_INT,
 																				BOUNDSFOLD(AssocCntEvUnCap,0,999999));
+																				
 BusinessSele: => BE_AssocCnt2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
 																				BOUNDSFOLD(AssocCnt2YUnCap,0,999999));	
+																				
 BusinessSele: => BE_AssocPct2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
 																				BE_AssocCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
 																				(AssocCnt2YUnCap/AssocCntEvUnCap)*100);
@@ -4430,21 +4433,25 @@ BusinessSele: => BE_AssocPct2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bu
 BusinessSele: => BE_AssocExecCntEv :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
 																						BE_AssocCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
 																						BOUNDSFOLD(AssocExecCntEvUnCap,0,999999));
+																						
 BusinessSele: => BE_AssocExecCnt2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
 																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
 																						BOUNDSFOLD(AssocExecCnt2YUnCap,0,999999));	
+																						
 BusinessSele: => BE_AssocExecPct2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
-																						BE_AssocExecCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BE_AssocExecCntEv = 0 OR BE_AssocExecCntEv = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
 																					 (AssocExecCnt2YUnCap/AssocExecCntEvUnCap)*100);		
 		
 BusinessSele: => BE_AssocNexecCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
 																						BE_AssocCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,																						
 																						BOUNDSFOLD(AssocNexecCntEvUnCap,0,999999));
+																						
 BusinessSele: => BE_AssocNexecCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
 																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
 																						BOUNDSFOLD(AssocNexecCnt2YUnCap,0,999999));	
+																						
 BusinessSele: => BE_AssocNexecPct2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
-																						BE_AssocNexecCntEv = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BE_AssocNexecCntEv = 0 OR BE_AssocNexecCntEv = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
 																					 (AssocNexecCnt2YUnCap/AssocNexecCntEvUnCap)*100);	
 
 
@@ -4460,12 +4467,60 @@ BusinessSele: => BE_AssocEmailFlag2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID
 																						AssocHasEmail = TRUE => 1, 0);
 
 BusinessSele: => BE_AssocExecEmailFlag2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						BE_AssocExecCnt2Y = 0 => BusinessSele.NO_DATA_FOUND,
+																						BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND,
 																						AssocExecHasEmail = TRUE => 1, 0);
 
 BusinessSele: => BE_AssocNexecEmailFlag2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						BE_AssocNexecCnt2Y = 0 => BusinessSele.NO_DATA_FOUND,
+																						BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND,
 																						AssocNexecHasEmail = TRUE => 1, 0);
+
+/**************************************************************************/	
+/*          Busienss Associates Age Attributes                            */
+/**************************************************************************/	
+Person.ReportedDatesOfBirth: => DOBBestNotNull := (Best = TRUE AND NOT DateOfBirth:Null);
+Person: => SelectAge := ONLY(ReportedDatesOfBirth(DOBBestNotNull), DateOfBirth);
+
+Person: => Age := YEARSBETWEEN(SelectAge, CURRENT_DATE);
+Person: => AgeMoreThan18 := Age >= 18;
+
+BusinessSele: => AssocAveAge := AVENZ(SelePerson(TwoYears).Contact(AgeMoreThan18), Age);
+BusinessSele: => AssocExecAveAge := AVENZ(SelePerson(TwoYears AND IsExecutiveEver).Contact(AgeMoreThan18), Age);
+BusinessSele: => AssocNexecAveAge := AVENZ(SelePerson(TwoYears AND NOT IsExecutiveEver).Contact(AgeMoreThan18), Age);
+
+BusinessSele: => BE_AssocAgeAvg2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						ROUND(AssocAveAge) < 18 OR AssocAveAge:Null => BusinessSele.NO_DATA_FOUND_97_INT,
+																						BOUNDSFOLD(ROUND(AssocAveAge),18,120));
+
+BusinessSele: => BE_AssocExecAgeAvg2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						ROUND(AssocExecAveAge) < 18 OR AssocExecAveAge:Null => BusinessSele.NO_DATA_FOUND_97_INT,
+																						BOUNDSFOLD(ROUND(AssocExecAveAge),18,120));
+
+BusinessSele: => BE_AssocNexecAgeAvg2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						ROUND(AssocNexecAveAge) < 18 OR AssocNexecAveAge:Null => BusinessSele.NO_DATA_FOUND_97_INT,
+																						BOUNDSFOLD(ROUND(AssocNexecAveAge),18,120));
+																						
+/**************************************************************************/	
+/*          Busienss Associates Education Attributes                      */
+/**************************************************************************/	
+
+BusinessSele: => AssocEducation := COUNT(SelePerson(TwoYears).Contact(EXISTS(PersonEducation))); 
+BusinessSele: => AssocExecEducation := COUNT(SelePerson(TwoYears AND IsExecutiveEver).Contact(EXISTS(PersonEducation)));
+BusinessSele: => AssocNexecEducation := COUNT(SelePerson(TwoYears AND NOT IsExecutiveEver).Contact(EXISTS(PersonEducation)));
+
+BusinessSele: => BE_AssocWEduCollCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocEducation,0,999999));	
+
+BusinessSele: => BE_AssocExecWEduCollCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocExecEducation,0,999999));	
+
+BusinessSele: => BE_AssocNexecWEduCollCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocNexecEducation,0,999999));	
 
 
 /**************************************************************************/	
@@ -4546,6 +4601,11 @@ BusinessSele.SICCodes: => SourcePriority := MAP( 	 Source = 'DF' => 1,
 BusinessSele.SICCodes: =>DaysSinceCode :=DAYSBETWEEN (SICCodes.SICCode:DateFirstSeen, BusinessSele.CURRENT_DATE_SOS);
 BusinessSele.SICCodes: => WithinLast24Months := DaysSinceCode < 730;	
 BusinessSele.SICCodes: => IsSicCode := SICCode != 0 AND NOT SICCode:Null AND LENGTH(STRING(SICCode)) <= 4;
+//SIC code function needed to decide where to pad the zeroes
+FUNCTION: MapSicCodePadding(STRING SicCode) <= MAP(LENGTH(SicCode) = 1 => '0'  + SicCode + '00',
+																									LENGTH(SicCode) = 3 => '0' + SicCode,
+																									LENGTH(SicCode) = 2 => SicCode + '00',
+																									SicCode); 
 BusinessSele: => BestSicCode1Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 1),1,WithinLast24Months,SourcePriority,SICCode);
 BusinessSele: => BestSicCode2Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 2),1,WithinLast24Months,SourcePriority,SICCode);
 BusinessSele: => BestSicCode3Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 3),1,WithinLast24Months,SourcePriority,SICCode);
@@ -4661,6 +4721,18 @@ BusinessSele: => AnnualSalesAmount := MAP(
 				EXISTS(SaleAmounts(IsInfutorSaleRecord)) => InfutorSalesAmount,
 				EXISTS(SaleAmounts(IsCorteraSaleRecord)) => CorteraSalesAmount,
 				EXISTS(SaleAmounts(IsEBRSaleRecord)) => EBRSalesAmount);
+				
+//Firmographic Flag Helper Attributes
+
+BusinessSele: ONE_YEAR_IN_DAYS := 365;  
+BusinessSele: =>prox :=BusinessProx{UID}; 
+BusinessSele.prox: => Seen_In_Last_One_Year := DAYSBETWEEN(UID:DateFirstSeen ,CURRENT_DATE) <= BusinessSele.ONE_YEAR_IN_DAYS;
+BusinessSele.prox: => Seen_In_Last_Two_Years := DAYSBETWEEN(UID:DateLastSeen ,CURRENT_DATE) <= BusinessSele.TWO_YEARS_IN_DAYS;
+BusinessSele: =>IsNonProfitFlag := EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'IN')) OR ForProfitIndicator = 'N' OR  EXISTS(BusinessProx.BusinessCharacteristics(IsNonProfit));
+BusinessSele: =>IsFranchise :=EXISTS(BusinessCharacteristics(IsFranchise)) OR EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'FN'));
+BusinessSele: =>Is401kOffered :=  EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'I')) ;
+BusinessSele: =>IsSBE :=EXISTS(BusinessProx.BusinessCharacteristics(IsSBE));
+
 
 /**************************************************************************/
 /*                                                                        */
@@ -4670,7 +4742,7 @@ BusinessSele: => AnnualSalesAmount := MAP(
 
 
 BusinessSele: => BE_BusSICCode1 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						IsBlank(ONLY(BestSicCode1Set,INTFORMAT(SICCode,4,1)),BusinessSele.NO_DATA_FOUND));
+																						IsBlank(ONLY(BestSicCode1Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND));
 BusinessSele: => BE_BusSICCode1Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode1));
@@ -4678,7 +4750,7 @@ BusinessSele: => BE_BusSICCode1GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 																							BE_BusSICCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode1,1,2)));
 BusinessSele: => BE_BusSICCode2 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						IsBlank(ONLY(BestSicCode2Set,INTFORMAT(SICCode,4,1)),BusinessSele.NO_DATA_FOUND));
+																						IsBlank(ONLY(BestSicCode2Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND));
 BusinessSele: => BE_BusSICCode2Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode2));
@@ -4686,7 +4758,7 @@ BusinessSele: => BE_BusSICCode2GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 																							BE_BusSICCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode2,1,2)));
 BusinessSele: => BE_BusSICCode3 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						IsBlank(ONLY(BestSicCode3Set,INTFORMAT(SICCode,4,1)),BusinessSele.NO_DATA_FOUND));
+																						IsBlank(ONLY(BestSicCode3Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND));
 BusinessSele: => BE_BusSICCode3Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode3));
@@ -4694,7 +4766,7 @@ BusinessSele: => BE_BusSICCode3GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 																							BE_BusSICCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode3,1,2)));
 BusinessSele: => BE_BusSICCode4 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						IsBlank(ONLY(BestSicCode4Set,INTFORMAT(SICCode,4,1)),BusinessSele.NO_DATA_FOUND));
+																						IsBlank(ONLY(BestSicCode4Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND));
 BusinessSele: => BE_BusSICCode4Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode4));
@@ -4768,3 +4840,24 @@ BusinessSele: => BE_BusAnnualSalesCurrRnge := MAP(B_LexIDLegalSeenFlag = '0' OR 
 				BE_BusAnnualSalesCurr >= 5000000 AND BE_BusAnnualSalesCurr < 10000000 => '90',
 				BE_BusAnnualSalesCurr >= 10000000 => '100',
 				NO_DATA_FOUND);
+				
+//Firmographics Flag Attributes
+
+BusinessSele: =>BE_BusIsNonProfitFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsNonProfitFlag => '1',
+		'0');
+BusinessSele: =>BE_BusIsFranchiseFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsFranchise => '1',
+		'0');
+BusinessSele: =>BE_BusOffers401kFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		 Is401kOffered => '1',
+		 '0');
+BusinessSele: =>BE_BusHasNewLocationFlag1Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		prox( Seen_In_Last_One_Year) => '1',
+		'0');
+BusinessSele: =>BE_BusLocActvCnt := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+	 BOUNDSFOLD(COUNT(prox( Seen_In_Last_Two_Years)),0,9999))	;
+BusinessSele: =>BE_BusIsSBEFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsSBE => '1',
+		'0');  
+
