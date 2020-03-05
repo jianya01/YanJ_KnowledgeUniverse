@@ -661,6 +661,21 @@ InputPII: => P_InpValEmailBogusFlagValue := MAP(
 				);
 InputPII: => P_InpValNameBogusFlag := MAP(InputFirstNameValue=MISSING_INPUT_DATA AND InputMiddleNameValue=MISSING_INPUT_DATA AND InputLastNameValue=MISSING_INPUT_DATA =>  MISSING_INPUT_DATA,
 				fnBogusNames(UPCASE(P_InpNameFirst),UPCASE(InputMiddleNameValue),UPCASE(InputLastNameValue)) = 1 => 1,0);
+
+
+InputPII: => AtPositionClean := FindLastStringInstance(InputEmailCleanValue, '@');
+InputPII: => EmailExtensionSpot :=  FindLastStringInstance(InputEmailCleanValue, '.');
+
+InputPII: => P_InpClnEmailUser := MAP(P_InpEmailFlagValue = '0' => MISSING_INPUT_DATA,
+																			AtPositionClean = 0 OR EmailExtensionSpot = 0 => NO_DATA_FOUND,//if not all 3 spots are full then return -99998 on all.
+																		  IsBlank(UPCASE(SUBSTR(InputEmailCleanValue, 1, AtPositionClean-1)),NO_DATA_FOUND));
+InputPII: => P_InpClnEmailDom := MAP(P_InpEmailFlagValue = '0' => MISSING_INPUT_DATA,
+																		  AtPositionClean = 0 OR EmailExtensionSpot = 0 => NO_DATA_FOUND,
+																		  IsBlank(UPCASE(SUBSTR(TRIM(InputEmailCleanValue), AtPositionClean+1,LENGTH(InputEmailCleanValue))),NO_DATA_FOUND));
+InputPII: =>P_InpClnEmailExt := MAP(P_InpEmailFlagValue = '0' => MISSING_INPUT_DATA,
+																		  AtPositionClean = 0 OR EmailExtensionSpot = 0 => NO_DATA_FOUND,
+																		  IsBlank(SUBSTR(InputEmailCleanValue,EmailExtensionSpot),NO_DATA_FOUND));
+
 InputPII: => P_InpValPhoneHomeBadCharFlag := 
 		MAP(InputHomePhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,					
 			Filter(TRIM(P_InpPhoneHome),'0123456789()-.+') = TRIM(P_InpPhoneHome) => 0, 1);				
