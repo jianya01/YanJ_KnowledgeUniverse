@@ -2510,6 +2510,21 @@ BusinessSele: => BusinessVerSourceListSorted := TOPN(BusinessVerSourceList, 1000
 BusinessSele: => BusinessCredentialSourceList := BusinessVerSourceListSorted(TranslatedSourceCode IN ['AR', 'BA', 'BR', 'C', 'DA', 'I', 'IN', 'P', 'V2', 'WA']);
 BusinessSele: => BusinessBureauSourceList := BusinessVerSourceListSorted(TranslatedSourceCode IN ['D', 'DN', 'ER', 'Q3', 'EF', 'RR', 'Z1']);
 
+BusinessSele.ReportedNames : => DoingBusinessAsSlimName :=  FilterOut(fnRemoveSpecialChars(DoingBusinessAs, ''), ' ');
+
+BusinessSele: => DBANames := ReportedNames{DoingBusinessAsSlimName};
+BusinessSele: => DBANamesWithDateLastSeen := DBANames{DoingBusinessAsSlimName,
+																							DateLastSeenCapped := MIN(DoingBusinessAsSlimName:DateLastSeen, BusinessSele.CURRENT_DATE)};
+
+BusinessSele: => DBANamesWithAge := DBANamesWithDateLastSeen{DoingBusinessAsSlimName, 
+																							DateLastSeenCapped,
+																							AgeInDays := ABSDAYSBETWEEN(DateLastSeenCapped, BusinessSele.CURRENT_DATE)};
+
+Address: => IsPOBoxZip :=  ZIP5.ZipClass = 'P';
+Address: => IsPOBoxADVO := EXISTS(AddressType(AddressTypeCode = '9'));
+Address: => IsPOBox := IsPOBoxZip OR IsPOBoxADVO;
+SeleAddress: => IsPOBoxBIP := EXISTS(AddressRecordType(RecType = 'P'));
+
 /**************************************************************************/
 /*                                                                        */
 /*                   Business Attributes                                  */
@@ -2553,6 +2568,19 @@ BusinessSele: => BE_VerSrcBureauOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT
 																					 BE_VerSrcBureauFlag = '0' => NO_DATA_FOUND_INT,
 																					 ALL(BusinessBureauSourceList, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
 																				   BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerSrcBureauOldDtEv), CURRENT_DATE), 0, 960));				
+																					 
+BusinessSele: => BE_DBANameCnt2Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA, MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(DBANamesWithAge(AgeInDays <= BusinessSele.TWO_YEARS_IN_DAYS)), 0, 99999));
+
+BusinessSele: => BE_AddrPOBoxFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				ALL(SeleAddress.Location.ZIP5, ZipClass:Null) AND ALL(SeleAddress.Location.AddressType, AddressTypeCode:Null) AND ALL(SeleAddress.AddressRecordType, RecType:Null) => NO_DATA_FOUND_INT,
+				EXISTS(SeleAddress(IsPOBoxBIP)) OR EXISTS(SeleAddress.Location(IsPOBox)) => 1,
+				0);
+
+BusinessSele: => BE_URLFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				EXISTS(URLs) => 1,
+				0);
+
 /*		Tradline Helper Attributes		*/
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
@@ -3388,6 +3416,48 @@ BusinessSele: => BE_AstVehAutoEmrgNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR
                                                BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_AstVehAutoEmrgNewDtEv),VehicleBuildCurrentDate),0,9999));
 
 
+/**************************************************************************/
+/*                                                                        */
+/*           Business Asset Property Helper Attributes                    */
+/*                                                                        */
+/**************************************************************************/	
+SeleProperty: => IsEverOwned := EXISTS(Prop.PropertyEvent.SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal));
+BusinessSele: => AssetPropertyCountEver := COUNT(SeleProperty(IsEverOwned));
+
+BusinessSele: => AssetPropertyStates := SeleProperty(IsEverOwned).AddressComponents{State};
+BusinessSele: => AssetPropertyStateCountCapped := MIN(COUNT(AssetPropertyStates), AssetPropertyCountEver);
+
+SeleProperty: => PropertyIsSold := EXISTS(Prop.PropertyEvent.SelePropertyEvent(PartyDetails.PartyIsSeller AND Legal = SeleProperty.Legal));
+SeleProperty: => PropertyIsOwnedDeed := EXISTS(Prop.PropertyEvent(IsDeed).SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal));
+PropertyEvent: => IsCurrentAssessmentRecord := IsAssessment AND ABSYEARSBETWEEN(LNFaresID:DateFirstSeen, Property.CURRENT_DATE) <= 1;
+SeleProperty: => PropertyIsOwnedAssessment := EXISTS(Prop.PropertyEvent(IsCurrentAssessmentRecord).SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal));
+SeleProperty: => IsCurrentlyOwned := (PropertyIsOwnedAssessment OR PropertyIsOwnedDeed) AND NOT PropertyIsSold;
+
+BusinessSele: => AssetPropertyCurrentCount := COUNT(SeleProperty(IsCurrentlyOwned));
+BusinessSele: => AssetPropertyCurrentStates := SeleProperty(IsCurrentlyOwned).AddressComponents{State};
+BusinessSele: => AssetPropertyCurrentStateCountCapped := MIN(COUNT(AssetPropertyCurrentStates), AssetPropertyCurrentCount);
+
+/**************************************************************************/
+/*                                                                        */
+/*           Business Asset Property Attributes                           */
+/*                                                                        */
+/**************************************************************************/	
+BusinessSele: => BE_AstPropCntEv := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA, MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(AssetPropertyCountEver, 0, 9999));
+		
+BusinessSele: => BE_AstPropStateCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				BE_AstPropCntEv = 0 => NO_DATA_FOUND_INT,
+				AssetPropertyStateCountCapped = 0 => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(AssetPropertyStateCountCapped, 1, 52));
+		
+BusinessSele: => BE_AstPropCurrCnt := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA, MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(AssetPropertyCurrentCount, 0, 9999));
+		
+BusinessSele: => BE_AstPropCurrStateCnt := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				BE_AstPropCurrCnt  = 0 => NO_DATA_FOUND_INT,
+				AssetPropertyCurrentStateCountCapped = 0 => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(AssetPropertyCurrentStateCountCapped, 1, 52));
+		
 /**************************************************************************/
 /*                                                                        */
 /*            Business Bankruptcy Helper Attributes                       */
