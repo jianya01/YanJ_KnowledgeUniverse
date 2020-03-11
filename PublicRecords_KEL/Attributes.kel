@@ -154,6 +154,7 @@ LienJudgment:  CURRENT_DATE  := MIN(GETBUILDDATE('liens_build_version'), CURRENT
 UCC:  CURRENT_DATE  := MIN(GETBUILDDATE('ucc_build_version'), CURRENTDATE());
 BusinessSele:  UCCCURRENT_DATE := MIN(GETBUILDDATE('ucc_build_version'), CURRENTDATE());
 BusinessSele: CURRENT_DATE_LIEN := MIN(GETBUILDDATE('liens_build_version'), CURRENTDATE());
+Person: CURRENT_DATE_LIEN := MIN(GETBUILDDATE('liens_build_version'), CURRENTDATE());
 SelePerson:  CURRENT_DATE  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
 
 
@@ -313,6 +314,9 @@ Person: MISSING_INPUT_DATA_INT := -99999;
 Person: MISSING_INPUT_DATA := '-99999';
 Person: NO_DATA_FOUND_INT := -99998;
 Person: NO_DATA_FOUND := '-99998';
+
+SelePerson: NO_DATA_FOUND_97 :=  '-99997';
+
 
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
@@ -661,6 +665,21 @@ InputPII: => P_InpValEmailBogusFlagValue := MAP(
 				);
 InputPII: => P_InpValNameBogusFlag := MAP(InputFirstNameValue=MISSING_INPUT_DATA AND InputMiddleNameValue=MISSING_INPUT_DATA AND InputLastNameValue=MISSING_INPUT_DATA =>  MISSING_INPUT_DATA,
 				fnBogusNames(UPCASE(P_InpNameFirst),UPCASE(InputMiddleNameValue),UPCASE(InputLastNameValue)) = 1 => 1,0);
+
+
+InputPII: => AtPositionClean := FindLastStringInstance(InputEmailCleanValue, '@');
+InputPII: => EmailExtensionSpot :=  FindLastStringInstance(InputEmailCleanValue, '.');
+
+InputPII: => P_InpClnEmailUser := MAP(P_InpEmailFlagValue = '0' => MISSING_INPUT_DATA,
+																			AtPositionClean = 0 OR EmailExtensionSpot = 0 => NO_DATA_FOUND,//if not all 3 spots are full then return -99998 on all.
+																		  IsBlank(UPCASE(SUBSTR(InputEmailCleanValue, 1, AtPositionClean-1)),NO_DATA_FOUND));
+InputPII: => P_InpClnEmailDom := MAP(P_InpEmailFlagValue = '0' => MISSING_INPUT_DATA,
+																		  AtPositionClean = 0 OR EmailExtensionSpot = 0 => NO_DATA_FOUND,
+																		  IsBlank(UPCASE(SUBSTR(TRIM(InputEmailCleanValue), AtPositionClean+1,LENGTH(InputEmailCleanValue))),NO_DATA_FOUND));
+InputPII: =>P_InpClnEmailExt := MAP(P_InpEmailFlagValue = '0' => MISSING_INPUT_DATA,
+																		  AtPositionClean = 0 OR EmailExtensionSpot = 0 => NO_DATA_FOUND,
+																		  IsBlank(SUBSTR(InputEmailCleanValue,EmailExtensionSpot),NO_DATA_FOUND));
+
 InputPII: => P_InpValPhoneHomeBadCharFlag := 
 		MAP(InputHomePhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,					
 			Filter(TRIM(P_InpPhoneHome),'0123456789()-.+') = TRIM(P_InpPhoneHome) => 0, 1);				
@@ -2507,6 +2526,21 @@ BusinessSele: => BusinessVerSourceListSorted := TOPN(BusinessVerSourceList, 1000
 BusinessSele: => BusinessCredentialSourceList := BusinessVerSourceListSorted(TranslatedSourceCode IN ['AR', 'BA', 'BR', 'C', 'DA', 'I', 'IN', 'P', 'V2', 'WA']);
 BusinessSele: => BusinessBureauSourceList := BusinessVerSourceListSorted(TranslatedSourceCode IN ['D', 'DN', 'ER', 'Q3', 'EF', 'RR', 'Z1']);
 
+BusinessSele.ReportedNames : => DoingBusinessAsSlimName :=  FilterOut(fnRemoveSpecialChars(DoingBusinessAs, ''), ' ');
+
+BusinessSele: => DBANames := ReportedNames{DoingBusinessAsSlimName};
+BusinessSele: => DBANamesWithDateLastSeen := DBANames{DoingBusinessAsSlimName,
+																							DateLastSeenCapped := MIN(DoingBusinessAsSlimName:DateLastSeen, BusinessSele.CURRENT_DATE)};
+
+BusinessSele: => DBANamesWithAge := DBANamesWithDateLastSeen{DoingBusinessAsSlimName, 
+																							DateLastSeenCapped,
+																							AgeInDays := ABSDAYSBETWEEN(DateLastSeenCapped, BusinessSele.CURRENT_DATE)};
+
+Address: => IsPOBoxZip :=  ZIP5.ZipClass = 'P';
+Address: => IsPOBoxADVO := EXISTS(AddressType(AddressTypeCode = '9'));
+Address: => IsPOBox := IsPOBoxZip OR IsPOBoxADVO;
+SeleAddress: => IsPOBoxBIP := EXISTS(AddressRecordType(RecType = 'P'));
+
 /**************************************************************************/
 /*                                                                        */
 /*                   Business Attributes                                  */
@@ -2544,12 +2578,25 @@ BusinessSele: => BE_VerSrcBureauFlag := IF(SeleID = MISSING_INPUT_DATA_INT OR B_
 																			     IF(EXISTS(BusinessBureauSourceList), '1', '0'));
 BusinessSele: => BE_VerSrcBureauOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA,
 																				 BE_VerSrcBureauFlag = '0' => NO_DATA_FOUND,	
-																				 ALL(BusinessBureauSourceList, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 	
+																				 ALL(BusinessBureauSourceList, SourceDateFirstSeen = NO_DATA_FOUND_97 OR NOT ISVALIDDATE(SourceDateFirstSeen:DateFirstSeen)) => NO_DATA_FOUND_97, 	
 																				 DATETOSTRING(MIN(BusinessBureauSourceList, DATE(SourceDateFirstSeen)), '%Y%m%d'));
 BusinessSele: => BE_VerSrcBureauOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																					 BE_VerSrcBureauFlag = '0' => NO_DATA_FOUND_INT,
-																					 ALL(BusinessBureauSourceList, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+																					 ALL(BusinessBureauSourceList, SourceDateFirstSeen = NO_DATA_FOUND_97 OR NOT ISVALIDDATE(SourceDateFirstSeen:DateFirstSeen)) => NO_DATA_FOUND_97_INT,
 																				   BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerSrcBureauOldDtEv), CURRENT_DATE), 0, 960));				
+																					 
+BusinessSele: => BE_DBANameCnt2Y := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA, MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(DBANamesWithAge(AgeInDays <= BusinessSele.TWO_YEARS_IN_DAYS)), 0, 99999));
+
+BusinessSele: => BE_AddrPOBoxFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				ALL(SeleAddress.Location.ZIP5, ZipClass:Null) AND ALL(SeleAddress.Location.AddressType, AddressTypeCode:Null) AND ALL(SeleAddress.AddressRecordType, RecType:Null) => NO_DATA_FOUND_INT,
+				EXISTS(SeleAddress(IsPOBoxBIP)) OR EXISTS(SeleAddress.Location(IsPOBox)) => 1,
+				0);
+
+BusinessSele: => BE_URLFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				EXISTS(URLs) => 1,
+				0);
+
 /*		Tradline Helper Attributes		*/
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
@@ -3387,6 +3434,48 @@ BusinessSele: => BE_AstVehAutoEmrgNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR
 
 /**************************************************************************/
 /*                                                                        */
+/*           Business Asset Property Helper Attributes                    */
+/*                                                                        */
+/**************************************************************************/	
+SeleProperty: => IsEverOwned := EXISTS(Prop.PropertyEvent.SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal));
+BusinessSele: => AssetPropertyCountEver := COUNT(SeleProperty(IsEverOwned));
+
+BusinessSele: => AssetPropertyStates := SeleProperty(IsEverOwned).AddressComponents{State};
+BusinessSele: => AssetPropertyStateCountCapped := MIN(COUNT(AssetPropertyStates), AssetPropertyCountEver);
+
+SeleProperty: => PropertyIsSold := EXISTS(Prop.PropertyEvent.SelePropertyEvent(PartyDetails.PartyIsSeller AND Legal = SeleProperty.Legal));
+SeleProperty: => PropertyIsOwnedDeed := EXISTS(Prop.PropertyEvent(IsDeed).SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal));
+PropertyEvent: => IsCurrentAssessmentRecord := IsAssessment AND ABSYEARSBETWEEN(LNFaresID:DateFirstSeen, Property.CURRENT_DATE) <= 1;
+SeleProperty: => PropertyIsOwnedAssessment := EXISTS(Prop.PropertyEvent(IsCurrentAssessmentRecord).SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal));
+SeleProperty: => IsCurrentlyOwned := (PropertyIsOwnedAssessment OR PropertyIsOwnedDeed) AND NOT PropertyIsSold;
+
+BusinessSele: => AssetPropertyCurrentCount := COUNT(SeleProperty(IsCurrentlyOwned));
+BusinessSele: => AssetPropertyCurrentStates := SeleProperty(IsCurrentlyOwned).AddressComponents{State};
+BusinessSele: => AssetPropertyCurrentStateCountCapped := MIN(COUNT(AssetPropertyCurrentStates), AssetPropertyCurrentCount);
+
+/**************************************************************************/
+/*                                                                        */
+/*           Business Asset Property Attributes                           */
+/*                                                                        */
+/**************************************************************************/	
+BusinessSele: => BE_AstPropCntEv := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA, MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(AssetPropertyCountEver, 0, 9999));
+		
+BusinessSele: => BE_AstPropStateCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				BE_AstPropCntEv = 0 => NO_DATA_FOUND_INT,
+				AssetPropertyStateCountCapped = 0 => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(AssetPropertyStateCountCapped, 1, 52));
+		
+BusinessSele: => BE_AstPropCurrCnt := IF(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA, MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(AssetPropertyCurrentCount, 0, 9999));
+		
+BusinessSele: => BE_AstPropCurrStateCnt := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+				BE_AstPropCurrCnt  = 0 => NO_DATA_FOUND_INT,
+				AssetPropertyCurrentStateCountCapped = 0 => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(AssetPropertyCurrentStateCountCapped, 1, 52));
+		
+/**************************************************************************/
+/*                                                                        */
 /*            Business Bankruptcy Helper Attributes                       */
 /*                                                                        */
 /**************************************************************************/
@@ -3784,8 +3873,9 @@ BusinessSele: => BE_DrgGovDebarredFlagEv :=	MAP(B_LexIDLegalSeenFlag = '0' OR Se
 LienJudgment: ONE_YEAR_IN_DAYS := 365;
 LienJudgment: SEVEN_YEAR_IN_DAYS := 2556;
 LienJudgment: LANDLORD_TENANT_DISPUTE_LIENS :=['FORCIBLE ENTRY/DETAINER','LANDLORD TENANT JUDGMENT','FORCIBLE ENTRY/DETAINER RELEAS','FORCIBLE ENTRY/DETAINER RELEASE'];
-SeleLienJudgment.Details: => IsDebtor := UPCASE(TRIM(DebtorPlaintiff)) = 'D';
 LienJudgment.Filing: => TMSID := LienJudgment.TMSID ;
+
+SeleLienJudgment.Details: => IsDebtor := UPCASE(TRIM(DebtorPlaintiff)) = 'D';
 BusinessSele: => AllLienData := SeleLienJudgment(Details.IsDebtor).Lien.Filing{ 
 									TMSID, 
 									FilingTypeDescription := ONLY(TOPN(GROUP(NOT FilingTypeDescription:Null), 1, -OriginalFilingDate), FilingTypeDescription ),
@@ -3797,6 +3887,21 @@ BusinessSele.AllLienData: => AgeInDays :=ABSDAYSBETWEEN(OriginalFilingDate, CURR
 BusinessSele.AllLienData: => IsLandlordTenantDispute := LandlordTenantDisputeFlag = TRUE OR FilingTypeDescription IN LienJudgment.LANDLORD_TENANT_DISPUTE_LIENS ;
 BusinessSele.AllLienData: => Seen_In_Seven_Years := AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS ;
 BusinessSele.AllLienData: => Seen_In_One_Year:= AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS;
+
+PersonLienJudgment.Details: => IsDebtor := UPCASE(TRIM(DebtorPlaintiff)) = 'D';
+Person: => AllLienData := PersonLienJudgment(Details.IsDebtor).Lien.Filing{ 
+									TMSID, 
+									FilingTypeDescription := ONLY(TOPN(GROUP(NOT FilingTypeDescription:Null), 1, -OriginalFilingDate), FilingTypeDescription ),
+									OriginalFilingDate := ONLY(TOPN(GROUP(ISVALIDDATE(OriginalFilingDate)), 1, OriginalFilingDate), OriginalFilingDate),
+									Amount := ONLY(TOPN(GROUP(NOT Amount:Null OR Amount != 0) , 1, -OriginalFilingDate,-Amount), Amount), 
+									LandlordTenantDisputeFlag := EXISTS(GROUP(LandlordTenantDisputeFlag = 'Y' ))
+								 };
+Person.AllLienData: => AgeInDays :=ABSDAYSBETWEEN(OriginalFilingDate, CURRENT_DATE_LIEN);
+Person.AllLienData: => IsLandlordTenantDispute := LandlordTenantDisputeFlag = TRUE OR FilingTypeDescription IN LienJudgment.LANDLORD_TENANT_DISPUTE_LIENS ;
+Person.AllLienData: => Seen_In_Seven_Years := AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS ;
+Person.AllLienData: => Seen_In_One_Year:= AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS;
+
+
 /**************************************************************************/
 /*                                                                        */
 /*              Business LienJudgment Attributes                          */
@@ -3977,6 +4082,13 @@ BusinessSele.AllLienData: => IsTotalTaxLien := IsFederalTaxLien OR IsStateTaxLie
 BusinessSele.AllLienData: => IsOtherLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_LIENS;
 BusinessSele.AllLienData: => IsOverAllLien := IsTotalTaxLien OR IsOtherLien;
 
+Person.AllLienData: => IsFederalTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FEDERAL_TAX_LIENS;
+Person.AllLienData: => IsStateTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.STATE_TAX_LIENS;
+Person.AllLienData: => IsOtherTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_TAX_LIENS;
+Person.AllLienData: => IsTotalTaxLien := IsFederalTaxLien OR IsStateTaxLien OR IsOtherTaxLien;
+Person.AllLienData: => IsOtherLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_LIENS;
+Person.AllLienData: => IsOverAllLien := IsTotalTaxLien OR IsOtherLien;
+
 /**************************************************************************/
 /*                                                                        */
 /*             Business OverAllLeinJudgment  Attributes            				*/
@@ -3985,8 +4097,10 @@ BusinessSele.AllLienData: => IsOverAllLien := IsTotalTaxLien OR IsOtherLien;
 
 BusinessSele: =>BE_DrgLienCnt1Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA,LienJudgment.MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT( AllLienData( Seen_In_One_Year AND  IsOverAllLien = TRUE)),0,99999));
+		
 BusinessSele: =>BE_DrgLienCnt7Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA,LienJudgment.MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE) ),0,99999));
+		
 BusinessSele: =>BE_DrgLienAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLienCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLienCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
@@ -4117,7 +4231,7 @@ BusinessSele: =>BE_DrgLienOtherOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 
 /**************************************************************************/
 /*                                                                        */
-/*             Business OverAll	Judgment Helper Attributes                */
+/*             OverAll	Judgment Helper Attributes                        */
 /*                                                                        */
 /**************************************************************************/
 
@@ -4129,6 +4243,12 @@ BusinessSele.AllLienData: => IsCivilCourtJudgment := LandlordTenantDisputeFlag =
 BusinessSele.AllLienData: => IsForeclosureJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FORECLOSURE_JUDGMENT;
 BusinessSele.AllLienData: => IsSmallCliamsJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SMALL_CLAIMS_JUDGMENT;
 BusinessSele.AllLienData: => IsOverAllJudgment := IsCivilCourtJudgment OR IsForeclosureJudgment OR IsSmallCliamsJudgment;
+
+Person.AllLienData: => IsCivilCourtJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.CIVIL_COURT_JUDGMENT;
+Person.AllLienData: => IsForeclosureJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FORECLOSURE_JUDGMENT;
+Person.AllLienData: => IsSmallCliamsJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SMALL_CLAIMS_JUDGMENT;
+Person.AllLienData: => IsOverAllJudgment := IsCivilCourtJudgment OR IsForeclosureJudgment OR IsSmallCliamsJudgment;
+
 
 /**************************************************************************/
 /*                                                                        */
@@ -4229,11 +4349,12 @@ BusinessSele: =>BE_DrgJudgFrclNewMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR Sel
 	
 /**************************************************************************/
 /*                                                                        */
-/*             Business OverAllDrg LienJudgment Helper Attributes         */
+/*             OverAllDrg LienJudgment Helper Attributes                  */
 /*                                                                        */
 /**************************************************************************/
 
 BusinessSele.AllLienData: => IsOverAllLienJudgment:= IsOverAllJudgment OR IsOverAllLien;
+Person.AllLienData: => IsOverAllLienJudgment:= IsOverAllJudgment OR IsOverAllLien;
 
 /**************************************************************************/
 /*                                                                        */
@@ -4270,12 +4391,13 @@ BusinessSele: =>BE_DrgLnJOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID =
 
 /**************************************************************************/
 /*                                                                        */
-/*             Business Suits Helper Attributes                           */
+/*             Suits Helper Attributes                                    */
 /*                                                                        */
 /**************************************************************************/
 
 LienJudgment: SUITS :=['CIVIL NEW FILING','CIVIL SUIT','CIVIL SUMMONS','COURT ORDER', 'FEDERAL COURT NEW FILING', 'FORECLOSURE NEW FILING', 'JUDGMENT - Chapter 7', 'LANDLORD TENANT SUIT', 'LIS PENDENS', 'LIS PENDENS NOTICE', 'LIS PENDENS RELEASE'];
 BusinessSele.AllLienData: => IsSuits := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SUITS ;
+Person.AllLienData: => IsSuits := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SUITS ;
 
 /**************************************************************************/
 /*                                                                        */
@@ -4399,6 +4521,23 @@ BusinessSele: =>BE_DrgOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MI
 		BE_DrgCnt7Y  = 0  => NO_DATA_FOUND_INT,
 		BE_DrgOldDt7Y = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(BKLnJLTDOldDateMaxMsnc, 0, 84));
+
+/******************************************************************************************************************/
+/*////////////////PERSON LIEN ATTRIBUTES COPIED FROM THE BUSINESS LOGIC///////////////////////////////////////////*/
+/******************************************************************************************************************/
+
+
+Person: => PL_DrgJudgCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllJudgment) ),0,999));
+
+Person: => PL_DrgLTDCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute = TRUE) ),0,999));
+																			
+Person: => PL_DrgLienCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE) ),0,999));		
+		
+		
+		
 
 /**************************************************************************/
 /*          Busienss Associates Attributes                                */
@@ -4579,8 +4718,138 @@ BusinessSele: => BE_AssocExecWDrgBkCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 
 BusinessSele: => BE_AssocNexecWDrgBkCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
 																						BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
-																						BOUNDSFOLD(AssocNexecHasBk,0,999999));																								
+																						BOUNDSFOLD(AssocNexecHasBk,0,999999));
+																						
+
+/**************************************************************************/	
+/*          Busienss Judgment Associates Attributes                       */
+/**************************************************************************/	
+
+
+BusinessSele: => AssocHasJudgment := COUNT(SelePerson(TwoYears).Contact(PL_DrgJudgCnt7Y > 0));
+BusinessSele: => AssocExecHasJudgment := COUNT(SelePerson(TwoYears AND IsExecutiveEver).Contact(PL_DrgJudgCnt7Y > 0));
+BusinessSele: => AssocNexecHasJudgment := COUNT(SelePerson(TwoYears AND NOT IsExecutiveEver).Contact(PL_DrgJudgCnt7Y > 0));
+
+BusinessSele: => BE_AssocWDrgJudgCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocHasJudgment,0,999999));	
+
+BusinessSele: => BE_AssocExecWDrgJudgCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocExecHasJudgment,0,999999));	
+
+BusinessSele: => BE_AssocNexecWDrgJudgCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocNexecHasJudgment,0,999999));	
 	
+/**************************************************************************/	
+/*          Busienss LTD Associates Attributes                       */
+/**************************************************************************/	
+
+BusinessSele: => AssocHasLTD := COUNT(SelePerson(TwoYears).Contact(PL_DrgLTDCnt7Y > 0));
+BusinessSele: => AssocExecHasLTD := COUNT(SelePerson(TwoYears AND IsExecutiveEver).Contact(PL_DrgLTDCnt7Y > 0));
+BusinessSele: => AssocNexecHasLTD := COUNT(SelePerson(TwoYears AND NOT IsExecutiveEver).Contact(PL_DrgLTDCnt7Y > 0));
+
+BusinessSele: => BE_AssocWDrgLTDCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocHasLTD,0,999999));	
+
+BusinessSele: => BE_AssocExecWDrgLTDCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocExecHasLTD,0,999999));	
+
+BusinessSele: => BE_AssocNexecWDrgLTDCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocNexecHasLTD,0,999999));		
+																						
+/**************************************************************************/	
+/*          Busienss Lien Associates Attributes                           */
+/**************************************************************************/	
+
+BusinessSele: => AssocHasLien := COUNT(SelePerson(TwoYears).Contact(PL_DrgLienCnt7Y > 0));
+BusinessSele: => AssocExecHasLien := COUNT(SelePerson(TwoYears AND IsExecutiveEver).Contact(PL_DrgLienCnt7Y > 0));
+BusinessSele: => AssocNexecHasLien := COUNT(SelePerson(TwoYears AND NOT IsExecutiveEver).Contact(PL_DrgLienCnt7Y > 0));
+
+BusinessSele: => BE_AssocWDrgLienCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocHasLien,0,999999));	
+
+BusinessSele: => BE_AssocExecWDrgLienCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocExecHasLien,0,999999));	
+
+BusinessSele: => BE_AssocNexecWDrgLienCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocNexecHasLien,0,999999));					
+																						
+/**************************************************************************/	
+/*          Busienss Derog Associates Attributes                           */
+/**************************************************************************/	
+
+Person: => DrgCntContact := BOUNDSFOLD(PL_DrgCrimFelCnt7Y + PL_DrgCrimNfelCnt7Y + PL_DrgBkCnt10Y + PL_DrgJudgCnt7Y + PL_DrgLTDCnt7Y + PL_DrgLienCnt7Y, 0,999999);	
+
+BusinessSele: => AssocHasDerog := COUNT(SelePerson(TwoYears).Contact(DrgCntContact > 0));
+BusinessSele: => AssocExecHasDerog := COUNT(SelePerson(TwoYears AND IsExecutiveEver).Contact(DrgCntContact > 0));
+BusinessSele: => AssocNexecHasDerog := COUNT(SelePerson(TwoYears AND NOT IsExecutiveEver).Contact(DrgCntContact > 0));
+
+BusinessSele: => BE_AssocWDrgCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocCnt2Y = 0 => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocHasDerog,0,999999));	
+
+BusinessSele: => BE_AssocExecWDrgCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocExecHasDerog,0,999999));	
+
+BusinessSele: => BE_AssocNexecWDrgCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+																						BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(AssocNexecHasDerog,0,999999));																								
+																						
+/**************************************************************************/	
+/*          Busienss Associates Time On File Attributes                   */	
+/**************************************************************************/
+SelePerson: =>AssocFsDate :=IF(MIN(ContactInfo, IsExecutive:DateFirstSeen)>CURRENT_DATE,CURRENT_DATE,MIN(ContactInfo, IsExecutive:DateFirstSeen));
+SelePerson: =>AssocValidDate :=IF(ISVALIDDATE(AssocFsDate),DATETOSTRING(AssocFsDate,'%Y%m%d'),NO_DATA_FOUND_97);
+SelePerson: =>Datemonths :=MONTHSBETWEEN(AssocFsDate,CURRENT_DATE);
+BusinessSele: =>AsscociateAvgmonths :=AVENZ(SelePerson(TwoYears AND NOT Datemonths:Null),Datemonths);
+BusinessSele: =>AsscociateExecAvgmonths :=AVENZ(SelePerson(TwoYears AND IsExecutiveEver AND NOT Datemonths:Null),Datemonths);
+BusinessSele: =>AsscociateNexecAvgmonths :=AVENZ(SelePerson(TwoYears AND NOT IsExecutiveEver AND NOT Datemonths:Null),Datemonths);
+
+BusinessSele: =>BE_AssocEmrgMsncAvg2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocCnt2Y = 0 OR BE_AssocCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+		ALL(SelePerson(TwoYears), AssocValidDate = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(ROUND(AsscociateAvgmonths),0,960));
+BusinessSele: => BE_AssocExecEmrgMsncAvg2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocExecCnt2Y  = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+		ALL(SelePerson(TwoYears AND IsExecutiveEver ), AssocValidDate = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(ROUND(AsscociateExecAvgmonths),0,960));
+BusinessSele: => BE_AssocNexecEmrgMsncAvg2Y :=  MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA =>BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocNexecCnt2Y  = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+		ALL(SelePerson(TwoYears AND NOT IsExecutiveEver), AssocValidDate = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,		
+		BOUNDSFOLD(ROUND(AsscociateNexecAvgmonths),0,960));
+		
+/**************************************************************************/	
+/*          Busienss Associates Demographics Attributes                   */
+/**************************************************************************/
+BusinessSele: =>AssocExecFemaleCnt2yUnCap := COUNT(SelePerson(TwoYears AND IsExecutiveEver).Contact(EXISTS(FullName.Title='MS')));
+SelePerson: =>Relatives :=Contact{FirstDegreeAssociations.FirstDegreeAssociation};
+SelePerson.Relatives : => RelativeIsBusinessContact := EXISTS(SelePerson.Legal.SelePerson.Contact= Relatives.FirstDegreeAssociation);
+BusinessSele: => AssocExecRelatedCnt2yUnCap := COUNT(SelePerson(TwoYears AND IsExecutiveEver AND EXISTS(Relatives(RelativeIsBusinessContact =TRUE))));
+
+BusinessSele: => BE_AssocExecFemaleCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocExecCnt2Y  = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+		BOUNDSFOLD(AssocExecFemaleCnt2yUnCap,0,999999));	
+BusinessSele: => BE_AssocExecFemalePct2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocExecCnt2Y  = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+		(AssocExecFemaleCnt2yUnCap/AssocExecCnt2YUnCap )*100);		
+BusinessSele: => BE_AssocExecRelatedCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocExecCnt2Y  = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+		BE_AssocExecCnt2Y  = 1 => BusinessSele.NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(AssocExecRelatedCnt2yUnCap,0,999999));	
+BusinessSele: => BE_AssocExecRelatedPct2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocExecCnt2Y  = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT  => BusinessSele.NO_DATA_FOUND_INT,
+		BE_AssocExecCnt2Y  = 1 => BusinessSele.NO_DATA_FOUND_97_INT,
+		(AssocExecRelatedCnt2yUnCap/AssocExecCnt2YUnCap )*100);	  
+
 /**************************************************************************/
 /*                                                                        */
 /*             Firmographics Helper Attributes                            */
@@ -4729,7 +4998,7 @@ BusinessSele: =>prox :=BusinessProx{UID};
 BusinessSele.prox: => Seen_In_Last_One_Year := DAYSBETWEEN(UID:DateFirstSeen ,CURRENT_DATE) <= BusinessSele.ONE_YEAR_IN_DAYS;
 BusinessSele.prox: => Seen_In_Last_Two_Years := DAYSBETWEEN(UID:DateLastSeen ,CURRENT_DATE) <= BusinessSele.TWO_YEARS_IN_DAYS;
 BusinessSele: =>IsNonProfitFlag := EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'IN')) OR ForProfitIndicator = 'N' OR  EXISTS(BusinessProx.BusinessCharacteristics(IsNonProfit));
-BusinessSele: =>IsFranchise :=EXISTS(BusinessCharacteristics(IsFranchise)) OR EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'FN'));
+BusinessSele: =>IsFranchise :=EXISTS(BusinessCharacteristics(IsFranchise)) OR EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'L0'));
 BusinessSele: =>Is401kOffered :=  EXISTS(BusinessVerSourceListSorted(TranslatedSourceCode = 'I')) ;
 BusinessSele: =>IsSBE :=EXISTS(BusinessProx.BusinessCharacteristics(IsSBE));
 
