@@ -4831,8 +4831,8 @@ BusinessSele: => BE_AssocNexecEmrgMsncAvg2Y :=  MAP(B_LexIDLegalSeenFlag = '0' O
 /*          Busienss Associates Demographics Attributes                   */
 /**************************************************************************/
 BusinessSele: =>AssocExecFemaleCnt2yUnCap := COUNT(SelePerson(TwoYears AND IsExecutiveEver).Contact(EXISTS(FullName.Title='MS')));
-SelePerson: =>Relatives :=Contact{FirstDegreeAssociations.FirstDegreeAssociation};
-SelePerson.Relatives : => RelativeIsBusinessContact := EXISTS(SelePerson.Legal.SelePerson.Contact= Relatives.FirstDegreeAssociation);
+SelePerson: =>Relatives :=Contact{FirstDegreeRelative.Relative};
+SelePerson.Relatives : => RelativeIsBusinessContact := EXISTS(SelePerson.Legal.SelePerson(TwoYears AND IsExecutiveEver).Contact= Relatives.Relative);
 BusinessSele: => AssocExecRelatedCnt2yUnCap := COUNT(SelePerson(TwoYears AND IsExecutiveEver AND EXISTS(Relatives(RelativeIsBusinessContact =TRUE))));
 
 BusinessSele: => BE_AssocExecFemaleCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
@@ -5157,4 +5157,33 @@ BusinessSele: =>BE_BusLocActvCnt := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = M
 BusinessSele: =>BE_BusIsSBEFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
 		IsSBE => '1',
 		'0');  
+//Firmographics Ownership Helper Attributes
+
+BusinessSele: => IsVendorCertifiedFemaleOwned :=EXISTS(BusinessCharacteristics(IsWomanOwned)) OR EXISTS(BusinessProx.BusinessOwnedCharacteristics(IsWomanOwned));
+BusinessSele: => IsVendorCertifiedMinorityOwned :=EXISTS(BusinessCharacteristics(IsMinorityOwned)) OR EXISTS(BusinessProx.BusinessOwnedCharacteristics(IsMinorityOwned));
+BusinessSele: => IsBHFirmPublic := IF(StockTickers(Ticker<>'' OR NOT Ticker:Null),'1','0');
+BusinessSele: => IsEBRFirmPublic := IF(Ownership(OwnershipType ='1'),'1','0');
+
+//Firmographics Ownership Attributes
+
+BusinessSele: =>BE_BusInferFemaleOwnedFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = NO_DATA_FOUND_INT AND NOT IsVendorCertifiedFemaleOwned  => NO_DATA_FOUND,
+		BE_AssocExecFemalePct2Y  < 51.00 AND NOT IsVendorCertifiedFemaleOwned =>'0',
+		IsVendorCertifiedFemaleOwned =>'1',
+		BE_AssocExecFemalePct2Y >=51.00 AND NOT IsVendorCertifiedFemaleOwned =>'2' );
+BusinessSele: =>BE_BusInferFamilyOwnedFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y =NO_DATA_FOUND_INT => NO_DATA_FOUND,
+		BE_AssocExecCnt2Y = 1 => NO_DATA_FOUND_97,
+		BE_AssocExecRelatedPct2Y < 51.00 =>'0',
+		BE_AssocExecRelatedPct2Y >= 51.00 =>'1');
+BusinessSele: =>BE_BusIsFemaleOwnedFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsVendorCertifiedFemaleOwned => '1','0');
+BusinessSele: =>BE_BusIsMinorityOwnedFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsVendorCertifiedMinorityOwned => '1','0');
+BusinessSele: =>BE_BusIsPublicFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsBHFirmPublic ='1' OR IsEBRFirmPublic ='1' => '1','0');
+
+
+
+
 
