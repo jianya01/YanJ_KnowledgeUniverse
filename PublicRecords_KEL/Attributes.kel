@@ -3457,12 +3457,16 @@ BusinessSele: => BE_AstVehAutoEmrgNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR
 /*           Business Asset Property Helper Attributes                    */
 /*                                                                        */
 /**************************************************************************/	
+
+// Property is considered Ever Owned if there is a SelePropertyEvent record on file for the Business marked as PartyIsBuyerOrOwner or PartyIsSeller.
+// Since a Property or PropertyEvent can be tied to multiple people/businesses, we need to specifically check that the record we are grabbing data from is tied to this BusinessSele.
 SeleProperty: => IsEverOwned := EXISTS(Prop.PropertyEvent.SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal));
 BusinessSele: => AssetPropertyCountEver := COUNT(SeleProperty(IsEverOwned));
 
 BusinessSele: => AssetPropertyStates := SeleProperty(IsEverOwned).AddressComponents{State};
 BusinessSele: => AssetPropertyStateCountCapped := MIN(COUNT(AssetPropertyStates), AssetPropertyCountEver);
 
+// A property is considerd currently owned by the business if it has not been sold by the business AND there is either a deed record on file where the business is marked as PartyIsBuyerOrOwner OR there is an assessment record on file for the business/property within the past year.
 SeleProperty: => PropertyIsSold := EXISTS(Prop.PropertyEvent.SelePropertyEvent(PartyDetails.PartyIsSeller AND Legal = SeleProperty.Legal));
 SeleProperty: => PropertyIsOwnedDeed := EXISTS(Prop.PropertyEvent(IsDeed).SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal));
 PropertyEvent: => IsCurrentAssessmentRecord := IsAssessment AND ABSYEARSBETWEEN(LNFaresID:DateFirstSeen, Property.CURRENT_DATE) <= 1;
@@ -3472,6 +3476,22 @@ SeleProperty: => IsCurrentlyOwned := (PropertyIsOwnedAssessment OR PropertyIsOwn
 BusinessSele: => AssetPropertyCurrentCount := COUNT(SeleProperty(IsCurrentlyOwned));
 BusinessSele: => AssetPropertyCurrentStates := SeleProperty(IsCurrentlyOwned).AddressComponents{State};
 BusinessSele: => AssetPropertyCurrentStateCountCapped := MIN(COUNT(AssetPropertyCurrentStates), AssetPropertyCurrentCount);
+
+// Due to a KEL compiler bug, need to pull DateFirstSeen into an attribute definition so that the following date calculations function correctly. 
+PropertyEvent: => DtFirstSeen := LNFaresID:DateFirstSeen; 
+
+SeleProperty: => PropertyMinDateFirstSeen := MIN(Prop.PropertyEvent(EXISTS(SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal))), DtFirstSeen);
+SeleProperty: => PropertyMaxDateFirstSeen := MAX(Prop.PropertyEvent(EXISTS(SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal))), DtFirstSeen);
+
+SeleProperty: => CurrentTaxValue := ONLY(TOPN(Prop.PropertyEvent(IsCurrentAssessmentRecord AND NOT AssessedTotalValue:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -AssessedTotalValue), AssessedTotalValue);
+SeleProperty: => CurrentMarketValue := ONLY(TOPN(Prop.PropertyEvent(IsCurrentAssessmentRecord AND NOT MarketTotalValue:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -MarketTotalValue), 	MarketTotalValue);
+SeleProperty: => CurrentOverallValue := MAX(CurrentTaxValue, CurrentMarketValue);
+
+SeleProperty: => CurrentLotSizeAssessments := ONLY(TOPN(Prop.PropertyEvent(IsCurrentAssessmentRecord AND NOT LotSize:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -LotSize), 	LotSize);
+SeleProperty: => CurrentLotSizeDeeds := ONLY(TOPN(Prop.PropertyEvent(IsDeed AND NOT LandSquareFootage:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -LandSquareFootage), 	LandSquareFootage);
+SeleProperty: => CurrentLotSize := MAX(CurrentLotSizeAssessments, CurrentLotSizeDeeds);
+
+SeleProperty: => CurrentBuildingSize := ONLY(TOPN(Prop.PropertyEvent(IsCurrentAssessmentRecord AND NOT BuildingArea:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -BuildingArea), 	BuildingArea);
 
 /**************************************************************************/
 /*                                                                        */
@@ -3493,6 +3513,56 @@ BusinessSele: => BE_AstPropCurrStateCnt := MAP(B_LexIDLegalSeenFlag = '0' OR Sel
 				BE_AstPropCurrCnt  = 0 => NO_DATA_FOUND_INT,
 				AssetPropertyCurrentStateCountCapped = 0 => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(AssetPropertyCurrentStateCountCapped, 1, 52));
+
+BusinessSele: => BE_AstPropOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		BE_AstPropCntEv = 0 => NO_DATA_FOUND,
+		NOT EXISTS(SeleProperty(IsEverOwned AND ISVALIDDATE(PropertyMinDateFirstSeen))) => NO_DATA_FOUND_97,
+		DATETOSTRING(MIN(SeleProperty(IsEverOwned AND ISVALIDDATE(PropertyMinDateFirstSeen)), PropertyMinDateFirstSeen), '%Y%m%d'));
+
+BusinessSele: => BE_AstPropOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCntEv = 0 => NO_DATA_FOUND_INT,
+		BE_AstPropOldDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_AstPropOldDtEv), Property.CURRENT_DATE), 0, 960));
+		
+BusinessSele: => BE_AstPropNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		BE_AstPropCntEv = 0 => NO_DATA_FOUND,
+		NOT EXISTS(SeleProperty(IsEverOwned AND ISVALIDDATE(PropertyMaxDateFirstSeen))) => NO_DATA_FOUND_97,
+		DATETOSTRING(MAX(SeleProperty(IsEverOwned AND ISVALIDDATE(PropertyMaxDateFirstSeen)), PropertyMaxDateFirstSeen), '%Y%m%d'));
+		
+BusinessSele: => BE_AstPropNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCntEv = 0 => NO_DATA_FOUND_INT,
+		BE_AstPropNewDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_AstPropNewDtEv), Property.CURRENT_DATE), 0, 960));
+
+BusinessSele: => BE_AstPropCurrTaxValTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentTaxValue:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentTaxValue), 0, 999999999));
+		
+BusinessSele: => BE_AstPropCurrMktValTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentMarketValue:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentMarketValue), 0, 999999999));
+		
+BusinessSele: => BE_AstPropCurrValTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentOverallValue:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentOverallValue), 0, 999999999));		
+
+BusinessSele: => BE_AstPropCurrLotSizeTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentLotSize:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentLotSize), 0, 999999999));		
+
+BusinessSele: => BE_AstPropCurrBldgSizeTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentBuildingSize:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentBuildingSize), 0, 999999999));		
+		
+BusinessSele: => BE_AstPropIndxEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCntEv = 0 => 0,
+		BE_AstPropCntEv > 0 AND BE_AstPropCurrCnt = 0 => 1,
+		BE_AstPropCurrCnt > 0 => 2);
 		
 /**************************************************************************/
 /*                                                                        */
