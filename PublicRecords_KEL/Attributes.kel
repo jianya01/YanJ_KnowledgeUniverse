@@ -116,8 +116,52 @@ FUNCTION: FnSICGroupCodeInterpreter(STRING SicCodeGroup) <= MAP(			SicCodeGroup 
 																																			'Other');
 FUNCTION: fnAddr1FromComponents(STRING PrimaryRange,STRING Predirectional,STRING PrimaryName,STRING Suffix,STRING Postdirectional,STRING UnitDesignation,STRING SecondaryRange) <= ECL(address.Addr1FromComponents(PrimaryRange,Predirectional,PrimaryName,Suffix,Postdirectional,UnitDesignation,SecondaryRange)) FROM address RETURNS STRING;	
 FUNCTION: fnOverrideAddrType(STRING Addr1, STRING AddrType, STRING CarrRTE) <= ECL(risk_indicators.iid_constants.override_addr_type(Addr1,AddrType,CarrRTE)) FROM risk_indicators RETURNS STRING; 
- 
- 
+
+FUNCTION: IsFound(STRING source, STRING target) <= ECL(STD.Str.Find(source, target, 1) > 0) RETURNS BOOLEAN;
+
+FUNCTION: RegexReplace(STRING regex, STRING text, STRING replacement, BOOLEAN nocase) <= ECL(REGEXREPLACE(regex, text, replacement, nocase)) RETURNS STRING;
+
+// SlimBusinessName prepares a company name to be compared to another company name for Business Input Source verification. 
+	// 1. Remove punctuation
+	// 2. Remove furniture words (Center, Company, Co, Corp, etc.)
+	// 3. Remove any whitespace
+FUNCTION: SlimBusinessName(STRING BusinessName) <= RegexReplace(
+	'\\s', // remove whitespace
+	RegexReplace(
+		'(?:^| )(?:CENTER(?:$| )|COMPANY(?:$| )|CO(?:$| )|CORP(?:$| )|CORPORATION(?:$| )|CORPORATE(?:$| )|SERVICE(?:$| )|SERVICES(?:$| )|SER(?:$| )|INC(?:$| )|INCORPORATED(?:$| )|INTL(?:$| )|INTERNATIONAL(?:$| )|GLOBAL(?:$| )|INTERCONTINENTAL(?:$| )|WORLDWIDE(?:$| )|ASSOC(?:$| )|ASS(?:$| )|ASSO(?:$| )|ASSOCIATES(?:$| )|ASSOCIATION(?:$| )|BOUTIQUE(?:$| )|INDUSTRIES(?:$| )|INDUSTRIAL(?:$| )|IND(?:$| )|ENTERPRISES(?:$| )|ENTERPRISE(?:$| )|TRADING(?:$| )|GP(?:$| )|G P(?:$| )|QA(?:$| )|Q A(?:$| )|LP(?:$| )|L P(?:$| )|LLP(?:$| )|COOP(?:$| )|FACTORY(?:$| )|GRP(?:$| )|GROUP(?:$| )|LC(?:$| )|L C(?:$| )|LLC(?:$| )|FL LLC(?:$| )|BUILDING(?:$| )|CONDOMINIUM(?:$| )|COMMISSION(?:$| )|CLUB(?:$| )|DEPT(?:$| )|DEPARTMENT(?:$| )|DEPARTMENTS(?:$| )|NATIONWIDE(?:$| )|CONTRACTORS(?:$| )|CONTRACTING(?:$| )|WORLD(?:$| )|ADVANCED(?:$| )|STORE(?:$| )|STORES(?:$| )|THE(?:$| )|OF(?:$| )|MALL(?:$| )|LTD(?:$| )|LIMITED(?:$| )|LIABILITY(?:$| )|PARTNERSHIP(?:$| )|PARTNERS(?:$| )|PARTNER(?:$| )|FRANCHISE(?:$| )|INDUSTRY(?:$| )|INDUSTRIES(?:$| )|VENTURE(?:$| )|VENTURES(?:$| )|HOLDING(?:$| )|HOLDINGS(?:$| )|GENERAL(?:$| )|AND(?:$| )|MANAGEMENT(?:$| )|MGMT(?:$| )|MFG(?:$| )|MANUFACTURING(?:$| )|COOPERATIVE(?:$| )|DBA(?:$| )|ORG(?:$| )|ORGANIZATION(?:$| )|CONTRACTOR(?:$| ))+', // remove furniture words
+		RegexReplace(
+			'[[:punct:]]', // remove punctuation
+			BusinessName, 
+			'', 
+			TRUE), 
+		'', 
+		TRUE),
+	'', 
+	TRUE);
+
+FUNCTION: LevenshteinSimilarity(STRING field1, STRING field2) <= EditDistance(field1, field2)/MAX(LENGTH(field1), LENGTH(field2));
+
+FUNCTION: IsNullOrEqual(Field1, Field2) <= Field1 = Field2 OR (Field1:Null AND Field2:Null);
+
+// The EditDistanceWithinRadius will have better performance than the EditDistance function (as it will short circuit matching logic for poor matches) so whenever possible, EditDistanceWithinRadius should be used instead of EditDistance
+FUNCTION: EditDistanceWithinRadius(STRING field1, STRING field2, INTEGER radius) <= ECL(STD.Str.EditDistanceWithinRadius(field1, field2, radius)) FROM STD RETURNS BOOLEAN;
+
+// Seven digit phones are considered a match if the Levenshtein distance between the two phone numbers is less than or equal to 1.
+FUNCTION: IsPhone7Match(STRING Phone1, STRING Phone2) <= EditDistanceWithinRadius(Phone1, Phone2, 1);
+// Ten digit phones are considered a match if the last seven digits of the phone number are an exact match or if the Levenshtein distance between the two phone10s is less than or equal to 2.
+FUNCTION: IsPhone10Match(STRING Phone1, STRING Phone2) <= SUBSTR(Phone1, 4, 10) = SUBSTR(Phone2, 4, 10) OR EditDistanceWithinRadius(Phone1, Phone2, 2);
+// To determine a phone match:
+	// If both phones are 10 digits, apply Phone10 match logic
+	// If both phones are 7 digits, apply Phone7 match logic
+	// If phone on file is 10 digits and input phone is 7 digits, strip the first three digits from the phone on file and apply Phone7 match logic
+	// If phone on file is 7 digits and input phone is 10 digits, append the first three digits of the input phone to the phone on file and apply Phone10 match logic
+FUNCTION: IsPhoneMatch(STRING PhoneOnFile, STRING InputPhone) <= 
+	MAP(LENGTH(PhoneOnFile) = 10 AND LENGTH(InputPhone) = 10 => IsPhone10Match(PhoneOnFile, InputPhone),
+			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 7 => IsPhone7Match(PhoneOnFile, InputPhone),	
+			LENGTH(PhoneOnFile) = 10 AND LENGTH(InputPhone) = 7 => IsPhone7Match(SUBSTR(PhoneOnFile, 4, 10), InputPhone),
+			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 10 => IsPhone10Match(SUBSTR(InputPhone, 1, 3) + PhoneOnFile, InputPhone),
+			FALSE);
+			
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -431,6 +475,10 @@ InputPII: => InputCityCleanValue := MAP(
 				P_InpAddrCityFlagValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
 				P_InpAddrCityFlagValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
 				IsBlank(P_InpClnAddrCity, NO_DATA_FOUND));
+InputPII: => InputCityPostCleanValue := MAP(
+				P_InpAddrCityFlagValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				P_InpAddrCityFlagValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(P_InpClnAddrCityPost, NO_DATA_FOUND));
 InputPII: => InputStateCleanValue := MAP(
 				P_InpAddrStateFlagValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
 				P_InpAddrStateFlagValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
@@ -523,6 +571,7 @@ InputPII: => P_InpClnAddrPostDirFlagValue:= IsCleanPopulated(InputPostDirectionC
 InputPII: => P_InpClnAddrUnitDesigFlagValue:= IsCleanPopulated(InputUnitDesigCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnAddrSecRngFlagValue:= IsCleanPopulated(InputSecondaryRangeCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnAddrCityFlagValue:= IsCleanPopulated(InputCityCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputPII: => P_InpClnAddrCityPostFlagValue:= IsCleanPopulated(InputCityPostCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnAddrStateFlagValue:= IsCleanPopulated(InputStateCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnAddrZip5FlagValue:= IsCleanPopulated(InputZip5CleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnAddrZip4FlagValue:= IsCleanPopulated(InputZip4CleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
@@ -675,10 +724,10 @@ InputPII: => P_InpClnEmailUser := MAP(P_InpEmailFlagValue = '0' => MISSING_INPUT
 																		  IsBlank(UPCASE(SUBSTR(InputEmailCleanValue, 1, AtPositionClean-1)),NO_DATA_FOUND));
 InputPII: => P_InpClnEmailDom := MAP(P_InpEmailFlagValue = '0' => MISSING_INPUT_DATA,
 																		  AtPositionClean = 0 OR EmailExtensionSpot = 0 => NO_DATA_FOUND,
-																		  IsBlank(UPCASE(SUBSTR(TRIM(InputEmailCleanValue), AtPositionClean+1,LENGTH(InputEmailCleanValue))),NO_DATA_FOUND));
+																		  IsBlank(UPCASE(SUBSTR(InputEmailCleanValue, AtPositionClean+1,EmailExtensionSpot-1)),NO_DATA_FOUND));
 InputPII: =>P_InpClnEmailExt := MAP(P_InpEmailFlagValue = '0' => MISSING_INPUT_DATA,
 																		  AtPositionClean = 0 OR EmailExtensionSpot = 0 => NO_DATA_FOUND,
-																		  IsBlank(SUBSTR(InputEmailCleanValue,EmailExtensionSpot),NO_DATA_FOUND));
+																		  IsBlank(UPCASE(SUBSTR(InputEmailCleanValue,EmailExtensionSpot)),NO_DATA_FOUND));
 
 InputPII: => P_InpValPhoneHomeBadCharFlag := 
 		MAP(InputHomePhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,					
@@ -1082,6 +1131,10 @@ InputBII: => BusInputCityCleanValue := MAP(
 				B_InpAddrCityFlagValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
 				B_InpAddrCityFlagValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
 				IsBlank(B_InpClnAddrCity, NO_DATA_FOUND));
+InputBII: => BusInputCityPostCleanValue := MAP(
+				B_InpAddrCityFlagValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
+				B_InpAddrCityFlagValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
+				IsBlank(B_InpClnAddrCityPost, NO_DATA_FOUND));
 InputBII: => BusInputStateCleanValue := MAP(
 				B_InpAddrStateFlagValue = '0' AND (AddrNotPopulated OR CityStateZipNotPopulated) => MISSING_INPUT_DATA,
 				B_InpAddrStateFlagValue = '1' AND (AddrNotPopulated OR CityStateZipNotPopulated) => NO_DATA_FOUND,
@@ -1153,6 +1206,7 @@ InputBII: => B_Rep1InpClnAddrPostDir := AuthRep1.InputPostDirectionCleanValue;
 InputBII: => B_Rep1InpClnAddrUnitDesig := AuthRep1.InputUnitDesigCleanValue;
 InputBII: => B_Rep1InpClnAddrSecRng := AuthRep1.InputSecondaryRangeCleanValue;
 InputBII: => B_Rep1InpClnAddrCity := AuthRep1.InputCityCleanValue;
+InputBII: => B_Rep1InpClnAddrCityPost := AuthRep1.InputCityPostCleanValue;
 InputBII: => B_Rep1InpClnAddrState := AuthRep1.InputStateCleanValue;
 InputBII: => B_Rep1InpClnAddrZip5 := AuthRep1.InputZip5CleanValue;
 InputBII: => B_Rep1InpClnAddrZip4 := AuthRep1.InputZip4CleanValue;
@@ -1198,6 +1252,7 @@ InputBII: => B_Rep2InpClnAddrPostDir := 	AuthRep2.InputPostDirectionCleanValue;
 InputBII: => B_Rep2InpClnAddrUnitDesig := 	AuthRep2.InputUnitDesigCleanValue;
 InputBII: => B_Rep2InpClnAddrSecRng := 		AuthRep2.InputSecondaryRangeCleanValue;
 InputBII: => B_Rep2InpClnAddrCity := 		AuthRep2.InputCityCleanValue;
+InputBII: => B_Rep2InpClnAddrCityPost := AuthRep2.InputCityPostCleanValue;
 InputBII: => B_Rep2InpClnAddrState := 		AuthRep2.InputStateCleanValue;
 InputBII: => B_Rep2InpClnAddrZip5 := 		AuthRep2.InputZip5CleanValue;
 InputBII: => B_Rep2InpClnAddrZip4 := 		AuthRep2.InputZip4CleanValue;
@@ -1243,6 +1298,7 @@ InputBII: => B_Rep3InpClnAddrPostDir := 	AuthRep3.InputPostDirectionCleanValue;
 InputBII: => B_Rep3InpClnAddrUnitDesig := 	AuthRep3.InputUnitDesigCleanValue;
 InputBII: => B_Rep3InpClnAddrSecRng := 		AuthRep3.InputSecondaryRangeCleanValue;
 InputBII: => B_Rep3InpClnAddrCity := 		AuthRep3.InputCityCleanValue;
+InputBII: => B_Rep3InpClnAddrCityPost := AuthRep3.InputCityPostCleanValue;
 InputBII: => B_Rep3InpClnAddrState := 		AuthRep3.InputStateCleanValue;
 InputBII: => B_Rep3InpClnAddrZip5 := 		AuthRep3.InputZip5CleanValue;
 InputBII: => B_Rep3InpClnAddrZip4 := 		AuthRep3.InputZip4CleanValue;
@@ -1288,6 +1344,7 @@ InputBII: => B_Rep4InpClnAddrPostDir := 	AuthRep4.InputPostDirectionCleanValue;
 InputBII: => B_Rep4InpClnAddrUnitDesig := 	AuthRep4.InputUnitDesigCleanValue;
 InputBII: => B_Rep4InpClnAddrSecRng := 		AuthRep4.InputSecondaryRangeCleanValue;
 InputBII: => B_Rep4InpClnAddrCity := 		AuthRep4.InputCityCleanValue;
+InputBII: => B_Rep4InpClnAddrCityPost := AuthRep4.InputCityPostCleanValue;
 InputBII: => B_Rep4InpClnAddrState := 		AuthRep4.InputStateCleanValue;
 InputBII: => B_Rep4InpClnAddrZip5 := 		AuthRep4.InputZip5CleanValue;
 InputBII: => B_Rep4InpClnAddrZip4 := 		AuthRep4.InputZip4CleanValue;
@@ -1333,6 +1390,7 @@ InputBII: => B_Rep5InpClnAddrPostDir := 	AuthRep5.InputPostDirectionCleanValue;
 InputBII: => B_Rep5InpClnAddrUnitDesig := 	AuthRep5.InputUnitDesigCleanValue;
 InputBII: => B_Rep5InpClnAddrSecRng := 		AuthRep5.InputSecondaryRangeCleanValue;
 InputBII: => B_Rep5InpClnAddrCity := 		AuthRep5.InputCityCleanValue;
+InputBII: => B_Rep5InpClnAddrCityPost := AuthRep5.InputCityPostCleanValue;
 InputBII: => B_Rep5InpClnAddrState := 		AuthRep5.InputStateCleanValue;
 InputBII: => B_Rep5InpClnAddrZip5 := 		AuthRep5.InputZip5CleanValue;
 InputBII: => B_Rep5InpClnAddrZip4 := 		AuthRep5.InputZip4CleanValue;
@@ -1380,7 +1438,8 @@ InputBII: => B_InpClnAddrSffxFlagValue := IsCleanPopulated(BusInputAddrSuffixCle
 InputBII: => B_InpClnAddrPostDirFlagValue := IsCleanPopulated(BusInputPostDirCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnAddrUnitDesigFlagValue := IsCleanPopulated(BusInputUnitDesigCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnAddrSecRngFlagValue := IsCleanPopulated(BusInputSecRangeCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
-InputBII: => B_InpClnAddrCityFlagValue := IsCleanPopulated(BusInputCityCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
+InputBII: => B_InpClnAddrCityFlagValue := IsCleanPopulated(BusInputCityCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputBII: => B_InpClnAddrCityPostFlagValue := IsCleanPopulated(BusInputCityPostCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnAddrStateFlagValue := IsCleanPopulated(BusInputStateCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnAddrZip5FlagValue := IsCleanPopulated(BusInputZip5CleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnAddrZip4FlagValue := IsCleanPopulated(BusInputZip4CleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
@@ -1420,7 +1479,8 @@ InputBII: => B_Rep1InpClnAddrSffxFlagValue := AuthRep1.P_InpClnAddrSffxFlagValue
 InputBII: => B_Rep1InpClnAddrPostDirFlagValue := AuthRep1.P_InpClnAddrPostDirFlagValue; 
 InputBII: => B_Rep1InpClnAddrUnitDesigFlagValue := AuthRep1.P_InpClnAddrUnitDesigFlagValue; 
 InputBII: => B_Rep1InpClnAddrSecRngFlagValue := AuthRep1.P_InpClnAddrSecRngFlagValue; 
-InputBII: => B_Rep1InpClnAddrCityFlagValue := AuthRep1.P_InpClnAddrCityFlagValue; 
+InputBII: => B_Rep1InpClnAddrCityFlagValue := AuthRep1.P_InpClnAddrCityFlagValue;
+InputBII: => B_Rep1InpClnAddrCityPostFlagValue := AuthRep1.P_InpClnAddrCityPostFlagValue; 
 InputBII: => B_Rep1InpClnAddrStateFlagValue := AuthRep1.P_InpClnAddrStateFlagValue; 
 InputBII: => B_Rep1InpClnAddrZip5FlagValue := AuthRep1.P_InpClnAddrZip5FlagValue; 
 InputBII: => B_Rep1InpClnAddrZip4FlagValue := AuthRep1.P_InpClnAddrZip4FlagValue; 
@@ -1451,7 +1511,8 @@ InputBII: => B_Rep2InpClnAddrSffxFlagValue := AuthRep2.P_InpClnAddrSffxFlagValue
 InputBII: => B_Rep2InpClnAddrPostDirFlagValue := AuthRep2.P_InpClnAddrPostDirFlagValue; 
 InputBII: => B_Rep2InpClnAddrUnitDesigFlagValue := AuthRep2.P_InpClnAddrUnitDesigFlagValue; 
 InputBII: => B_Rep2InpClnAddrSecRngFlagValue := AuthRep2.P_InpClnAddrSecRngFlagValue; 
-InputBII: => B_Rep2InpClnAddrCityFlagValue := AuthRep2.P_InpClnAddrCityFlagValue; 
+InputBII: => B_Rep2InpClnAddrCityFlagValue := AuthRep2.P_InpClnAddrCityFlagValue;
+InputBII: => B_Rep2InpClnAddrCityPostFlagValue := AuthRep2.P_InpClnAddrCityPostFlagValue; 
 InputBII: => B_Rep2InpClnAddrStateFlagValue := AuthRep2.P_InpClnAddrStateFlagValue; 
 InputBII: => B_Rep2InpClnAddrZip5FlagValue := AuthRep2.P_InpClnAddrZip5FlagValue; 
 InputBII: => B_Rep2InpClnAddrZip4FlagValue := AuthRep2.P_InpClnAddrZip4FlagValue; 
@@ -1482,7 +1543,8 @@ InputBII: => B_Rep3InpClnAddrSffxFlagValue := AuthRep3.P_InpClnAddrSffxFlagValue
 InputBII: => B_Rep3InpClnAddrPostDirFlagValue := AuthRep3.P_InpClnAddrPostDirFlagValue; 
 InputBII: => B_Rep3InpClnAddrUnitDesigFlagValue := AuthRep3.P_InpClnAddrUnitDesigFlagValue; 
 InputBII: => B_Rep3InpClnAddrSecRngFlagValue := AuthRep3.P_InpClnAddrSecRngFlagValue; 
-InputBII: => B_Rep3InpClnAddrCityFlagValue := AuthRep3.P_InpClnAddrCityFlagValue; 
+InputBII: => B_Rep3InpClnAddrCityFlagValue := AuthRep3.P_InpClnAddrCityFlagValue;
+InputBII: => B_Rep3InpClnAddrCityPostFlagValue := AuthRep3.P_InpClnAddrCityPostFlagValue; 
 InputBII: => B_Rep3InpClnAddrStateFlagValue := AuthRep3.P_InpClnAddrStateFlagValue; 
 InputBII: => B_Rep3InpClnAddrZip5FlagValue := AuthRep3.P_InpClnAddrZip5FlagValue; 
 InputBII: => B_Rep3InpClnAddrZip4FlagValue := AuthRep3.P_InpClnAddrZip4FlagValue; 
@@ -1513,7 +1575,8 @@ InputBII: => B_Rep4InpClnAddrSffxFlagValue := AuthRep4.P_InpClnAddrSffxFlagValue
 InputBII: => B_Rep4InpClnAddrPostDirFlagValue := AuthRep4.P_InpClnAddrPostDirFlagValue; 
 InputBII: => B_Rep4InpClnAddrUnitDesigFlagValue := AuthRep4.P_InpClnAddrUnitDesigFlagValue; 
 InputBII: => B_Rep4InpClnAddrSecRngFlagValue := AuthRep4.P_InpClnAddrSecRngFlagValue; 
-InputBII: => B_Rep4InpClnAddrCityFlagValue := AuthRep4.P_InpClnAddrCityFlagValue; 
+InputBII: => B_Rep4InpClnAddrCityFlagValue := AuthRep4.P_InpClnAddrCityFlagValue;
+InputBII: => B_Rep4InpClnAddrCityPostFlagValue := AuthRep4.P_InpClnAddrCityPostFlagValue; 
 InputBII: => B_Rep4InpClnAddrStateFlagValue := AuthRep4.P_InpClnAddrStateFlagValue; 
 InputBII: => B_Rep4InpClnAddrZip5FlagValue := AuthRep4.P_InpClnAddrZip5FlagValue; 
 InputBII: => B_Rep4InpClnAddrZip4FlagValue := AuthRep4.P_InpClnAddrZip4FlagValue; 
@@ -1544,7 +1607,8 @@ InputBII: => B_Rep5InpClnAddrSffxFlagValue := AuthRep5.P_InpClnAddrSffxFlagValue
 InputBII: => B_Rep5InpClnAddrPostDirFlagValue := AuthRep5.P_InpClnAddrPostDirFlagValue; 
 InputBII: => B_Rep5InpClnAddrUnitDesigFlagValue := AuthRep5.P_InpClnAddrUnitDesigFlagValue; 
 InputBII: => B_Rep5InpClnAddrSecRngFlagValue := AuthRep5.P_InpClnAddrSecRngFlagValue; 
-InputBII: => B_Rep5InpClnAddrCityFlagValue := AuthRep5.P_InpClnAddrCityFlagValue; 
+InputBII: => B_Rep5InpClnAddrCityFlagValue := AuthRep5.P_InpClnAddrCityFlagValue;
+InputBII: => B_Rep5InpClnAddrCityPostFlagValue := AuthRep5.P_InpClnAddrCityPostFlagValue; 
 InputBII: => B_Rep5InpClnAddrStateFlagValue := AuthRep5.P_InpClnAddrStateFlagValue; 
 InputBII: => B_Rep5InpClnAddrZip5FlagValue := AuthRep5.P_InpClnAddrZip5FlagValue; 
 InputBII: => B_Rep5InpClnAddrZip4FlagValue := AuthRep5.P_InpClnAddrZip4FlagValue; 
@@ -2597,6 +2661,277 @@ BusinessSele: => BE_URLFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSIN
 				EXISTS(URLs) => 1,
 				0);
 
+/**************************************************************************/
+/*                                                                        */
+/*     Business Input Verification Helper Attributes                      */
+/*                                                                        */
+/**************************************************************************/
+
+// Name match logic
+BusinessSele: => BII := ONLY(InputBII);
+BusinessSele: => BusInputNameCleanValue := BII.BusInputNameCleanValue;
+// Rules for determining a business name match:
+	// 1. Remove punctuation from B_InpClnName, Name, CorporationLegalName, DoingBusinessAs
+	// 2. Remove all furniture words from the results of step 1 (Corp, Co, Services, etc)
+	// 3. Remove all whitespace from results of step 2.
+	// 4. Check if modified version of B_InpClnName is detected in any of the modified versions of Name, CorporationLegalName, DoingBusinessAs
+	// 5. If no match is established in step 4, Levenshtein Similarity between modified version of B_InpClnName and modified versions of Name, CorporationLegalName, DoingBusinessAs. 
+			// If Levenshtein Similarity > .6, name is a match. Otherwise, name is not a match. 
+BusinessSele.ReportedNames: => SlimName := SlimBusinessName(Name);
+BusinessSele.ReportedNames: => SlimCorporationLegalName := SlimBusinessName(CorporationLegalName);
+BusinessSele.ReportedNames: => SlimDoingBusinessAs := SlimBusinessName(DoingBusinessAs);
+BusinessSele.ReportedNames: => SlimInpClnName := SlimBusinessName(BusinessSele.BusInputNameCleanValue);
+
+BusinessSele.ReportedNames: => NameMatch := IsFound(SlimName, SlimInpClnName);
+BusinessSele.ReportedNames: => CorporationLegalNameMatch := IsFound(SlimCorporationLegalName, SlimInpClnName);
+BusinessSele.ReportedNames: => DoingBusinessAsMatch := IsFound(SlimDoingBusinessAs, SlimInpClnName);
+BusinessSele.ReportedNames: => BusinessNameMatch := NameMatch OR CorporationLegalNameMatch OR DoingBusinessAsMatch;
+
+BusinessSele.ReportedNames: => NameSimilarity := LevenshteinSimilarity(SlimName, SlimInpClnName);
+BusinessSele.ReportedNames: => CorporationLegalNameSimilarity := LevenshteinSimilarity(SlimCorporationLegalName, SlimInpClnName);
+BusinessSele.ReportedNames: => DoingBusinessAsSimilarity := LevenshteinSimilarity(SlimDoingBusinessAs, SlimInpClnName);
+BusinessSele.ReportedNames: => BusinessNameIsSimilar := NameSimilarity > 0.6 OR CorporationLegalNameSimilarity > 0.6 OR DoingBusinessAsSimilarity > 0.6;
+
+BusinessSele.ReportedNames: => BusinessNameMatchRecord := (BusinessNameMatch AND HeaderHitFlag) OR (BusinessNameIsSimilar AND HeaderHitFlag); // Consider only BIP header records when determining a name match
+
+BusinessSele.ReportedNames: => TranslatedSource := SourceGroup(Source);
+
+BusinessSele: => BusinessNameMatchSourcesPre := ReportedNames(BusinessNameMatchRecord){TranslatedSource};
+
+BusinessSele: => BusinessNameMatchSources := BusinessNameMatchSourcesPre{
+				TranslatedSource,
+				DateFirstSeenClean := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), DATETOSTRING(TranslatedSource:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+				DateLastSeenClean := IF(ISVALIDDATE(TranslatedSource:DateLastSeen), DATETOSTRING(MIN(TranslatedSource:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+BusinessSele: => BusinessNameMatchSourcesSorted := TOPN(BusinessNameMatchSources, 1000, DateFirstSeenClean = NO_DATA_FOUND_97, DateFirstSeenClean, -DateLastSeenClean, TranslatedSource);
+
+// Address match logic
+BusinessSele: => B_InpClnAddrPrimRng := BII.B_InpClnAddrPrimRng;
+BusinessSele: => B_InpClnAddrPreDir := BII.B_InpClnAddrPreDir;
+BusinessSele: => B_InpClnAddrPrimName := BII.B_InpClnAddrPrimName;
+BusinessSele: => B_InpClnAddrSffx := BII.B_InpClnAddrSffx;
+BusinessSele: => B_InpClnAddrPostDir := BII.B_InpClnAddrPostDir;
+BusinessSele: => B_InpClnAddrZip5 := BII.B_InpClnAddrZip5;
+BusinessSele: => B_InpClnAddrSecRng := BII.B_InpClnAddrSecRng;
+
+SeleAddress: => InputAddressMatch := 
+	IsNullOrEqual(PrimaryRange, Legal.B_InpClnAddrPrimRng) AND  
+	IsNullOrEqual(Predirectional, Legal.B_InpClnAddrPreDir) AND
+	IsNullOrEqual(PrimaryName, Legal.B_InpClnAddrPrimName) AND
+	IsNullOrEqual(Suffix, Legal.B_InpClnAddrSffx) AND
+	IsNullOrEqual(Postdirectional, Legal.B_InpClnAddrPostDir) AND
+	IsNullOrEqual(ZIP5, Legal.B_InpClnAddrZip5) AND
+	IsNullOrEqual(SecondaryRange, Legal.B_InpClnAddrSecRng);
+
+SeleAddress.DataSources: => TranslatedSource := SourceGroup(Source);
+BusinessSele: => SeleAddressMatchSourcesPre := SeleAddress(InputAddressMatch).DataSources(HeaderHitFlag){TranslatedSource};
+BusinessSele: => SeleAddressMatchSources := SeleAddressMatchSourcesPre{
+				TranslatedSource,
+				DateFirstSeenClean := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), DATETOSTRING(TranslatedSource:DateFirstSeen, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97),
+				DateLastSeenClean := IF(ISVALIDDATE(TranslatedSource:DateLastSeen), DATETOSTRING(MIN(TranslatedSource:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97)};
+				
+BusinessSele: => BusinessAddressMatchSourcesSorted := TOPN(SeleAddressMatchSources, 1000, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97, DateFirstSeenClean, -DateLastSeenClean, TranslatedSource);
+
+// TIN Match logic
+BusinessSele: => B_InpClnTIN := BII.BusInputTINCleanValue;
+
+// Consider a TIN on file a match with the input TIN if the Levenstein distance between the TINs is <= 2.
+SeleTIN: => InputTINMatch := EditDistanceWithinRadius(TaxID, Legal.B_InpClnTIN, 2);
+
+SeleTIN.DataSources: => TranslatedSource := SourceGroup(Source);
+BusinessSele: => SeleTINMatchSourcesPre := SeleTIN(InputTINMatch).DataSources(HeaderHitFlag){TranslatedSource};
+BusinessSele: => SeleTINMatchSources := SeleTINMatchSourcesPre{
+				TranslatedSource,
+				DateFirstSeenClean := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), DATETOSTRING(TranslatedSource:DateFirstSeen, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97),
+				DateLastSeenClean := IF(ISVALIDDATE(TranslatedSource:DateLastSeen), DATETOSTRING(MIN(TranslatedSource:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97)};
+
+BusinessSele: => BusinessTINMatchSourcesSorted := TOPN(SeleTINMatchSources, 1000, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97, DateFirstSeenClean, -DateLastSeenClean, TranslatedSource);
+
+// Phone match logic
+BusinessSele: => B_InpClnPhone := BII.BusInputPhoneCleanValue;
+
+SelePhoneNumber: => InputPhoneMatch := IsPhoneMatch(STRING(PhoneNumber), Legal.B_InpClnPhone);
+
+SelePhoneNumber.DataSources: => TranslatedSource := SourceGroup(Source);
+BusinessSele: => SelePhoneMatchSourcesPre := SelePhoneNumber(InputPhoneMatch).DataSources(HeaderHitFlag){TranslatedSource};
+BusinessSele: => SelePhoneMatchSources := SelePhoneMatchSourcesPre{
+				TranslatedSource,
+				DateFirstSeenClean := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), DATETOSTRING(TranslatedSource:DateFirstSeen, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97),
+				DateLastSeenClean := IF(ISVALIDDATE(TranslatedSource:DateLastSeen), DATETOSTRING(MIN(TranslatedSource:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97)};
+
+BusinessSele: => BusinessPhoneMatchSourcesSorted := TOPN(SelePhoneMatchSources, 1000, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97, DateFirstSeenClean, -DateLastSeenClean, TranslatedSource);
+
+/**************************************************************************/
+/*                                                                        */
+/*     				Business Input Verification Attributes                      */
+/*                                                                        */
+/**************************************************************************/
+BusinessSele: => BE_VerNameFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				EXISTS(BusinessNameMatchSources) => 1,
+				0);
+
+BusinessSele: => BE_VerNameSrcListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessNameMatchSourcesSorted, TranslatedSource, '|'));
+				
+BusinessSele: => BE_VerNameSrcCntEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND_INT,				
+				BOUNDSFOLD(COUNT(BusinessNameMatchSourcesSorted), 0, 34));
+				
+BusinessSele: => BE_VerNameSrcEmrgDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessNameMatchSourcesSorted, DateFirstSeenClean, '|'));
+
+BusinessSele: => BE_VerNameSrcLastDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessNameMatchSourcesSorted, DateLastSeenClean, '|'));
+
+BusinessSele: => BE_VerNameSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessNameMatchSourcesSorted, DateFirstSeenClean = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(BusinessNameMatchSourcesSorted, DATE(DateFirstSeenClean)), '%Y%m%d'));
+
+BusinessSele: => BE_VerNameSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessNameMatchSourcesSorted, DateLastSeenClean = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(BusinessNameMatchSourcesSorted, DATE(DateLastSeenClean)), '%Y%m%d'));
+
+BusinessSele: => BE_VerNameSrcOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessNameMatchSourcesSorted, DateFirstSeenClean = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerNameSrcOldDtEv), CURRENT_DATE), 0 ,960));
+
+BusinessSele: => BE_VerNameSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessNameMatchSourcesSorted, DateLastSeenClean = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerNameSrcNewDtEv), CURRENT_DATE), 0 ,960));
+				
+BusinessSele: => BE_VerAddrFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				EXISTS(BusinessAddressMatchSourcesSorted) => 1,
+				0);
+
+BusinessSele: => BE_VerAddrSrcListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessAddressMatchSourcesSorted, TranslatedSource, '|'));
+				
+BusinessSele: => BE_VerAddrSrcCntEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(BusinessAddressMatchSourcesSorted), 0, 34));
+
+BusinessSele: => BE_VerAddrSrcEmrgDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessAddressMatchSourcesSorted, DateFirstSeenClean, '|'));
+
+BusinessSele: => BE_VerAddrSrcLastDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessAddressMatchSourcesSorted, DateLastSeenClean, '|'));
+				
+BusinessSele: => BE_VerAddrSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessAddressMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(BusinessAddressMatchSourcesSorted, DATE(DateFirstSeenClean)), '%Y%m%d'));
+
+BusinessSele: => BE_VerAddrSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessAddressMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(BusinessAddressMatchSourcesSorted, DATE(DateLastSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerAddrSrcOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessAddressMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerAddrSrcOldDtEv), CURRENT_DATE), 0, 960));
+
+BusinessSele: => BE_VerAddrSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessAddressMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerAddrSrcNewDtEv), CURRENT_DATE), 0, 960));	
+				
+BusinessSele: => BE_VerAddrSrcDtSpanEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessAddressMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,				
+				ALL(BusinessAddressMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,			
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerAddrSrcOldDtEv), DATE(BE_VerAddrSrcNewDtEv)), 0, 960));	
+				
+BusinessSele: => BE_VerTINFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				EXISTS(BusinessTINMatchSourcesSorted) => 1,
+				0);
+				
+BusinessSele: => BE_VerTINSrcListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessTINMatchSourcesSorted, TranslatedSource, '|'));
+				
+BusinessSele: => BE_VerTINSrcCntEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(BusinessTINMatchSourcesSorted), 0, 34));
+				
+BusinessSele: => BE_VerTINSrcEmrgDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessTINMatchSourcesSorted, DateFirstSeenClean, '|'));
+				
+BusinessSele: => BE_VerTINSrcLastDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessTINMatchSourcesSorted, DateLastSeenClean, '|'));
+				
+BusinessSele: => BE_VerTINSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessTINMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(BusinessTINMatchSourcesSorted, DATE(DateFirstSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerTINSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessTINMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(BusinessTINMatchSourcesSorted, DATE(DateLastSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerTINSrcOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessTINMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerTINSrcOldDtEv), CURRENT_DATE), 0, 960));
+				
+BusinessSele: => BE_VerTINSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessTINMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerTINSrcNewDtEv), CURRENT_DATE), 0, 960));	
+				
+BusinessSele: => BE_VerPhoneFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				EXISTS(BusinessPhoneMatchSourcesSorted) => 1,
+				0);
+				
+BusinessSele: => BE_VerPhoneSrcListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessPhoneMatchSourcesSorted, TranslatedSource, '|'));
+				
+BusinessSele: => BE_VerPhoneSrcCntEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(BusinessPhoneMatchSourcesSorted), 0, 34));
+				
+BusinessSele: => BE_VerPhoneSrcEmrgDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessPhoneMatchSourcesSorted, DateFirstSeenClean, '|'));
+
+BusinessSele: => BE_VerPhoneSrcLastDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessPhoneMatchSourcesSorted, DateLastSeenClean, '|'));
+				
+BusinessSele: => BE_VerPhoneSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessPhoneMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(BusinessPhoneMatchSourcesSorted, DATE(DateFirstSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerPhoneSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessPhoneMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(BusinessPhoneMatchSourcesSorted, DATE(DateLastSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerPhoneSrcOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessPhoneMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerPhoneSrcOldDtEv), CURRENT_DATE), 0, 960));
+				
+BusinessSele: => BE_VerPhoneSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessPhoneMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerPhoneSrcNewDtEv), CURRENT_DATE), 0, 960));	
+				
 /*		Tradline Helper Attributes		*/
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
@@ -3437,12 +3772,16 @@ BusinessSele: => BE_AstVehAutoEmrgNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR
 /*           Business Asset Property Helper Attributes                    */
 /*                                                                        */
 /**************************************************************************/	
+
+// Property is considered Ever Owned if there is a SelePropertyEvent record on file for the Business marked as PartyIsBuyerOrOwner or PartyIsSeller.
+// Since a Property or PropertyEvent can be tied to multiple people/businesses, we need to specifically check that the record we are grabbing data from is tied to this BusinessSele.
 SeleProperty: => IsEverOwned := EXISTS(Prop.PropertyEvent.SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal));
 BusinessSele: => AssetPropertyCountEver := COUNT(SeleProperty(IsEverOwned));
 
 BusinessSele: => AssetPropertyStates := SeleProperty(IsEverOwned).AddressComponents{State};
 BusinessSele: => AssetPropertyStateCountCapped := MIN(COUNT(AssetPropertyStates), AssetPropertyCountEver);
 
+// A property is considerd currently owned by the business if it has not been sold by the business AND there is either a deed record on file where the business is marked as PartyIsBuyerOrOwner OR there is an assessment record on file for the business/property within the past year.
 SeleProperty: => PropertyIsSold := EXISTS(Prop.PropertyEvent.SelePropertyEvent(PartyDetails.PartyIsSeller AND Legal = SeleProperty.Legal));
 SeleProperty: => PropertyIsOwnedDeed := EXISTS(Prop.PropertyEvent(IsDeed).SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal));
 PropertyEvent: => IsCurrentAssessmentRecord := IsAssessment AND ABSYEARSBETWEEN(LNFaresID:DateFirstSeen, Property.CURRENT_DATE) <= 1;
@@ -3452,6 +3791,22 @@ SeleProperty: => IsCurrentlyOwned := (PropertyIsOwnedAssessment OR PropertyIsOwn
 BusinessSele: => AssetPropertyCurrentCount := COUNT(SeleProperty(IsCurrentlyOwned));
 BusinessSele: => AssetPropertyCurrentStates := SeleProperty(IsCurrentlyOwned).AddressComponents{State};
 BusinessSele: => AssetPropertyCurrentStateCountCapped := MIN(COUNT(AssetPropertyCurrentStates), AssetPropertyCurrentCount);
+
+// Due to a KEL compiler bug, need to pull DateFirstSeen into an attribute definition so that the following date calculations function correctly. 
+PropertyEvent: => DtFirstSeen := LNFaresID:DateFirstSeen; 
+
+SeleProperty: => PropertyMinDateFirstSeen := MIN(Prop.PropertyEvent(EXISTS(SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal))), DtFirstSeen);
+SeleProperty: => PropertyMaxDateFirstSeen := MAX(Prop.PropertyEvent(EXISTS(SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal))), DtFirstSeen);
+
+SeleProperty: => CurrentTaxValue := ONLY(TOPN(Prop.PropertyEvent(IsCurrentAssessmentRecord AND NOT AssessedTotalValue:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -AssessedTotalValue), AssessedTotalValue);
+SeleProperty: => CurrentMarketValue := ONLY(TOPN(Prop.PropertyEvent(IsCurrentAssessmentRecord AND NOT MarketTotalValue:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -MarketTotalValue), 	MarketTotalValue);
+SeleProperty: => CurrentOverallValue := MAX(CurrentTaxValue, CurrentMarketValue);
+
+SeleProperty: => CurrentLotSizeAssessments := ONLY(TOPN(Prop.PropertyEvent(IsCurrentAssessmentRecord AND NOT LotSize:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -LotSize), 	LotSize);
+SeleProperty: => CurrentLotSizeDeeds := ONLY(TOPN(Prop.PropertyEvent(IsDeed AND NOT LandSquareFootage:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -LandSquareFootage), 	LandSquareFootage);
+SeleProperty: => CurrentLotSize := MAX(CurrentLotSizeAssessments, CurrentLotSizeDeeds);
+
+SeleProperty: => CurrentBuildingSize := ONLY(TOPN(Prop.PropertyEvent(IsCurrentAssessmentRecord AND NOT BuildingArea:Null AND EXISTS(SelePropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Legal = SeleProperty.Legal))), 1, -DtFirstSeen, -BuildingArea), 	BuildingArea);
 
 /**************************************************************************/
 /*                                                                        */
@@ -3473,6 +3828,56 @@ BusinessSele: => BE_AstPropCurrStateCnt := MAP(B_LexIDLegalSeenFlag = '0' OR Sel
 				BE_AstPropCurrCnt  = 0 => NO_DATA_FOUND_INT,
 				AssetPropertyCurrentStateCountCapped = 0 => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(AssetPropertyCurrentStateCountCapped, 1, 52));
+
+BusinessSele: => BE_AstPropOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		BE_AstPropCntEv = 0 => NO_DATA_FOUND,
+		NOT EXISTS(SeleProperty(IsEverOwned AND ISVALIDDATE(PropertyMinDateFirstSeen))) => NO_DATA_FOUND_97,
+		DATETOSTRING(MIN(SeleProperty(IsEverOwned AND ISVALIDDATE(PropertyMinDateFirstSeen)), PropertyMinDateFirstSeen), '%Y%m%d'));
+
+BusinessSele: => BE_AstPropOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCntEv = 0 => NO_DATA_FOUND_INT,
+		BE_AstPropOldDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_AstPropOldDtEv), Property.CURRENT_DATE), 0, 960));
+		
+BusinessSele: => BE_AstPropNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		BE_AstPropCntEv = 0 => NO_DATA_FOUND,
+		NOT EXISTS(SeleProperty(IsEverOwned AND ISVALIDDATE(PropertyMaxDateFirstSeen))) => NO_DATA_FOUND_97,
+		DATETOSTRING(MAX(SeleProperty(IsEverOwned AND ISVALIDDATE(PropertyMaxDateFirstSeen)), PropertyMaxDateFirstSeen), '%Y%m%d'));
+		
+BusinessSele: => BE_AstPropNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCntEv = 0 => NO_DATA_FOUND_INT,
+		BE_AstPropNewDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_AstPropNewDtEv), Property.CURRENT_DATE), 0, 960));
+
+BusinessSele: => BE_AstPropCurrTaxValTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentTaxValue:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentTaxValue), 0, 999999999));
+		
+BusinessSele: => BE_AstPropCurrMktValTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentMarketValue:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentMarketValue), 0, 999999999));
+		
+BusinessSele: => BE_AstPropCurrValTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentOverallValue:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentOverallValue), 0, 999999999));		
+
+BusinessSele: => BE_AstPropCurrLotSizeTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentLotSize:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentLotSize), 0, 999999999));		
+
+BusinessSele: => BE_AstPropCurrBldgSizeTot := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCurrCnt = 0 => NO_DATA_FOUND_INT,
+		ALL(SeleProperty(IsCurrentlyOwned), CurrentBuildingSize:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SUM(SeleProperty(IsCurrentlyOwned), CurrentBuildingSize), 0, 999999999));		
+		
+BusinessSele: => BE_AstPropIndxEv := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		BE_AstPropCntEv = 0 => 0,
+		BE_AstPropCntEv > 0 AND BE_AstPropCurrCnt = 0 => 1,
+		BE_AstPropCurrCnt > 0 => 2);
 		
 /**************************************************************************/
 /*                                                                        */
@@ -4718,10 +5123,10 @@ BusinessSele: => BE_AssocExecWDrgBkCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 
 BusinessSele: => BE_AssocNexecWDrgBkCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
 																						BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
-																						BOUNDSFOLD(AssocNexecHasBk,0,999999));
-																						
+																						BOUNDSFOLD(AssocNexecHasBk,0,999999));																								
+	
 
-/**************************************************************************/	
+/**************************************************************************/
 /*          Busienss Judgment Associates Attributes                       */
 /**************************************************************************/	
 
@@ -4831,8 +5236,8 @@ BusinessSele: => BE_AssocNexecEmrgMsncAvg2Y :=  MAP(B_LexIDLegalSeenFlag = '0' O
 /*          Busienss Associates Demographics Attributes                   */
 /**************************************************************************/
 BusinessSele: =>AssocExecFemaleCnt2yUnCap := COUNT(SelePerson(TwoYears AND IsExecutiveEver).Contact(EXISTS(FullName.Title='MS')));
-SelePerson: =>Relatives :=Contact{FirstDegreeAssociations.FirstDegreeAssociation};
-SelePerson.Relatives : => RelativeIsBusinessContact := EXISTS(SelePerson.Legal.SelePerson.Contact= Relatives.FirstDegreeAssociation);
+SelePerson: =>Relatives :=Contact{FirstDegreeRelative.Relative};
+SelePerson.Relatives : => RelativeIsBusinessContact := EXISTS(SelePerson.Legal.SelePerson(TwoYears AND IsExecutiveEver).Contact= Relatives.Relative);
 BusinessSele: => AssocExecRelatedCnt2yUnCap := COUNT(SelePerson(TwoYears AND IsExecutiveEver AND EXISTS(Relatives(RelativeIsBusinessContact =TRUE))));
 
 BusinessSele: => BE_AssocExecFemaleCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
@@ -4848,7 +5253,24 @@ BusinessSele: => BE_AssocExecRelatedCnt2Y := MAP(B_LexIDLegalSeenFlag = '0' OR S
 BusinessSele: => BE_AssocExecRelatedPct2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
 		BE_AssocExecCnt2Y  = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT  => BusinessSele.NO_DATA_FOUND_INT,
 		BE_AssocExecCnt2Y  = 1 => BusinessSele.NO_DATA_FOUND_97_INT,
-		(AssocExecRelatedCnt2yUnCap/AssocExecCnt2YUnCap )*100);	  
+		(AssocExecRelatedCnt2yUnCap/AssocExecCnt2YUnCap )*100);
+	  
+//Associate Buisness Average Helper Attributes
+Person: =>ContactBusCnt :=COUNT(SelePerson(TwoYears));
+BusinessSele: =>ContactBusAvg :=AVENZ(SelePerson(TwoYears).Contact,ContactBusCnt);
+BusinessSele: =>ContactExecBusAvg :=AVENZ(SelePerson(TwoYears AND IsExecutiveEver ).Contact,ContactBusCnt);
+BusinessSele: =>ContactNexecBusAvg :=AVENZ(SelePerson(TwoYears AND NOT IsExecutiveEver ).Contact,ContactBusCnt);
+
+//Associate Buisness Average Attributes
+BusinessSele: => BE_AssocBusCntAvg2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocCnt2Y = 0 OR BE_AssocCnt2Y = BusinessSele.NO_DATA_FOUND_INT =>BusinessSele.NO_DATA_FOUND_INT,
+		BOUNDSFOLD(ROUND(ContactBusAvg),1,999));
+BusinessSele: => BE_AssocExecBusCntAvg2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+		BOUNDSFOLD(ROUND(ContactExecBusAvg),1,999));
+BusinessSele: => BE_AssocNexecBusCntAvg2Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA_INT,
+		BE_AssocNexecCnt2Y = 0 OR BE_AssocNexecCnt2Y = BusinessSele.NO_DATA_FOUND_INT => BusinessSele.NO_DATA_FOUND_INT,
+		BOUNDSFOLD(ROUND(ContactNexecBusAvg),1,999));
 
 /**************************************************************************/
 /*                                                                        */
@@ -4879,6 +5301,10 @@ BusinessSele: => BestSicCode1Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 1
 BusinessSele: => BestSicCode2Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 2),1,WithinLast24Months,SourcePriority,SICCode);
 BusinessSele: => BestSicCode3Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 3),1,WithinLast24Months,SourcePriority,SICCode);
 BusinessSele: => BestSicCode4Set :=	TOPN(SICCodes(IsSicCode AND SICCodeOrder = 4),1,WithinLast24Months,SourcePriority,SICCode);
+BusinessSele: => BusSICCode1 := IsBlank(ONLY(BestSicCode1Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND);
+BusinessSele: => BusSICCode2 := IsBlank(ONLY(BestSicCode2Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND);
+BusinessSele: => BusSICCode3 := IsBlank(ONLY(BestSicCode3Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND);
+BusinessSele: => BusSICCode4 := IsBlank(ONLY(BestSicCode4Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND);
 BusinessSele.NAICSCodes: => SourcePriority := MAP( Source = 'DF' => 1,
 																									 Source = 'Z1' => 2,
 																									 Source = 'RR' => 3,
@@ -4897,6 +5323,10 @@ BusinessSele: => BestNAICSCode1Set :=	TOPN(NAICSCodes(IsNAICSCode AND NAICSCodeO
 BusinessSele: => BestNAICSCode2Set :=	TOPN(NAICSCodes(IsNAICSCode AND NAICSCodeOrder = 2),1,WithinLast24Months,SourcePriority,NAICSCode);
 BusinessSele: => BestNAICSCode3Set :=	TOPN(NAICSCodes(IsNAICSCode AND NAICSCodeOrder = 3),1,WithinLast24Months,SourcePriority,NAICSCode);
 BusinessSele: => BestNAICSCode4Set :=	TOPN(NAICSCodes(IsNAICSCode AND NAICSCodeOrder = 4),1,WithinLast24Months,SourcePriority,NAICSCode);
+BusinessSele: => BusNAICSCode1 := IsBlank(ONLY(BestNAICSCode1Set,NAICSCode),BusinessSele.NO_DATA_FOUND);
+BusinessSele: => BusNAICSCode2 := IsBlank(ONLY(BestNAICSCode2Set,NAICSCode),BusinessSele.NO_DATA_FOUND);
+BusinessSele: => BusNAICSCode3 := IsBlank(ONLY(BestNAICSCode3Set,NAICSCode),BusinessSele.NO_DATA_FOUND);
+BusinessSele: => BusNAICSCode4 := IsBlank(ONLY(BestNAICSCode4Set,NAICSCode),BusinessSele.NO_DATA_FOUND);
 
 BusinessSele.EmployeeCounts: => DateLastSeenCapped := MIN(TotalEmployees:DateLastSeen, CURRENT_DATE);
 BusinessSele.EmployeeCounts: => AgeInDays := ABSDAYSBETWEEN(DateLastSeenCapped, BusinessSele.CURRENT_DATE);
@@ -5011,7 +5441,11 @@ BusinessSele: =>IsSBE :=EXISTS(BusinessProx.BusinessCharacteristics(IsSBE));
 
 
 BusinessSele: => BE_BusSICCode1 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						IsBlank(ONLY(BestSicCode1Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND));
+																						BusSICCode1 != BusinessSele.NO_DATA_FOUND => BusSICCode1,
+																						BusSICCode2 != BusinessSele.NO_DATA_FOUND => BusSICCode2,
+																						BusSICCode3 != BusinessSele.NO_DATA_FOUND => BusSICCode3,
+																						BusSICCode4 != BusinessSele.NO_DATA_FOUND => BusSICCode4,
+																						BusinessSele.NO_DATA_FOUND);
 BusinessSele: => BE_BusSICCode1Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode1));
@@ -5019,7 +5453,10 @@ BusinessSele: => BE_BusSICCode1GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 																							BE_BusSICCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode1,1,2)));
 BusinessSele: => BE_BusSICCode2 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						IsBlank(ONLY(BestSicCode2Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND));
+																						BusSICCode2 != BusinessSele.NO_DATA_FOUND AND BusSICCode2 != BE_BusSICCode1 => BusSICCode2,
+																						BusSICCode3 != BusinessSele.NO_DATA_FOUND AND BusSICCode3 != BE_BusSICCode1 => BusSICCode3,
+																						BusSICCode4 != BusinessSele.NO_DATA_FOUND AND BusSICCode4 != BE_BusSICCode1 => BusSICCode4,
+																						BusinessSele.NO_DATA_FOUND);
 BusinessSele: => BE_BusSICCode2Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode2));
@@ -5027,7 +5464,9 @@ BusinessSele: => BE_BusSICCode2GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 																							BE_BusSICCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode2,1,2)));
 BusinessSele: => BE_BusSICCode3 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						IsBlank(ONLY(BestSicCode3Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND));
+																						BusSICCode3 != BusinessSele.NO_DATA_FOUND AND BusSICCode3 != BE_BusSICCode1 AND BusSICCode3 != BE_BusSICCode2 => BusSICCode3,
+																						BusSICCode4 != BusinessSele.NO_DATA_FOUND AND BusSICCode4 != BE_BusSICCode1 AND BusSICCode4 != BE_BusSICCode2 => BusSICCode4,
+																						BusinessSele.NO_DATA_FOUND);
 BusinessSele: => BE_BusSICCode3Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode3));
@@ -5035,7 +5474,8 @@ BusinessSele: => BE_BusSICCode3GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 																							BE_BusSICCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode3,1,2)));
 BusinessSele: => BE_BusSICCode4 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
-																						IsBlank(ONLY(BestSicCode4Set,MapSicCodePadding(SICCode)),BusinessSele.NO_DATA_FOUND));
+																						BusSICCode4 != BusinessSele.NO_DATA_FOUND AND BusSICCode4 != BE_BusSICCode1 AND BusSICCode4 != BE_BusSICCode2 AND BusSICCode4 != BE_BusSICCode3 => BusSICCode4,
+																						BusinessSele.NO_DATA_FOUND);
 BusinessSele: => BE_BusSICCode4Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = BusinessSele.MISSING_INPUT_DATA => BusinessSele.MISSING_INPUT_DATA,
 																							BE_BusSICCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICCodeInterpreter(BE_BusSICCode4));
@@ -5043,7 +5483,11 @@ BusinessSele: => BE_BusSICCode4GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 																							BE_BusSICCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							FnSICGroupCodeInterpreter(SUBSTR(BE_BusSICCode4,1,2)));
 BusinessSele: => BE_BusNAICSCode1 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-																						IsBlank(ONLY(BestNAICSCode1Set,NAICSCode),BusinessSele.NO_DATA_FOUND));
+																						BusNAICSCode1 != BusinessSele.NO_DATA_FOUND => BusNAICSCode1,
+																						BusNAICSCode2 != BusinessSele.NO_DATA_FOUND => BusNAICSCode2,
+																						BusNAICSCode3 != BusinessSele.NO_DATA_FOUND => BusNAICSCode3,
+																						BusNAICSCode4 != BusinessSele.NO_DATA_FOUND => BusNAICSCode4,
+																						BusinessSele.NO_DATA_FOUND);
 BusinessSele: => BE_BusNAICSCode1Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicCodeInterpreter(BE_BusNAICSCode1));
@@ -5051,7 +5495,10 @@ BusinessSele: => BE_BusNAICSCode1GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR 
 																							BE_BusNAICSCode1 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode1,1,2)));
 BusinessSele: => BE_BusNAICSCode2 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-																						IsBlank(ONLY(BestNAICSCode2Set,NAICSCode),BusinessSele.NO_DATA_FOUND));
+																						BusNAICSCode2 != BusinessSele.NO_DATA_FOUND AND BusNAICSCode2 != BE_BusNAICSCode1 => BusNAICSCode2,
+																						BusNAICSCode3 != BusinessSele.NO_DATA_FOUND AND BusNAICSCode3 != BE_BusNAICSCode1 => BusNAICSCode3,
+																						BusNAICSCode4 != BusinessSele.NO_DATA_FOUND AND BusNAICSCode4 != BE_BusNAICSCode1 => BusNAICSCode4,
+																						BusinessSele.NO_DATA_FOUND);
 BusinessSele: => BE_BusNAICSCode2Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicCodeInterpreter(BE_BusNAICSCode2));
@@ -5059,7 +5506,9 @@ BusinessSele: => BE_BusNAICSCode2GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR 
 																							BE_BusNAICSCode2 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode2,1,2)));
 BusinessSele: => BE_BusNAICSCode3 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-																						IsBlank(ONLY(BestNAICSCode3Set,NAICSCode),BusinessSele.NO_DATA_FOUND));
+																						BusNAICSCode3 != BusinessSele.NO_DATA_FOUND AND BusNAICSCode3 != BE_BusNAICSCode1 AND BusNAICSCode3 != BE_BusNAICSCode2 => BusNAICSCode3,
+																						BusNAICSCode4 != BusinessSele.NO_DATA_FOUND AND BusNAICSCode4 != BE_BusNAICSCode1 AND BusNAICSCode4 != BE_BusNAICSCode2 => BusNAICSCode4,
+																						BusinessSele.NO_DATA_FOUND);
 BusinessSele: => BE_BusNAICSCode3Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicCodeInterpreter(BE_BusNAICSCode3));
@@ -5067,7 +5516,8 @@ BusinessSele: => BE_BusNAICSCode3GroupDesc := MAP(B_LexIDLegalSeenFlag = '0' OR 
 																							BE_BusNAICSCode3 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicGroupCodeInterpreter(SUBSTR(BE_BusNAICSCode3,1,2)));
 BusinessSele: => BE_BusNAICSCode4 := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-																						IsBlank(ONLY(BestNAICSCode4Set,NAICSCode),BusinessSele.NO_DATA_FOUND));
+																						BusNAICSCode4 != BusinessSele.NO_DATA_FOUND AND BusNAICSCode4 != BE_BusNAICSCode1 AND BusNAICSCode4 != BE_BusNAICSCode2 AND BusNAICSCode4 != BE_BusNAICSCode3 => BusNAICSCode4,
+																						BusinessSele.NO_DATA_FOUND);
 BusinessSele: => BE_BusNAICSCode4Desc := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 																							BE_BusNAICSCode4 = BusinessSele.NO_DATA_FOUND => BusinessSele.NO_DATA_FOUND,
 																							fnNaicCodeInterpreter(BE_BusNAICSCode4));
@@ -5129,4 +5579,28 @@ BusinessSele: =>BE_BusLocActvCnt := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = M
 BusinessSele: =>BE_BusIsSBEFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
 		IsSBE => '1',
 		'0');  
+//Firmographics Ownership Helper Attributes
 
+BusinessSele: => IsVendorCertifiedFemaleOwned :=EXISTS(BusinessCharacteristics(IsWomanOwned)) OR EXISTS(BusinessProx.BusinessOwnedCharacteristics(IsWomanOwned));
+BusinessSele: => IsVendorCertifiedMinorityOwned :=EXISTS(BusinessCharacteristics(IsMinorityOwned)) OR EXISTS(BusinessProx.BusinessOwnedCharacteristics(IsMinorityOwned));
+BusinessSele: => IsBHFirmPublic := IF(StockTickers(Ticker<>'' OR NOT Ticker:Null),'1','0');
+BusinessSele: => IsEBRFirmPublic := IF(Ownership(OwnershipType ='1'),'1','0');
+
+//Firmographics Ownership Attributes
+
+BusinessSele: =>BE_BusInferFemaleOwnedFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		(BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y = NO_DATA_FOUND_INT) AND NOT IsVendorCertifiedFemaleOwned  => NO_DATA_FOUND,
+		BE_AssocExecFemalePct2Y  < 51.00 AND NOT IsVendorCertifiedFemaleOwned =>'0',
+		IsVendorCertifiedFemaleOwned =>'1',
+		BE_AssocExecFemalePct2Y >=51.00 AND NOT IsVendorCertifiedFemaleOwned =>'2' );
+BusinessSele: =>BE_BusInferFamilyOwnedFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		BE_AssocExecCnt2Y = 0 OR BE_AssocExecCnt2Y =NO_DATA_FOUND_INT => NO_DATA_FOUND,
+		BE_AssocExecCnt2Y = 1 => NO_DATA_FOUND_97,
+		BE_AssocExecRelatedPct2Y < 51.00 =>'0',
+		BE_AssocExecRelatedPct2Y >= 51.00 =>'1');
+BusinessSele: =>BE_BusIsFemaleOwnedFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsVendorCertifiedFemaleOwned => '1','0');
+BusinessSele: =>BE_BusIsMinorityOwnedFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsVendorCertifiedMinorityOwned => '1','0');
+BusinessSele: =>BE_BusIsPublicFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		IsBHFirmPublic ='1' OR IsEBRFirmPublic ='1' => '1','0');
