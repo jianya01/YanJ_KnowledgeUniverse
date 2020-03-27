@@ -116,8 +116,52 @@ FUNCTION: FnSICGroupCodeInterpreter(STRING SicCodeGroup) <= MAP(			SicCodeGroup 
 																																			'Other');
 FUNCTION: fnAddr1FromComponents(STRING PrimaryRange,STRING Predirectional,STRING PrimaryName,STRING Suffix,STRING Postdirectional,STRING UnitDesignation,STRING SecondaryRange) <= ECL(address.Addr1FromComponents(PrimaryRange,Predirectional,PrimaryName,Suffix,Postdirectional,UnitDesignation,SecondaryRange)) FROM address RETURNS STRING;	
 FUNCTION: fnOverrideAddrType(STRING Addr1, STRING AddrType, STRING CarrRTE) <= ECL(risk_indicators.iid_constants.override_addr_type(Addr1,AddrType,CarrRTE)) FROM risk_indicators RETURNS STRING; 
- 
- 
+
+FUNCTION: IsFound(STRING source, STRING target) <= ECL(STD.Str.Find(source, target, 1) > 0) RETURNS BOOLEAN;
+
+FUNCTION: RegexReplace(STRING regex, STRING text, STRING replacement, BOOLEAN nocase) <= ECL(REGEXREPLACE(regex, text, replacement, nocase)) RETURNS STRING;
+
+// SlimBusinessName prepares a company name to be compared to another company name for Business Input Source verification. 
+	// 1. Remove punctuation
+	// 2. Remove furniture words (Center, Company, Co, Corp, etc.)
+	// 3. Remove any whitespace
+FUNCTION: SlimBusinessName(STRING BusinessName) <= RegexReplace(
+	'\\s', // remove whitespace
+	RegexReplace(
+		'(?:^| )(?:CENTER(?:$| )|COMPANY(?:$| )|CO(?:$| )|CORP(?:$| )|CORPORATION(?:$| )|CORPORATE(?:$| )|SERVICE(?:$| )|SERVICES(?:$| )|SER(?:$| )|INC(?:$| )|INCORPORATED(?:$| )|INTL(?:$| )|INTERNATIONAL(?:$| )|GLOBAL(?:$| )|INTERCONTINENTAL(?:$| )|WORLDWIDE(?:$| )|ASSOC(?:$| )|ASS(?:$| )|ASSO(?:$| )|ASSOCIATES(?:$| )|ASSOCIATION(?:$| )|BOUTIQUE(?:$| )|INDUSTRIES(?:$| )|INDUSTRIAL(?:$| )|IND(?:$| )|ENTERPRISES(?:$| )|ENTERPRISE(?:$| )|TRADING(?:$| )|GP(?:$| )|G P(?:$| )|QA(?:$| )|Q A(?:$| )|LP(?:$| )|L P(?:$| )|LLP(?:$| )|COOP(?:$| )|FACTORY(?:$| )|GRP(?:$| )|GROUP(?:$| )|LC(?:$| )|L C(?:$| )|LLC(?:$| )|FL LLC(?:$| )|BUILDING(?:$| )|CONDOMINIUM(?:$| )|COMMISSION(?:$| )|CLUB(?:$| )|DEPT(?:$| )|DEPARTMENT(?:$| )|DEPARTMENTS(?:$| )|NATIONWIDE(?:$| )|CONTRACTORS(?:$| )|CONTRACTING(?:$| )|WORLD(?:$| )|ADVANCED(?:$| )|STORE(?:$| )|STORES(?:$| )|THE(?:$| )|OF(?:$| )|MALL(?:$| )|LTD(?:$| )|LIMITED(?:$| )|LIABILITY(?:$| )|PARTNERSHIP(?:$| )|PARTNERS(?:$| )|PARTNER(?:$| )|FRANCHISE(?:$| )|INDUSTRY(?:$| )|INDUSTRIES(?:$| )|VENTURE(?:$| )|VENTURES(?:$| )|HOLDING(?:$| )|HOLDINGS(?:$| )|GENERAL(?:$| )|AND(?:$| )|MANAGEMENT(?:$| )|MGMT(?:$| )|MFG(?:$| )|MANUFACTURING(?:$| )|COOPERATIVE(?:$| )|DBA(?:$| )|ORG(?:$| )|ORGANIZATION(?:$| )|CONTRACTOR(?:$| ))+', // remove furniture words
+		RegexReplace(
+			'[[:punct:]]', // remove punctuation
+			BusinessName, 
+			'', 
+			TRUE), 
+		'', 
+		TRUE),
+	'', 
+	TRUE);
+
+FUNCTION: LevenshteinSimilarity(STRING field1, STRING field2) <= EditDistance(field1, field2)/MAX(LENGTH(field1), LENGTH(field2));
+
+FUNCTION: IsNullOrEqual(Field1, Field2) <= Field1 = Field2 OR (Field1:Null AND Field2:Null);
+
+// The EditDistanceWithinRadius will have better performance than the EditDistance function (as it will short circuit matching logic for poor matches) so whenever possible, EditDistanceWithinRadius should be used instead of EditDistance
+FUNCTION: EditDistanceWithinRadius(STRING field1, STRING field2, INTEGER radius) <= ECL(STD.Str.EditDistanceWithinRadius(field1, field2, radius)) FROM STD RETURNS BOOLEAN;
+
+// Seven digit phones are considered a match if the Levenshtein distance between the two phone numbers is less than or equal to 1.
+FUNCTION: IsPhone7Match(STRING Phone1, STRING Phone2) <= EditDistanceWithinRadius(Phone1, Phone2, 1);
+// Ten digit phones are considered a match if the last seven digits of the phone number are an exact match or if the Levenshtein distance between the two phone10s is less than or equal to 2.
+FUNCTION: IsPhone10Match(STRING Phone1, STRING Phone2) <= SUBSTR(Phone1, 4, 10) = SUBSTR(Phone2, 4, 10) OR EditDistanceWithinRadius(Phone1, Phone2, 2);
+// To determine a phone match:
+	// If both phones are 10 digits, apply Phone10 match logic
+	// If both phones are 7 digits, apply Phone7 match logic
+	// If phone on file is 10 digits and input phone is 7 digits, strip the first three digits from the phone on file and apply Phone7 match logic
+	// If phone on file is 7 digits and input phone is 10 digits, append the first three digits of the input phone to the phone on file and apply Phone10 match logic
+FUNCTION: IsPhoneMatch(STRING PhoneOnFile, STRING InputPhone) <= 
+	MAP(LENGTH(PhoneOnFile) = 10 AND LENGTH(InputPhone) = 10 => IsPhone10Match(PhoneOnFile, InputPhone),
+			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 7 => IsPhone7Match(PhoneOnFile, InputPhone),	
+			LENGTH(PhoneOnFile) = 10 AND LENGTH(InputPhone) = 7 => IsPhone7Match(SUBSTR(PhoneOnFile, 4, 10), InputPhone),
+			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 10 => IsPhone10Match(SUBSTR(InputPhone, 1, 3) + PhoneOnFile, InputPhone),
+			FALSE);
+			
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -2617,6 +2661,277 @@ BusinessSele: => BE_URLFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSIN
 				EXISTS(URLs) => 1,
 				0);
 
+/**************************************************************************/
+/*                                                                        */
+/*     Business Input Verification Helper Attributes                      */
+/*                                                                        */
+/**************************************************************************/
+
+// Name match logic
+BusinessSele: => BII := ONLY(InputBII);
+BusinessSele: => BusInputNameCleanValue := BII.BusInputNameCleanValue;
+// Rules for determining a business name match:
+	// 1. Remove punctuation from B_InpClnName, Name, CorporationLegalName, DoingBusinessAs
+	// 2. Remove all furniture words from the results of step 1 (Corp, Co, Services, etc)
+	// 3. Remove all whitespace from results of step 2.
+	// 4. Check if modified version of B_InpClnName is detected in any of the modified versions of Name, CorporationLegalName, DoingBusinessAs
+	// 5. If no match is established in step 4, Levenshtein Similarity between modified version of B_InpClnName and modified versions of Name, CorporationLegalName, DoingBusinessAs. 
+			// If Levenshtein Similarity > .6, name is a match. Otherwise, name is not a match. 
+BusinessSele.ReportedNames: => SlimName := SlimBusinessName(Name);
+BusinessSele.ReportedNames: => SlimCorporationLegalName := SlimBusinessName(CorporationLegalName);
+BusinessSele.ReportedNames: => SlimDoingBusinessAs := SlimBusinessName(DoingBusinessAs);
+BusinessSele.ReportedNames: => SlimInpClnName := SlimBusinessName(BusinessSele.BusInputNameCleanValue);
+
+BusinessSele.ReportedNames: => NameMatch := IsFound(SlimName, SlimInpClnName);
+BusinessSele.ReportedNames: => CorporationLegalNameMatch := IsFound(SlimCorporationLegalName, SlimInpClnName);
+BusinessSele.ReportedNames: => DoingBusinessAsMatch := IsFound(SlimDoingBusinessAs, SlimInpClnName);
+BusinessSele.ReportedNames: => BusinessNameMatch := NameMatch OR CorporationLegalNameMatch OR DoingBusinessAsMatch;
+
+BusinessSele.ReportedNames: => NameSimilarity := LevenshteinSimilarity(SlimName, SlimInpClnName);
+BusinessSele.ReportedNames: => CorporationLegalNameSimilarity := LevenshteinSimilarity(SlimCorporationLegalName, SlimInpClnName);
+BusinessSele.ReportedNames: => DoingBusinessAsSimilarity := LevenshteinSimilarity(SlimDoingBusinessAs, SlimInpClnName);
+BusinessSele.ReportedNames: => BusinessNameIsSimilar := NameSimilarity > 0.6 OR CorporationLegalNameSimilarity > 0.6 OR DoingBusinessAsSimilarity > 0.6;
+
+BusinessSele.ReportedNames: => BusinessNameMatchRecord := (BusinessNameMatch AND HeaderHitFlag) OR (BusinessNameIsSimilar AND HeaderHitFlag); // Consider only BIP header records when determining a name match
+
+BusinessSele.ReportedNames: => TranslatedSource := SourceGroup(Source);
+
+BusinessSele: => BusinessNameMatchSourcesPre := ReportedNames(BusinessNameMatchRecord){TranslatedSource};
+
+BusinessSele: => BusinessNameMatchSources := BusinessNameMatchSourcesPre{
+				TranslatedSource,
+				DateFirstSeenClean := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), DATETOSTRING(TranslatedSource:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+				DateLastSeenClean := IF(ISVALIDDATE(TranslatedSource:DateLastSeen), DATETOSTRING(MIN(TranslatedSource:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+BusinessSele: => BusinessNameMatchSourcesSorted := TOPN(BusinessNameMatchSources, 1000, DateFirstSeenClean = NO_DATA_FOUND_97, DateFirstSeenClean, -DateLastSeenClean, TranslatedSource);
+
+// Address match logic
+BusinessSele: => B_InpClnAddrPrimRng := BII.B_InpClnAddrPrimRng;
+BusinessSele: => B_InpClnAddrPreDir := BII.B_InpClnAddrPreDir;
+BusinessSele: => B_InpClnAddrPrimName := BII.B_InpClnAddrPrimName;
+BusinessSele: => B_InpClnAddrSffx := BII.B_InpClnAddrSffx;
+BusinessSele: => B_InpClnAddrPostDir := BII.B_InpClnAddrPostDir;
+BusinessSele: => B_InpClnAddrZip5 := BII.B_InpClnAddrZip5;
+BusinessSele: => B_InpClnAddrSecRng := BII.B_InpClnAddrSecRng;
+
+SeleAddress: => InputAddressMatch := 
+	IsNullOrEqual(PrimaryRange, Legal.B_InpClnAddrPrimRng) AND  
+	IsNullOrEqual(Predirectional, Legal.B_InpClnAddrPreDir) AND
+	IsNullOrEqual(PrimaryName, Legal.B_InpClnAddrPrimName) AND
+	IsNullOrEqual(Suffix, Legal.B_InpClnAddrSffx) AND
+	IsNullOrEqual(Postdirectional, Legal.B_InpClnAddrPostDir) AND
+	IsNullOrEqual(ZIP5, Legal.B_InpClnAddrZip5) AND
+	IsNullOrEqual(SecondaryRange, Legal.B_InpClnAddrSecRng);
+
+SeleAddress.DataSources: => TranslatedSource := SourceGroup(Source);
+BusinessSele: => SeleAddressMatchSourcesPre := SeleAddress(InputAddressMatch).DataSources(HeaderHitFlag){TranslatedSource};
+BusinessSele: => SeleAddressMatchSources := SeleAddressMatchSourcesPre{
+				TranslatedSource,
+				DateFirstSeenClean := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), DATETOSTRING(TranslatedSource:DateFirstSeen, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97),
+				DateLastSeenClean := IF(ISVALIDDATE(TranslatedSource:DateLastSeen), DATETOSTRING(MIN(TranslatedSource:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97)};
+				
+BusinessSele: => BusinessAddressMatchSourcesSorted := TOPN(SeleAddressMatchSources, 1000, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97, DateFirstSeenClean, -DateLastSeenClean, TranslatedSource);
+
+// TIN Match logic
+BusinessSele: => B_InpClnTIN := BII.BusInputTINCleanValue;
+
+// Consider a TIN on file a match with the input TIN if the Levenstein distance between the TINs is <= 2.
+SeleTIN: => InputTINMatch := EditDistanceWithinRadius(TaxID, Legal.B_InpClnTIN, 2);
+
+SeleTIN.DataSources: => TranslatedSource := SourceGroup(Source);
+BusinessSele: => SeleTINMatchSourcesPre := SeleTIN(InputTINMatch).DataSources(HeaderHitFlag){TranslatedSource};
+BusinessSele: => SeleTINMatchSources := SeleTINMatchSourcesPre{
+				TranslatedSource,
+				DateFirstSeenClean := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), DATETOSTRING(TranslatedSource:DateFirstSeen, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97),
+				DateLastSeenClean := IF(ISVALIDDATE(TranslatedSource:DateLastSeen), DATETOSTRING(MIN(TranslatedSource:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97)};
+
+BusinessSele: => BusinessTINMatchSourcesSorted := TOPN(SeleTINMatchSources, 1000, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97, DateFirstSeenClean, -DateLastSeenClean, TranslatedSource);
+
+// Phone match logic
+BusinessSele: => B_InpClnPhone := BII.BusInputPhoneCleanValue;
+
+SelePhoneNumber: => InputPhoneMatch := IsPhoneMatch(STRING(PhoneNumber), Legal.B_InpClnPhone);
+
+SelePhoneNumber.DataSources: => TranslatedSource := SourceGroup(Source);
+BusinessSele: => SelePhoneMatchSourcesPre := SelePhoneNumber(InputPhoneMatch).DataSources(HeaderHitFlag){TranslatedSource};
+BusinessSele: => SelePhoneMatchSources := SelePhoneMatchSourcesPre{
+				TranslatedSource,
+				DateFirstSeenClean := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), DATETOSTRING(TranslatedSource:DateFirstSeen, '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97),
+				DateLastSeenClean := IF(ISVALIDDATE(TranslatedSource:DateLastSeen), DATETOSTRING(MIN(TranslatedSource:DateLastSeen, BusinessSele.CURRENT_DATE), '%Y%m%d'), BusinessSele.NO_DATA_FOUND_97)};
+
+BusinessSele: => BusinessPhoneMatchSourcesSorted := TOPN(SelePhoneMatchSources, 1000, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97, DateFirstSeenClean, -DateLastSeenClean, TranslatedSource);
+
+/**************************************************************************/
+/*                                                                        */
+/*     				Business Input Verification Attributes                      */
+/*                                                                        */
+/**************************************************************************/
+BusinessSele: => BE_VerNameFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				EXISTS(BusinessNameMatchSources) => 1,
+				0);
+
+BusinessSele: => BE_VerNameSrcListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessNameMatchSourcesSorted, TranslatedSource, '|'));
+				
+BusinessSele: => BE_VerNameSrcCntEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND_INT,				
+				BOUNDSFOLD(COUNT(BusinessNameMatchSourcesSorted), 0, 34));
+				
+BusinessSele: => BE_VerNameSrcEmrgDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessNameMatchSourcesSorted, DateFirstSeenClean, '|'));
+
+BusinessSele: => BE_VerNameSrcLastDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessNameMatchSourcesSorted, DateLastSeenClean, '|'));
+
+BusinessSele: => BE_VerNameSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessNameMatchSourcesSorted, DateFirstSeenClean = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(BusinessNameMatchSourcesSorted, DATE(DateFirstSeenClean)), '%Y%m%d'));
+
+BusinessSele: => BE_VerNameSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessNameMatchSourcesSorted, DateLastSeenClean = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(BusinessNameMatchSourcesSorted, DATE(DateLastSeenClean)), '%Y%m%d'));
+
+BusinessSele: => BE_VerNameSrcOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessNameMatchSourcesSorted, DateFirstSeenClean = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerNameSrcOldDtEv), CURRENT_DATE), 0 ,960));
+
+BusinessSele: => BE_VerNameSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.BusInputNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerNameFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessNameMatchSourcesSorted, DateLastSeenClean = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerNameSrcNewDtEv), CURRENT_DATE), 0 ,960));
+				
+BusinessSele: => BE_VerAddrFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				EXISTS(BusinessAddressMatchSourcesSorted) => 1,
+				0);
+
+BusinessSele: => BE_VerAddrSrcListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessAddressMatchSourcesSorted, TranslatedSource, '|'));
+				
+BusinessSele: => BE_VerAddrSrcCntEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(BusinessAddressMatchSourcesSorted), 0, 34));
+
+BusinessSele: => BE_VerAddrSrcEmrgDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessAddressMatchSourcesSorted, DateFirstSeenClean, '|'));
+
+BusinessSele: => BE_VerAddrSrcLastDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessAddressMatchSourcesSorted, DateLastSeenClean, '|'));
+				
+BusinessSele: => BE_VerAddrSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessAddressMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(BusinessAddressMatchSourcesSorted, DATE(DateFirstSeenClean)), '%Y%m%d'));
+
+BusinessSele: => BE_VerAddrSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessAddressMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(BusinessAddressMatchSourcesSorted, DATE(DateLastSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerAddrSrcOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessAddressMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerAddrSrcOldDtEv), CURRENT_DATE), 0, 960));
+
+BusinessSele: => BE_VerAddrSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessAddressMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerAddrSrcNewDtEv), CURRENT_DATE), 0, 960));	
+				
+BusinessSele: => BE_VerAddrSrcDtSpanEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR BII.B_InpClnAddrLocID = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				BE_VerAddrFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessAddressMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,				
+				ALL(BusinessAddressMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,			
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerAddrSrcOldDtEv), DATE(BE_VerAddrSrcNewDtEv)), 0, 960));	
+				
+BusinessSele: => BE_VerTINFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				EXISTS(BusinessTINMatchSourcesSorted) => 1,
+				0);
+				
+BusinessSele: => BE_VerTINSrcListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessTINMatchSourcesSorted, TranslatedSource, '|'));
+				
+BusinessSele: => BE_VerTINSrcCntEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(BusinessTINMatchSourcesSorted), 0, 34));
+				
+BusinessSele: => BE_VerTINSrcEmrgDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessTINMatchSourcesSorted, DateFirstSeenClean, '|'));
+				
+BusinessSele: => BE_VerTINSrcLastDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessTINMatchSourcesSorted, DateLastSeenClean, '|'));
+				
+BusinessSele: => BE_VerTINSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessTINMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(BusinessTINMatchSourcesSorted, DATE(DateFirstSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerTINSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessTINMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(BusinessTINMatchSourcesSorted, DATE(DateLastSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerTINSrcOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessTINMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerTINSrcOldDtEv), CURRENT_DATE), 0, 960));
+				
+BusinessSele: => BE_VerTINSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnTIN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerTINFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessTINMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerTINSrcNewDtEv), CURRENT_DATE), 0, 960));	
+				
+BusinessSele: => BE_VerPhoneFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				EXISTS(BusinessPhoneMatchSourcesSorted) => 1,
+				0);
+				
+BusinessSele: => BE_VerPhoneSrcListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessPhoneMatchSourcesSorted, TranslatedSource, '|'));
+				
+BusinessSele: => BE_VerPhoneSrcCntEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(BusinessPhoneMatchSourcesSorted), 0, 34));
+				
+BusinessSele: => BE_VerPhoneSrcEmrgDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessPhoneMatchSourcesSorted, DateFirstSeenClean, '|'));
+
+BusinessSele: => BE_VerPhoneSrcLastDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				CONCAT(BusinessPhoneMatchSourcesSorted, DateLastSeenClean, '|'));
+				
+BusinessSele: => BE_VerPhoneSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessPhoneMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(BusinessPhoneMatchSourcesSorted, DATE(DateFirstSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerPhoneSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND,
+				ALL(BusinessPhoneMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(BusinessPhoneMatchSourcesSorted, DATE(DateLastSeenClean)), '%Y%m%d'));
+				
+BusinessSele: => BE_VerPhoneSrcOldMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessPhoneMatchSourcesSorted, DateFirstSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerPhoneSrcOldDtEv), CURRENT_DATE), 0, 960));
+				
+BusinessSele: => BE_VerPhoneSrcNewMsncEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = '0' OR B_InpClnPhone IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				BE_VerPhoneFlag = 0 => NO_DATA_FOUND_INT,
+				ALL(BusinessPhoneMatchSourcesSorted, DateLastSeenClean = BusinessSele.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_VerPhoneSrcNewDtEv), CURRENT_DATE), 0, 960));	
+				
 /*		Tradline Helper Attributes		*/
 Tradeline: ONE_MONTH_IN_DAYS := 30;
 Tradeline: THREE_MONTHS_IN_DAYS := 90;
@@ -5289,8 +5604,3 @@ BusinessSele: =>BE_BusIsMinorityOwnedFlag := MAP(B_LexIDLegalSeenFlag = '0' OR S
 		IsVendorCertifiedMinorityOwned => '1','0');
 BusinessSele: =>BE_BusIsPublicFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
 		IsBHFirmPublic ='1' OR IsEBRFirmPublic ='1' => '1','0');
-
-
-
-
-
