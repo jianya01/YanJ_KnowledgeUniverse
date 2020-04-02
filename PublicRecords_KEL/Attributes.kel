@@ -44,10 +44,10 @@ FUNCTION: GETBUILDDATE(STRING variableName) <= ECL((UNSIGNED8)Risk_Indicators.ge
 FUNCTION: EditDistance(STRING field1, STRING field2) <= ECL(STD.Str.EditDistance(field1, field2)) FROM STD RETURNS INTEGER;
 FUNCTION: FindCount(STRING source, STRING target) <= ECL(STD.Str.FindCount(source, target)) FROM STD RETURNS INTEGER;
 FUNCTION: SourceGroup(STRING RawSource) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.SourceGroup(RawSource)) FROM PublicRecords_KEL RETURNS STRING;
-/*		function for filter		*/
+/*		function for filter		*/ 
 FUNCTION: Filter(STRING Source, STRING FilterString) <= ECL(STD.Str.Filter(Source, FilterString)) FROM STD RETURNS STRING;	
 FUNCTION: FilterOut(STRING source, STRING filter) <= ECL(STD.Str.FilterOut(source, filter)) FROM STD RETURNS STRING;
-/*		function for check phone is in bad phone list		*/
+/*		function for check phone is in bad phone list		*/ 
 FUNCTION: IsBadPhone(STRING Phone) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadPhone(Phone)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
 /*		function for check ssn is in bad ssn list		*/
 FUNCTION: IsBadSSN(STRING SSN) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsBadSSN(SSN)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
@@ -200,9 +200,9 @@ BusinessSele:  UCCCURRENT_DATE := MIN(GETBUILDDATE('ucc_build_version'), CURRENT
 BusinessSele: CURRENT_DATE_LIEN := MIN(GETBUILDDATE('liens_build_version'), CURRENTDATE());
 Person: CURRENT_DATE_LIEN := MIN(GETBUILDDATE('liens_build_version'), CURRENTDATE());
 SelePerson:  CURRENT_DATE  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
-Education:  CURRENT_DATE  := MIN(GETBUILDDATE('asl_build_version'), CURRENTDATE());
-PersonEducation:  CURRENT_DATE  := MIN(GETBUILDDATE('asl_build_version'), CURRENTDATE());
-
+//Hardcoding the static build date for Alloy Media Student Data since the keys are not updating anymore in Prod
+Education: ALLOY_MEDIA_BUILD_DATE := DATE(20160129); 
+Education: ASL_BUILD_DATE := GETBUILDDATE('asl_build_version'); 
 
 /***********************************************************************************************************************/
 /***********************************************************************************************************************/
@@ -1872,11 +1872,12 @@ Person: => PL_PrevAddrLocID := MAP(
 
 Education: => CollRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['C','H','O']));
 Education: => EduRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['M','C','H','O']));
+Person: => BUILD_DATE := MIN(IF(EXISTS(PersonEducation.Edu(DataSources.Source = 'AY')), Education.ALLOY_MEDIA_BUILD_DATE , Education.ASL_BUILD_DATE), CURRENTDATE());
 
 Person: => EduRecVerSourceList := PersonEducation.Edu(EduRecFlag).CollegeCharacteristics{
 	FileType,
 	SourceDateFirstSeen := IF(ISVALIDDATE(FileType:DateFirstSeen), DATETOSTRING(FileType:DateFirstSeen, '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97),
-	SourceDateLastSeen :=  IF(ISVALIDDATE(FileType:DateLastSeen), DATETOSTRING(MIN(FileType:DateLastSeen, Education.CURRENT_DATE), '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97)};
+	SourceDateLastSeen :=  IF(ISVALIDDATE(FileType:DateLastSeen), DATETOSTRING(MIN(FileType:DateLastSeen, Person.BUILD_DATE), '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97)};
 	
 Person: => EduRecVerSourceListSorted := TOPN(EduRecVerSourceList, 1000, SourceDateFirstSeen = Person.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, FileType);
 Person: => EduCollRecVerSourceList := EduRecVerSourceListSorted(FileType IN ['C','H','O']);
@@ -1933,12 +1934,12 @@ Person: => PL_EduCollSrcNewRecNewDtEv := MAP(
 Person: => PL_EduCollSrcNewRecOldMsncEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
 		NOT PersonEducation.Edu(CollRecFlag) => PersonEducation.NO_DATA_FOUND,
-		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_EduCollSrcNewRecOldDtEv),Education.CURRENT_DATE),0,999)); 
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_EduCollSrcNewRecOldDtEv),Person.BUILD_DATE),0,999)); 
 		
 Person: => PL_EduCollSrcNewRecNewMsncEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
 		NOT PersonEducation.Edu(CollRecFlag) => PersonEducation.NO_DATA_FOUND,
-		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_EduCollSrcNewRecNewDtEv),Education.CURRENT_DATE),0,999)); 
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_EduCollSrcNewRecNewDtEv),Person.BUILD_DATE),0,999)); 
 
 Person: => PL_EduCollRecSpanEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
