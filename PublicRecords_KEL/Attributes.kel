@@ -1874,15 +1874,17 @@ Education: => CollRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['C','H',
 Education: => EduRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['M','C','H','O']));
 Person: => BUILD_DATE := MIN(IF(EXISTS(PersonEducation.Edu(DataSources.Source = 'AY')), Education.ALLOY_MEDIA_BUILD_DATE , Education.ASL_BUILD_DATE), CURRENTDATE());
 
-Person: => EduRecVerSourceList := PersonEducation.Edu(EduRecFlag).CollegeCharacteristics{
+Person: => EduRecVerSourceListPre := PersonEducation.Edu(EduRecFlag).CollegeCharacteristics{FileType, DateFirstSeenMin := MIN(GROUP, FileType:DateFirstSeen), DateLastSeenMax := MAX(GROUP, FileType:DateLastSeen)};
+Person: => EduRecVerSourceList := EduRecVerSourceListPre{
 	FileType,
-	SourceDateFirstSeen := IF(ISVALIDDATE(FileType:DateFirstSeen), DATETOSTRING(FileType:DateFirstSeen, '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97),
-	SourceDateLastSeen :=  IF(ISVALIDDATE(FileType:DateLastSeen), DATETOSTRING(MIN(FileType:DateLastSeen, Person.BUILD_DATE), '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97)};
+	SourceDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMin), DATETOSTRING(DateFirstSeenMin, '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97),
+	SourceDateLastSeen :=  IF(ISVALIDDATE(DateLastSeenMax), DATETOSTRING(MIN(DateLastSeenMax, Person.BUILD_DATE), '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97)};
 	
-Person: => EduRecVerSourceListSorted := TOPN(EduRecVerSourceList, 1000, FileType, SourceDateFirstSeen = Person.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen);
-Person: => EduRecVerSourceListDeduped := Sequence.Dedup(EduRecVerSourceListSorted, LEFT.FileType = RIGHT.FileType, FileType);
-Person: => EduCollRecVerSourceList := EduRecVerSourceListDeduped(FileType IN ['C','H','O']);
-Person: => EduHSRecVerSourceList   := EduRecVerSourceListDeduped(FileType IN ['M']);
+Person: => EduRecVerSourceListSorted := TOPN(EduRecVerSourceList, 1000, SourceDateLastSeen = Person.NO_DATA_FOUND_97, SourceDateLastSeen);
+
+Person: => EduCollRecVerSourceList := EduRecVerSourceListSorted(FileType IN ['C','H','O']);
+Person: => EduHSRecVerSourceList   := EduRecVerSourceListSorted(FileType IN ['M']);
+
 
 /**************************************************************************/
 /*                                                                        */
@@ -1898,7 +1900,7 @@ Person: => PL_EduRecFlagEv := MAP(
 Person: => PL_EduSrcListEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
 		NOT PersonEducation.Edu(EduRecFlag) => PersonEducation.NO_DATA_FOUND,
-		CONCAT(EduRecVerSourceListDeduped, FileType, '|'));
+		CONCAT(EduRecVerSourceListSorted, FileType, '|'));
 		
 Person: => PL_EduHSRecFlagEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
