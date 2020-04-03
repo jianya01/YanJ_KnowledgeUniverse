@@ -1879,9 +1879,10 @@ Person: => EduRecVerSourceList := PersonEducation.Edu(EduRecFlag).CollegeCharact
 	SourceDateFirstSeen := IF(ISVALIDDATE(FileType:DateFirstSeen), DATETOSTRING(FileType:DateFirstSeen, '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(FileType:DateLastSeen), DATETOSTRING(MIN(FileType:DateLastSeen, Person.BUILD_DATE), '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97)};
 	
-Person: => EduRecVerSourceListSorted := TOPN(EduRecVerSourceList, 1000, SourceDateFirstSeen = Person.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, FileType);
-Person: => EduCollRecVerSourceList := EduRecVerSourceListSorted(FileType IN ['C','H','O']);
-Person: => EduHSRecVerSourceList   := EduRecVerSourceListSorted(FileType IN ['M']);
+Person: => EduRecVerSourceListSorted := TOPN(EduRecVerSourceList, 1000, FileType, SourceDateFirstSeen = Person.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen);
+Person: => EduRecVerSourceListDeduped := Sequence.Dedup(EduRecVerSourceListSorted, LEFT.FileType = RIGHT.FileType, FileType);
+Person: => EduCollRecVerSourceList := EduRecVerSourceListDeduped(FileType IN ['C','H','O']);
+Person: => EduHSRecVerSourceList   := EduRecVerSourceListDeduped(FileType IN ['M']);
 
 /**************************************************************************/
 /*                                                                        */
@@ -1897,7 +1898,7 @@ Person: => PL_EduRecFlagEv := MAP(
 Person: => PL_EduSrcListEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
 		NOT PersonEducation.Edu(EduRecFlag) => PersonEducation.NO_DATA_FOUND,
-		CONCAT(EduRecVerSourceListSorted, FileType, '|'));
+		CONCAT(EduRecVerSourceListDeduped, FileType, '|'));
 		
 Person: => PL_EduHSRecFlagEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
