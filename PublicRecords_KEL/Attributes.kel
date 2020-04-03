@@ -4378,31 +4378,46 @@ BusinessSele: => BE_DrgGovDebarredFlagEv :=	MAP(B_LexIDLegalSeenFlag = '0' OR Se
 LienJudgment: ONE_YEAR_IN_DAYS := 365;
 LienJudgment: SEVEN_YEAR_IN_DAYS := 2556;
 LienJudgment: LANDLORD_TENANT_DISPUTE_LIENS :=['FORCIBLE ENTRY/DETAINER','LANDLORD TENANT JUDGMENT','FORCIBLE ENTRY/DETAINER RELEAS','FORCIBLE ENTRY/DETAINER RELEASE'];
+LienJudgment: SUITS :=['CIVIL NEW FILING','CIVIL SUIT','CIVIL SUMMONS','COURT ORDER', 'FEDERAL COURT NEW FILING', 'FORECLOSURE NEW FILING', 'JUDGMENT - Chapter 7', 'LANDLORD TENANT SUIT', 'LIS PENDENS', 'LIS PENDENS NOTICE', 'LIS PENDENS RELEASE'];
 LienJudgment.Filing: => TMSID := LienJudgment.TMSID ;
 
 SeleLienJudgment.Details: => IsDebtor := UPCASE(TRIM(DebtorPlaintiff)) = 'D';
-BusinessSele: => AllLienData := SeleLienJudgment(Details.IsDebtor).Lien.Filing{ 
-									TMSID, 
-									FilingTypeDescription := ONLY(TOPN(GROUP(NOT FilingTypeDescription:Null), 1, -OriginalFilingDate), FilingTypeDescription ),
-									OriginalFilingDate := ONLY(TOPN(GROUP(ISVALIDDATE(OriginalFilingDate)), 1, OriginalFilingDate), OriginalFilingDate),
-									Amount := ONLY(TOPN(GROUP(NOT Amount:Null OR Amount != 0) , 1, -OriginalFilingDate,-Amount), Amount), 
-									LandlordTenantDisputeFlag := EXISTS(GROUP(LandlordTenantDisputeFlag = 'Y' ))
-								 };
+SeleLienJudgment: => GatherLiens := Lien.Filing{ 
+		TMSID, 
+		FilingTypeDescription,
+		Amount, 
+		LandlordTenantDisputeFlag,
+		MyDateFirstSeen := SeleLienJudgment.TMSID:DateFirstSeen
+		};
+BusinessSele: => AllLienData := SeleLienJudgment(Details.IsDebtor).GatherLiens{
+		TMSID,
+		FilingTypeDescription := ONLY(TOPN(GROUP(NOT FilingTypeDescription:Null), 1, -MyDateFirstSeen), FilingTypeDescription ),
+		Amount := ONLY(TOPN(GROUP(NOT Amount:Null OR Amount != 0), 1, -MyDateFirstSeen, -Amount), Amount), 
+		LandlordTenantDisputeFlag := EXISTS(GROUP(LandlordTenantDisputeFlag = 'Y' )),
+		OriginalFilingDate := ONLY(TOPN(GROUP(ISVALIDDATE(MyDateFirstSeen)), 1, MyDateFirstSeen), MyDateFirstSeen)
+		};
 BusinessSele.AllLienData: => AgeInDays :=ABSDAYSBETWEEN(OriginalFilingDate, CURRENT_DATE_LIEN);
-BusinessSele.AllLienData: => IsLandlordTenantDispute := LandlordTenantDisputeFlag = TRUE OR FilingTypeDescription IN LienJudgment.LANDLORD_TENANT_DISPUTE_LIENS ;
+BusinessSele.AllLienData: => IsLandlordTenantDispute := (LandlordTenantDisputeFlag = TRUE OR FilingTypeDescription IN LienJudgment.LANDLORD_TENANT_DISPUTE_LIENS) AND NOT FilingTypeDescription IN LienJudgment.SUITS  ;
 BusinessSele.AllLienData: => Seen_In_Seven_Years := AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS ;
 BusinessSele.AllLienData: => Seen_In_One_Year:= AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS;
 
 PersonLienJudgment.Details: => IsDebtor := UPCASE(TRIM(DebtorPlaintiff)) = 'D';
-Person: => AllLienData := PersonLienJudgment(Details.IsDebtor).Lien.Filing{ 
-									TMSID, 
-									FilingTypeDescription := ONLY(TOPN(GROUP(NOT FilingTypeDescription:Null), 1, -OriginalFilingDate), FilingTypeDescription ),
-									OriginalFilingDate := ONLY(TOPN(GROUP(ISVALIDDATE(OriginalFilingDate)), 1, OriginalFilingDate), OriginalFilingDate),
-									Amount := ONLY(TOPN(GROUP(NOT Amount:Null OR Amount != 0) , 1, -OriginalFilingDate,-Amount), Amount), 
-									LandlordTenantDisputeFlag := EXISTS(GROUP(LandlordTenantDisputeFlag = 'Y' ))
-								 };
+PersonLienJudgment: => GatherLiens := Lien.Filing{ 
+		TMSID, 
+		FilingTypeDescription,
+		Amount, 
+		LandlordTenantDisputeFlag,
+		MyDateFirstSeen := PersonLienJudgment.TMSID:DateFirstSeen
+		};
+Person: => AllLienData := PersonLienJudgment(Details.IsDebtor).GatherLiens{
+		TMSID,
+		FilingTypeDescription := ONLY(TOPN(GROUP(NOT FilingTypeDescription:Null), 1, -MyDateFirstSeen), FilingTypeDescription ),
+		Amount := ONLY(TOPN(GROUP(NOT Amount:Null OR Amount != 0), 1, -MyDateFirstSeen, -Amount), Amount), 
+		LandlordTenantDisputeFlag := EXISTS(GROUP(LandlordTenantDisputeFlag = 'Y' )),
+		OriginalFilingDate := ONLY(TOPN(GROUP(ISVALIDDATE(MyDateFirstSeen)), 1, MyDateFirstSeen), MyDateFirstSeen)
+		};
 Person.AllLienData: => AgeInDays :=ABSDAYSBETWEEN(OriginalFilingDate, CURRENT_DATE_LIEN);
-Person.AllLienData: => IsLandlordTenantDispute := LandlordTenantDisputeFlag = TRUE OR FilingTypeDescription IN LienJudgment.LANDLORD_TENANT_DISPUTE_LIENS ;
+Person.AllLienData: => IsLandlordTenantDispute := (LandlordTenantDisputeFlag = TRUE OR FilingTypeDescription IN LienJudgment.LANDLORD_TENANT_DISPUTE_LIENS) AND NOT FilingTypeDescription IN LienJudgment.SUITS;
 Person.AllLienData: => Seen_In_Seven_Years := AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS ;
 Person.AllLienData: => Seen_In_One_Year:= AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS;
 
@@ -4900,7 +4915,6 @@ BusinessSele: =>BE_DrgLnJOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID =
 /*                                                                        */
 /**************************************************************************/
 
-LienJudgment: SUITS :=['CIVIL NEW FILING','CIVIL SUIT','CIVIL SUMMONS','COURT ORDER', 'FEDERAL COURT NEW FILING', 'FORECLOSURE NEW FILING', 'JUDGMENT - Chapter 7', 'LANDLORD TENANT SUIT', 'LIS PENDENS', 'LIS PENDENS NOTICE', 'LIS PENDENS RELEASE'];
 BusinessSele.AllLienData: => IsSuits := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SUITS ;
 Person.AllLienData: => IsSuits := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SUITS ;
 
