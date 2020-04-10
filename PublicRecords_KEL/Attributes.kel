@@ -5750,40 +5750,40 @@ BusinessSele: =>BE_BusIsPublicFlag := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID =
 		IsBHFirmPublic ='1' OR IsEBRFirmPublic ='1' => '1','0');
 
 
-SeleAddress.BestAddresses: => isLowestRank := BestAddressRank=MIN(SeleAddress.Legal.SeleAddress.BestAddresses, BestAddressRank);
+BusinessSele: => BestAddresses := SeleAddress.BestAddresses(BestAddressRank = MIN(BusinessSele.SeleAddress.BestAddresses,BestAddressRank));
+BusinessSele: => OnlyBestAddress := ONLY(BestAddresses);
 
-SeleAddress: => OnlyBestAddress := ONLY(SeleAddress.Legal.SeleAddress.BestAddresses(isLowestRank));
-SeleAddress: => MatchesIsBestHelperAttr := OnlyBestAddress.BestPrimaryRange  = PrimaryRange
-AND (OnlyBestAddress.BestPredirectional = Predirectional OR OnlyBestAddress.BestPredirectional = '' OR OnlyBestAddress.BestPredirectional:Null)
-AND (OnlyBestAddress.BestPrimaryName = PrimaryName)
-AND (OnlyBestAddress.BestSuffix = Suffix)
-AND (OnlyBestAddress.BestPostdirectional = Postdirectional OR OnlyBestAddress.BestPostdirectional = '' OR OnlyBestAddress.BestPostdirectional:Null)
-AND (ZIP5 = OnlyBestAddress.BestZip5)
-AND (OnlyBestAddress.BestSecondaryRange = SecondaryRange OR OnlyBestAddress.BestSecondaryRange = '' OR OnlyBestAddress.BestSecondaryRange:Null);
+SeleAddress: => MatchesIsBestHelperAttr := Legal.OnlyBestAddress.BestPrimaryRange  = PrimaryRange
+												AND (Legal.OnlyBestAddress.BestPredirectional = Predirectional OR Legal.OnlyBestAddress.BestPredirectional = '' OR Legal.OnlyBestAddress.BestPredirectional:Null)
+												AND (Legal.OnlyBestAddress.BestPrimaryName = PrimaryName)
+												AND (Legal.OnlyBestAddress.BestSuffix = Suffix)
+												AND (Legal.OnlyBestAddress.BestPostdirectional = Postdirectional OR Legal.OnlyBestAddress.BestPostdirectional = '' OR Legal.OnlyBestAddress.BestPostdirectional:Null)
+												AND (ZIP5 = Legal.OnlyBestAddress.BestZip5)
+												AND (Legal.OnlyBestAddress.BestSecondaryRange = SecondaryRange OR Legal.OnlyBestAddress.BestSecondaryRange = '' OR Legal.OnlyBestAddress.BestSecondaryRange:Null);
 
 
 SeleAddress.DataSources: => AgeHelperAttribute := IF(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d') = '0',-99998,DAYSBETWEEN(Source:DateFirstSeen,SeleAddress.Legal.CURRENT_DATE));
 SeleAddress.DataSources: => LastSeenAgeHelperAttribute := IF(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d') = '0' OR DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'):Null,-99998,DAYSBETWEEN(Source:DateLastSeen,SeleAddress.Legal.CURRENT_DATE));
 SeleAddress.DataSources: => AgeIsNotZeroHelper := DATETOSTRING(Source:DateFirstSeen,'%Y%m%d') != '0';
 BusinessSele: => BestAddressSourcesSet := TOPN(SeleAddress(MatchesIsBestHelperAttr).DataSources, 99999, AgeIsNotZeroHelper, -AgeHelperAttribute, LastSeenAgeHelperAttribute, Source){AgeIsNotZeroHelper, AgeHelperAttribute, Source};
-BusinessSele: => BE_BestAddrSeenFlag := MAP(B_LexIDLegalSeenFlag = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA_INT,
-                                                                                    BE_BestAddrLocID = NO_DATA_FOUND_INT =>NO_DATA_FOUND_INT,
+BusinessSele: => BE_BestAddrSeenFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA_INT,
+                                                                                     (BE_BestAddrSt = NO_DATA_FOUND_INT OR BE_BestAddrZip = NO_DATA_FOUND_INT) AND (BE_BestAddrSt = NO_DATA_FOUND_INT OR BE_BestAddrCity = NO_DATA_FOUND_INT OR BE_BestAddrState = NO_DATA_FOUND_INT) =>NO_DATA_FOUND_INT,
                                                                                     EXISTS(BestAddressSourcesSet(AgeHelperAttribute >=0 OR NOT AgeIsNotZeroHelper)) => 1,
                                                                                     0);
-BusinessSele: => BE_BestAddrSrcListEv := MAP(B_LexIDLegalSeenFlag = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
+BusinessSele: => BE_BestAddrSrcListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
                                                                                     BE_BestAddrSeenFlag = NO_DATA_FOUND_INT OR BE_BestAddrSeenFlag = 0 => NO_DATA_FOUND,                                                                                   
                                                                                     EXISTS(SeleAddress(MatchesIsBestHelperAttr){DataSources.Source}) => CONCAT(TOPN(SeleAddress(MatchesIsBestHelperAttr).DataSources,99999, IF(AgeIsNotZeroHelper:Null,FALSE,AgeIsNotZeroHelper), IF(NOT AgeHelperAttribute:Null, -AgeHelperAttribute, 9999),IF(NOT LastSeenAgeHelperAttribute:Null, LastSeenAgeHelperAttribute, 9999),Source){Source},Source,'|'),
                                                                                     NO_DATA_FOUND);
-BusinessSele: => BE_BestAddrSrcCntEv := MAP(B_LexIDLegalSeenFlag = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA_INT,
+BusinessSele: => BE_BestAddrSrcCntEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA_INT,
                                                                                     BE_BestAddrSeenFlag = NO_DATA_FOUND_INT OR BE_BestAddrSeenFlag = 0 => NO_DATA_FOUND_INT,
                                                                                     COUNT(SeleAddress(MatchesIsBestHelperAttr).DataSources{Source}));
-BusinessSele: => BE_BestAddrSrcEmrgDtListEv := MAP(B_LexIDLegalSeenFlag = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
+BusinessSele: => BE_BestAddrSrcEmrgDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
                                                                                     BE_BestAddrSeenFlag = NO_DATA_FOUND_INT OR BE_BestAddrSeenFlag = 0 =>NO_DATA_FOUND,
                                                                                    
                                                                                     EXISTS(SeleAddress(MatchesIsBestHelperAttr).DataSources{Source}) => CONCAT(TOPN(SeleAddress(MatchesIsBestHelperAttr).DataSources,99999,IF(AgeIsNotZeroHelper:Null,FALSE,AgeIsNotZeroHelper),IF(NOT AgeHelperAttribute:Null, -AgeHelperAttribute, 999),IF(NOT LastSeenAgeHelperAttribute:Null, LastSeenAgeHelperAttribute, 9999), Source){Source},DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),'|'),
                                                                                     NO_DATA_FOUND)
                                                                                     ;
-BusinessSele: => BE_BestAddrSrcLastDtListEv := MAP(B_LexIDLegalSeenFlag = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
+BusinessSele: => BE_BestAddrSrcLastDtListEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
                                                                                     BE_BestAddrSeenFlag = NO_DATA_FOUND_INT OR BE_BestAddrSeenFlag = 0 =>NO_DATA_FOUND,
                                                                                    
                                                                                     EXISTS(SeleAddress(MatchesIsBestHelperAttr).DataSources{Source}) => CONCAT(TOPN(SeleAddress(MatchesIsBestHelperAttr).DataSources,99999,IF(AgeIsNotZeroHelper:Null,FALSE,AgeIsNotZeroHelper),IF(NOT AgeHelperAttribute:Null, -AgeHelperAttribute, 999),IF(NOT LastSeenAgeHelperAttribute:Null, LastSeenAgeHelperAttribute, 9999), Source){Source},DATETOSTRING(Source:DateLastSeen,'%Y%m%d'),'|'),
@@ -5793,21 +5793,93 @@ BusinessSele: => OldestAddrDateHelper := MIN(BestAddressSourcesSet(AgeIsNotZeroH
 BusinessSele: => NewestAddrDateHelper := TOPN(SeleAddress(MatchesIsBestHelperAttr).DataSources,1,AgeIsNotZeroHelper,AgeHelperAttribute,-LastSeenAgeHelperAttribute, Source);
 BusinessSele: => OnlyNewestAddrDateHelper := ONLY(NewestAddrDateHelper,Source);
 BusinessSele: => NewestAddrDateHelper2 := OnlyNewestAddrDateHelper:DateLastSeen;
-BusinessSele: => BE_BestAddrSrcOldDtEv := MAP(B_LexIDLegalSeenFlag = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
+BusinessSele: => BE_BestAddrSrcOldDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
                                                                                     BE_BestAddrSeenFlag = NO_DATA_FOUND_INT OR BE_BestAddrSeenFlag = 0 =>NO_DATA_FOUND,
                                                                                     EXISTS(SeleAddress.DataSources(AgeHelperAttribute != -99998)) => DATETOSTRING(OldestAddrDateHelper,'%Y%m%d'),
                                                                                     NO_DATA_FOUND_97);
                                                                                     
-BusinessSele: => BE_BestAddrSrcNewDtEv := MAP(B_LexIDLegalSeenFlag = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
+BusinessSele: => BE_BestAddrSrcNewDtEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
                                                                                     BE_BestAddrSeenFlag = NO_DATA_FOUND_INT OR BE_BestAddrSeenFlag = 0 =>NO_DATA_FOUND,
                                                                                     EXISTS(SeleAddress.DataSources(LastSeenAgeHelperAttribute != -99998)) => DATETOSTRING(NewestAddrDateHelper2,'%Y%m%d'),
                                                                                     NO_DATA_FOUND_97);
                                                                                     
-BusinessSele: => BE_BestAddrSrcOldMsncEv :=  MAP(B_LexIDLegalSeenFlag = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
+BusinessSele: => BE_BestAddrSrcOldMsncEv :=  MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
                                                                                     BE_BestAddrSeenFlag = NO_DATA_FOUND_INT OR BE_BestAddrSeenFlag = 0 =>NO_DATA_FOUND,
                                                                                     BE_BestAddrSrcNewDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
                                                                                     MONTHSBETWEEN( FROMSTRINGTODATE(BE_BestAddrSrcOldDtEv,'%Y%m%d'), BusinessSele.CURRENT_DATE));
-BusinessSele: => BE_BestAddrSrcNewMsncEv :=  MAP(B_LexIDLegalSeenFlag = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
+BusinessSele: => BE_BestAddrSrcNewMsncEv :=  MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 => MISSING_INPUT_DATA,
                                                                                     BE_BestAddrSeenFlag = NO_DATA_FOUND_INT OR BE_BestAddrSeenFlag = 0 =>NO_DATA_FOUND,
                                                                                     BE_BestAddrSrcNewDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
                                                                                     MONTHSBETWEEN( FROMSTRINGTODATE(BE_BestAddrSrcNewDtEv,'%Y%m%d'), BusinessSele.CURRENT_DATE));														
+
+
+
+//4822 Attributes
+BusinessSele: => BestAddressHelper := ONLY(SeleAddress(MatchesIsBestHelperAttr),Location);
+BusinessSele: => BestAddressHelperFlagRow := ONLY(BestAddressHelper{
+																							ExistsRoBAC := EXISTS(ResidentialOrBusiness(ResidentialOrBusinessIndicator IN ['A','C'])),
+																							ExistsRoBBD := EXISTS(ResidentialOrBusiness(ResidentialOrBusinessIndicator IN ['B','D'])),
+																							AllUnitDesignationNullOrEmpty := ALL(AddressComponents, UnitDesignation:Null OR UnitDesignation=''),
+																							ExistsVacancyIndicatorY := EXISTS(Vacancy(VacancyIndicator = 'Y')),
+																							ExistsVacancyIndicatorN := EXISTS(Vacancy(VacancyIndicator = 'N')),
+																							AllVacancyIndicatorNullOrEmpty := ALL(Vacancy, VacancyIndicator:Null OR VacancyIndicator=''),
+																							ExistsAddressTypeDerivedHHD := EXISTS(BusinessCharacteristics(AddressTypeDerived IN ['H','HD'])),
+																							ExistsAddressTypeDerivedP := EXISTS(BusinessCharacteristics(AddressTypeDerived ='P')),
+																							AllAddressTypeDerivedNullOrEmpty := ALL(BusinessCharacteristics,AddressTypeDerived:Null OR AddressTypeDerived = ''),
+																							SecondaryRangeNullOrEmpty := SecondaryRange:Null OR SecondaryRange=''
+																							});
+
+BusinessSele: => BestAddressZipHelper := ONLY(SeleAddress(MatchesIsBestHelperAttr).Location.ZIP5);
+BusinessSele: => BestSeleAddressHelper := ONLY(SeleAddress(MatchesIsBestHelperAttr){SecondaryRange,OtherLocationDetails,AddressTypes});
+BusinessSele: => BE_BestAddrIsResidentialFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
+																						BestAddressHelper:Null => NO_DATA_FOUND_INT,
+																						BestAddressHelperFlagRow.ExistsRoBAC => 1, //I think this should not be a submodel
+																						BestAddressHelperFlagRow.ExistsRoBBD => 0,
+																						NO_DATA_FOUND_97);
+BusinessSele: => MultiUnitFlagNullCheck := 			ALL(BestSeleAddressHelper.OtherLocationDetails,(UnitDesignation:Null AND UnitDesignation = '')) AND 
+																								ALL(BestSeleAddressHelper.AddressTypes,(AddressTypeDerived:Null OR AddressTypeDerived = '')) AND 
+																								(BestSeleAddressHelper.SecondaryRange:Null OR BestSeleAddressHelper.SecondaryRange = '') AND 
+																								BestAddressHelperFlagRow.AllUnitDesignationNullOrEmpty AND
+																								BestAddressHelperFlagRow.AllAddressTypeDerivedNullOrEmpty AND
+																								BestAddressHelperFlagRow.SecondaryRangeNullOrEmpty;
+BusinessSele: => BE_BestAddrBldgIsMultiUnitFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
+																													MultiUnitFlagNullCheck => NO_DATA_FOUND_INT,
+																													EXISTS(BestSeleAddressHelper.AddressTypes(AddressTypeDerived IN ['H','HD'])) OR
+																													BestAddressHelperFlagRow.ExistsAddressTypeDerivedHHD OR
+																													NOT BestAddressHelperFlagRow.SecondaryRangeNullOrEmpty OR
+																													NOT BestAddressHelperFlagRow.AllUnitDesignationNullOrEmpty 
+																									=> 1,
+																									0);
+
+BusinessSele: => BE_BestAddrBldgType := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
+																						BE_BestAddrIsResidentialFlag = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+																						BE_BestAddrIsResidentialFlag = NO_DATA_FOUND_97 OR BE_BestAddrBldgIsMultiUnitFlag = NO_DATA_FOUND_INT => NO_DATA_FOUND_97,
+																						BE_BestAddrIsResidentialFlag = 1 => 0,
+																						BE_BestAddrIsResidentialFlag = 0 AND BE_BestAddrBldgIsMultiUnitFlag = 0 => 1,
+																						BE_BestAddrIsResidentialFlag = 0 AND BE_BestAddrBldgIsMultiUnitFlag = 1 => 2);
+										
+										
+										
+										
+BusinessSele: => POBoxNullChecks := ALL(BestSeleAddressHelper.AddressTypes,AddressTypeDerived:Null OR  AddressTypeDerived = '') AND //<-- this line
+																							 (BestAddressZipHelper.ZipClass:Null OR BestAddressZipHelper.ZipClass = '') AND 
+																							 BestAddressHelperFlagRow.AllAddressTypeDerivedNullOrEmpty AND //<-- this line
+																							 (BestAddressZipHelper.ZipClass:Null OR BestAddressZipHelper.ZipClass = '');			
+BusinessSele: (NOT POBoxNullChecks) => POBox := BestAddressHelperFlagRow.ExistsAddressTypeDerivedP OR
+																							 BestAddressZipHelper.ZipClass = 'P' OR
+																							 EXISTS(BestSeleAddressHelper.AddressTypes(AddressTypeDerived = '9'));
+BusinessSele: => BE_BestAddrIsPOBoxFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,															 																					
+																							 POBoxNullChecks => NO_DATA_FOUND_INT,
+																							 POBox => 1,
+																							 0);
+BusinessSele: => VacantEmpty := NOT BestAddressHelperFlagRow.ExistsVacancyIndicatorY AND NOT BestAddressHelperFlagRow.ExistsVacancyIndicatorN;
+BusinessSele: (NOT VacantEmpty) => VacantNull := BestAddressHelperFlagRow.AllVacancyIndicatorNullOrEmpty;
+BusinessSele: (NOT VacantNull AND NOT VacantEmpty) => NotVacant := BestAddressHelperFlagRow.ExistsVacancyIndicatorN;
+BusinessSele: (NOT VacantNull AND NOT VacantEmpty AND NOT NotVacant) => Vacant := BestAddressHelperFlagRow.ExistsVacancyIndicatorY;
+BusinessSele: => BE_BestAddrIsVacantFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
+																						
+																						VacantEmpty => NO_DATA_FOUND_INT,
+																						VacantNull => NO_DATA_FOUND_97_INT,
+																						NotVacant => 0,
+																						Vacant => 1, 
+																						NO_DATA_FOUND_97_INT);
