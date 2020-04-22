@@ -1883,9 +1883,11 @@ Person: => EduRecVerSourceList := EduRecVerSourceListPre{
 	SourceDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMin), DATETOSTRING(DateFirstSeenMin, '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(DateLastSeenMax), DATETOSTRING(MIN(DateLastSeenMax, Person.BUILD_DATE), '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97)};
 	
-Person: => EduRecVerSourceListSorted := TOPN(EduRecVerSourceList, 1000, SourceDateLastSeen = Person.NO_DATA_FOUND_97, SourceDateLastSeen);
+Person: => EduRecVerSourceListSorted := TOPN(EduRecVerSourceList, 1000, SourceDateLastSeen = Person.NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen);
 
 Person: => EduCollRecVerSourceList := EduRecVerSourceListSorted(FileType IN ['C','H','O']);
+Person: => EduCollRecVerSourceListFiltered := TOPN(EduCollRecVerSourceList, 1, -SourceDateLastSeen, -SourceDateFirstSeen);
+
 Person: => EduHSRecVerSourceList   := EduRecVerSourceListSorted(FileType IN ['M']);
 
 
@@ -1930,12 +1932,12 @@ Person: => PL_EduCollSrcLastDtListEv := MAP(
 Person: => PL_EduCollSrcNewRecOldDtEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
 		NOT PersonEducation.Edu(CollRecFlag) => PersonEducation.NO_DATA_FOUND,
-		DATETOSTRING(MAX(EduCollRecVerSourceList, DATE(SourceDateFirstSeen)), '%Y%m%d'));
+		ONLY(EduCollRecVerSourceListFiltered, SourceDateFirstSeen));
 				
 Person: => PL_EduCollSrcNewRecNewDtEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
 		NOT PersonEducation.Edu(CollRecFlag) => PersonEducation.NO_DATA_FOUND,
-		DATETOSTRING(MAX(EduCollRecVerSourceList, DATE(SourceDateLastSeen)), '%Y%m%d'));
+		ONLY(EduCollRecVerSourceListFiltered, SourceDateLastSeen));
 		
 Person: => PL_EduCollSrcNewRecOldMsncEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
