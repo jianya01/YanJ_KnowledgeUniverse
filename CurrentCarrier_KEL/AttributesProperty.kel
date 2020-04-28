@@ -1,5 +1,6 @@
 ﻿IMPORT KnowledgeUniverse.CurrentCarrier_KEL.Entities;
 
+
 //Constant
 Policy: POLICY_TYPE_LIST := ['HO'];
 Policy: => DEFAULT_99999 := -99999;
@@ -17,17 +18,19 @@ Report: => CAP_9999 := 9999;
 
 
 //Globals
-Policy: => Subject := PolicyHolder(NOT EndDate:Null AND SubjectNumber = 1).Holder; // Grab the primary policy holder for this policy (Relation = 'B1' would be additional policy holders)
+// Policy: => Subject := PolicyHolder(NOT EndDate:Null AND SubjectNumber = 1).Holder; // Grab the primary policy holder for this policy (Relation = 'B1' would be additional policy holders)
+Policy: => Subject := PolicyHolder(NOT EndDate:Null AND SubjectNumber = 1){SubjectNumber}; // Grab the primary policy holder for this policy (Relation = 'B1' would be additional policy holders)
 Policy: => ExistValidTerms := EXISTS(Subject);
+Policy: => DateOfReport := rReport.DateOfReport;
 Report: => SetDefault1 := COUNT(Policy(ExistValidTerms));//Do not have valid policy terms at all
-Report: => SetDefault2 := COUNT(Policy(ExistValidTerms AND PolicyType IN POLICY_TYPE_LIST));//have policy terms but not in type HO
+Report: => SetDefault2 := COUNT(Policy(ExistValidTerms AND (PolicyType IN POLICY_TYPE_LIST)));//have policy terms but not in type HO
 
 Policy: => SubjectEndDatePolicy := MAX(PolicyHolder(NOT EndDate:Null AND SubjectNumber = 1), EndDate);// null, if not valid records
-Policy: => Calculated_End_Date := IF(NOT SubjectEndDatePolicy:Null, MIN(SubjectEndDatePolicy, FirstLoadDate));//null, if no subject begin date at all
+Policy: => Calculated_End_Date := IF(NOT SubjectEndDatePolicy:Null, MIN(SubjectEndDatePolicy, DateOfReport));//null, if no subject end date at all. of course, not valid policy
 
 Policy: => SubjectBeginDatePolicy := MIN(PolicyHolder(NOT EndDate:Null AND SubjectNumber = 1 AND EndDate = Policy.SubjectEndDatePolicy), StartDate);
 
-Policy: => Calculated_Start_Date:= IF(NOT SubjectBeginDatePolicy:Null, MIN(InceptionDate,SubjectBeginDatePolicy));
+Policy: => Calculated_Start_Date:= IF(NOT SubjectBeginDatePolicy:Null, MIN(InceptionDate,SubjectBeginDatePolicy),InceptionDate);//added inceptiondate if no subjectbegindate
 //set the age to -99999, if (inceptiondate) start date > end date (future terms), or no terms to calcualte (should not happen since I need set this to -1)
 Policy: => Policy_Tenure := IF(Calculated_End_Date:Null OR Calculated_Start_Date:Null OR Calculated_Start_Date > Calculated_End_Date, DEFAULT_99999, MONTHSBETWEEN(Calculated_Start_Date, Calculated_End_Date));
 
@@ -41,24 +44,25 @@ Policy: => Policy_Tenure := IF(Calculated_End_Date:Null OR Calculated_Start_Date
 // Report: => Policy_Tenure_tmp_SubjectOne := ONLY(Current_Policy_SubjectOne, Policy_Tenure_CurrentTerm_SubjectOne);
 
 //Note: Logic issue. Calculate end date is processed date if it is future end date, this logic will not be able to grab all current cases.
-Policy: => Policy_Tenure_CP := IF(InceptionDate > FirstLoadDate, DEFAULT_99999, // all future cases
-																	MONTHSBETWEEN(InceptionDate, FirstLoadDate));
-Report: => OnlyFuturePolicy_CP := NOT EXISTS(Policy(Policy_Tenure_CP >= 0 AND PolicyType IN POLICY_TYPE_LIST));
-Report: => OnlyFuturePolicy := NOT EXISTS(Policy(Policy_Tenure >= 0 AND PolicyType IN POLICY_TYPE_LIST));
+Policy: => Policy_Tenure_CP := IF(InceptionDate > DateOfReport, DEFAULT_99999, // all future cases
+																	MONTHSBETWEEN(Calculated_Start_Date, DateOfReport));
+Report: => OnlyFuturePolicy_CP := NOT EXISTS(Policy(Policy_Tenure_CP >= 0 AND (PolicyType IN POLICY_TYPE_LIST)));
+Report: => OnlyFuturePolicy := NOT EXISTS(Policy(Policy_Tenure >= 0 AND (PolicyType IN POLICY_TYPE_LIST)));
 
-Policy: => CheckCP1 := ExistValidTerms AND (FirstLoadDate <= SubjectEndDatePolicy) AND (PolicyType IN POLICY_TYPE_LIST) AND Policy_Tenure_CP >= 0;
-Policy: => CheckCP2 := ExistValidTerms AND (DAYSBETWEEN(SubjectEndDatePolicy,FirstLoadDate) <= 30) AND (PolicyType IN POLICY_TYPE_LIST) AND Policy_Tenure_CP >= 0;
+Policy: => CheckCP1 := ExistValidTerms AND (DateOfReport <= SubjectEndDatePolicy) AND (PolicyType IN POLICY_TYPE_LIST) AND Policy_Tenure_CP >= 0;
+Policy: => CheckCP2 := ExistValidTerms AND (DAYSBETWEEN(SubjectEndDatePolicy,DateOfReport) <= 30) AND (PolicyType IN POLICY_TYPE_LIST) AND Policy_Tenure_CP >= 0;
  
 //Take the oldest policy, by inception
-Report: => Current_Policy := TOPN(Policy(ExistValidTerms AND (FirstLoadDate <= SubjectEndDatePolicy OR DAYSBETWEEN(SubjectEndDatePolicy,FirstLoadDate) <= 30) AND (PolicyType IN POLICY_TYPE_LIST) AND Policy_Tenure_CP >= 0){UID, InceptionDate, Policy_Tenure_CP}, 1, -InceptionDate, -Policy_Tenure_CP);
-Report: => Policy_Tenure_CP := ONLY(Current_Policy,Policy_Tenure_CP);
+// Report: => Current_Policy := TOPN(Policy(ExistValidTerms AND (FirstLoadDate <= SubjectEndDatePolicy OR DAYSBETWEEN(SubjectEndDatePolicy,FirstLoadDate) <= 30) AND (PolicyType IN POLICY_TYPE_LIST) AND Policy_Tenure_CP >= 0){UID, InceptionDate, Policy_Tenure_CP}, 1, -InceptionDate, -Policy_Tenure_CP);
+// Report: => Policy_Tenure_CP := ONLY(Current_Policy,Policy_Tenure_CP);
+Report: => Policy_Tenure_CP := MAX(Policy(ExistValidTerms AND (CheckCP1 OR CheckCP2) AND (PolicyType IN POLICY_TYPE_LIST) AND Policy_Tenure_CP >= 0), Policy_Tenure_CP);
 
 
 //Attributes 
 Report: => Plcy_CNT_All_tmp := MAP(SetDefault1 = 0  => DEFAULT_1,
 																					 SetDefault2 = 0 => 0, // no HO
 																					 OnlyFuturePolicy => DEFAULT_3, // HO ONLY CONTAINS FUTURE TERMS
-																			 COUNT(Policy(PolicyType IN POLICY_TYPE_LIST AND ExistValidTerms AND Policy_Tenure >= 0))); //true 0, with valid policy but not in HO
+																			 COUNT(Policy((PolicyType IN POLICY_TYPE_LIST) AND ExistValidTerms AND Policy_Tenure >= 0))); //true 0, with valid policy but not in HO
 Report: => Plcy_CNT_All := MIN(Plcy_CNT_All_tmp,CAP_999);																			 
 																			 
 Report: => Plcy_Tenure_CP_tmp := MAP(SetDefault1 = 0  => DEFAULT_1,
@@ -70,19 +74,19 @@ Report: => Plcy_Tenure_CP := MIN(Plcy_Tenure_CP_tmp,CAP_9999);
 Report: => Plcy_MIN_Tenure_tmp := MAP(SetDefault1 = 0  => DEFAULT_1,
 																			 SetDefault2 = 0 => DEFAULT_2,
 																			 OnlyFuturePolicy => DEFAULT_3, // HO ONLY CONTAINS FUTURE TERMS
-																			 MIN(Policy(PolicyType IN POLICY_TYPE_LIST AND ExistValidTerms AND Policy_Tenure >= 0),Policy_Tenure));//true 0, age is in 1 month, Inception date to end date is in 1 month
+																			 MIN(Policy((PolicyType IN POLICY_TYPE_LIST) AND ExistValidTerms AND Policy_Tenure >= 0),Policy_Tenure));//true 0, age is in 1 month, Inception date to end date is in 1 month
 Report: => Plcy_MIN_Tenure := MIN(Plcy_MIN_Tenure_tmp,CAP_9999);	
 
 Report: => Plcy_MAX_Tenure_tmp := MAP(SetDefault1 = 0  => DEFAULT_1,
 																			 SetDefault2 = 0 => DEFAULT_2,
 																			 OnlyFuturePolicy => DEFAULT_3, // HO ONLY CONTAINS FUTURE TERMS
-																			 MAX(Policy(PolicyType IN POLICY_TYPE_LIST AND ExistValidTerms AND Policy_Tenure >= 0), Policy_Tenure));
+																			 MAX(Policy((PolicyType IN POLICY_TYPE_LIST) AND ExistValidTerms AND Policy_Tenure >= 0), Policy_Tenure));
 Report: => Plcy_MAX_Tenure := MIN(Plcy_MAX_Tenure_tmp,CAP_9999);	
 																			 
 Report: => Plcy_TOT_Tenure_tmp := MAP(SetDefault1 = 0  => DEFAULT_1,
 																			 SetDefault2 = 0 => DEFAULT_2,
 																			 OnlyFuturePolicy => DEFAULT_3, // HO ONLY CONTAINS FUTURE TERMS
-																			 SUM(Policy(PolicyType IN POLICY_TYPE_LIST AND ExistValidTerms AND Policy_Tenure >= 0), Policy_Tenure));
+																			 SUM(Policy((PolicyType IN POLICY_TYPE_LIST) AND ExistValidTerms AND Policy_Tenure >= 0), Policy_Tenure));
 Report: => Plcy_TOT_Tenure := MIN(Plcy_TOT_Tenure_tmp,CAP_9999);	
 																			 
 Report: => Plcy_CNT_All_TMP2 :=COUNT(Policy(PolicyType IN POLICY_TYPE_LIST AND ExistValidTerms AND Policy_Tenure >= 0));
