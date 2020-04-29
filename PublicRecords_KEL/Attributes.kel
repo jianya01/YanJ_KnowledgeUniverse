@@ -15,6 +15,7 @@ IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
 /**************************************************************************/
 /**************************************************************************/
 
+
 FUNCTION: IsBlank(STRING FieldToCheck, STRING DefaultVal) <= IF(FieldToCheck:Null OR FieldToCheck = '', DefaultVal, FieldToCheck);
 FUNCTION: IsZero(INTEGER FieldToCheck, INTEGER DefaultVal) <= IF(FieldToCheck:Null OR FieldToCheck = 0, DefaultVal, FieldToCheck);
 FUNCTION: IsBlank2Fields(STRING Field1ToCheck, STRING Default1Val, STRING Field2ToCheck, Default2Val) <=
@@ -161,6 +162,8 @@ FUNCTION: IsPhoneMatch(STRING PhoneOnFile, STRING InputPhone) <=
 			LENGTH(PhoneOnFile) = 10 AND LENGTH(InputPhone) = 7 => IsPhone7Match(SUBSTR(PhoneOnFile, 4, 10), InputPhone),
 			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 10 => IsPhone10Match(SUBSTR(InputPhone, 1, 3) + PhoneOnFile, InputPhone),
 			FALSE);
+FUNCTION: FnIPValidate(STRING field1) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_IPValidate(field1)) FROM PublicRecords_KEL RETURNS STRING;	
+			
 			
 /**************************************************************************/
 /*                                                                        */
@@ -371,6 +374,7 @@ PersonEducation: NO_DATA_FOUND := '-99998';
 PersonEducation: NO_DATA_FOUND_97 := '-99997';
 
 Education: NO_DATA_FOUND_97 :=  '-99997';
+
 
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
@@ -603,6 +607,7 @@ InputPII: => P_InpClnPhoneHomeFlagValue:= IsCleanPopulated(InputHomePhoneCleanVa
 InputPII: => P_InpClnPhoneWorkFlagValue:= IsCleanPopulated(InputWorkPhoneCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnEmailFlagValue:= IsCleanPopulated(InputEmailCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
 InputPII: => P_InpClnArchDtFlagValue :=  IsEchoPopulated(P_InpClnArchDt); // This only returns 0/1, so using the IsEchoPopulatedFunction to check the clean archive date.
+InputPII: => P_InpClnIPAddrFlagValue := MAP(P_InpClnIPAddr = InputPII.NO_DATA_FOUND => 0,IsCleanPopulated(InputIPAddrValue, MISSING_INPUT_DATA, NO_DATA_FOUND));
 
 
 /**************************************************************************/
@@ -765,7 +770,10 @@ InputPII: => P_InpValPhoneWorkBadLenFlag :=
 InputPII: => P_InpValPhoneWorkBogusFlag := 
 		MAP(InputWorkPhoneValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA_INT,							
 	      IsBadPhone(TRIM(P_InpPhoneWork))=> 1,0);
-
+InputPII: => P_InpClnIPAddr := 
+		MAP(InputIPAddrValue = InputPII.MISSING_INPUT_DATA => InputPII.MISSING_INPUT_DATA,							
+	      FnIPValidate(P_InpIPAddr) = 1 => P_InpIPAddr,
+				InputPII.NO_DATA_FOUND);
 
 /**************************************************************************/
 /*                                                                        */
@@ -1201,6 +1209,10 @@ InputBII: => BusInputAddrTypeCleanValue := IF(AddrNotPopulated OR CityStateZipNo
 InputBII: => BusInputAddrStatusCleanValue := IF(AddrNotPopulated OR CityStateZipNotPopulated, MISSING_INPUT_DATA, IsBlank(B_InpClnAddrStatus, NO_DATA_FOUND));
 InputBII: => BusInputPhoneCleanValue := IsBlank2Fields(B_InpPhone, MISSING_INPUT_DATA, B_InpClnPhone, NO_DATA_FOUND);
 InputBII: => BusInputTINCleanValue := IsBlank2Fields(B_InpTIN, MISSING_INPUT_DATA, B_InpClnTIN, NO_DATA_FOUND);
+InputBII: => BusInputIPCleanValue := 
+		MAP(BusInputIPAddressEchoValue = InputBII.MISSING_INPUT_DATA => InputBII.MISSING_INPUT_DATA,							
+	      FnIPValidate(B_InpIPAddr) = 1 => B_InpIPAddr,
+				InputBII.NO_DATA_FOUND);	
 InputBII: => BusInputEmailCleanValue := IsBlank2Fields(B_InpEmail, MISSING_INPUT_DATA, B_InpClnEmail, NO_DATA_FOUND);
 InputBII: => BusInputArchiveDateCleanValue := IsBlank(B_InpClnArchDt, NO_DATA_FOUND);
 /*		Auth Rep 1 Clean Input Attributes		*/
@@ -1476,7 +1488,8 @@ InputBII: => B_InpClnAddrLocID := IF(AddrNotPopulated OR CityStateZipNotPopulate
 														IF(BusInputStateCleanValue=NO_DATA_FOUND, '', B_InpClnAddrState),
 														IF(BusInputZip5CleanValue=NO_DATA_FOUND, '', B_InpClnAddrZip5)),NO_DATA_FOUND_INT));	 
 InputBII: => B_InpClnPhoneFlagValue := IsCleanPopulated(BusInputPhoneCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
-InputBII: => B_InpClnTINFlagValue := IsCleanPopulated(BusInputTINCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
+InputBII: => B_InpClnTINFlagValue := IsCleanPopulated(BusInputTINCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND);
+InputBII: => B_InpClnIPAddrFlagValue := MAP(BusInputIPCleanValue = InputBII.NO_DATA_FOUND => 0,IsCleanPopulated(BusInputIPAddressEchoValue, InputBII.MISSING_INPUT_DATA, InputBII.NO_DATA_FOUND));
 InputBII: => B_InpClnEmailFlagValue := IsCleanPopulated(BusInputEmailCleanValue, MISSING_INPUT_DATA, NO_DATA_FOUND); 
 InputBII: => B_InpClnArchDtFlagValue :=  IsEchoPopulated(B_InpClnArchDt); // This only returns 0/1, so using the IsEchoPopulated Function to check the clean archive date.
 /*		Auth Rep 1 Clean Pop Attributes		*/
