@@ -6,120 +6,150 @@ PERMITS FCRA, // 1
 		NonFCRA, // 2
 		BothFCRAAndNonFCRA; // 3
 
+// Code Comments indicate if a field is used for Consumer Disclosure (CD) purposes, 
+// any fields marked like this CANNOT be removed from the Entity without ESP and Consumer Disclosure work
+
 Policy := ENTITY(FLAT(UID(PolicyNumber, PolicyPlan, AMBestNumber),
-		STRING PolicyNumber,
-		STRING PolicyPlan,
-		STRING LineOfBusiness,
-		INTEGER AMBestNumber,
-		INTEGER EndorsementNumber,
-		STRING EndorsementDate,
-		INTEGER GroupNumber,
-		STRING OPolicyNumber,
-		INTEGER ProductUsage,
-		DATE ReportStartDate,
-		DATE ReportEndDate,
-		STRING IsCombinationPolicyPayment,
+		STRING PolicyNumber,	// CD
+		STRING PolicyPlan,		// CD
+		INTEGER AMBestNumber,	// CD
+		STRING LineOfBusiness,	// CD
+		INTEGER GroupNumber,	// CD - PolicyGroupNumber
+		STRING OPolicyNumber,	// CD
+		STRING CompanyName,		// CD
+		INTEGER NAICCode,		// CD, National Association of Insurance Commissioners
+		STRING PolicyState,		// CD
+		DATE OriginationDate,	// CD - PolicyOriginationDate
+		
+		// These Fields Included for Consumer Disclosure Purposes, making sure they generate into the KEL Indexes
+		STRING AgencyName,
+		STRING AgentName,
+		STRING CancellationReasonCode,
+		DATE ChangeEffectiveDate,
+		STRING IsCombinationPolicyPayment,	// CD - CombinationPolicyPaymentIndicator
 		INTEGER NumberOfPolicies,
 		STRING PaymentGroupIndicator,
 		STRING PaymentStatusCode,
-		STRING CompanyName,
-		INTEGER NAICCode, // National Association of Insurance Commissioners
-		STRING PolicyState,
-		DATE OriginationDate,
+		INTEGER ProductUsage,
+		STRING ReportEndDate,				// 14 character string which is why this isn't a DATE type
+		DATE ReportStartDate,
+		STRING CompanyProducerNumber,
+		INTEGER AgentNationalProducerNumber,
+		STRING ExtractExclusion,
+		DATE CancellationNoticeDate,		// CD - PolicyCancellationNoticeDate
+		INTEGER EndorsementNumber,			// CD - Policy_Endorsement_Nbr
+		DATE EndorsementDate,				// CD - Policy_Endorsement_Date
+		DATE CancellationDate,				// CD - PolicyCancellationDate
+		DATE TermBeginDate,					// CD - PolicyTermBeginDate
+		DATE TermEndDate,					// CD - PolicyTermEndDate
+		STRING PolicyStatus,				// CD - Policy_Status
+		STRING UsageInd,					// CD - Usage_Ind
+		DATE FirstLoadDate,					// CD - First_Load_Date
+		STRING DeleteFlag,					// CD - Delete_Flg
+		STRING BatchID,						// CD - Batch_ID
+		STRING Status
+		),
+	MODEL(UID, PolicyNumber, PolicyPlan, AMBestNumber, 
+		LineOfBusiness, GroupNumber, OPolicyNumber, CompanyName, NAICCode, PolicyState, OriginationDate,
+		// Consumer Disclosure Fields - doesn't matter if they are multi-valued or not they build into the Indexes the same way
+		AgencyName, AgentName, CancellationReasonCode, ChangeEffectiveDate, IsCombinationPolicyPayment, NumberOfPolicies, 
+		PaymentGroupIndicator, PaymentStatusCode, EndorsementDate, EndorsementNumber, CancellationDate, CancellationNoticeDate,
+		TermBeginDate, TermEndDate, ProductUsage, ReportEndDate, ReportStartDate, CompanyProducerNumber, AgentNationalProducerNumber,
+		ExtractExclusion, PolicyStatus, UsageInd, FirstLoadDate, DeleteFlag, BatchID, Status));
+
+PolicyTerm := ENTITY(FLAT(UID(PolicyNumber, PolicyPlan, AMBestNumber, TermBeginDate),
+		Policy rPolicy = UID(PolicyNumber, PolicyPlan, AMBestNumber),
+		
+		// UID Fields
+		STRING PolicyNumber,	// CD
+		STRING PolicyPlan,		// CD
+		INTEGER AMBestNumber,	// CD
 		DATE TermBeginDate,
+		
 		DATE TermEndDate,
+		STRING OPolicyNumber,			// CD
+		STRING PolicyStatus,
+		DATE ReportStartDate,
+		DATE ReportEndDate,
+		DATE FirstLoadDate,				// CD - First_Load_Date
+		STRING PaymentTransactionID,	// CD - PaymentInvoiceTransactionID
+		STRING LineOfBusiness,			// CD
+		INTEGER NumberOfPolicies,
+		INTEGER ProductUsage,
+		INTEGER GroupNumber,			// CD - PolicyGroupNumber
+		STRING PaymentGroupIndicator,
+		STRING IsCombinationPolicyPayment,
+		STRING PaymentStatusCode,
 		DATE ChangeEffectiveDate,
 		DATE CancellationNoticeDate,
 		DATE CancellationDate,
 		STRING CancellationReasonCode,
 		STRING PaymentExtractExclusion,
-		STRING PolicyStatus,
-		STRING IsUsage,
-		DATE FirstLoadDate,
-		STRING BatchID,
-		STRING Status),
-	MODEL(UID,
-		PolicyNumber, PolicyPlan, LineOfBusiness, AMBestNumber, OPolicyNumber,
-		ProductUsage, NumberOfPolicies, 
-		CompanyName, NAICCode, PolicyState, OriginationDate, IsUsage,
-		Details{TermBeginDate, TermEndDate, PaymentGroupIndicator, PaymentStatusCode, IsCombinationPolicyPayment,
-			ChangeEffectiveDate, CancellationNoticeDate, CancellationDate, CancellationReasonCode, 
-			PolicyStatus, EndorsementNumber, EndorsementDate, ReportStartDate, ReportEndDate, GroupNumber, FirstLoadDate, BatchID, Status},
-		PaymentSpecialProjects{PaymentExtractExclusion}));
-
-PaymentPlan := ENTITY(FLAT(UID(PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
-		Policy rPolicy = UID(PolicyNumber, PolicyPlan, AMBestNumber),
-		STRING PolicyNumber,
-		STRING PolicyPlan,
-		INTEGER AMBestNumber,
-		INTEGER EndorsementNumber,
-		STRING EndorsementDate,
-		DATE PlanEffectiveDate,
-		INTEGER PolicyTermLengthNonLife,
-		INTEGER PolicyTermLengthLife,
-		STRING PaymentFrequency,
-		STRING PaymentFrequencyOtherReason,
-		REAL DownPaymentPercentage=NULL(''),
-		INTEGER NumberOfInstallmentPayments=NULL(),
-		REAL InstallmentPaymentPercentageAmount=NULL(''),
-		STRING IsAccountSetupForAutoDebit,
-		STRING BillType,
-		STRING BillTypeIfOther), 
+		
+		// Payment Plan Fields
+		INTEGER EndorsementNumber,							// CD - Policy_Endorsement_Nbr
+		DATE EndorsementDate,								// CD - Policy_Endorsement_Date
+		DATE PlanEffectiveDate,								// CD
+		INTEGER PolicyTermLengthNonLife,					// CD
+		INTEGER PolicyTermLengthLife,						// CD - PolicyLengthLife
+		STRING PaymentFrequency,							// CD
+		STRING PaymentFrequencyOtherReason,					// CD
+		REAL DownPaymentPercentage=NULL(''),				// CD
+		INTEGER NumberOfInstallmentPayments=NULL(),			// CD
+		REAL InstallmentPaymentPercentageAmount=NULL(''),	// CD
+		STRING IsAccountSetupForAutoDebit,					// CD - AccountSetupForAutoDebit
+		STRING BillType,									// CD
+		STRING BillTypeIfOther,								// CD
+		
+		// Payment Details Fields
+		STRING PaymentReceivedMethod,						// CD
+		STRING PaymentReceivedType,							// CD
+		STRING PaymentReceivedTypeIfOther,					// CD
+		REAL TransactionPaymentReceivedPercentage=NULL(''),	// CD
+		REAL TotalPaymentReceivedPercentage=NULL(''),		// CD
+		DATE PaymentReceivedDate,							// CD
+		STRING PolicyInEquityIndicator,						// CD
+		STRING IsPaymentPercentageDueNotPaidInFull,			// CD - PaymentPercentageDueNotPaidInFullIndicator
+		STRING IsPaymentClearance,							// CD - PaymentClearanceIndicator
+		STRING PaymentClearanceIndicatorReason,				// CD
+		STRING IsLatePayment,								// CD - LatePaymentIndicator
+		DATE LatePaymentRecognitionDate,					// CD
+		STRING IsPaymentFailure,							// CD - PaymentFailureIndicator
+		DATE PaymentFailureDate,							// CD
+		STRING IsPaymentFailureNotice,						// CD - PaymentFailureNoticeIndicator
+		DATE PaymentFailureNoticeDate,						// CD
+		STRING IsPolicyReinstatement,						// CD - PolicyReinstatementIndicator
+		DATE PolicyReinstatementDate,						// CD
+		STRING IsPaidInFull,								// CD - PaidInFullIndicator
+		DATE PaidInFullDate,								// CD
+		
+		// Invoice Fields
+		STRING InvoiceTransactionID,	// CD
+		DATE InvoiceDate,				// CD
+		DATE DueDate,					// CD - InvoiceDueDate
+		STRING IsReturnMail,			// CD - ReturnMailIndicator
+		STRING ReturnMailReason,		// CD - ReturnMailIndicatorReason
+		DATE ReturnMailDate,				// CD
+		
+		// These Fields Included for Consumer Disclosure Purposes, making sure they generate into the KEL Indexes
+		STRING SuppressInd,					// CD - Suppress_Ind
+		STRING DeleteFlag,					// CD - Delete_Flg
+		STRING BatchID,						// CD - Batch_ID
+		STRING Status
+		),
 	MODEL(UID, rPolicy,
-		PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate,
-		PlanEffectiveDate, PolicyTermLengthNonLife, PolicyTermLengthLife, PaymentFrequency, PaymentFrequencyOtherReason, DownPaymentPercentage,
-		NumberOfInstallmentPayments, InstallmentPaymentPercentageAmount, IsAccountSetupForAutoDebit, BillType, BillTypeIfOther));
-
-Invoice := ENTITY(FLAT(UID(InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
-		PaymentPlan rPaymentPlan = UID(PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
-		STRING InvoiceTransactionID,
-		STRING PolicyNumber,
-		STRING PolicyPlan,
-		INTEGER AMBestNumber,
-		INTEGER EndorsementNumber,
-		STRING EndorsementDate,
-		DATE InvoiceDate,
-		DATE DueDate,
-		STRING IsReturnMail,
-		STRING ReturnMailReason,
-		DATE ReturnMailDate), 
-	MODEL(UID, rPaymentPlan,
-		InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate,
-		InvoiceDate, DueDate, IsReturnMail, ReturnMailReason, ReturnMailDate));
-
-PaymentDetails := ENTITY(FLAT(UID(InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
-		PaymentPlan rPaymentPlan = UID(PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate),
-		STRING InvoiceTransactionID,
-		STRING PolicyNumber,
-		STRING PolicyPlan,
-		INTEGER AMBestNumber,
-		INTEGER EndorsementNumber,
-		STRING EndorsementDate,
-		STRING PaymentReceivedMethod,
-		STRING PaymentReceivedType,
-		STRING PaymentReceivedTypeIfOther,
-		REAL TransactionPaymentReceivedPercentage=NULL(''),
-		REAL TotalPaymentReceivedPercentage=NULL(''),
-		DATE PaymentReceivedDate,
-		STRING PolicyInEquityIndicator,
-		STRING IsPaymentPercentageDueNotPaidInFull,
-		STRING IsPaymentClearance,
-		STRING PaymentClearanceIndicatorReason,
-		STRING IsLatePayment,
-		DATE LatePaymentRecognitionDate,
-		STRING IsPaymentFailure,
-		DATE PaymentFailureDate,
-		STRING IsPaymentFailureNotice,
-		DATE PaymentFailureNoticeDate,
-		STRING IsPolicyReinstatement,
-		DATE PolicyReinstatementDate,
-		STRING IsPaidInFull,
-		DATE PaidInFullDate),
-	MODEL(UID, rPaymentPlan,
-		InvoiceTransactionID, PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate,
-		PaymentReceivedMethod, PaymentReceivedType, PaymentReceivedTypeIfOther, TransactionPaymentReceivedPercentage, TotalPaymentReceivedPercentage, PaymentReceivedDate,
+		PolicyNumber, PolicyPlan, LineOfBusiness, AMBestNumber, OPolicyNumber,TermBeginDate, TermEndDate,
+		Details{PaymentGroupIndicator, NumberOfPolicies,IsCombinationPolicyPayment,PaymentStatusCode,
+		ChangeEffectiveDate, CancellationNoticeDate, CancellationDate, CancellationReasonCode,
+		PolicyStatus, EndorsementNumber, EndorsementDate, ReportStartDate, ReportEndDate, ProductUsage, GroupNumber, FirstLoadDate,PlanEffectiveDate, PolicyTermLengthNonLife, PolicyTermLengthLife, PaymentFrequency, PaymentFrequencyOtherReason, DownPaymentPercentage,
+		NumberOfInstallmentPayments, InstallmentPaymentPercentageAmount, IsAccountSetupForAutoDebit, BillType, BillTypeIfOther,
+		InvoiceTransactionID,InvoiceDate, DueDate, IsReturnMail, ReturnMailReason, ReturnMailDate,PaymentTransactionID,PaymentReceivedMethod, PaymentReceivedType, PaymentReceivedTypeIfOther, TransactionPaymentReceivedPercentage, TotalPaymentReceivedPercentage, PaymentReceivedDate,
 		PolicyInEquityIndicator, IsPaymentPercentageDueNotPaidInFull, IsPaymentClearance, PaymentClearanceIndicatorReason, IsLatePayment, LatePaymentRecognitionDate, 
-		IsPaymentFailure, PaymentFailureDate, IsPaymentFailureNotice, PaymentFailureNoticeDate, IsPolicyReinstatement, PolicyReinstatementDate, IsPaidInFull, PaidInFullDate));
+		IsPaymentFailure, PaymentFailureDate, IsPaymentFailureNotice, PaymentFailureNoticeDate, IsPolicyReinstatement, PolicyReinstatementDate, IsPaidInFull, PaidInFullDate},
+		PaymentSpecialProjects{PaymentExtractExclusion},
+		// Consumer Disclosure Fields - doesn't matter if they are multi-valued or not they build into the Indexes the same way
+		SuppressInd, DeleteFlag, BatchID, Status
+		));
 
 Agency := ENTITY(FLAT(UID(CompanyProducerNumber),
 		STRING CompanyProducerNumber,
@@ -131,28 +161,96 @@ Agency := ENTITY(FLAT(UID(CompanyProducerNumber),
 		Agents{AgentName, AgentNationalProducerNumber}));
 
 Individual := ENTITY(FLAT(UID = LexID,
-		INTEGER OwnerID,
-		INTEGER IndividualNameID,
-		INTEGER IndividualAddressID,
-		STRING Source,
-		INTEGER SourceRID,
-		DATE VendorDateFirstSeen,
-		DATE VendorDateLastSeen,
-		STRING Title,
-		STRING FirstName,
-		STRING MiddleName,
-		STRING LastName,
-		STRING NameSuffix,
+		INTEGER LexID,						// CD
+		INTEGER OwnerID,					// CD
+		INTEGER IndividualNameID,			// CD
+		INTEGER IndividualAddID,			// CD
+		STRING Source,						// CD - Src
+		INTEGER SourceRID,					// CD - Source_RID
+		DATE VendorDateFirstSeen,			// CD - Vendor_First_Seen_Date
+		DATE VendorDateLastSeen,			// CD - Vendor_Last_Seen_Date
+		STRING Title,						// CD - Prefix
+		STRING FirstName,					// CD - Clean_FName
+		STRING MiddleName,					// CD - Clean_MName
+		STRING LastName,					// CD - Clean_LName
+		STRING NameSuffix,					// CD - Clean_SName
 		STRING ProfessionalSuffix,
-		STRING NameIndicator, // Individual, Business, Trustee
-		DATE DateOfBirth,
-		STRING EmailAddress,
-		INTEGER SocialSecurityNumber,
-		INTEGER TaxIdentificationNumber,
-		STRING Gender,
-		STRING PolicyOwnerExtractExclusion),
-	MODEL(UID,
-		OwnerID, IndividualNameID, IndividualAddressID, Source, SourceRID,
+		STRING NameIndicator,				// CD, Individual, Business, Trustee
+		DATE DateOfBirth,					// CD
+		STRING EmailAddress,				// CD
+		INTEGER SocialSecurityNumber,		// CD
+		INTEGER TaxIdentificationNumber,	// CD
+		STRING Gender,						// CD
+		STRING PolicyOwnerExtractExclusion,	// CD - ExtractExclusion
+		
+		// These Fields Included for Consumer Disclosure Purposes, making sure they generate into the KEL Indexes
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber,
+		STRING DriversLicenseNumber,
+		STRING DriversLicenseState,
+		STRING LineOfBusiness,
+		STRING OPolicyNumber,
+		INTEGER EndorsementNumber,		// CD - Policy_Endorsement_Nbr
+		DATE EndorsementDate,			// CD - Policy_Endorsement_Date
+		INTEGER GroupNumber,			// CD - PolicyGroupNumber
+		STRING IsPrimaryPolicyOwner,	// CD - PrimaryPolicyOwnerIndicator
+		STRING AddressType,
+		STRING StreetNumber,
+		STRING StreetName,
+		STRING ApartmentOrBuildingNumber,
+		STRING RCity,
+		STRING RCounty,
+		STRING RState,
+		INTEGER RZip,
+		INTEGER RZip4,
+		STRING RCountryCode,
+		STRING RNonUSPostalCode,
+		STRING AddressCleanerErrorCode,	// CD - Error_Code
+		STRING PrimRange,				// CD - Prim_Range
+		STRING Predir,
+		STRING PrimName,				// CD - Prim_Name
+		STRING AddrSuffix,				// CD - Addr_Suffix
+		STRING Postdir,
+		STRING UnitDesig,				// CD - Unit_Desig
+		STRING SecRange,				// CD - Sec_Range
+		STRING City,
+		STRING State,					// CD - St
+		INTEGER Zip,
+		INTEGER Zip4,
+		STRING Cart,
+		STRING CRSortSize,				// CD - cr_sort_sz
+		STRING Lot,
+		STRING LotOrder,				// CD - lot_order
+		STRING DBPC,
+		STRING ChkDigit,				// CD - chk_digit
+		STRING RecordType,				// CD - rec_type
+		STRING FIPSState,				// CD - fips_state
+		STRING FIPSCounty,				// CD - fips_county
+		REAL GeoLat,					// CD - geo_lat
+		REAL GeoLong,					// CD - geo_long
+		STRING MSA,
+		STRING GeoBlock,				// CD - geo_blk
+		STRING GeoMatch,				// CD - geo_match
+		INTEGER AddressID,				// CD - Address_ID
+		STRING TelephoneCountryCode,
+		INTEGER TelephoneNumber,
+		STRING TypeOfTelephoneNumber,
+		DATE FirstSeenDate,
+		DATE LastSeenDate,
+		STRING RawFirstName,			// CD - FirstName
+		STRING RawMiddleName,			// CD - MiddleName
+		STRING RawLastName,				// CD - LastName
+		STRING RawSuffix,				// CD - Suffix
+		STRING PFName,
+		STRING SuppressInd,					// CD - Suppress_Ind
+		DATE FirstLoadDate,					// CD - First_Load_Date
+		STRING DeleteFlag,					// CD - Delete_Flg
+		STRING BatchID,						// CD - Batch_ID
+		STRING Status
+		),
+	MODEL(UID, LexID,
+		OwnerID, IndividualNameID, IndividualAddID, Source, SourceRID,
 		FullName{Title, FirstName, MiddleName, LastName, NameSuffix, ProfessionalSuffix},
 		NameIndicator,
 		ReportedDatesOfBirth{DateOfBirth},
@@ -161,49 +259,203 @@ Individual := ENTITY(FLAT(UID = LexID,
 		ReportedTaxIdentificationNumbers{TaxIdentificationNumber},
 		Gender,
 		PolicyOwnerSpecialProjects{PolicyOwnerExtractExclusion},
-		VendorDateFirstSeen, VendorDateLastSeen));
+		VendorDateFirstSeen, VendorDateLastSeen,
+		// Consumer Disclosure Fields - doesn't matter if they are multi-valued or not they build into the Indexes the same way
+		PolicyNumber, PolicyPlan, AMBestNumber, DriversLicenseNumber, DriversLicenseState, LineOfBusiness, OPolicyNumber,
+		EndorsementNumber, EndorsementDate, GroupNumber, IsPrimaryPolicyOwner, RCity, RCounty, RState, RZip, RZip4, RCountryCode, RNonUSPostalCode, 
+		TelephoneCountryCode, TelephoneNumber, TypeOfTelephoneNumber, FirstSeenDate, LastSeenDate, PFName,
+		RawFirstName, RawMiddleName, RawLastName, RawSuffix, AddressType, StreetNumber, StreetName, ApartmentOrBuildingNumber,
+		AddressCleanerErrorCode, AddressID, PrimRange, Predir, PrimName, AddrSuffix, Postdir, UnitDesig, SecRange,  City, State, Zip, Zip4, 
+		Cart, CRSortSize, Lot, LotOrder, DBPC, ChkDigit, RecordType, FIPSState, FIPSCounty, GeoLat, GeoLong, MSA, GeoBlock, GeoMatch,
+		SuppressInd, FirstLoadDate, DeleteFlag, BatchID, Status
+		));
 
 Trustee := ENTITY(FLAT(UID = ownerid,
-		INTEGER OwnerID,
 		Policy rPolicy=UID(PolicyNumber, PolicyPlan, AMBestNumber),
-		INTEGER TrusteeAddressID,
-		STRING TrusteeName,
-		STRING NameIndicator, // Individual, Business, Trustee
-		STRING EmailAddress,
-		INTEGER SocialSecurityNumber,
-		INTEGER TaxIdentificationNumber,
-		STRING TrusteeExtractExclusion),
+		INTEGER OwnerID,				// CD
+		INTEGER TrusteeAddID,			// CD - TrusAddID
+		STRING TrusteeName,				// CD
+		STRING NameIndicator,			// CD, Individual, Business, Trustee
+		STRING EmailAddress,			// CD
+		INTEGER SocialSecurityNumber,	// CD
+		INTEGER TaxIdentificationNumber,// CD
+		STRING TrusteeExtractExclusion,	// CD - ExtractExclusion
+		
+		// These Fields Included for Consumer Disclosure Purposes, making sure they generate into the KEL Indexes
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber,
+		INTEGER EndorsementNumber,		// CD - Policy_Endorsement_Nbr
+		DATE EndorsementDate,			// CD - Policy_Endorsement_Date
+		INTEGER GroupNumber,			// CD - PolicyGroupNumber
+		STRING OPolicyNumber,
+		STRING LineOfBusiness,
+		STRING TelephoneCountryCode,
+		INTEGER TelephoneNumber,
+		STRING TypeOfTelephoneNumber,
+		STRING AddressType,
+		STRING StreetNumber,
+		STRING StreetName,
+		STRING ApartmentOrBuildingNumber,
+		STRING RCity,
+		STRING RCounty,
+		STRING RState,
+		INTEGER RZip,
+		INTEGER RZip4,
+		STRING RCountryCode,
+		STRING RNonUSPostalCode,
+		STRING AddressCleanerErrorCode,	// CD - Error_Code
+		STRING PrimRange,				// CD - Prim_Range
+		STRING Predir,
+		STRING PrimName,				// CD - Prim_Name
+		STRING AddrSuffix,				// CD - Addr_Suffix
+		STRING Postdir,
+		STRING UnitDesig,				// CD - Unit_Desig
+		STRING SecRange,				// CD - Sec_Range
+		STRING City,
+		STRING State,					// CD - St
+		INTEGER Zip,
+		INTEGER Zip4,
+		STRING Cart,
+		STRING CRSortSize,				// CD - cr_sort_sz
+		STRING Lot,
+		STRING LotOrder,				// CD - lot_order
+		STRING DBPC,
+		STRING ChkDigit,				// CD - chk_digit
+		STRING RecordType,				// CD - rec_type
+		STRING FIPSState,				// CD - fips_state
+		STRING FIPSCounty,				// CD - fips_county
+		REAL GeoLat,					// CD - geo_lat
+		REAL GeoLong,					// CD - geo_long
+		STRING MSA,
+		STRING GeoBlock,				// CD - geo_blk
+		STRING GeoMatch,				// CD - geo_match
+		INTEGER AddressID,				// CD - Address_ID
+		STRING SuppressInd,					// CD - Suppress_Ind
+		DATE FirstLoadDate,					// CD - First_Load_Date
+		STRING DeleteFlag,					// CD - Delete_Flg
+		STRING BatchID,						// CD - Batch_ID
+		STRING Status
+		),
 	MODEL(UID, OwnerID,
 		rPolicy,
-		TrusteeAddressID, NameIndicator, TrusteeName,
+		TrusteeAddID, NameIndicator, TrusteeName,
 		ReportedEmailAddresses{EmailAddress},
 		ReportedSocialSecurityNumbers{SocialSecurityNumber},
 		ReportedTaxIdentificationNumbers{TaxIdentificationNumber},
-		TrusteeSpecialProjects{TrusteeExtractExclusion}));
+		TrusteeSpecialProjects{TrusteeExtractExclusion},
+		// Consumer Disclosure Fields - doesn't matter if they are multi-valued or not they build into the Indexes the same way
+		PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate, GroupNumber, OPolicyNumber, LineOfBusiness,
+		TelephoneCountryCode, TelephoneNumber, TypeOfTelephoneNumber, RCity, RCounty, RState, RZip, RZip4, RCountryCode, RNonUSPostalCode,
+		AddressType, StreetNumber, StreetName, ApartmentOrBuildingNumber, AddressCleanerErrorCode,
+		AddressID, PrimRange, Predir, PrimName, AddrSuffix, Postdir, UnitDesig, SecRange,  City, State, Zip, Zip4, 
+		Cart, CRSortSize, Lot, LotOrder, DBPC, ChkDigit, RecordType, FIPSState, FIPSCounty, GeoLat, GeoLong, MSA, GeoBlock, GeoMatch,
+		SuppressInd, FirstLoadDate, DeleteFlag, BatchID, Status
+		));
 
-Business := ENTITY(FLAT(UID = BDID,
-		INTEGER OwnerID,
-		INTEGER BusinessAddressID,
-		STRING NameIndicator,
-		STRING BusinessName,
-		STRING EmailAddress,
-		INTEGER SocialSecurityNumber,
-		INTEGER TaxIdentificationNumber,
-		STRING BusinessExtractExclusion,
-		STRING DoingBusinessAs,
-		INTEGER ProxID,
-		INTEGER PowID,
-		INTEGER SeleID,
-		INTEGER OrgID,
-		INTEGER UltID),
- MODEL(UID,
-		OwnerID, BusinessAddressID, NameIndicator, BusinessName, 
+Business := ENTITY(FLAT(UID(UltID, OrgID, SeleID),
+		INTEGER UltID,						// CD
+		INTEGER OrgID,						// CD
+		INTEGER SeleID,						// CD
+		INTEGER ProxID,						// CD
+		INTEGER PowID,						// CD
+		INTEGER DotID,
+		INTEGER OwnerID,					// CD
+		INTEGER BusinessAddID,				// CD
+		STRING NameIndicator,				// CD
+		STRING BusinessName,				// CD
+		STRING EmailAddress,				// CD
+		INTEGER SocialSecurityNumber,		// CD
+		INTEGER TaxIdentificationNumber,	// CD
+		STRING BusinessExtractExclusion,	// CD - ExtractExclusion
+		STRING DoingBusinessAs,				// CD - DBA
+		
+		// These Fields Included for Consumer Disclosure Purposes, making sure they generate into the KEL Indexes
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber,
+		INTEGER EndorsementNumber,		// CD - Policy_Endorsement_Nbr
+		DATE EndorsementDate,			// CD - Policy_Endorsement_Date
+		INTEGER GroupNumber,			// CD - PolicyGroupNumber
+		STRING OPolicyNumber,
+		STRING LineOfBusiness,
+		INTEGER BDID,
+		INTEGER UltWeight,
+		INTEGER UltScore,
+		INTEGER OrgWeight,
+		INTEGER OrgScore,
+		INTEGER SeleWeight,
+		INTEGER SeleScore,
+		INTEGER ProxWeight,
+		INTEGER ProxScore,
+		INTEGER PowWeight,
+		INTEGER PowScore,
+		INTEGER DotWeight,
+		INTEGER DotScore,
+		STRING AddressType,
+		STRING StreetNumber,
+		STRING StreetName,
+		STRING ApartmentOrBuildingNumber,
+		STRING RCity,
+		STRING RCounty,
+		STRING RState,
+		INTEGER RZip,
+		INTEGER RZip4,
+		STRING RCountryCode,
+		STRING RNonUSPostalCode,
+		STRING AddressCleanerErrorCode,	// CD - Error_Code
+		STRING PrimRange,				// CD - Prim_Range
+		STRING Predir,
+		STRING PrimName,				// CD - Prim_Name
+		STRING AddrSuffix,				// CD - Addr_Suffix
+		STRING Postdir,
+		STRING UnitDesig,				// CD - Unit_Desig
+		STRING SecRange,				// CD - Sec_Range
+		STRING City,
+		STRING State,					// CD - St
+		INTEGER Zip,
+		INTEGER Zip4,
+		STRING Cart,
+		STRING CRSortSize,				// CD - cr_sort_sz
+		STRING Lot,
+		STRING LotOrder,				// CD - lot_order
+		STRING DBPC,
+		STRING ChkDigit,				// CD - chk_digit
+		STRING RecordType,				// CD - rec_type
+		STRING FIPSState,				// CD - fips_state
+		STRING FIPSCounty,				// CD - fips_county
+		REAL GeoLat,					// CD - geo_lat
+		REAL GeoLong,					// CD - geo_long
+		STRING MSA,
+		STRING GeoBlock,				// CD - geo_blk
+		STRING GeoMatch,				// CD - geo_match
+		INTEGER AddressID,				// CD - Address_ID
+		STRING TelephoneCountryCode,
+		INTEGER TelephoneNumber,
+		STRING TypeOfTelephoneNumber,
+		STRING SuppressInd,					// CD - Suppress_Ind
+		DATE FirstLoadDate,					// CD - First_Load_Date
+		STRING DeleteFlag,					// CD - Delete_Flg
+		STRING BatchID,						// CD - Batch_ID
+		STRING Status
+		),
+ MODEL(UID, UltID, OrgID, SeleID,
+		OwnerID, BusinessAddID, NameIndicator, BusinessName, 
 		ReportedEmailAddresses{EmailAddress},
 		ReportedSocialSecurityNumbers{SocialSecurityNumber},
 		ReportedTaxIdentificationNumbers{TaxIdentificationNumber},
 		DBAs{DoingBusinessAs},
-		BIPs{ProxID, PowID, SeleID, OrgID, UltID},
-		BusinessSpecialProjects{BusinessExtractExclusion}));
+		BIPIDs{UltID, OrgID, SeleID, ProxID, PowID, DotID},
+		BusinessSpecialProjects{BusinessExtractExclusion},
+		// Consumer Disclosure Fields - doesn't matter if they are multi-valued or not they build into the Indexes the same way
+		PolicyNumber, PolicyPlan, AMBestNumber, EndorsementNumber, EndorsementDate, GroupNumber, OPolicyNumber, LineOfBusiness,
+		BDID, UltWeight, UltScore, OrgWeight, OrgScore, SeleWeight, SeleScore, ProxWeight, ProxScore, PowWeight, PowScore, DotWeight, DotScore,
+		TelephoneCountryCode, TelephoneNumber, TypeOfTelephoneNumber, RCity, RCounty, RState, RZip, RZip4, RCountryCode, RNonUSPostalCode,
+		AddressType, StreetNumber, StreetName, ApartmentOrBuildingNumber, AddressCleanerErrorCode,
+		AddressID, PrimRange, Predir, PrimName, AddrSuffix, Postdir, UnitDesig, SecRange,  City, State, Zip, Zip4, 
+		Cart, CRSortSize, Lot, LotOrder, DBPC, ChkDigit, RecordType, FIPSState, FIPSCounty, GeoLat, GeoLong, MSA, GeoBlock, GeoMatch,
+		SuppressInd, FirstLoadDate, DeleteFlag, BatchID, Status
+		));
 
 Address := ENTITY(FLAT(UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
 		STRING PrimaryRange=NULL(),
@@ -255,17 +507,113 @@ DriversLicense := ENTITY(FLAT(UID(DriversLicenseNumber,IssuingState),
 	MODEL(UID,
 		DriversLicenseNumber, IssuingState));
 
-AgencyPolicy := ASSOCIATION(FLAT(Agency Company = UID(CompanyProducerNumber), Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber)));
+AgencyPolicy := ASSOCIATION(FLAT(
+		Agency Company = UID(CompanyProducerNumber), 
+		Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber),
+		STRING CompanyProducerNumber,
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber),
+	MODEL(Company, Policy, CompanyProducerNumber, PolicyNumber, PolicyPlan, AMBestNumber));
 
-IndividualPolicy := ASSOCIATION(FLAT(Individual Person, Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber), STRING IsPrimaryPolicyOwner));
-IndividualAddress := ASSOCIATION(FLAT(Individual Person, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
-IndividualPhone := ASSOCIATION(FLAT(Individual Person, Phone PhoneNumber));
-IndividualDriversLicense := ASSOCIATION(FLAT(Individual Person, DriversLicense LicenseInformation=UID(DriversLicenseNumber, IssuingState)));
+IndividualPolicy := ASSOCIATION(FLAT(
+		Individual Person, 
+		Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber), 
+		STRING IsPrimaryPolicyOwner,
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber),
+	MODEL(Person, Policy, IsPrimaryPolicyOwner, PolicyNumber, PolicyPlan, AMBestNumber));
 
-PolicyTrustee	:= ASSOCIATION(FLAT(Trustee Trustee, Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber)));
-TrusteePhone := ASSOCIATION(FLAT(Trustee Trustee, Phone PhoneNumber));
-TrusteeAddress := ASSOCIATION(FLAT(Trustee Trustee, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+IndividualPolicyTerm := ASSOCIATION(FLAT(
+		Individual Person, 
+		PolicyTerm PolicyTerm = UID(PolicyNumber, PolicyPlan, AMBestNumber, TermBeginDate), 
+		STRING IsPrimaryPolicyOwner,
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber,
+		DATE TermBeginDate),
+	MODEL(Person, PolicyTerm, IsPrimaryPolicyOwner, PolicyNumber, PolicyPlan, AMBestNumber, TermBeginDate));
 
-BusinessPolicy	:= ASSOCIATION(FLAT(Business Company, Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber)));
-BusinessPhone := ASSOCIATION(FLAT(Business Company, Phone PhoneNumber));
-BusinessAddress := ASSOCIATION(FLAT(Business Company, Address Location=UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange)));
+IndividualAddress := ASSOCIATION(FLAT(
+		Individual Person, 
+		Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
+		STRING PrimaryRange=NULL(),
+		STRING Predirectional=NULL(),
+		STRING PrimaryName=NULL(),
+		STRING Suffix=NULL(),
+		STRING Postdirectional=NULL(),
+		STRING SecondaryRange=NULL(),
+		INTEGER ZIP5),
+	MODEL(Person, Location, PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, SecondaryRange, ZIP5));
+
+IndividualPhone := ASSOCIATION(FLAT(
+		Individual Person, 
+		Phone PhoneNumber),
+	MODEL(Person, PhoneNumber));
+
+IndividualDriversLicense := ASSOCIATION(FLAT(
+		Individual Person, 
+		DriversLicense LicenseInformation = UID(DriversLicenseNumber, IssuingState),
+		STRING DriversLicenseNumber,
+		STRING IssuingState),
+	MODEL(Person, LicenseInformation, DriversLicenseNumber, IssuingState));
+
+PolicyTrustee := ASSOCIATION(FLAT(
+		Trustee Trustee, 
+		Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber),
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber),
+	MODEL(Trustee, Policy, PolicyNumber, PolicyPlan, AMBestNumber));
+
+TrusteePhone := ASSOCIATION(FLAT(
+		Trustee Trustee, 
+		Phone PhoneNumber),
+	MODEL(Trustee, PhoneNumber));
+
+TrusteeAddress := ASSOCIATION(FLAT(
+		Trustee Trustee, 
+		Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
+		STRING PrimaryRange=NULL(),
+		STRING Predirectional=NULL(),
+		STRING PrimaryName=NULL(),
+		STRING Suffix=NULL(),
+		STRING Postdirectional=NULL(),
+		STRING SecondaryRange=NULL(),
+		INTEGER ZIP5),
+	MODEL(Trustee, Location, PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, SecondaryRange, ZIP5));
+
+BusinessPolicy := ASSOCIATION(FLAT(
+		Business Company = UID(UltID, OrgID, SeleID), 
+		Policy Policy = UID(PolicyNumber, PolicyPlan, AMBestNumber),
+		INTEGER UltID,
+		INTEGER OrgID,
+		INTEGER SeleID,
+		STRING PolicyNumber,
+		STRING PolicyPlan,
+		INTEGER AMBestNumber),
+	MODEL(Company, Policy, UltID, OrgID, SeleID, PolicyNumber, PolicyPlan, AMBestNumber));
+
+BusinessPhone := ASSOCIATION(FLAT(
+		Business Company = UID(UltID, OrgID, SeleID), 
+		Phone PhoneNumber,
+		INTEGER UltID,
+		INTEGER OrgID,
+		INTEGER SeleID),
+	MODEL(Company, PhoneNumber, UltID, OrgID, SeleID));
+
+BusinessAddress := ASSOCIATION(FLAT(
+		Business Company = UID(UltID, OrgID, SeleID), 
+		Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange),
+		INTEGER UltID,
+		INTEGER OrgID,
+		INTEGER SeleID,
+		STRING PrimaryRange=NULL(),
+		STRING Predirectional=NULL(),
+		STRING PrimaryName=NULL(),
+		STRING Suffix=NULL(),
+		STRING Postdirectional=NULL(),
+		STRING SecondaryRange=NULL(),
+		INTEGER ZIP5),
+	MODEL(Company, Location, UltID, OrgID, SeleID, PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, SecondaryRange, ZIP5));

@@ -227,7 +227,7 @@ InputPII: MISSING_INPUT_DATA_INT := -99999;
 InputPII: NO_DATA_FOUND := '-99998';
 InputPII: NO_DATA_FOUND_INT := -99998;
 InputPII: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-99997';	
-// InputPII: RECS_AVAIL_BUT_CANNOT_CALCULATE_INT := -99997;	
+InputPII: RECS_AVAIL_BUT_CANNOT_CALCULATE_INT := -99997;	
 
 InputBII: MISSING_INPUT_DATA := '-99999';
 InputBII: MISSING_INPUT_DATA_INT := -99999;
@@ -457,7 +457,6 @@ InputPII: => InputLastNameCleanValue := MAP(P_InpValNameBogusFlag = 1 => NO_DATA
 																			IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameLast, NO_DATA_FOUND)));
 InputPII: => InputSuffixCleanValue := MAP(P_InpValNameBogusFlag = 1 => NO_DATA_FOUND,
 																			IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameSffx, NO_DATA_FOUND)));
-// InputPII: => InputCleanAddrPropertyUID := P_InpClnAddrPropertyUID;
 
 InputPII: => InputPrimaryRangeCleanValue := MAP(
 				AddrNotPopulated => MISSING_INPUT_DATA, 
@@ -780,112 +779,60 @@ InputPII: => P_InpClnIPAddr :=
 /*              Input PII address AVM Helper Attributes                   */
 /*                                                                        */
 /**************************************************************************/
-// InputPII: => PropertyCurrentDate := Property.CURRENT_DATE;
-// InputPII: => InputAddressProperty := Property(UID=InputPII.P_InpClnAddrPropertyUID)
-                                             // {
-
-                                                // AVMAutomatedValuation := ONLY(AutomatedValuationModel,AVMAutomatedValuation),
-                                                // AVMDateFirstSeen := ONLY(AutomatedValuationModel,AVMAutomatedValuation:DateFirstSeen),
-                                                // AVMConfidenceScore := ONLY(AutomatedValuationModel,AVMConfidenceScore),
-                                                // AVMYearsBetween := YEARSBETWEEN(ONLY(AutomatedValuationModel,AVMAutomatedValuation:DateFirstSeen), ONLY(InputPII,PropertyCurrentDate))
-                                             // };
-// InputPII: => InputAddressPropertyAVMSet := TOPN(InputAddressProperty,1,-AVMDateFirstSeen);
-// InputPII: => InputAddressPropertyCnt := COUNT(InputAddressProperty);
-// InputPII: => InputAddressOnAVM := EXISTS(InputAddressProperty);
-// InputPII: => InputAddressProperty1YearSet := InputAddressProperty(AVMYearsBetween >= 1 AND AVMYearsBetween < 2);
-// InputPII: => InputAddressProperty5YearSet := InputAddressProperty(AVMYearsBetween >= 5 AND AVMYearsBetween < 6);
+Property.AutomatedValuationModel: =>AVMValueDate :=AVMAutomatedValuation:DateFirstSeen;
+Property.AutomatedValuationModel: =>AVMYears :=ABSYEARSBETWEEN(AVMValueDate,Property.CURRENT_DATE);
+InputPII: => InputAddressPropertySet := TOPN(Prop.AutomatedValuationModel(AVMYears<=1)
+                                                {
+																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
+InputPII: => InputAddressPropertySet1Y := TOPN(Prop.AutomatedValuationModel(AVMYears>=1 AND AVMYears<2)
+                                                {
+																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
+InputPII: => InputAddressPropertySet5Y := TOPN(Prop.AutomatedValuationModel(AVMYears>=5 AND AVMYears<6)
+                                                {
+																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);																								
+InputPII: => InputAddressOnAVM := EXISTS(InputAddressPropertySet);
+InputPII: => InputAddressPropertyCnt := COUNT(InputAddressPropertySet);
+InputPII: => InputAddressPropertyCnt1Y := COUNT(InputAddressPropertySet1Y);
+InputPII: => InputAddressPropertyCnt5Y := COUNT(InputAddressPropertySet5Y);
+InputPII: =>AVMValueUnCap :=ONLY(InputAddressPropertySet,AVMAutomatedValuation);
+InputPII: =>AVMValue1YUnCap :=ONLY(InputAddressPropertySet1Y,AVMAutomatedValuation);
+InputPII: =>AVMValue5YUnCap :=ONLY(InputAddressPropertySet5Y,AVMAutomatedValuation);
 
 /**************************************************************************/
 /*                                                                        */
-/*              Input PII address AVM Attributes	                  */
+/*              Input PII address AVM Attributes	                        */
 /*                                                                        */
 /**************************************************************************/
-
-// InputPII: => PI_InpAddrAVMVal := MAP(
-        // InputPrimaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputPrimaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputPrimaryNameCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputPrimaryNameCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputSecondaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputSecondaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputZip5CleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputZip5CleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,        
-        // P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-        // NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-        // InputAddressPropertyCnt = 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-        // BOUNDSFOLD(ONLY(InputAddressPropertyAVMSet,AVMAutomatedValuation),0,999999999));
-// InputPII: => PI_InpAddrAVMValA1Y := MAP(
-				// InputPrimaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputPrimaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputPrimaryNameCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputPrimaryNameCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputSecondaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputSecondaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputZip5CleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputZip5CleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,        
-        // P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-        // NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-        // COUNT(TOPN(InputAddressProperty1YearSet, 1, -AVMDateFirstSeen))=0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-        // BOUNDSFOLD(ONLY(TOPN(InputAddressProperty1YearSet, 1, -AVMDateFirstSeen), AVMAutomatedValuation),0,999999999));
-// InputPII: => PI_InpAddrAVMRatio1Y := MAP(
-				// InputPrimaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA, 
-				// InputPrimaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA,
-        // InputPrimaryNameCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA, 
-				// InputPrimaryNameCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA,
-        // InputSecondaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA, 
-				// InputSecondaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA,
-        // InputZip5CleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA, 
-				// InputZip5CleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA,        
-        // P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA,
-        // NOT InputAddressOnAVM => NO_DATA_FOUND,
-        // PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-        // PI_InpAddrAVMValA1Y = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-        // PI_InpAddrAVMValA1Y <= 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-        // STRING(BOUNDSFOLD(ROUND((PI_InpAddrAVMVal/PI_InpAddrAVMValA1Y),2),0,99.99)));
-// InputPII: => PI_InpAddrAVMValA5Y := MAP(
-				// InputPrimaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputPrimaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputPrimaryNameCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputPrimaryNameCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputSecondaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputSecondaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputZip5CleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputZip5CleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,        
-        // P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-        // NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-        // COUNT(TOPN(InputAddressProperty5YearSet, 1, -AVMDateFirstSeen))=0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-        // BOUNDSFOLD(ONLY(TOPN(InputAddressProperty5YearSet, 1, -AVMDateFirstSeen), AVMAutomatedValuation),0,999999999));
-// InputPII: => InputAddrAVMRatio5YCalc := ROUND(PI_InpAddrAVMVal/PI_InpAddrAVMValA5Y,2);
-// InputPII: => PI_InpAddrAVMRatio5Y := MAP(
-				// InputPrimaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA, 
-				// InputPrimaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA,
-        // InputPrimaryNameCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA, 
-				// InputPrimaryNameCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA,
-        // InputSecondaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA, 
-				// InputSecondaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA,
-        // InputZip5CleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA, 
-				// InputZip5CleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA,        
-        // P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA,
-        // NOT InputAddressOnAVM => NO_DATA_FOUND,
-        // PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-        // PI_InpAddrAVMValA1Y = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-        // PI_InpAddrAVMValA5Y = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-        // PI_InpAddrAVMValA5Y <= 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-        // STRING(BOUNDSFOLD(InputAddrAVMRatio5YCalc,0,99.99)));
-// InputPII: => PI_InpAddrAVMConfScore := MAP(
-				// InputPrimaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputPrimaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputPrimaryNameCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputPrimaryNameCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputSecondaryRangeCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputSecondaryRangeCleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,
-        // InputZip5CleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
-				// InputZip5CleanValue = NO_DATA_FOUND => MISSING_INPUT_DATA_INT,        
-        // P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-        // NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-        // PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-        // BOUNDSFOLD(ONLY(InputAddressPropertyAVMSet,AVMConfidenceScore),0,100));
-
+InputPII: => PI_InpAddrAVMVal := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		InputAddressPropertyCnt = 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(AVMValueUnCap,0,999999999));
+InputPII: => PI_InpAddrAVMValA1Y := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT, 
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		InputAddressPropertyCnt1Y =0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(AVMValue1YUnCap,0,999999999));
+InputPII: => PI_InpAddrAVMRatio1Y := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMVal <= 0 OR PI_InpAddrAVMValA1Y = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMValA1Y <= 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		MIN(ROUND(AVMValueUnCap/AVMValue1YUnCap,2),99.99));
+InputPII: => PI_InpAddrAVMValA5Y := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		InputAddressPropertyCnt5Y =0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(AVMValue5YUnCap,0,999999999));
+InputPII: => PI_InpAddrAVMRatio5Y := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMVal <= 0 OR PI_InpAddrAVMValA5Y = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMValA5Y <= 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		MIN(ROUND(AVMValueUnCap/AVMValue5YUnCap,2),99.99));
+InputPII: => PI_InpAddrAVMConfScore := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(ONLY(InputAddressPropertySet,AVMConfidenceScore),0,100));
 
 /**************************************************************************/
 /*                                                                        */
