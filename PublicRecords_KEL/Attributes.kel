@@ -1,4 +1,4 @@
-﻿IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities; 
+﻿IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities;
 IMPORT PublicRecords_KEL.Uses;
 
 IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
@@ -206,6 +206,7 @@ BusinessSele:  UCCCURRENT_DATE := MIN(GETBUILDDATE('ucc_build_version'), CURRENT
 BusinessSele: CURRENT_DATE_LIEN := MIN(GETBUILDDATE('liens_build_version'), CURRENTDATE());
 Person: CURRENT_DATE_LIEN := MIN(GETBUILDDATE('liens_build_version'), CURRENTDATE());
 SelePerson:  CURRENT_DATE  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
+Address: ADVO_CURRENT_DATE := MIN(GETBUILDDATE('cds_build_version'), CURRENTDATE());
 //Hardcoding the static build date for Alloy Media Student Data since the keys are not updating anymore in Prod
 Education: ALLOY_MEDIA_BUILD_DATE := DATE(20160129); 
 Education: ASL_BUILD_DATE := GETBUILDDATE('asl_build_version'); 
@@ -378,6 +379,7 @@ PersonEducation: NO_DATA_FOUND_97 := '-99997';
 
 Education: NO_DATA_FOUND_97 :=  '-99997';
 
+Address: NO_DATA_FOUND_97 :='-99997';
 
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
@@ -836,6 +838,78 @@ InputPII: => PI_InpAddrAVMConfScore := MAP(
 		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
 		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 		BOUNDSFOLD(ONLY(InputAddressPropertySet,AVMConfidenceScore),0,100));
+		
+/**************************************************************************/
+/*                                                                        */
+/*              Input PII Address Flag Helper Attributes                  */
+/*                                                                        */
+/**************************************************************************/
+
+Address: => BestchildAdvo := TOPN(ADVOSummary, 1, -ADVODateFirstSeen);
+Address: => VacantFlag := ONLY(BestchildAdvo, VacancyIndicator);
+Address: => ThrowBackFlag := ONLY(BestchildAdvo, ThrowBackIndicator);
+Address: => StyleFlag := ONLY(BestchildAdvo, StyleCode);
+Address: => CollegeFlag := ONLY(BestchildAdvo, CollegeIndicator);
+Address: => DropIndicatorFlag := ONLY(BestchildAdvo, DropIndicator);
+Address: => SeasonalDeliveryFlag := ONLY(BestchildAdvo, SeasonalDeliveryIndicator);
+Address: => DoNotDeliverFlag := ONLY(BestchildAdvo, DoNotDeliverIndicator);
+Address: => ResBusFlag := ONLY(BestchildAdvo, ResidentialOrBusinessIndicator);
+Address: => OnlyGMFlag := ONLY(BestchildAdvo, OnlyWayToGetMailIndicator);
+InputPII: =>InputAddronfile :=EXISTS(Location);
+InputPII: => IsPostalSource :=EXISTS(Location.DataSources(Source ='VL')); 
+
+/**************************************************************************/
+/*                                                                        */
+/*              Input PII Address Flag  Attributes                        */
+/*                                                                        */
+/**************************************************************************/
+
+InputPII: => PI_InpAddrOnFileFlagEv := MAP(P_InpClnAddrFullFlagValue = MISSING_INPUT_DATA OR P_InpClnAddrFullFlagValue='0' => MISSING_INPUT_DATA_INT, 
+		InputAddronfile => 1,0);
+InputPII: => PI_InpAddrIsVacantFlag :=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND_INT,
+		Location.VacantFlag ='' OR Location.VacantFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.VacantFlag ='Y' =>1,0);
+InputPII: => PI_InpAddrIsThrowbackFlag :=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0=> NO_DATA_FOUND_INT,
+		Location.ThrowBackFlag ='' OR Location.ThrowBackFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.ThrowBackFlag ='Y' =>1,0);
+InputPII: => PI_InpAddrSeasonalType :=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv ='0'=> NO_DATA_FOUND_INT,
+		Location.SeasonalDeliveryFlag	='' OR Location.SeasonalDeliveryFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.SeasonalDeliveryFlag ='N' =>0,
+		Location.SeasonalDeliveryFlag ='Y' =>1,
+		Location.SeasonalDeliveryFlag	='E' =>2);
+InputPII: => PI_InpAddrIsDNDFlag :=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0=> NO_DATA_FOUND_INT,
+		Location.DoNotDeliverFlag	='' OR Location.DoNotDeliverFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.DoNotDeliverFlag	='Y' =>1,0);
+InputPII: => PI_InpAddrIsCollegeFlag :=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
+		Location.CollegeFlag ='' OR Location.CollegeFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.CollegeFlag ='Y' =>1,0);
+InputPII: => PI_InpAddrIsCMRAFlag	 :=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
+		Location.DropIndicatorFlag	='' OR Location.DropIndicatorFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.DropIndicatorFlag	='C' =>1,0);  
+InputPII: => PI_InpAddrIsSimpAddrFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
+		Location.StyleFlag ='' OR Location.StyleFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.StyleFlag ='S'=>1,0);
+InputPII: => PI_InpAddrIsDropDeliveryFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT, 
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
+		Location.DropIndicatorFlag	=''	OR Location.DropIndicatorFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.DropIndicatorFlag	='Y' =>1,0);
+InputPII: => PI_InpAddrIsBusinessFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
+		Location.ResBusFlag =''	OR Location.ResBusFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.ResBusFlag IN ['A','C']	=>0,
+		Location.ResBusFlag IN ['B','D']	=>1);
+InputPII: => PI_InpAddrOWGMFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
+		Location.OnlyGMFlag  =''	OR Location.OnlyGMFlag:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		Location.OnlyGMFlag = 'N'	=>0,
+		Location.OnlyGMFlag = 'Y'	=>1);
 
 /**************************************************************************/
 /*                                                                        */
