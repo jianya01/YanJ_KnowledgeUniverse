@@ -2808,8 +2808,96 @@ Person: => PL_DrgBkSeverityIndx10Y := MAP(
 			PL_DrgBkNewDispType10Y = 'DISMISSED' => '3',
 			PL_DrgBkNewChType10Y = 13 => '2',
 			'1'
-			); 	
+			); 
+			
+/**************************************************************************/
+/*                                                                        */
+/*            Person Lien&Judgment Helper Attributes                      */
+/*                                                                        */
+/**************************************************************************/
 
+LienJudgment: ONE_YEAR_IN_DAYS := 365;
+LienJudgment: SEVEN_YEAR_IN_DAYS := 2556;
+LienJudgment: LANDLORD_TENANT_DISPUTE_LIENS :=['FORCIBLE ENTRY/DETAINER','LANDLORD TENANT JUDGMENT','FORCIBLE ENTRY/DETAINER RELEAS','FORCIBLE ENTRY/DETAINER RELEASE'];
+LienJudgment: SUITS :=['CIVIL NEW FILING','CIVIL SUIT','CIVIL SUMMONS','COURT ORDER', 'FEDERAL COURT NEW FILING', 'FORECLOSURE NEW FILING', 'JUDGMENT - Chapter 7', 'LANDLORD TENANT SUIT', 'LIS PENDENS', 'LIS PENDENS NOTICE', 'LIS PENDENS RELEASE'];
+LienJudgment: FEDERAL_TAX_LIENS :=['CORRECTED FEDERAL TAX LIEN', 'FEDERAL TAX LIEN', 'FEDERAL TAX LIEN RELEASE', 'FEDERAL TAX RELEASE'];
+LienJudgment: STATE_TAX_LIENS :=['JUDGMENT or STATE TAX LIEN', 'STATE TAX LIEN', 'STATE TAX LIEN RELEASE', 'STATE TAX LIEN RENEWAL', 'STATE TAX LIEN RENEWED', 'STATE TAX RELEASE', 'STATE TAX WARRANT', 'STATE TAX WARRANT RELEASE', 'STATE TAX WARRANT RENEWED'];
+LienJudgment: OTHER_TAX_LIENS :=[ 'CITY TAX LIEN', 'COUNTY TAX LIEN', 'COUNTY TAX LIEN RELEASE', 'CITY TAX LIEN RELEASE', 'ILLINOIS TAX LIEN', 'ILLINOIS TAX RELEASE', 'PROPERTY TAX LIEN', 'PROPERTY TAX RELEASE'];
+LienJudgment: OTHER_LIENS :=[ 'BUILDING LIEN', 'BUILDING LIEN RELEASE', 'BUILDING RELEASE', 'CHILD SUPPORT LIEN', 'CHILD SUPPORT PAYMENT', 'CHILD SUPPORT PAYMENT RELEASE', 'JUDGEMENT LIEN', 'JUDGMENT LIEN RELEASE', 'SIDEWALK LIEN', 'SIDEWALK LIEN RELEASE', 'SIDEWALK RELEASE', 'WELFARE LIEN', 'MECHANICS LIEN', 'MECHANICS LIEN RELEASE'];
+LienJudgment: CIVIL_COURT_JUDGMENT :=[ 'CIVIL JUDGMENT', 'CIVIL JUDGMENT RELEASE', 'CIVIL SPECIAL JUDGMENT', 'CIVIL SPECIAL JUDGMENT RELEASE', 'FEDERAL COURT JUDGMENT', 'JUDGMENT', 'JUDGMENTS', 'JUDGMENTS DOCKET', 'RENEW/REOPEN CIVIL JUDGMENT', 'SATISFACTION OF JUDGMENT', 'SATISFIED JUDGMENT', 'SUBSEQUENT JUDGMENT', 'DOMESTIC JUDGMENT IN DIVORCE', 'DOMESTIC RELEASE IN DIVORCE'];
+LienJudgment: FORECLOSURE_JUDGMENT :=[ 'FORECLOSURE (JUDGMENT)', 'FORECLOSURE SATISFIED'];
+LienJudgment: SMALL_CLAIMS_JUDGMENT :=['RENEW/REOPEN SMALL CLAIM JUDGM', 'SMALL CLAIMS JUDGMENT', 'SMALL CLAIMS JUDGMENT RELEASE'];
+
+LienJudgment.Filing: => TMSID := LienJudgment.TMSID ;
+PersonLienJudgment.Details: => IsDebtor := UPCASE(TRIM(DebtorPlaintiff)) = 'D';
+PersonLienJudgment: => GatherLiens := Lien.Filing{ 
+									TMSID, 
+		FilingTypeDescription,
+		Amount, 
+		LandlordTenantDisputeFlag,
+		MyDateFirstSeen := PersonLienJudgment.TMSID:DateFirstSeen
+								 };
+Person: => AllLienData := PersonLienJudgment(Details.IsDebtor).GatherLiens{
+		TMSID,
+		FilingTypeDescription := ONLY(TOPN(GROUP(NOT FilingTypeDescription:Null), 1, -MyDateFirstSeen), FilingTypeDescription ),
+		Amount := ONLY(TOPN(GROUP(NOT Amount:Null OR Amount != 0), 1, -MyDateFirstSeen, -Amount), Amount), 
+		LandlordTenantDisputeFlag := EXISTS(GROUP(LandlordTenantDisputeFlag = 'Y' )),
+		OriginalFilingDate := ONLY(TOPN(GROUP(ISVALIDDATE(MyDateFirstSeen)), 1, MyDateFirstSeen), MyDateFirstSeen)
+		};
+Person.AllLienData: => AgeInDays :=ABSDAYSBETWEEN(OriginalFilingDate, CURRENT_DATE_LIEN);
+Person.AllLienData: => IsLandlordTenantDispute := (LandlordTenantDisputeFlag = TRUE OR FilingTypeDescription IN LienJudgment.LANDLORD_TENANT_DISPUTE_LIENS) AND NOT FilingTypeDescription IN LienJudgment.SUITS;
+Person.AllLienData: => Seen_In_Seven_Years := AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS ;
+Person.AllLienData: => Seen_In_One_Year:= AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS;
+Person.AllLienData: => IsFederalTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FEDERAL_TAX_LIENS;
+Person.AllLienData: => IsStateTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.STATE_TAX_LIENS;
+Person.AllLienData: => IsOtherTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_TAX_LIENS;
+Person.AllLienData: => IsTotalTaxLien := IsFederalTaxLien OR IsStateTaxLien OR IsOtherTaxLien;
+Person.AllLienData: => IsOtherLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_LIENS;
+Person.AllLienData: => IsOverAllLien := IsTotalTaxLien OR IsOtherLien;
+Person.AllLienData: => IsCivilCourtJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.CIVIL_COURT_JUDGMENT;
+Person.AllLienData: => IsForeclosureJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FORECLOSURE_JUDGMENT;
+Person.AllLienData: => IsSmallCliamsJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SMALL_CLAIMS_JUDGMENT;
+Person.AllLienData: => IsOverAllJudgment := IsCivilCourtJudgment OR IsForeclosureJudgment OR IsSmallCliamsJudgment;
+Person.AllLienData: => IsOverAllLienJudgment:= IsOverAllJudgment OR IsOverAllLien;
+Person.AllLienData: => IsSuits := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SUITS ;
+Person: =>Suits7YListSorted :=TOPN(AllLienData(Seen_In_Seven_Years AND IsSuits){Amount:=IF(Amount:Null OR Amount ='' OR Amount = 0,LienJudgment.REC_FOUND_BUT_INVALID,Amount),OriginalFilingDate:= IF(ISVALIDDATE(OriginalFilingDate),DATETOSTRING(OriginalFilingDate,'%Y%m%d'),LienJudgment.REC_FOUND_BUT_INVALID),TMSID},999,OriginalFilingDate);
+Person: =>SuitsAmount7YList:= CONCAT(Suits7YListSorted,Amount,'|');
+Person: =>SuitsDates7YList:= CONCAT(Suits7YListSorted,OriginalFilingDate,'|');
+Person: =>Suit7YNewDate :=IsBlank(STRING(MAX(AllLienData( Seen_In_Seven_Years AND  IsSuits ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
+Person: =>Suit7YOldDate :=IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsSuits ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
+/**************************************************************************/
+/*                                                                        */
+/*            Person Lien&Judgment Attributes                             */
+/*                                                                        */
+/**************************************************************************/
+
+Person: => PL_DrgJudgCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllJudgment) ),0,999));
+Person: => PL_DrgLTDCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute = TRUE) ),0,999));
+Person: => PL_DrgLienCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE) ),0,999));		
+Person: =>PL_DrgSuitCnt7Y  :=IF(P_LexIDSeenFlag  = '0',LienJudgment.MISSING_INPUT_DATA_INT, 
+		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsSuits ) ),0,999));
+Person: =>PL_DrgSuitAmtList7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA,
+		PL_DrgSuitCnt7Y  < 1  => LienJudgment.NO_DATA_FOUND_LIEN, 
+		SuitsAmount7YList);
+Person: =>PL_DrgSuitAmtTot7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA_INT,
+		PL_DrgSuitCnt7Y  < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
+		ALL(Suits7YListSorted,Amount = LienJudgment.REC_FOUND_BUT_INVALID_INT) =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsSuits ) ,Amount),1,999999999));
+Person: =>PL_DrgSuitDtList7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA,
+		PL_DrgSuitCnt7Y  < 1  => LienJudgment.NO_DATA_FOUND_LIEN,
+		SuitsDates7YList);
+Person: =>PL_DrgSuitNewMsnc7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA_INT,
+		PL_DrgSuitCnt7Y  < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
+		ALL(AllLienData( Seen_In_Seven_Years AND  IsSuits ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(Suit7YNewDate),CURRENT_DATE_LIEN),0,84));
+Person: =>PL_DrgSuitOldMsnc7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA_INT,
+		PL_DrgSuitCnt7Y  < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
+		ALL(AllLienData( Seen_In_Seven_Years AND  IsSuits ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(Suit7YOldDate),CURRENT_DATE_LIEN),0,84));
+				
 /**************************************************************************/
 /*                                                                        */
 /*            ProfessionalLicense Helper Attributes                       */
@@ -4587,13 +4675,6 @@ BusinessSele: => BE_DrgGovDebarredFlagEv :=	MAP(B_LexIDLegalSeenFlag = '0' OR Se
 /*                                                                        */
 /**************************************************************************/	
 
-
-LienJudgment: ONE_YEAR_IN_DAYS := 365;
-LienJudgment: SEVEN_YEAR_IN_DAYS := 2556;
-LienJudgment: LANDLORD_TENANT_DISPUTE_LIENS :=['FORCIBLE ENTRY/DETAINER','LANDLORD TENANT JUDGMENT','FORCIBLE ENTRY/DETAINER RELEAS','FORCIBLE ENTRY/DETAINER RELEASE'];
-LienJudgment: SUITS :=['CIVIL NEW FILING','CIVIL SUIT','CIVIL SUMMONS','COURT ORDER', 'FEDERAL COURT NEW FILING', 'FORECLOSURE NEW FILING', 'JUDGMENT - Chapter 7', 'LANDLORD TENANT SUIT', 'LIS PENDENS', 'LIS PENDENS NOTICE', 'LIS PENDENS RELEASE'];
-LienJudgment.Filing: => TMSID := LienJudgment.TMSID ;
-
 SeleLienJudgment.Details: => IsDebtor := UPCASE(TRIM(DebtorPlaintiff)) = 'D';
 SeleLienJudgment: => GatherLiens := Lien.Filing{ 
 									TMSID, 
@@ -4614,27 +4695,6 @@ BusinessSele.AllLienData: => IsLandlordTenantDispute := (LandlordTenantDisputeFl
 BusinessSele.AllLienData: => Seen_In_Seven_Years := AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS ;
 BusinessSele.AllLienData: => Seen_In_One_Year:= AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS;
 
-PersonLienJudgment.Details: => IsDebtor := UPCASE(TRIM(DebtorPlaintiff)) = 'D';
-PersonLienJudgment: => GatherLiens := Lien.Filing{ 
-									TMSID, 
-		FilingTypeDescription,
-		Amount, 
-		LandlordTenantDisputeFlag,
-		MyDateFirstSeen := PersonLienJudgment.TMSID:DateFirstSeen
-								 };
-Person: => AllLienData := PersonLienJudgment(Details.IsDebtor).GatherLiens{
-		TMSID,
-		FilingTypeDescription := ONLY(TOPN(GROUP(NOT FilingTypeDescription:Null), 1, -MyDateFirstSeen), FilingTypeDescription ),
-		Amount := ONLY(TOPN(GROUP(NOT Amount:Null OR Amount != 0), 1, -MyDateFirstSeen, -Amount), Amount), 
-		LandlordTenantDisputeFlag := EXISTS(GROUP(LandlordTenantDisputeFlag = 'Y' )),
-		OriginalFilingDate := ONLY(TOPN(GROUP(ISVALIDDATE(MyDateFirstSeen)), 1, MyDateFirstSeen), MyDateFirstSeen)
-		};
-Person.AllLienData: => AgeInDays :=ABSDAYSBETWEEN(OriginalFilingDate, CURRENT_DATE_LIEN);
-Person.AllLienData: => IsLandlordTenantDispute := (LandlordTenantDisputeFlag = TRUE OR FilingTypeDescription IN LienJudgment.LANDLORD_TENANT_DISPUTE_LIENS) AND NOT FilingTypeDescription IN LienJudgment.SUITS;
-Person.AllLienData: => Seen_In_Seven_Years := AgeInDays <= LienJudgment.SEVEN_YEAR_IN_DAYS ;
-Person.AllLienData: => Seen_In_One_Year:= AgeInDays <= LienJudgment.ONE_YEAR_IN_DAYS;
-
-
 /**************************************************************************/
 /*                                                                        */
 /*              Business LienJudgment Attributes                          */
@@ -4649,7 +4709,7 @@ BusinessSele: => BE_DrgLTDCnt7Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Lien
 BusinessSele: => BE_DrgLTDAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
                                          BE_DrgLTDCnt7Y = '0'  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 								                         BE_DrgLTDCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-																					BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute = TRUE),Amount),0,99999999));
+																					BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute = TRUE),Amount),1,99999999));
 BusinessSele: => BE_DrgLTDAmtAvg7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
                                          BE_DrgLTDCnt7Y = '0'  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 								                         BE_DrgLTDCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
@@ -4821,26 +4881,14 @@ BusinessSele: => BE_UCCActvRoleIndx := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID
 /*                                                                        */
 /*             Business OverAllLeinJudgment Helper Attributes             */
 /*                                                                        */
-/**************************************************************************/	
-
-LienJudgment: FEDERAL_TAX_LIENS :=['CORRECTED FEDERAL TAX LIEN', 'FEDERAL TAX LIEN', 'FEDERAL TAX LIEN RELEASE', 'FEDERAL TAX RELEASE'];
-LienJudgment: STATE_TAX_LIENS :=['JUDGMENT or STATE TAX LIEN', 'STATE TAX LIEN', 'STATE TAX LIEN RELEASE', 'STATE TAX LIEN RENEWAL', 'STATE TAX LIEN RENEWED', 'STATE TAX RELEASE', 'STATE TAX WARRANT', 'STATE TAX WARRANT RELEASE', 'STATE TAX WARRANT RENEWED'];
-LienJudgment: OTHER_TAX_LIENS :=[ 'CITY TAX LIEN', 'COUNTY TAX LIEN', 'COUNTY TAX LIEN RELEASE', 'CITY TAX LIEN RELEASE', 'ILLINOIS TAX LIEN', 'ILLINOIS TAX RELEASE', 'PROPERTY TAX LIEN', 'PROPERTY TAX RELEASE'];
-LienJudgment: OTHER_LIENS :=[ 'BUILDING LIEN', 'BUILDING LIEN RELEASE', 'BUILDING RELEASE', 'CHILD SUPPORT LIEN', 'CHILD SUPPORT PAYMENT', 'CHILD SUPPORT PAYMENT RELEASE', 'JUDGEMENT LIEN', 'JUDGMENT LIEN RELEASE', 'SIDEWALK LIEN', 'SIDEWALK LIEN RELEASE', 'SIDEWALK RELEASE', 'WELFARE LIEN', 'MECHANICS LIEN', 'MECHANICS LIEN RELEASE'];
-
+/**************************************************************************/
+	
 BusinessSele.AllLienData: => IsFederalTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FEDERAL_TAX_LIENS;
 BusinessSele.AllLienData: => IsStateTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.STATE_TAX_LIENS;
 BusinessSele.AllLienData: => IsOtherTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_TAX_LIENS;
 BusinessSele.AllLienData: => IsTotalTaxLien := IsFederalTaxLien OR IsStateTaxLien OR IsOtherTaxLien;
 BusinessSele.AllLienData: => IsOtherLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_LIENS;
 BusinessSele.AllLienData: => IsOverAllLien := IsTotalTaxLien OR IsOtherLien;
-
-Person.AllLienData: => IsFederalTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FEDERAL_TAX_LIENS;
-Person.AllLienData: => IsStateTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.STATE_TAX_LIENS;
-Person.AllLienData: => IsOtherTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_TAX_LIENS;
-Person.AllLienData: => IsTotalTaxLien := IsFederalTaxLien OR IsStateTaxLien OR IsOtherTaxLien;
-Person.AllLienData: => IsOtherLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_LIENS;
-Person.AllLienData: => IsOverAllLien := IsTotalTaxLien OR IsOtherLien;
 
 /**************************************************************************/
 /*                                                                        */
@@ -4850,14 +4898,12 @@ Person.AllLienData: => IsOverAllLien := IsTotalTaxLien OR IsOtherLien;
 
 BusinessSele: =>BE_DrgLienCnt1Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA,LienJudgment.MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT( AllLienData( Seen_In_One_Year AND  IsOverAllLien = TRUE)),0,99999));
-		
 BusinessSele: =>BE_DrgLienCnt7Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA,LienJudgment.MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE) ),0,99999));
-		
 BusinessSele: =>BE_DrgLienAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLienCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLienCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE),Amount),1,99999999));
 BusinessSele: =>BE_DrgLienAmtAvg7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLienCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLienCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
@@ -4882,7 +4928,7 @@ BusinessSele: =>BE_DrgLienTaxCnt7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = 
 BusinessSele: =>BE_DrgLienTaxAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLienTaxCnt7Y = 0 OR BE_DrgLienTaxCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLienTaxCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsTotalTaxLien = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsTotalTaxLien = TRUE),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsTotalTaxLien = TRUE),Amount),1,99999999));
 BusinessSele: =>BE_DrgLienTaxOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
 		BE_DrgLienTaxCnt7Y = 0 OR BE_DrgLienTaxCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN,
 		IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsTotalTaxLien = TRUE),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
@@ -4903,7 +4949,7 @@ BusinessSele: =>BE_DrgLienTaxFedCnt7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID
 BusinessSele: =>BE_DrgLienTaxFedAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLienTaxFedCnt7Y = 0 OR BE_DrgLienTaxFedCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLienTaxFedCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsFederalTaxLien = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsFederalTaxLien = TRUE),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsFederalTaxLien = TRUE),Amount),1,99999999));
 BusinessSele: =>BE_DrgLienTaxFedOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
 		BE_DrgLienTaxFedCnt7Y = 0 OR BE_DrgLienTaxFedCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN,
 		IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsFederalTaxLien = TRUE),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
@@ -4924,7 +4970,7 @@ BusinessSele: =>BE_DrgLienTaxStateCnt7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR Sele
 BusinessSele: =>BE_DrgLienTaxStateAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLienTaxStateCnt7Y = 0 OR BE_DrgLienTaxStateCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLienTaxStateCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsStateTaxLien = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsStateTaxLien = TRUE),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsStateTaxLien = TRUE),Amount),1,99999999));
 BusinessSele: =>BE_DrgLienTaxStateOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
 		BE_DrgLienTaxStateCnt7Y = 0  OR BE_DrgLienTaxStateCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT=> LienJudgment.NO_DATA_FOUND_LIEN,
 		IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsStateTaxLien = TRUE),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
@@ -4945,7 +4991,7 @@ BusinessSele: =>BE_DrgLienTaxOtherCnt7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR Sele
 BusinessSele: =>BE_DrgLienTaxOtherAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLienTaxOtherCnt7Y = 0 OR BE_DrgLienTaxOtherCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT=> LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLienTaxOtherCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsOtherTaxLien = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOtherTaxLien = TRUE),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOtherTaxLien = TRUE),Amount),1,99999999));
 BusinessSele: =>BE_DrgLienTaxOtherOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
 		BE_DrgLienTaxOtherCnt7Y = 0 OR BE_DrgLienTaxOtherCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN,
 		IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsOtherTaxLien = TRUE),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
@@ -4966,7 +5012,7 @@ BusinessSele: =>BE_DrgLienOtherCnt7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID 
 BusinessSele: =>BE_DrgLienOtherAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLienOtherCnt7Y = 0 OR BE_DrgLienOtherCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLienOtherCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsOtherLien = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOtherLien = TRUE),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOtherLien = TRUE),Amount),1,99999999));
 BusinessSele: =>BE_DrgLienOtherNewDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
 		BE_DrgLienOtherCnt7Y = 0 OR BE_DrgLienOtherCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN,
 		IsBlank(STRING(MAX(AllLienData( Seen_In_Seven_Years AND  IsOtherLien = TRUE),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
@@ -4988,20 +5034,10 @@ BusinessSele: =>BE_DrgLienOtherOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR Se
 /*                                                                        */
 /**************************************************************************/
 
-LienJudgment: CIVIL_COURT_JUDGMENT :=[ 'CIVIL JUDGMENT', 'CIVIL JUDGMENT RELEASE', 'CIVIL SPECIAL JUDGMENT', 'CIVIL SPECIAL JUDGMENT RELEASE', 'FEDERAL COURT JUDGMENT', 'JUDGMENT', 'JUDGMENTS', 'JUDGMENTS DOCKET', 'RENEW/REOPEN CIVIL JUDGMENT', 'SATISFACTION OF JUDGMENT', 'SATISFIED JUDGMENT', 'SUBSEQUENT JUDGMENT', 'DOMESTIC JUDGMENT IN DIVORCE', 'DOMESTIC RELEASE IN DIVORCE'];
-LienJudgment: FORECLOSURE_JUDGMENT :=[ 'FORECLOSURE (JUDGMENT)', 'FORECLOSURE SATISFIED'];
-LienJudgment: SMALL_CLAIMS_JUDGMENT :=['RENEW/REOPEN SMALL CLAIM JUDGM', 'SMALL CLAIMS JUDGMENT', 'SMALL CLAIMS JUDGMENT RELEASE'];
-
 BusinessSele.AllLienData: => IsCivilCourtJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.CIVIL_COURT_JUDGMENT;
 BusinessSele.AllLienData: => IsForeclosureJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FORECLOSURE_JUDGMENT;
 BusinessSele.AllLienData: => IsSmallCliamsJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SMALL_CLAIMS_JUDGMENT;
 BusinessSele.AllLienData: => IsOverAllJudgment := IsCivilCourtJudgment OR IsForeclosureJudgment OR IsSmallCliamsJudgment;
-
-Person.AllLienData: => IsCivilCourtJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.CIVIL_COURT_JUDGMENT;
-Person.AllLienData: => IsForeclosureJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FORECLOSURE_JUDGMENT;
-Person.AllLienData: => IsSmallCliamsJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SMALL_CLAIMS_JUDGMENT;
-Person.AllLienData: => IsOverAllJudgment := IsCivilCourtJudgment OR IsForeclosureJudgment OR IsSmallCliamsJudgment;
-
 
 /**************************************************************************/
 /*                                                                        */
@@ -5016,7 +5052,7 @@ BusinessSele: =>BE_DrgJudgCnt7Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Lien
 BusinessSele: =>BE_DrgJudgAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgJudgCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgJudgCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllJudgment),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllJudgment),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllJudgment),Amount),1,99999999));
 BusinessSele: =>BE_DrgJudgAmtAvg7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgJudgCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgJudgCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllJudgment),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
@@ -5041,7 +5077,7 @@ BusinessSele: =>BE_DrgJudgCivCrtCnt7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID
 BusinessSele: =>BE_DrgJudgCivCrtAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgJudgCivCrtCnt7Y = 0 OR BE_DrgJudgCivCrtCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgJudgCivCrtCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsCivilCourtJudgment = TRUE),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsCivilCourtJudgment),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsCivilCourtJudgment),Amount),1,99999999));
 BusinessSele: =>BE_DrgJudgCivCrtOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
 		BE_DrgJudgCivCrtCnt7Y = 0  OR BE_DrgJudgCivCrtCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT=> LienJudgment.NO_DATA_FOUND_LIEN,
 		IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsCivilCourtJudgment ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
@@ -5062,7 +5098,7 @@ BusinessSele: =>BE_DrgJudgSmClaimCnt7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleI
 BusinessSele: =>BE_DrgJudgSmClaimAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgJudgSmClaimCnt7Y = 0 OR BE_DrgJudgSmClaimCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgJudgSmClaimCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsSmallCliamsJudgment ),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsSmallCliamsJudgment ),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsSmallCliamsJudgment ),Amount),1,99999999));
 BusinessSele: =>BE_DrgJudgSmClaimOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
 		BE_DrgJudgSmClaimCnt7Y = 0  OR BE_DrgJudgSmClaimCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT=> LienJudgment.NO_DATA_FOUND_LIEN,
 		IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsSmallCliamsJudgment ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
@@ -5083,7 +5119,7 @@ BusinessSele: =>BE_DrgJudgFrclCnt7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID =
 BusinessSele: =>BE_DrgJudgFrclAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgJudgFrclCnt7Y = 0 OR BE_DrgJudgFrclCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgJudgFrclCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsForeclosureJudgment),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsForeclosureJudgment = TRUE),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsForeclosureJudgment = TRUE),Amount),1,99999999));
 BusinessSele: =>BE_DrgJudgFrclOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
 		BE_DrgJudgFrclCnt7Y = 0 OR BE_DrgJudgFrclCnt7Y = LienJudgment.NO_DATA_FOUND_LIEN_INT => LienJudgment.NO_DATA_FOUND_LIEN,
 		IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsForeclosureJudgment ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
@@ -5107,7 +5143,6 @@ BusinessSele: =>BE_DrgJudgFrclNewMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR Sel
 /**************************************************************************/
 
 BusinessSele.AllLienData: => IsOverAllLienJudgment:= IsOverAllJudgment OR IsOverAllLien;
-Person.AllLienData: => IsOverAllLienJudgment:= IsOverAllJudgment OR IsOverAllLien;
 
 /**************************************************************************/
 /*                                                                        */
@@ -5122,7 +5157,7 @@ BusinessSele: =>BE_DrgLnJCnt7Y :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJ
 BusinessSele: =>BE_DrgLnJAmtTot7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLnJCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLnJCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment),Amount),1,99999999));
 BusinessSele: =>BE_DrgLnJAmtAvg7Y :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgLnJCnt7Y = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgLnJCnt7Y > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
@@ -5149,7 +5184,6 @@ BusinessSele: =>BE_DrgLnJOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID =
 /**************************************************************************/
 
 BusinessSele.AllLienData: => IsSuits := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SUITS ;
-Person.AllLienData: => IsSuits := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.SUITS ;
 
 /**************************************************************************/
 /*                                                                        */
@@ -5162,7 +5196,7 @@ BusinessSele: =>BE_DrgSuitCnt7Y  :=IF(B_LexIDLegalSeenFlag = '0' OR SeleID = Lie
 BusinessSele: =>BE_DrgSuitAmtTot7Y  :=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA => LienJudgment.MISSING_INPUT_DATA_INT,
 		BE_DrgSuitCnt7Y  = 0  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		BE_DrgSuitCnt7Y  > 0 AND SUM(AllLienData( Seen_In_Seven_Years AND  IsSuits ),Amount) = 0 =>LienJudgment.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsSuits),Amount),0,99999999));
+		BOUNDSFOLD(SUM(AllLienData( Seen_In_Seven_Years AND  IsSuits),Amount),1,99999999));
 BusinessSele: =>BE_DrgSuitOldDt7Y:=MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = LienJudgment.MISSING_INPUT_DATA =>LienJudgment.MISSING_INPUT_DATA,
 		BE_DrgSuitCnt7Y  = 0  => LienJudgment.NO_DATA_FOUND_LIEN,
 		IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsSuits),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID));
@@ -5273,28 +5307,6 @@ BusinessSele: =>BE_DrgOldMsnc7Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = MI
 		BE_DrgCnt7Y  = 0  => NO_DATA_FOUND_INT,
 		BE_DrgOldDt7Y = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(BKLnJLTDOldDateMaxMsnc, 0, 84));
-/**************************************************************************/
-/*                                                                        */
-/*             Business Best - Best Sources                               */
-/*                                                                        */
-/**************************************************************************/	
-
-/******************************************************************************************************************/
-/*////////////////PERSON LIEN ATTRIBUTES COPIED FROM THE BUSINESS LOGIC///////////////////////////////////////////*/
-/******************************************************************************************************************/
-
-
-Person: => PL_DrgJudgCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllJudgment) ),0,999));
-
-Person: => PL_DrgLTDCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute = TRUE) ),0,999));
-																			
-Person: => PL_DrgLienCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE) ),0,999));		
-		
-		
-		
 
 /**************************************************************************/
 /*          Busienss Associates Attributes                                */
