@@ -2865,6 +2865,11 @@ Person: =>SuitsAmount7YList:= CONCAT(Suits7YListSorted,Amount,'|');
 Person: =>SuitsDates7YList:= CONCAT(Suits7YListSorted,OriginalFilingDate,'|');
 Person: =>Suit7YNewDate :=IsBlank(STRING(MAX(AllLienData( Seen_In_Seven_Years AND  IsSuits ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
 Person: =>Suit7YOldDate :=IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsSuits ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
+Person : =>LTD7YListSorted :=TOPN(AllLienData(Seen_In_Seven_Years AND IsLandlordTenantDispute){Amount:=IF(Amount:Null OR Amount ='' OR Amount =0,LienJudgment.REC_FOUND_BUT_INVALID,Amount),OriginalFilingDate:= IF(ISVALIDDATE(OriginalFilingDate),DATETOSTRING(OriginalFilingDate,'%Y%m%d'),LienJudgment.REC_FOUND_BUT_INVALID),TMSID},999,OriginalFilingDate);
+Person: =>LTDAmount7YList:= CONCAT(LTD7YListSorted,Amount,'|');
+Person: =>LTDDates7YList:= CONCAT(LTD7YListSorted,OriginalFilingDate,'|');
+Person: =>LTD7YNewDate :=IsBlank(STRING(MAX(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
+Person: =>LTD7YOldDate :=IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
 /**************************************************************************/
 /*                                                                        */
 /*            Person Lien&Judgment Attributes                             */
@@ -2875,6 +2880,20 @@ Person: => PL_DrgJudgCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT
 		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllJudgment) ),0,999));
 Person: => PL_DrgLTDCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute = TRUE) ),0,999));
+Person: =>PL_DrgLTDAmtList7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA,
+		PL_DrgLTDCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN,
+		LTDAmount7YList);
+Person: =>PL_DrgLTDDtList7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA,
+		PL_DrgLTDCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN,
+		LTDDates7YList);
+Person: =>PL_DrgLTDNewMsnc7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA_INT,
+		PL_DrgLTDCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
+		ALL(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(LTD7YNewDate),CURRENT_DATE_LIEN),0,84));
+Person: =>PL_DrgLTDOldMsnc7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA_INT,
+		PL_DrgLTDCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
+		ALL(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(LTD7YOldDate),CURRENT_DATE_LIEN),0,84));
 Person: => PL_DrgLienCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllLien = TRUE) ),0,999));		
 Person: =>PL_DrgSuitCnt7Y  :=IF(P_LexIDSeenFlag  = '0',LienJudgment.MISSING_INPUT_DATA_INT, 
