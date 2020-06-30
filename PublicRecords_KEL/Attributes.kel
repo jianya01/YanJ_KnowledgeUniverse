@@ -2824,6 +2824,7 @@ LienJudgment: FEDERAL_TAX_LIENS :=['CORRECTED FEDERAL TAX LIEN', 'FEDERAL TAX LI
 LienJudgment: STATE_TAX_LIENS :=['JUDGMENT or STATE TAX LIEN', 'STATE TAX LIEN', 'STATE TAX LIEN RELEASE', 'STATE TAX LIEN RENEWAL', 'STATE TAX LIEN RENEWED', 'STATE TAX RELEASE', 'STATE TAX WARRANT', 'STATE TAX WARRANT RELEASE', 'STATE TAX WARRANT RENEWED'];
 LienJudgment: OTHER_TAX_LIENS :=[ 'CITY TAX LIEN', 'COUNTY TAX LIEN', 'COUNTY TAX LIEN RELEASE', 'CITY TAX LIEN RELEASE', 'ILLINOIS TAX LIEN', 'ILLINOIS TAX RELEASE', 'PROPERTY TAX LIEN', 'PROPERTY TAX RELEASE'];
 LienJudgment: OTHER_LIENS :=[ 'BUILDING LIEN', 'BUILDING LIEN RELEASE', 'BUILDING RELEASE', 'CHILD SUPPORT LIEN', 'CHILD SUPPORT PAYMENT', 'CHILD SUPPORT PAYMENT RELEASE', 'JUDGEMENT LIEN', 'JUDGMENT LIEN RELEASE', 'SIDEWALK LIEN', 'SIDEWALK LIEN RELEASE', 'SIDEWALK RELEASE', 'WELFARE LIEN', 'MECHANICS LIEN', 'MECHANICS LIEN RELEASE'];
+LienJudgment: OTHER_LIENS_PERSON :=[ 'BUILDING LIEN', 'BUILDING LIEN RELEASE', 'BUILDING RELEASE', 'CHILD SUPPORT LIEN', 'CHILD SUPPORT PAYMENT', 'CHILD SUPPORT PAYMENT RELEASE', 'JUDGEMENT LIEN', 'JUDGMENT LIEN RELEASE', 'SIDEWALK LIEN', 'SIDEWALK LIEN RELEASE', 'SIDEWALK RELEASE', 'WELFARE LIEN'];
 LienJudgment: CIVIL_COURT_JUDGMENT :=[ 'CIVIL JUDGMENT', 'CIVIL JUDGMENT RELEASE', 'CIVIL SPECIAL JUDGMENT', 'CIVIL SPECIAL JUDGMENT RELEASE', 'FEDERAL COURT JUDGMENT', 'JUDGMENT', 'JUDGMENTS', 'JUDGMENTS DOCKET', 'RENEW/REOPEN CIVIL JUDGMENT', 'SATISFACTION OF JUDGMENT', 'SATISFIED JUDGMENT', 'SUBSEQUENT JUDGMENT', 'DOMESTIC JUDGMENT IN DIVORCE', 'DOMESTIC RELEASE IN DIVORCE'];
 LienJudgment: FORECLOSURE_JUDGMENT :=[ 'FORECLOSURE (JUDGMENT)', 'FORECLOSURE SATISFIED'];
 LienJudgment: SMALL_CLAIMS_JUDGMENT :=['RENEW/REOPEN SMALL CLAIM JUDGM', 'SMALL CLAIMS JUDGMENT', 'SMALL CLAIMS JUDGMENT RELEASE'];
@@ -2852,7 +2853,7 @@ Person.AllLienData: => IsFederalTaxLien := LandlordTenantDisputeFlag = FALSE AND
 Person.AllLienData: => IsStateTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.STATE_TAX_LIENS;
 Person.AllLienData: => IsOtherTaxLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_TAX_LIENS;
 Person.AllLienData: => IsTotalTaxLien := IsFederalTaxLien OR IsStateTaxLien OR IsOtherTaxLien;
-Person.AllLienData: => IsOtherLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_LIENS;
+Person.AllLienData: => IsOtherLien := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.OTHER_LIENS_PERSON;
 Person.AllLienData: => IsOverAllLien := IsTotalTaxLien OR IsOtherLien;
 Person.AllLienData: => IsCivilCourtJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.CIVIL_COURT_JUDGMENT;
 Person.AllLienData: => IsForeclosureJudgment := LandlordTenantDisputeFlag = FALSE AND FilingTypeDescription IN LienJudgment.FORECLOSURE_JUDGMENT;
@@ -2870,6 +2871,12 @@ Person: =>LTDAmount7YList:= CONCAT(LTD7YListSorted,Amount,'|');
 Person: =>LTDDates7YList:= CONCAT(LTD7YListSorted,OriginalFilingDate,'|');
 Person: =>LTD7YNewDate :=IsBlank(STRING(MAX(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
 Person: =>LTD7YOldDate :=IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsLandlordTenantDispute ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
+Person: =>LnJ7YListSorted :=TOPN(AllLienData(Seen_In_Seven_Years AND IsOverAllLienJudgment){Amount:=IF(Amount:Null OR Amount ='' OR Amount =0,LienJudgment.REC_FOUND_BUT_INVALID,Amount),OriginalFilingDate:= IF(ISVALIDDATE(OriginalFilingDate),DATETOSTRING(OriginalFilingDate,'%Y%m%d'),LienJudgment.REC_FOUND_BUT_INVALID),TMSID},999,OriginalFilingDate);
+Person: =>LnJAmount7YList:= CONCAT(LnJ7YListSorted,Amount,'|');
+Person: =>LnJDates7YList:= CONCAT(LnJ7YListSorted,OriginalFilingDate,'|');
+Person: =>LnJ7YNewDate :=IsBlank(STRING(MAX(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
+Person: =>LnJ7YOldDate :=IsBlank(STRING(MIN(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment ),OriginalFilingDate)),LienJudgment.REC_FOUND_BUT_INVALID);
+
 /**************************************************************************/
 /*                                                                        */
 /*            Person Lien&Judgment Attributes                             */
@@ -2916,6 +2923,31 @@ Person: =>PL_DrgSuitOldMsnc7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISS
 		PL_DrgSuitCnt7Y  < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		ALL(AllLienData( Seen_In_Seven_Years AND  IsSuits ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(Suit7YOldDate),CURRENT_DATE_LIEN),0,84));
+
+Person: => PL_DrgLnJCnt7Y :=IF(P_LexIDSeenFlag = '0',LienJudgment.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment) ),0,999));
+Person: =>PL_DrgLnJAmtList7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA,
+		PL_DrgLnJCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN,
+		LnJAmount7YList); 
+Person: =>PL_DrgLnJDtList7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA,
+		PL_DrgLnJCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN,
+		LnJDates7YList);
+Person: =>PL_DrgLnJNewDt7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA,
+		PL_DrgLnJCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN,
+		ALL(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID,
+		LnJ7YNewDate);
+Person: =>PL_DrgLnJNewMsnc7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA_INT,
+		PL_DrgLnJCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
+		ALL(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(LnJ7YNewDate),CURRENT_DATE_LIEN),0,84));
+Person: =>PL_DrgLnJOldDt7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA,
+		PL_DrgLnJCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN,
+		ALL(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID,
+		LnJ7YOldDate);
+Person: =>PL_DrgLnJOldMsnc7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSING_INPUT_DATA_INT,
+		PL_DrgLnJCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
+		ALL(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(LnJ7YOldDate),CURRENT_DATE_LIEN),0,84));
 				
 /**************************************************************************/
 /*                                                                        */
