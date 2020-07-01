@@ -1972,6 +1972,22 @@ Person: =>OnlyCurrAddressHelperFlag := ONLY(CurrAddrHelperAttribute{
 		});
 Person: => IsPostalSource :=EXISTS(PersonAddress(CurenntAddrMatchattribute).Location.DataSources(Source ='VL'));
 
+PersonAddress: =>PreviousAddrMatchattribute := Subject.PreviousAddrPrimRng = PrimaryRange
+			AND (Subject.PreviousAddrPreDir= Predirectional OR ((Subject.PreviousAddrPreDir = '' OR Subject.PreviousAddrPreDir:Null) AND (Predirectional = '' OR Predirectional:Null)))
+			AND (Subject.PreviousAddrPrimName = PrimaryName)
+			AND (Subject.PreviousAddrSffx = Suffix)
+			AND (Subject.PreviousPostdirectional = Postdirectional OR ((Subject.PreviousPostdirectional= '' OR Subject.PreviousPostdirectional:Null) AND (Postdirectional = '' OR Postdirectional:Null)))
+			AND (ZIP5 = Subject.PreviousAddrZip5)
+			AND (Subject.PreviousAddrSecRng = SecondaryRange OR ((Subject.PreviousAddrSecRng= '' OR Subject.PreviousAddrSecRng:Null) AND (SecondaryRange = '' OR SecondaryRange:Null)));
+Person: =>PreviousAddrHelper :=ONLY(PersonAddress(PreviousAddrMatchattribute),Location);
+Person: =>OnlyPreviousAddressHelperFlag := ONLY(PreviousAddrHelper{
+		StyleFlagNull :=StyleFlag ='' OR StyleFlag:Null,
+		StyleFlagS := StyleFlag ='S',
+		ResBusFlagNull :=ResBusFlag ='' OR ResBusFlag:Null,
+		ResBusFlagAC :=ResBusFlag IN ['A','C'],
+		ResBusFlagBD :=ResBusFlag IN ['B','D']
+		});
+Person: => IsPreviousPostalSource :=EXISTS(PersonAddress(PreviousAddrMatchattribute).Location.DataSources(Source ='VL'));
 
 /**************************************************************************/
 /*                                                                        */
@@ -2067,6 +2083,21 @@ Person: => PL_CurrAddrIsBusinessFlag:= MAP(
 			OnlyCurrAddressHelperFlag.ResBusFlagNull =>NO_DATA_FOUND_97_INT,
 			OnlyCurrAddressHelperFlag.ResBusFlagAC =>0,
 			OnlyCurrAddressHelperFlag.ResBusFlagBD =>1,
+			NO_DATA_FOUND_97_INT);
+			
+Person: => PL_PrevAddrIsSimpAddrFlag:= MAP(
+			PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
+			NOT IsPreviousPostalSource =>NO_DATA_FOUND_INT,
+			OnlyPreviousAddressHelperFlag.StyleFlagNull =>NO_DATA_FOUND_97_INT,
+			OnlyPreviousAddressHelperFlag.StyleFlagS =>1,
+			NOT OnlyPreviousAddressHelperFlag.StyleFlagS =>0,
+			NO_DATA_FOUND_97_INT);
+Person: => PL_PrevAddrIsBusinessFlag:= MAP(
+			PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
+			NOT IsPreviousPostalSource =>NO_DATA_FOUND_INT,
+			OnlyPreviousAddressHelperFlag.ResBusFlagNull =>NO_DATA_FOUND_97_INT,
+			OnlyPreviousAddressHelperFlag.ResBusFlagAC =>0,
+			OnlyPreviousAddressHelperFlag.ResBusFlagBD =>1,
 			NO_DATA_FOUND_97_INT);
 
 /**************************************************************************/
