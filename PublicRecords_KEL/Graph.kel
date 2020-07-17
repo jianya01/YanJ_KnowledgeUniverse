@@ -1806,27 +1806,33 @@ QUERY: NonFCRABusinessSeleIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INT
 		BE_BestAddrNewTaxValYrEv,
 		BE_BestAddrLotSize,
 		BE_BestAddrBldgSize
+
+		}
+	ASOF ArchiveDated(P_InpClnArchDt) 
+	USING DPM
+	USE InputPIIDataset(FLAT,
+			InputPII(UID = G_ProcUID),
+			InputBIIInputPII(PII = G_ProcUID, BII = G_ProcBusUID)),
+		InputBIIDataset(FLAT, InputBII(UID = G_ProcBusUID));	
 		
-		},
 	// This res1 results for NonFCRABusinessSeleIDAttributesV1 is used only to calculate B_LexIDLegalRstdOnlyFlag. 
 	// The intention of this is to check if we can find any records on file for the business given the permissions we have set, regardless of the date on the records.
 	// This is a search on the Business SeleID ENTITY with a history date of the current date used instead of the archive date. 
 	// If we find records on file, we say the business is not restricted.
 	// If no records are found, but we do have a SeleID, then the business must only be seen on restricted sources. This attribute is ONLY used in the master layout,
 	// And therefore should only be calculated when master results are requested so that we do not impact production performance.		
-	BusinessSele(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
+
+QUERY: NonFCRABusinessSeleIDNoDatesAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in,  
+					P_InpClnArchDt, 
+					PERMITS DPM) <= BusinessSele(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
 		B_LexIDUlt := UltID,
 		B_LexIDOrg := OrgID,
 		B_LexIDLegal := SeleID,
 		B_LexIDLegalRstdOnlyFlag
 		}		
 	ASOF ArchiveDated(P_InpClnArchDt) 
-	USING DPM
-	USE InputPIIDataset(FLAT,
-			InputPII(UID = G_ProcUID),
-			InputBIIInputPII(PII = G_ProcUID, BII = G_ProcBusUID)),
-		InputBIIDataset(FLAT, InputBII(UID = G_ProcBusUID));
-	
+	USING DPM;
+
 QUERY: NonFCRABusinessProxIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in, INTEGER ProxID_in,  
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputBII InputBIIDataset, 
