@@ -210,7 +210,10 @@ SelePerson:  CURRENT_DATE  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE
 Address: ADVO_CURRENT_DATE := MIN(GETBUILDDATE('cds_build_version'), CURRENTDATE());
 //Hardcoding the static build date for Alloy Media Student Data since the keys are not updating anymore in Prod
 Education: ALLOY_MEDIA_BUILD_DATE := DATE(20160129); 
-Education: ASL_BUILD_DATE := GETBUILDDATE('asl_build_version'); 
+Education: ASL_BUILD_DATE := GETBUILDDATE('asl_build_version');
+NameSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
+
+ 
 
 /***********************************************************************************************************************/
 /***********************************************************************************************************************/
@@ -382,6 +385,10 @@ PersonEducation: NO_DATA_FOUND_97 := '-99997';
 Education: NO_DATA_FOUND_97 :=  '-99997';
 
 Address: NO_DATA_FOUND_97 :='-99997';
+
+NameSummary: MISSING_INPUT_DATA := '-99999';
+NameSummary: NO_DATA_FOUND := '-99998';
+NameSummary: NO_DATA_FOUND_97 := '-99997';
 
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
@@ -976,6 +983,33 @@ InputPII: => PI_InpAddrIsMultiUnitFlag :=MAP(PI_InpAddrOnFileFlagEv = MISSING_IN
 InputPII: => PI_InpAddrIsAptFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
 		PI_InpAddrIsBusinessFlag =0 AND PI_InpAddrIsMultiUnitFlag =1 =>1,0);
+		
+		
+NameSummary: =>PII :=ONLY(InputPII);
+NameSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
+NameSummary: =>P_InpClnNameLast :=PII.InputLastNameCleanValue;
+NameSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
+NameSummary.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
+
+NameSummary: => TranslatedSources := DataSources{TranslatedSourceCode};
+NameSummary: => NameSummarySourceList := TranslatedSources{
+
+	TranslatedSourceCode := IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, NameSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
+	
+NameSummary: => NameSummarySourceListSorted := TOPN(NameSummarySourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+NameSummary: => PI_SrcWInpFLDListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+		ALL(NameSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		CONCAT(NameSummarySourceListSorted,TranslatedSourceCode,'|')); 
+NameSummary: => PI_SrcWInpFLDEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+		PI_SrcWInpFLDListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
+		ALL(NameSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
+		CONCAT(NameSummarySourceListSorted,SourceDateFirstSeen,'|'));
+NameSummary: => PI_SrcWInpFLDLastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+		PI_SrcWInpFLDListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
+		ALL(NameSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
+		CONCAT(NameSummarySourceListSorted,SourceDateLastSeen,'|'));		
 
 /**************************************************************************/
 /*                                                                        */
