@@ -212,7 +212,7 @@ Address: ADVO_CURRENT_DATE := MIN(GETBUILDDATE('cds_build_version'), CURRENTDATE
 Education: ALLOY_MEDIA_BUILD_DATE := DATE(20160129); 
 Education: ASL_BUILD_DATE := GETBUILDDATE('asl_build_version');
 NameSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
-
+AddressSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
  
 
 /***********************************************************************************************************************/
@@ -389,6 +389,10 @@ Address: NO_DATA_FOUND_97 :='-99997';
 NameSummary: MISSING_INPUT_DATA := '-99999';
 NameSummary: NO_DATA_FOUND := '-99998';
 NameSummary: NO_DATA_FOUND_97 := '-99997';
+
+AddressSummary: MISSING_INPUT_DATA := '-99999';
+AddressSummary: NO_DATA_FOUND := '-99998';
+AddressSummary: NO_DATA_FOUND_97 := '-99997';
 
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
@@ -6350,3 +6354,44 @@ BusinessSele: => BE_BestAddrBldgSize := MAP(SeleID = MISSING_INPUT_DATA_INT OR B
                                                                                                                                                                         bestPropertyEventFromAddress:Null => NO_DATA_FOUND_INT,
                                                                                                                                                                         BuildingSizeEvent:Null OR BuildingSizeEvent.BuildingArea:Null => NO_DATA_FOUND_97_INT,
                                                                                                                                                                         BuildingSizeEvent.BuildingArea);
+
+//Address Summary Attributes 
+
+AddressSummary: => PII :=ONLY(InputPII);
+AddressSummary: => P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
+AddressSummary: => P_InpClnNameLast :=PII.InputLastNameCleanValue;
+AddressSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
+AddressSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
+AddressSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
+																					 
+// Name Sources take from the submodel NameSource																					 
+AddressSummary.NameSummary: => TranslatedSourceCode := ConsumerSourceGroup(NameSource);
+AddressSummary: => TranslatedSources := NameSummary{TranslatedSourceCode};
+
+AddressSummary: => AddressSummarySourceList := TranslatedSources{
+											TranslatedSourceCode := IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+											SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+											SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+//Sort by earliest associated date
+AddressSummary: => AddressSummarySourceListSorted := TOPN(AddressSummarySourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+AddressSummary: => PI_SrcWInpFLAListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
+																								OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																								OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				  ALL(AddressSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+																				  CONCAT(AddressSummarySourceListSorted,TranslatedSourceCode,'|'));
+ 
+AddressSummary: => PI_SrcWInpFLAEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
+																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																								PI_SrcWInpFLAListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
+																								ALL(AddressSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
+																								CONCAT(AddressSummarySourceListSorted,SourceDateFirstSeen,'|'));
+		
+AddressSummary: => PI_SrcWInpFLALastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
+																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																								PI_SrcWInpFLAListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
+																								ALL(AddressSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
+																								CONCAT(AddressSummarySourceListSorted,SourceDateLastSeen,'|'));	
+
