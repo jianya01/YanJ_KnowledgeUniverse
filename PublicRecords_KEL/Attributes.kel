@@ -189,6 +189,7 @@ CriminalPunishment: CURRENT_DATE  := MIN(GETBUILDDATE('doc_build_version'), CURR
 Inquiry:  CURRENT_DATE  := MIN(GETBUILDDATE('inquiry_update_build_version'), CURRENTDATE());
 Person:  CURRENT_DATE  := MIN(GETBUILDDATE('header_build_version'), CURRENTDATE());
 Phone:  CURRENT_DATE  := MIN(GETBUILDDATE('targus_build_version'), CURRENTDATE());
+PhoneSummary:  CURRENT_DATE  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
 ProfessionalLicense:  CURRENT_DATE  := MIN(GETBUILDDATE('proflic_build_version'), CURRENTDATE());
 Property:  CURRENT_DATE  := MIN(GETBUILDDATE('property_build_version'), CURRENTDATE());
 Property:  CURRENT_DATEFCRA := MIN(GETBUILDDATE('fcra_property_build_version'), CURRENTDATE());
@@ -394,6 +395,14 @@ NameSummary: NO_DATA_FOUND_97 := '-99997';
 SSNSummary: MISSING_INPUT_DATA := '-99999';
 SSNSummary: NO_DATA_FOUND := '-99998';
 SSNSummary: NO_DATA_FOUND_97 := '-99997';		
+
+
+PhoneSummary: MISSING_INPUT_DATA := '-99999';
+PhoneSummary: MISSING_INPUT_DATA_INT := -99999;
+PhoneSummary: NO_DATA_FOUND := '-99998';
+PhoneSummary: NO_DATA_FOUND_INT := -99998;
+PhoneSummary: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-99997';	
+PhoneSummary: RECS_AVAIL_BUT_CANNOT_CALCULATE_INT := -99997;	
 
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
@@ -1014,8 +1023,8 @@ NameSummary: => PI_SrcWInpFLDEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_I
 NameSummary: => PI_SrcWInpFLDLastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLDListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
 		ALL(NameSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
-		CONCAT(NameSummarySourceListSorted,SourceDateLastSeen,'|'));	
-		
+		CONCAT(NameSummarySourceListSorted,SourceDateLastSeen,'|'));		
+
 //SSNSummary		
 SSNSummary: =>PII :=ONLY(InputPII);
 SSNSummary: =>P_InpClnSSN :=PII.InputSSNCleanValue;
@@ -6382,3 +6391,27 @@ BusinessSele: => BE_BestAddrBldgSize := MAP(SeleID = MISSING_INPUT_DATA_INT OR B
                                                                                                                                                                         bestPropertyEventFromAddress:Null => NO_DATA_FOUND_INT,
                                                                                                                                                                         BuildingSizeEvent:Null OR BuildingSizeEvent.BuildingArea:Null => NO_DATA_FOUND_97_INT,
                                                                                                                                                                         BuildingSizeEvent.BuildingArea);
+
+
+PhoneSummary: =>PII :=ONLY(InputPII);
+PhoneSummary: =>P_InpClnPhoneHome :=PII.P_InpClnPhoneHome;
+PhoneSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
+
+PhoneSummary.DateOfBirthSummary: => TranslatedSource := ConsumerSourceGroup(Source);
+
+PhoneSummary: => TranslatedDOBSources := DateOfBirthSummary{DateOfBirth, Source := TranslatedSource};
+PhoneSummary.TranslatedDOBSources: => MyDateFirstSeen := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),'-99997');
+PhoneSummary.TranslatedDOBSources: => MyDateLastSeen := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', '-99997', DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
+PhoneSummary.TranslatedDOBSources: => NewDateAge := IsBlank(DAYSBETWEEN(Source:DateFirstSeen,PhoneSummary.CURRENT_DATE),-999999);
+PhoneSummary: => SortedDOBTranslatedSourceList := TOPN(TranslatedDOBSources(DATETOSTRING(DateOfBirth,'%Y%m%d') = PhoneSummary.P_InpClnDOB),99999,-NewDateAge,Source){Source,MyDateFirstSeen,MyDateLastSeen};
+PhoneSummary: => PI_SrcWInpPDListEv := MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				NOT EXISTS(TranslatedDOBSources(DATETOSTRING(DateOfBirth,'%Y%m%d') = PhoneSummary.P_InpClnDOB){Source}) => NO_DATA_FOUND,
+																				CONCAT(SortedDOBTranslatedSourceList, Source,'|'));
+
+PhoneSummary: => PI_SrcWInpPDEmrgDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				PI_SrcWInpPDListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																				CONCAT(SortedDOBTranslatedSourceList,MyDateFirstSeen ,'|'));
+
+PhoneSummary: => PI_SrcWInpPDLastDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				PI_SrcWInpPDListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																				CONCAT(SortedDOBTranslatedSourceList,MyDateLastSeen ,'|'));
