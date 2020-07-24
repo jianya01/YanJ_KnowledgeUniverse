@@ -6427,15 +6427,17 @@ AddressSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
 																					 
 // Name Sources take from the submodel NameSource																					 
 AddressSummary.NameSummary: => TranslatedSourceCode := ConsumerSourceGroup(NameSource);
-AddressSummary: => TranslatedSources := NameSummary{TranslatedSourceCode};
+AddressSummary: => TranslatedSources := NameSummary{NameFirstName, NameLastName, TranslatedSourceCode};
 
 AddressSummary: => AddressSummarySourceList := TranslatedSources{
+											FirstName := NameFirstName,
+											LastName := NameLastName,
 											TranslatedSourceCode := IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
 											SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 											SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 
-//Sort by earliest associated date
-AddressSummary: => AddressSummarySourceListSorted := TOPN(AddressSummarySourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+// Match the input FirstName and LastName and Sorting by earliest associated date
+AddressSummary: => AddressSummarySourceListSorted := TOPN(AddressSummarySourceList(FirstName= AddressSummary.P_InpClnNameFirst AND LastName = AddressSummary.P_InpClnNameLast), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 AddressSummary: => PI_SrcWInpFLAListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
 																								OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
 																								OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
