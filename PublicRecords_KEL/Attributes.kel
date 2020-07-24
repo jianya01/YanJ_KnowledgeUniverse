@@ -214,8 +214,7 @@ Education: ALLOY_MEDIA_BUILD_DATE := DATE(20160129);
 Education: ASL_BUILD_DATE := GETBUILDDATE('asl_build_version');
 NameSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
 SSNSummary: CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
-
- 
+AddressSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE()); 
 
 /***********************************************************************************************************************/
 /***********************************************************************************************************************/
@@ -394,8 +393,11 @@ NameSummary: NO_DATA_FOUND_97 := '-99997';
 
 SSNSummary: MISSING_INPUT_DATA := '-99999';
 SSNSummary: NO_DATA_FOUND := '-99998';
-SSNSummary: NO_DATA_FOUND_97 := '-99997';		
-
+SSNSummary: NO_DATA_FOUND_97 := '-99997';
+		
+AddressSummary: MISSING_INPUT_DATA := '-99999';
+AddressSummary: NO_DATA_FOUND := '-99998';
+AddressSummary: NO_DATA_FOUND_97 := '-99997';/**********************************************************************************************************************/
 
 PhoneSummary: MISSING_INPUT_DATA := '-99999';
 PhoneSummary: MISSING_INPUT_DATA_INT := -99999;
@@ -404,7 +406,6 @@ PhoneSummary: NO_DATA_FOUND_INT := -99998;
 PhoneSummary: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-99997';	
 PhoneSummary: RECS_AVAIL_BUT_CANNOT_CALCULATE_INT := -99997;	
 
-/**********************************************************************************************************************/
 /**********************************************************************************************************************/
 /*********                                                                                                  ***********/
 /*********                        Attributes Section                                                        ***********/
@@ -6415,3 +6416,45 @@ PhoneSummary: => PI_SrcWInpPDEmrgDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_I
 PhoneSummary: => PI_SrcWInpPDLastDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 																				PI_SrcWInpPDListEv = NO_DATA_FOUND => NO_DATA_FOUND,
 																				CONCAT(SortedDOBTranslatedSourceList,MyDateLastSeen ,'|'));
+//Address Summary Attributes 
+
+AddressSummary: => PII :=ONLY(InputPII);
+AddressSummary: => P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
+AddressSummary: => P_InpClnNameLast :=PII.InputLastNameCleanValue;
+AddressSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
+AddressSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
+AddressSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
+																					 
+// Name Sources take from the submodel NameSource																					 
+AddressSummary.NameSummary: => TranslatedSourceCode := ConsumerSourceGroup(NameSource);
+AddressSummary: => TranslatedSources := NameSummary{NameFirstName, NameLastName, TranslatedSourceCode};
+
+AddressSummary: => AddressSummarySourceList := TranslatedSources{
+											FirstName := NameFirstName,
+											LastName := NameLastName,
+											TranslatedSourceCode := IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+											SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+											SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+// Match the input FirstName and LastName and Sorting by earliest associated date
+AddressSummary: => AddressSummarySourceListSorted := TOPN(AddressSummarySourceList(FirstName= AddressSummary.P_InpClnNameFirst AND LastName = AddressSummary.P_InpClnNameLast), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+AddressSummary: => PI_SrcWInpFLAListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
+																								OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																								OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				  ALL(AddressSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+																				  CONCAT(AddressSummarySourceListSorted,TranslatedSourceCode,'|'));
+ 
+AddressSummary: => PI_SrcWInpFLAEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
+																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																								PI_SrcWInpFLAListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
+																								ALL(AddressSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
+																								CONCAT(AddressSummarySourceListSorted,SourceDateFirstSeen,'|'));
+		
+AddressSummary: => PI_SrcWInpFLALastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
+																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																								PI_SrcWInpFLAListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
+																								ALL(AddressSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
+																								CONCAT(AddressSummarySourceListSorted,SourceDateLastSeen,'|'));	
+
