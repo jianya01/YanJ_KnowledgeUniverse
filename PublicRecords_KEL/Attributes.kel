@@ -1035,12 +1035,13 @@ SSNSummary: =>P_InpClnZip :=PII.InputZip5CleanValue;
 SSNSummary: =>P_InpClnFullAddress := PII.InputFullAddressCleanValue;
 
 SSNSummary.AddressSummary: => TranslatedSourceCode := ConsumerSourceGroup(AddressSource);
-SSNSummary: => TranslatedSources := AddressSummary{TranslatedSourceCode};
+SSNSummary: => TranslatedSources := AddressSummary{SSN, TranslatedSourceCode};
 SSNSummary: => SSNSummarySourceList := TranslatedSources{
+	SSNValue := SSN,
 	TranslatedSourceCode :=IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
 	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-SSNSummary: => SSNSummarySourceListSorted := TOPN(SSNSummarySourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+SSNSummary: => SSNSummarySourceListSorted := TOPN(SSNSummarySourceList(SSNValue = P_InpClnSSN), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 SSNSummary: => PI_SrcWInpASListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		ALL(SSNSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
