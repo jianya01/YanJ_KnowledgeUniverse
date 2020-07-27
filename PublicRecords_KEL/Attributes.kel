@@ -1032,15 +1032,17 @@ SSNSummary: =>P_InpClnSSN :=PII.InputSSNCleanValue;
 SSNSummary: =>P_InpClnPrimaryName :=PII.InputPrimaryNameCleanValue;
 SSNSummary: =>P_InpClnPrimaryRange :=PII.InputPrimaryRangeCleanValue;
 SSNSummary: =>P_InpClnZip :=PII.InputZip5CleanValue;
-SSNSummary: =>P_InpClnFullAddress := PII.InputFullAddressCleanValue;
 
 SSNSummary.AddressSummary: => TranslatedSourceCode := ConsumerSourceGroup(AddressSource);
-SSNSummary: => TranslatedSources := AddressSummary{TranslatedSourceCode};
+SSNSummary: => TranslatedSources := AddressSummary{AddressPrimaryName, AddressPrimaryRange, AddressZip, TranslatedSourceCode};
 SSNSummary: => SSNSummarySourceList := TranslatedSources{
+	PrimaryNameAddress := AddressPrimaryName,
+	PrimaryRangeAddress := AddressPrimaryRange,
+	ZipAddress := AddressZip,
 	TranslatedSourceCode :=IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
 	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-SSNSummary: => SSNSummarySourceListSorted := TOPN(SSNSummarySourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+SSNSummary: => SSNSummarySourceListSorted := TOPN(SSNSummarySourceList(PrimaryNameAddress = P_InpClnPrimaryName, PrimaryRangeAddress = P_InpClnPrimaryRange, ZipAddress = P_InpClnZip), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 SSNSummary: => PI_SrcWInpASListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		ALL(SSNSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
