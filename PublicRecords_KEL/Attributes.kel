@@ -1055,6 +1055,28 @@ SSNSummary: => PI_SrcWInpASLastDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DAT
 		PI_SrcWInpASListEv = NO_DATA_FOUND => NO_DATA_FOUND,
 		ALL(SSNSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(SSNSummarySourceList, SourceDateLastSeen, '|'));
+		
+SSNSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
+SSNSummary.DateOfBirthSummary: => TranslatedSourceCode := ConsumerSourceGroup(DobSource);
+SSNSummary: => TranslatedDOBSources := DateOfBirthSummary{DobDateOfBirth,  TranslatedSourceCode};
+SSNSummary: =>TranslatedDOBSourcesList :=TranslatedDOBSources{
+		DateOfBirth:=DobDateOfBirth,
+		TranslatedSourceCode :=IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
+SSNSummary: => SortedDOBTranslatedSourceList := TOPN(TranslatedDOBSourcesList(DATETOSTRING(DateOfBirth,'%Y%m%d') = SSNSummary.P_InpClnDOB),1000,SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+
+SSNSummary: => PI_SrcWInpSDListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+		ALL(SortedDOBTranslatedSourceList,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		CONCAT(SortedDOBTranslatedSourceList, TranslatedSourceCode,'|'));
+SSNSummary: => PI_SrcWInpSDEmrgDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+		PI_SrcWInpSDListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
+		ALL(SortedDOBTranslatedSourceList,SourceDateFirstSeen=NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
+		CONCAT(SortedDOBTranslatedSourceList, SourceDateFirstSeen, '|'));
+SSNSummary: => PI_SrcWInpSDLastDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+		PI_SrcWInpSDListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
+		ALL(SortedDOBTranslatedSourceList,SourceDateLastSeen=NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
+		CONCAT(SortedDOBTranslatedSourceList, SourceDateLastSeen, '|'));
 /**************************************************************************/
 /*                                                                        */
 /*    For each Rep, it'll apply the PII input Echo attributes             */
