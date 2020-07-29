@@ -1032,6 +1032,8 @@ SSNSummary: =>P_InpClnSSN :=PII.InputSSNCleanValue;
 SSNSummary: =>P_InpClnPrimaryName :=PII.InputPrimaryNameCleanValue;
 SSNSummary: =>P_InpClnPrimaryRange :=PII.InputPrimaryRangeCleanValue;
 SSNSummary: =>P_InpClnZip :=PII.InputZip5CleanValue;
+SSNSummary: => P_InpClnPhoneHome := PII.InputHomePhoneCleanValue;
+
 
 SSNSummary.AddressSummary: => TranslatedSourceCode := ConsumerSourceGroup(AddressSource);
 SSNSummary: => TranslatedSources := AddressSummary{AddressPrimaryName, AddressPrimaryRange, AddressZip, TranslatedSourceCode};
@@ -1077,6 +1079,29 @@ SSNSummary: => PI_SrcWInpSDLastDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DA
 		PI_SrcWInpSDListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
 		ALL(SortedDOBTranslatedSourceList,SourceDateLastSeen=NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 		CONCAT(SortedDOBTranslatedSourceList, SourceDateLastSeen, '|'));
+    
+SSNSummary.PhoneSummary: => PhoneTranslatedSourceCode := ConsumerSourceGroup(PhoneSource);
+
+SSNSummary: => PhoneTranslatedSources := PhoneSummary{PhoneNumber, PhoneTranslatedSourceCode};
+SSNSummary: => PhoneSummarySourceList := PhoneTranslatedSources{
+  Phone10 := PhoneNumber,
+	PhoneTranslatedSourceCode := IF(PhoneTranslatedSourceCode ='' OR PhoneTranslatedSourceCode:Null,NO_DATA_FOUND,PhoneTranslatedSourceCode),
+	SourceDateFirstSeen := IF(ISVALIDDATE(PhoneTranslatedSourceCode:DateFirstSeen), DATETOSTRING(PhoneTranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+	SourceDateLastSeen :=  IF(ISVALIDDATE(PhoneTranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(PhoneTranslatedSourceCode:DateLastSeen, SSNSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
+	
+SSNSummary: => PhoneSummarySourceListSorted := TOPN(PhoneSummarySourceList(Phone10 = P_InpClnPhoneHome), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, PhoneTranslatedSourceCode);
+SSNSummary: => PI_SrcWInpPSListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		ALL(PhoneSummarySourceListSorted,PhoneTranslatedSourceCode=NO_DATA_FOUND) => NO_DATA_FOUND,
+		CONCAT(PhoneSummarySourceListSorted,PhoneTranslatedSourceCode,'|')); 
+SSNSummary: => PI_SrcWInpPSEmrgDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PI_SrcWInpPSListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
+		ALL(PhoneSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
+		CONCAT(PhoneSummarySourceListSorted,SourceDateFirstSeen,'|'));
+SSNSummary: => PI_SrcWInpPSLastDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PI_SrcWInpPSListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+		ALL(PhoneSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+		CONCAT(PhoneSummarySourceListSorted,SourceDateLastSeen,'|'));	
+    
 /**************************************************************************/
 /*                                                                        */
 /*    For each Rep, it'll apply the PII input Echo attributes             */
@@ -6500,4 +6525,4 @@ AddressSummary: => PI_SrcWInpFLALastDtListEv := MAP(P_InpClnNameFirst IN [MISSIN
 																								PI_SrcWInpFLAListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
 																								ALL(AddressSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 																								CONCAT(AddressSummarySourceListSorted,SourceDateLastSeen,'|'));	
-
+                                                                                                                    
