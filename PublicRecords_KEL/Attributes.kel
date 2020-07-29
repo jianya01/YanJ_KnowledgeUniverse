@@ -186,6 +186,8 @@ BusinessSele:  CURRENT_DATE  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDA
 CriminalOffense: CURRENT_DATE  := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
 CriminalOffender: CURRENT_DATE  := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
 CriminalPunishment: CURRENT_DATE  := MIN(GETBUILDDATE('doc_build_version'), CURRENTDATE());
+Email: CURRENT_DATE_FCRA := MIN(GETBUILDDATE('FCRA_email_build_version'), CURRENTDATE());
+Email: CURRENT_DATE_NON_FCRA := MIN(GETBUILDDATE('email_build_version'), CURRENTDATE());
 Inquiry:  CURRENT_DATE  := MIN(GETBUILDDATE('inquiry_update_build_version'), CURRENTDATE());
 Person:  CURRENT_DATE  := MIN(GETBUILDDATE('header_build_version'), CURRENTDATE());
 Phone:  CURRENT_DATE  := MIN(GETBUILDDATE('targus_build_version'), CURRENTDATE());
@@ -3254,8 +3256,11 @@ Person: => PL_ProfLicActvNewSrcType := MAP(
 /*                      Email Helper Attributes                           */
 /*                                                                        */
 /**************************************************************************/
+
+Email: SEVEN_YEARS_IN_DAYS := 2556;
 Email: SOURCESFCRA := ['ET', 'M1', 'AW', 'SC'];
 Email: SOURCESNONFCRA := ['!I', 'ET', 'AN', 'AW', 'M1', 'DG', 'RS', 'SC', 'W@', 'AP'];
+
 
 /**************************************************************************/
 /*                                                                        */
@@ -3263,7 +3268,8 @@ Email: SOURCESNONFCRA := ['!I', 'ET', 'AN', 'AW', 'M1', 'DG', 'RS', 'SC', 'W@', 
 /*                                                                        */
 /**************************************************************************/
 
-Person: => EmailCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DataSources(Source IN SOURCESFCRA)))),0,999);
+Email: => Emails7y := ABSDAYSBETWEEN(CURRENT_DATE_FCRA, UID:DateLastSeen) < SEVEN_YEARS_IN_DAYS;
+Person: => EmailCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(Emails7y, EXISTS(DataSources(Source IN SOURCESFCRA)))),0,999);
 Person: => EmailCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DataSources(Source IN SOURCESNONFCRA)))),0,999);
 Person: => PL_EmailCntEvFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, EmailCntEvFCRA);
 Person: => PL_EmailCntEvNonFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, EmailCntEvNonFCRA);
