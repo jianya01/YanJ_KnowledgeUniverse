@@ -217,6 +217,7 @@ Education: ASL_BUILD_DATE := GETBUILDDATE('asl_build_version');
 NameSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
 SSNSummary: CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
 AddressSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE()); 
+Person: BUILD_DATE_UTIL := MIN(GETBUILDDATE('utility_build_version'), CURRENTDATE());
 
 /***********************************************************************************************************************/
 /***********************************************************************************************************************/
@@ -377,6 +378,13 @@ Person: NO_DATA_FOUND_97 := '-99997';
 Person: NO_DATA_FOUND_97_INT := -99997;
 
 SelePerson: NO_DATA_FOUND_97 :=  '-99997';
+
+SeleUtility: MISSING_INPUT_DATA := '-99999';
+SeleUtility: MISSING_INPUT_DATA_INT := -99999;
+SeleUtility: NO_DATA_FOUND := '-99998';
+SeleUtility: NO_DATA_FOUND_INT := -99998;
+SeleUtility: NO_DATA_FOUND_97 := '-99997';
+SeleUtility: NO_DATA_FOUND_97_INT := -99997;
 
 PersonEducation: MISSING_INPUT_DATA_INT := -99999;
 PersonEducation: NO_DATA_FOUND_INT := -99998;
@@ -2451,7 +2459,31 @@ Person: => PL_EduCollRecSpanEv := MAP(
 		NOT PersonEducation.Edu(CollRecFlag) => PersonEducation.NO_DATA_FOUND,
 		BOUNDSFOLD(MONTHSBETWEEN(MIN(EduCollRecVerSourceList(SourceDateFirstSeen<>Person.NO_DATA_FOUND_97), DATE(SourceDateFirstSeen)),
 														 MAX(EduCollRecVerSourceList(SourceDateLastSeen<>Person.NO_DATA_FOUND_97), DATE(SourceDateLastSeen))),0,999)); 
-														 
+
+/**************************************************************************/
+/*                                                                        */
+/*                  Utility Attributes                        			      */
+/*                                                                        */
+/**************************************************************************/
+
+Person: => UtilListPre := UtilityPerson{Util, DateFirstSeenMin := MIN(GROUP, Util:DateFirstSeen)};
+Person: => UtilList := UtilListPre{
+	Util,
+	UtilDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMin), DATETOSTRING(DateFirstSeenMin, '%Y%m%d'), SeleUtility.NO_DATA_FOUND_97)};
+Person: => UtilListSorted := TOPN(UtilList, 100, UtilDateFirstSeen = Person.NO_DATA_FOUND_97, UtilDateFirstSeen);
+Person: => PL_UtilCntEv := IF(P_LexIDSeenFlag = '0', SeleUtility.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(UtilityPerson), 0, 999));
+Person: => PL_UtilOldDtListEv := MAP(P_LexIDSeenFlag = '0' => SeleUtility.MISSING_INPUT_DATA,
+		PL_UtilCntEv = 0 => SeleUtility.NO_DATA_FOUND,
+		CONCAT(UtilListSorted, UtilDateFirstSeen, '|'));
+Person: => PL_UtilOldDtEv := MAP(P_LexIDSeenFlag = '0' => SeleUtility.MISSING_INPUT_DATA,
+		PL_UtilCntEv = 0 => SeleUtility.NO_DATA_FOUND,
+		PL_UtilCntEv > 0 AND ALL(UtilListSorted, UtilDateFirstSeen = SeleUtility.NO_DATA_FOUND_97) => SeleUtility.NO_DATA_FOUND_97,
+		DATETOSTRING(MIN(UtilListSorted(UtilDateFirstSeen != SeleUtility.NO_DATA_FOUND_97),DATE(UtilDateFirstSeen)) ,'%Y%m%d'));
+Person: => PL_UtilOldMsncEv := MAP(P_LexIDSeenFlag = '0' => SeleUtility.MISSING_INPUT_DATA_INT,
+		PL_UtilCntEv = 0 => SeleUtility.NO_DATA_FOUND_INT,
+		PL_UtilCntEv > 0 AND ALL(UtilListSorted, UtilDateFirstSeen = SeleUtility.NO_DATA_FOUND_97) => SeleUtility.NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_UtilOldDtEv),Person.BUILD_DATE_UTIL),0,999)); 
+
 /**************************************************************************/
 /*                                                                        */
 /*                  Vehicle Helper Attributes                             */
