@@ -6465,6 +6465,10 @@ BusinessSele: => BE_BestAddrBldgSize := MAP(SeleID = MISSING_INPUT_DATA_INT OR B
 PhoneSummary: =>PII :=ONLY(InputPII);
 PhoneSummary: =>P_InpClnPhoneHome :=PII.P_InpClnPhoneHome;
 PhoneSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
+PhoneSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
+PhoneSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
+PhoneSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
+
 
 PhoneSummary.DateOfBirthSummary: => TranslatedSource := ConsumerSourceGroup(Source);
 
@@ -6473,6 +6477,15 @@ PhoneSummary.TranslatedDOBSources: => MyDateFirstSeen := IsBlank(DATETOSTRING(So
 PhoneSummary.TranslatedDOBSources: => MyDateLastSeen := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', '-99997', DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
 PhoneSummary.TranslatedDOBSources: => NewDateAge := IsBlank(DAYSBETWEEN(Source:DateFirstSeen,PhoneSummary.CURRENT_DATE),-999999);
 PhoneSummary: => SortedDOBTranslatedSourceList := TOPN(TranslatedDOBSources(DATETOSTRING(DateOfBirth,'%Y%m%d') = PhoneSummary.P_InpClnDOB),99999,-NewDateAge,Source){Source,MyDateFirstSeen,MyDateLastSeen};
+
+PhoneSummary.AddressSummary: => TranslatedSource := ConsumerSourceGroup(Source);
+
+PhoneSummary: => TranslatedAddressSources := AddressSummary{PrimaryName, PrimaryRange, Zip, Source := TranslatedSource};
+PhoneSummary.TranslatedAddressSources: => MyDateFirstSeen := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),'-99997');
+PhoneSummary.TranslatedAddressSources: => MyDateLastSeen := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', '-99997', DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
+PhoneSummary.TranslatedAddressSources: => NewDateAge := IsBlank(DAYSBETWEEN(Source:DateFirstSeen,PhoneSummary.CURRENT_DATE),-999999);
+PhoneSummary: => SortedAddressTranslatedSourceList := TOPN(TranslatedAddressSources(PrimaryName=PhoneSummary.P_InpClnAddrPrimName,PrimaryRange=PhoneSummary.P_InpClnAddrPrimRng, Zip=P_InpClnAddrZip5), 99999, -NewDateAge, Source){Source,MyDateFirstSeen,MyDateLastSeen};
+
 PhoneSummary: => PI_SrcWInpPDListEv := MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 																				NOT EXISTS(TranslatedDOBSources(DATETOSTRING(DateOfBirth,'%Y%m%d') = PhoneSummary.P_InpClnDOB){Source}) => NO_DATA_FOUND,
 																				CONCAT(SortedDOBTranslatedSourceList, Source,'|'));
@@ -6484,6 +6497,19 @@ PhoneSummary: => PI_SrcWInpPDEmrgDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_I
 PhoneSummary: => PI_SrcWInpPDLastDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 																				PI_SrcWInpPDListEv = NO_DATA_FOUND => NO_DATA_FOUND,
 																				CONCAT(SortedDOBTranslatedSourceList,MyDateLastSeen ,'|'));
+PhoneSummary: => PI_SrcWInpAPListEv := MAP(	P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				NOT EXISTS(TranslatedAddressSources(PrimaryName=PhoneSummary.P_InpClnAddrPrimName,PrimaryRange=PhoneSummary.P_InpClnAddrPrimRng, Zip=P_InpClnAddrZip5){Source}) => NO_DATA_FOUND,
+																				CONCAT(SortedAddressTranslatedSourceList, Source, '|'));
+
+PhoneSummary: => PI_SrcWInpAPEmrgDtListEv := MAP(	P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				PI_SrcWInpAPListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																				CONCAT(SortedAddressTranslatedSourceList, MyDateFirstSeen, '|'));
+
+PhoneSummary: => PI_SrcWInpAPLastDtListEv := MAP(	P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				PI_SrcWInpAPListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																				CONCAT(SortedAddressTranslatedSourceList, MyDateLastSeen, '|'));
+
+
 //Address Summary Attributes 
 
 AddressSummary: => PII :=ONLY(InputPII);
