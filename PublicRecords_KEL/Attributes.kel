@@ -1011,29 +1011,27 @@ InputPII: => PI_InpAddrIsAptFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DA
 		
 		
 NameSummary: =>PII :=ONLY(InputPII);
-NameSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
-NameSummary: =>P_InpClnNameLast :=PII.InputLastNameCleanValue;
+NameSummary: =>P_InpClnNameFirst :=PII.InputFirstClnNameValue;
+NameSummary: =>P_InpClnNameLast :=PII.InputLastClnNameValue;
 NameSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
 NameSummary.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
 
-NameSummary: => TranslatedSources := DataSources{TranslatedSourceCode};
+NameSummary: => TranslatedSources := DataSources(TranslatedSourceCode!=''){TranslatedSourceCode};
 NameSummary: => NameSummarySourceList := TranslatedSources{
 
-	TranslatedSourceCode := IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+	TranslatedSourceCode,
 	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, NameSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 	
 NameSummary: => NameSummarySourceListSorted := TOPN(NameSummarySourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 NameSummary: => PI_SrcWInpFLDListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		ALL(NameSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		NOT EXISTS(NameSummarySourceListSorted) =>NO_DATA_FOUND,
 		CONCAT(NameSummarySourceListSorted,TranslatedSourceCode,'|')); 
 NameSummary: => PI_SrcWInpFLDEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLDListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(NameSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(NameSummarySourceListSorted,SourceDateFirstSeen,'|'));
 NameSummary: => PI_SrcWInpFLDLastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLDListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(NameSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 		CONCAT(NameSummarySourceListSorted,SourceDateLastSeen,'|'));		
 
 //SSNSummary		
@@ -1046,94 +1044,86 @@ SSNSummary: => P_InpClnPhoneHome := PII.InputHomePhoneCleanValue;
 
 
 SSNSummary.AddressSummary: => TranslatedSourceCode := ConsumerSourceGroup(AddressSource);
-SSNSummary: => TranslatedSources := AddressSummary{AddressPrimaryName, AddressPrimaryRange, AddressZip, TranslatedSourceCode};
+SSNSummary: => TranslatedSources := AddressSummary(TranslatedSourceCode!=''){AddressPrimaryName, AddressPrimaryRange, AddressZip, TranslatedSourceCode};
 SSNSummary: => SSNSummarySourceList := TranslatedSources{
 	PrimaryNameAddress := AddressPrimaryName,
 	PrimaryRangeAddress := AddressPrimaryRange,
 	ZipAddress := AddressZip,
-	TranslatedSourceCode :=IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+	TranslatedSourceCode,
 	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 SSNSummary: => SSNSummarySourceListSorted := TOPN(SSNSummarySourceList(PrimaryNameAddress = P_InpClnPrimaryName AND PrimaryRangeAddress = P_InpClnPrimaryRange AND ZipAddress = P_InpClnZip), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 SSNSummary: => PI_SrcWInpASListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		ALL(SSNSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		NOT EXISTS(SSNSummarySourceListSorted) =>NO_DATA_FOUND,
 		CONCAT(SSNSummarySourceListSorted,TranslatedSourceCode,'|'));
 SSNSummary: => PI_SrcWInpASEmrgDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		PI_SrcWInpASListEv = NO_DATA_FOUND => NO_DATA_FOUND,
-		ALL(SSNSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(SSNSummarySourceListSorted, SourceDateFirstSeen, '|'));
 SSNSummary: => PI_SrcWInpASLastDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		PI_SrcWInpASListEv = NO_DATA_FOUND => NO_DATA_FOUND,
-		ALL(SSNSummarySourceListSorted,SourceDateLastSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(SSNSummarySourceListSorted, SourceDateLastSeen, '|'));
 		
 SSNSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
 SSNSummary.DateOfBirthSummary: => TranslatedSourceCode := ConsumerSourceGroup(DobSource);
-SSNSummary: => TranslatedDOBSources := DateOfBirthSummary{DobDateOfBirth,  TranslatedSourceCode};
+SSNSummary: => TranslatedDOBSources := DateOfBirthSummary(TranslatedSourceCode!=''){DobDateOfBirth,  TranslatedSourceCode};
 SSNSummary: =>TranslatedDOBSourcesList :=TranslatedDOBSources{
 		DateOfBirth:=DobDateOfBirth,
-		TranslatedSourceCode :=IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+		TranslatedSourceCode,
 		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 SSNSummary: => SortedDOBTranslatedSourceList := TOPN(TranslatedDOBSourcesList(DATETOSTRING(DateOfBirth,'%Y%m%d') = SSNSummary.P_InpClnDOB),1000,SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 SSNSummary: => PI_SrcWInpSDListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		ALL(SortedDOBTranslatedSourceList,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		NOT EXISTS(SortedDOBTranslatedSourceList) =>NO_DATA_FOUND,
 		CONCAT(SortedDOBTranslatedSourceList, TranslatedSourceCode,'|'));
 SSNSummary: => PI_SrcWInpSDEmrgDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpSDListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(SortedDOBTranslatedSourceList,SourceDateFirstSeen=NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 		CONCAT(SortedDOBTranslatedSourceList, SourceDateFirstSeen, '|'));
 SSNSummary: => PI_SrcWInpSDLastDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpSDListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(SortedDOBTranslatedSourceList,SourceDateLastSeen=NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 		CONCAT(SortedDOBTranslatedSourceList, SourceDateLastSeen, '|'));
     
 SSNSummary.PhoneSummary: => PhoneTranslatedSourceCode := ConsumerSourceGroup(PhoneSource);
 
-SSNSummary: => PhoneTranslatedSources := PhoneSummary{PhoneNumber, PhoneTranslatedSourceCode};
+SSNSummary: => PhoneTranslatedSources := PhoneSummary(PhoneTranslatedSourceCode!=''){PhoneNumber, PhoneTranslatedSourceCode};
 SSNSummary: => PhoneSummarySourceList := PhoneTranslatedSources{
   Phone10 := PhoneNumber,
-	PhoneTranslatedSourceCode := IF(PhoneTranslatedSourceCode ='' OR PhoneTranslatedSourceCode:Null,NO_DATA_FOUND,PhoneTranslatedSourceCode),
+	PhoneTranslatedSourceCode,
 	SourceDateFirstSeen := IF(ISVALIDDATE(PhoneTranslatedSourceCode:DateFirstSeen), DATETOSTRING(PhoneTranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(PhoneTranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(PhoneTranslatedSourceCode:DateLastSeen, SSNSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 	
 SSNSummary: => PhoneSummarySourceListSorted := TOPN(PhoneSummarySourceList(Phone10 = SSNSummary.P_InpClnPhoneHome), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, PhoneTranslatedSourceCode);
 SSNSummary: => PI_SrcWInpPSListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		ALL(PhoneSummarySourceListSorted,PhoneTranslatedSourceCode=NO_DATA_FOUND) => NO_DATA_FOUND,
+		NOT EXISTS(PhoneSummarySourceListSorted) => NO_DATA_FOUND,
 		CONCAT(PhoneSummarySourceListSorted,PhoneTranslatedSourceCode,'|')); 
 SSNSummary: => PI_SrcWInpPSEmrgDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		PI_SrcWInpPSListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(PhoneSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(PhoneSummarySourceListSorted,SourceDateFirstSeen,'|'));
 SSNSummary: => PI_SrcWInpPSLastDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		PI_SrcWInpPSListEv = NO_DATA_FOUND => NO_DATA_FOUND,
-		ALL(PhoneSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
 		CONCAT(PhoneSummarySourceListSorted,SourceDateLastSeen,'|'));	
 
-SSNSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
-SSNSummary: =>P_InpClnNameLast :=PII.InputLastNameCleanValue;
+SSNSummary: =>P_InpClnNameFirst :=PII.InputFirstClnNameValue;
+SSNSummary: =>P_InpClnNameLast :=PII.InputLastClnNameValue;
 SSNSummary.NameSummary: => TranslatedSourceCode := ConsumerSourceGroup(NameSource);
-SSNSummary: => TranslatedFnLnSources := NameSummary{NameFirstName,  NameLastName,TranslatedSourceCode};
+SSNSummary: => TranslatedFnLnSources := NameSummary(TranslatedSourceCode!=''){NameFirstName,  NameLastName,TranslatedSourceCode};
 SSNSummary: =>TranslatedFnLnSourcesList :=TranslatedFnLnSources{
 		FirstName:=NameFirstName,
 		LastName :=NameLastName,
-		TranslatedSourceCode :=IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+		TranslatedSourceCode,
 		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 SSNSummary: => SortedFnLnTranslatedSourceList := TOPN(TranslatedFnLnSourcesList(FirstName = SSNSummary.P_InpClnNameFirst AND LastName =SSNSummary.P_InpClnNameLast),1000,SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 SSNSummary: => PI_SrcWInpFLSListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		ALL(SortedFnLnTranslatedSourceList,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		NOT EXISTS(SortedFnLnTranslatedSourceList) =>NO_DATA_FOUND,
 		CONCAT(SortedFnLnTranslatedSourceList, TranslatedSourceCode,'|'));
 SSNSummary: => PI_SrcWInpFLSEmrgDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLSListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(SortedFnLnTranslatedSourceList,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(SortedFnLnTranslatedSourceList, SourceDateFirstSeen, '|'));
 SSNSummary: => PI_SrcWInpFLSLastDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLSListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(SortedFnLnTranslatedSourceList,SourceDateLastSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(SortedFnLnTranslatedSourceList, SourceDateLastSeen, '|'));
 				    
 /**************************************************************************/
@@ -6627,8 +6617,8 @@ PhoneSummary: => PI_SrcWInpLPLastDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_I
 //Address Summary Attributes 
 
 AddressSummary: => PII :=ONLY(InputPII);
-AddressSummary: => P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
-AddressSummary: => P_InpClnNameLast :=PII.InputLastNameCleanValue;
+AddressSummary: => P_InpClnNameFirst :=PII.InputFirstClnNameValue;
+AddressSummary: => P_InpClnNameLast :=PII.InputLastClnNameValue;
 AddressSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
 AddressSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
 AddressSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
@@ -6641,7 +6631,7 @@ AddressSummary: => TranslatedSources := NameSummary{NameFirstName, NameLastName,
 AddressSummary: => AddressSummarySourceList := TranslatedSources{
 											FirstName := NameFirstName,
 											LastName := NameLastName,
-											TranslatedSourceCode := IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+											TranslatedSourceCode ,
 											SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 											SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 
@@ -6650,21 +6640,19 @@ AddressSummary: => AddressSummarySourceListSorted := TOPN(AddressSummarySourceLi
 AddressSummary: => PI_SrcWInpFLAListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
 																								OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
 																								OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				  ALL(AddressSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+																				  NOT EXISTS(AddressSummarySourceListSorted) =>NO_DATA_FOUND,
 																				  CONCAT(AddressSummarySourceListSorted,TranslatedSourceCode,'|'));
  
 AddressSummary: => PI_SrcWInpFLAEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
 																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
 																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 																								PI_SrcWInpFLAListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-																								ALL(AddressSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 																								CONCAT(AddressSummarySourceListSorted,SourceDateFirstSeen,'|'));
 		
 AddressSummary: => PI_SrcWInpFLALastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
 																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
 																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 																								PI_SrcWInpFLAListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-																								ALL(AddressSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 																								CONCAT(AddressSummarySourceListSorted,SourceDateLastSeen,'|'));	
                                                                                                                     
 AddressSummary.DateOfBirthSummary: => DOBTranslatedSourceCode := ConsumerSourceGroup(DobSource);
