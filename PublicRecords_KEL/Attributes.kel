@@ -76,6 +76,9 @@ FUNCTION: AppendLocationID(STRING PrimRange, STRING Predir, STRING PrimName, STR
 FUNCTION: fnRemoveSpecialChars(STRING field1, STRING replacement) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_RemoveSpecialChars(field1, replacement)) FROM PublicRecords_KEL RETURNS STRING;	
 FUNCTION: fnInVotersState(STRING State, BOOLEAN isFCRA, STRING historydate) <= 
 		ECL(PublicRecords_KEL.ECL_Functions.FN_inVotersState(State,isFCRA,historydate))FROM PublicRecords_KEL.ECL_Functions RETURNS BOOLEAN;
+FUNCTION: fnInDriversState(STRING State) <= State IN ['MO', 'MN', 'FL', 'OH', 'TX', 'NE', 
+																										 'ID', 'ME', 'WV', 'MI', 'LA', 'NC', 
+																										 'MA', 'TN', 'WY', 'KY', 'CT', 'WI'];//This is a hard coded list copied over from production.
 FUNCTION: fnNaicCodeInterpreter(STRING NaicCodeInput) <= ECL(PublicRecords_KEL.ECL_Functions.fn_NaicCodeInterpreter(NaicCodeInput))FROM PublicRecords_KEL.ECL_Functions RETURNS STRING;
 FUNCTION: fnNaicGroupCodeInterpreter(STRING NaicCodeGroup) <= MAP(NaicCodeGroup = '11' => 'Agriculture, Forestry, Fishing and Hunting',
 																																			NaicCodeGroup = '21' => 'Mining',
@@ -1009,7 +1012,28 @@ InputPII: => PI_InpAddrIsAptFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DA
 		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
 		PI_InpAddrIsBusinessFlag =0 AND PI_InpAddrIsMultiUnitFlag =1 =>1,0);
 		
-		
+
+//KS-1192
+InputPII: =>PI_InpDOBAge := MAP(P_InpClnDOBFlagValue <>1 => MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(YEARSBETWEEN(P_InpClnDOB,FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')),0,120));
+
+InputPII: =>PI_InpSSNIsDeceasedFlag := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')){DateOfDeath}) => 0,
+																						 1);
+InputPII: =>PI_InpSSNDeceasedDt := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																			 PI_InpSSNIsDeceasedFlag = 0 => NO_DATA_FOUND_INT,
+																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
+//KS-6266
+InputPII: =>PI_InpAddrStateDLAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																			 fnInDriversState(P_InpClnAddrState) => 1,
+																			 0);
+InputPII: =>PI_InpAddrStateVoterAvailFlag_FCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																			 fnInVotersState(P_InpClnAddrState, TRUE ,STRING(P_InpClnArchDt)) => 1,
+																			 0);
+InputPII: =>PI_InpAddrStateVoterAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																			 fnInVotersState(P_InpClnAddrState, FALSE ,STRING(P_InpClnArchDt)) => 1,
+																			 0);
+//Name Summary attributes		
 NameSummary: =>PII :=ONLY(InputPII);
 NameSummary: =>P_InpClnNameFirst :=PII.InputFirstClnNameValue;
 NameSummary: =>P_InpClnNameLast :=PII.InputLastClnNameValue;
