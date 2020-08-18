@@ -76,6 +76,9 @@ FUNCTION: AppendLocationID(STRING PrimRange, STRING Predir, STRING PrimName, STR
 FUNCTION: fnRemoveSpecialChars(STRING field1, STRING replacement) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_RemoveSpecialChars(field1, replacement)) FROM PublicRecords_KEL RETURNS STRING;	
 FUNCTION: fnInVotersState(STRING State, BOOLEAN isFCRA, STRING historydate) <= 
 		ECL(PublicRecords_KEL.ECL_Functions.FN_inVotersState(State,isFCRA,historydate))FROM PublicRecords_KEL.ECL_Functions RETURNS BOOLEAN;
+FUNCTION: fnInDriversState(STRING State) <= State IN ['MO', 'MN', 'FL', 'OH', 'TX', 'NE', 
+																										 'ID', 'ME', 'WV', 'MI', 'LA', 'NC', 
+																										 'MA', 'TN', 'WY', 'KY', 'CT', 'WI'];//This is a hard coded list copied over from production.
 FUNCTION: fnNaicCodeInterpreter(STRING NaicCodeInput) <= ECL(PublicRecords_KEL.ECL_Functions.fn_NaicCodeInterpreter(NaicCodeInput))FROM PublicRecords_KEL.ECL_Functions RETURNS STRING;
 FUNCTION: fnNaicGroupCodeInterpreter(STRING NaicCodeGroup) <= MAP(NaicCodeGroup = '11' => 'Agriculture, Forestry, Fishing and Hunting',
 																																			NaicCodeGroup = '21' => 'Mining',
@@ -217,6 +220,7 @@ Education: ASL_BUILD_DATE := GETBUILDDATE('asl_build_version');
 NameSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
 SSNSummary: CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
 AddressSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE()); 
+Person: BUILD_DATE_UTIL := MIN(GETBUILDDATE('utility_build_version'), CURRENTDATE());
 
 /***********************************************************************************************************************/
 /***********************************************************************************************************************/
@@ -377,6 +381,13 @@ Person: NO_DATA_FOUND_97 := '-99997';
 Person: NO_DATA_FOUND_97_INT := -99997;
 
 SelePerson: NO_DATA_FOUND_97 :=  '-99997';
+
+SeleUtility: MISSING_INPUT_DATA := '-99999';
+SeleUtility: MISSING_INPUT_DATA_INT := -99999;
+SeleUtility: NO_DATA_FOUND := '-99998';
+SeleUtility: NO_DATA_FOUND_INT := -99998;
+SeleUtility: NO_DATA_FOUND_97 := '-99997';
+SeleUtility: NO_DATA_FOUND_97_INT := -99997;
 
 PersonEducation: MISSING_INPUT_DATA_INT := -99999;
 PersonEducation: NO_DATA_FOUND_INT := -99998;
@@ -1001,31 +1012,50 @@ InputPII: => PI_InpAddrIsAptFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DA
 		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
 		PI_InpAddrIsBusinessFlag =0 AND PI_InpAddrIsMultiUnitFlag =1 =>1,0);
 		
-		
+
+//KS-1192
+InputPII: =>PI_InpDOBAge := MAP(P_InpClnDOBFlagValue <>1 => MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(YEARSBETWEEN(P_InpClnDOB,FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')),0,120));
+
+InputPII: =>PI_InpSSNIsDeceasedFlag := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')){DateOfDeath}) => 0,
+																						 1);
+InputPII: =>PI_InpSSNDeceasedDt := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																			 PI_InpSSNIsDeceasedFlag = 0 => NO_DATA_FOUND_INT,
+																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
+//KS-6266
+InputPII: =>PI_InpAddrStateDLAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																			 fnInDriversState(P_InpClnAddrState) => 1,
+																			 0);
+InputPII: =>PI_InpAddrStateVoterAvailFlag_FCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																			 fnInVotersState(P_InpClnAddrState, TRUE ,STRING(P_InpClnArchDt)) => 1,
+																			 0);
+InputPII: =>PI_InpAddrStateVoterAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																			 fnInVotersState(P_InpClnAddrState, FALSE ,STRING(P_InpClnArchDt)) => 1,
+																			 0);
+//Name Summary attributes		
 NameSummary: =>PII :=ONLY(InputPII);
-NameSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
-NameSummary: =>P_InpClnNameLast :=PII.InputLastNameCleanValue;
+NameSummary: =>P_InpClnNameFirst :=PII.InputFirstClnNameValue;
+NameSummary: =>P_InpClnNameLast :=PII.InputLastClnNameValue;
 NameSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
 NameSummary.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
 
-NameSummary: => TranslatedSources := DataSources{TranslatedSourceCode};
+NameSummary: => TranslatedSources := DataSources(TranslatedSourceCode!=''){TranslatedSourceCode};
 NameSummary: => NameSummarySourceList := TranslatedSources{
 
-	TranslatedSourceCode := IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+	TranslatedSourceCode,
 	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, NameSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 	
 NameSummary: => NameSummarySourceListSorted := TOPN(NameSummarySourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 NameSummary: => PI_SrcWInpFLDListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		ALL(NameSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		NOT EXISTS(NameSummarySourceListSorted) =>NO_DATA_FOUND,
 		CONCAT(NameSummarySourceListSorted,TranslatedSourceCode,'|')); 
 NameSummary: => PI_SrcWInpFLDEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLDListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(NameSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(NameSummarySourceListSorted,SourceDateFirstSeen,'|'));
 NameSummary: => PI_SrcWInpFLDLastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLDListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(NameSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 		CONCAT(NameSummarySourceListSorted,SourceDateLastSeen,'|'));		
 
 //SSNSummary		
@@ -1038,94 +1068,86 @@ SSNSummary: => P_InpClnPhoneHome := PII.InputHomePhoneCleanValue;
 
 
 SSNSummary.AddressSummary: => TranslatedSourceCode := ConsumerSourceGroup(AddressSource);
-SSNSummary: => TranslatedSources := AddressSummary{AddressPrimaryName, AddressPrimaryRange, AddressZip, TranslatedSourceCode};
+SSNSummary: => TranslatedSources := AddressSummary(TranslatedSourceCode!=''){AddressPrimaryName, AddressPrimaryRange, AddressZip, TranslatedSourceCode};
 SSNSummary: => SSNSummarySourceList := TranslatedSources{
 	PrimaryNameAddress := AddressPrimaryName,
 	PrimaryRangeAddress := AddressPrimaryRange,
 	ZipAddress := AddressZip,
-	TranslatedSourceCode :=IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+	TranslatedSourceCode,
 	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-SSNSummary: => SSNSummarySourceListSorted := TOPN(SSNSummarySourceList(PrimaryNameAddress = P_InpClnPrimaryName, PrimaryRangeAddress = P_InpClnPrimaryRange, ZipAddress = P_InpClnZip), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+SSNSummary: => SSNSummarySourceListSorted := TOPN(SSNSummarySourceList(PrimaryNameAddress = P_InpClnPrimaryName AND PrimaryRangeAddress = P_InpClnPrimaryRange AND ZipAddress = P_InpClnZip), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 SSNSummary: => PI_SrcWInpASListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		ALL(SSNSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		NOT EXISTS(SSNSummarySourceListSorted) =>NO_DATA_FOUND,
 		CONCAT(SSNSummarySourceListSorted,TranslatedSourceCode,'|'));
 SSNSummary: => PI_SrcWInpASEmrgDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		PI_SrcWInpASListEv = NO_DATA_FOUND => NO_DATA_FOUND,
-		ALL(SSNSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
-		CONCAT(SSNSummarySourceList, SourceDateFirstSeen, '|'));
+		CONCAT(SSNSummarySourceListSorted, SourceDateFirstSeen, '|'));
 SSNSummary: => PI_SrcWInpASLastDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		PI_SrcWInpASListEv = NO_DATA_FOUND => NO_DATA_FOUND,
-		ALL(SSNSummarySourceListSorted,SourceDateLastSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
-		CONCAT(SSNSummarySourceList, SourceDateLastSeen, '|'));
+		CONCAT(SSNSummarySourceListSorted, SourceDateLastSeen, '|'));
 		
 SSNSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
 SSNSummary.DateOfBirthSummary: => TranslatedSourceCode := ConsumerSourceGroup(DobSource);
-SSNSummary: => TranslatedDOBSources := DateOfBirthSummary{DobDateOfBirth,  TranslatedSourceCode};
+SSNSummary: => TranslatedDOBSources := DateOfBirthSummary(TranslatedSourceCode!=''){DobDateOfBirth,  TranslatedSourceCode};
 SSNSummary: =>TranslatedDOBSourcesList :=TranslatedDOBSources{
 		DateOfBirth:=DobDateOfBirth,
-		TranslatedSourceCode :=IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+		TranslatedSourceCode,
 		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 SSNSummary: => SortedDOBTranslatedSourceList := TOPN(TranslatedDOBSourcesList(DATETOSTRING(DateOfBirth,'%Y%m%d') = SSNSummary.P_InpClnDOB),1000,SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 SSNSummary: => PI_SrcWInpSDListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		ALL(SortedDOBTranslatedSourceList,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		NOT EXISTS(SortedDOBTranslatedSourceList) =>NO_DATA_FOUND,
 		CONCAT(SortedDOBTranslatedSourceList, TranslatedSourceCode,'|'));
 SSNSummary: => PI_SrcWInpSDEmrgDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpSDListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(SortedDOBTranslatedSourceList,SourceDateFirstSeen=NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 		CONCAT(SortedDOBTranslatedSourceList, SourceDateFirstSeen, '|'));
 SSNSummary: => PI_SrcWInpSDLastDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpSDListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(SortedDOBTranslatedSourceList,SourceDateLastSeen=NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 		CONCAT(SortedDOBTranslatedSourceList, SourceDateLastSeen, '|'));
     
 SSNSummary.PhoneSummary: => PhoneTranslatedSourceCode := ConsumerSourceGroup(PhoneSource);
 
-SSNSummary: => PhoneTranslatedSources := PhoneSummary{PhoneNumber, PhoneTranslatedSourceCode};
+SSNSummary: => PhoneTranslatedSources := PhoneSummary(PhoneTranslatedSourceCode!=''){PhoneNumber, PhoneTranslatedSourceCode};
 SSNSummary: => PhoneSummarySourceList := PhoneTranslatedSources{
   Phone10 := PhoneNumber,
-	PhoneTranslatedSourceCode := IF(PhoneTranslatedSourceCode ='' OR PhoneTranslatedSourceCode:Null,NO_DATA_FOUND,PhoneTranslatedSourceCode),
+	PhoneTranslatedSourceCode,
 	SourceDateFirstSeen := IF(ISVALIDDATE(PhoneTranslatedSourceCode:DateFirstSeen), DATETOSTRING(PhoneTranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(PhoneTranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(PhoneTranslatedSourceCode:DateLastSeen, SSNSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 	
-SSNSummary: => PhoneSummarySourceListSorted := TOPN(PhoneSummarySourceList(Phone10 = P_InpClnPhoneHome), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, PhoneTranslatedSourceCode);
+SSNSummary: => PhoneSummarySourceListSorted := TOPN(PhoneSummarySourceList(Phone10 = SSNSummary.P_InpClnPhoneHome), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, PhoneTranslatedSourceCode);
 SSNSummary: => PI_SrcWInpPSListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		ALL(PhoneSummarySourceListSorted,PhoneTranslatedSourceCode=NO_DATA_FOUND) => NO_DATA_FOUND,
+		NOT EXISTS(PhoneSummarySourceListSorted) => NO_DATA_FOUND,
 		CONCAT(PhoneSummarySourceListSorted,PhoneTranslatedSourceCode,'|')); 
 SSNSummary: => PI_SrcWInpPSEmrgDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		PI_SrcWInpPSListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(PhoneSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(PhoneSummarySourceListSorted,SourceDateFirstSeen,'|'));
 SSNSummary: => PI_SrcWInpPSLastDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		PI_SrcWInpPSListEv = NO_DATA_FOUND => NO_DATA_FOUND,
-		ALL(PhoneSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
 		CONCAT(PhoneSummarySourceListSorted,SourceDateLastSeen,'|'));	
 
-SSNSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
-SSNSummary: =>P_InpClnNameLast :=PII.InputLastNameCleanValue;
+SSNSummary: =>P_InpClnNameFirst :=PII.InputFirstClnNameValue;
+SSNSummary: =>P_InpClnNameLast :=PII.InputLastClnNameValue;
 SSNSummary.NameSummary: => TranslatedSourceCode := ConsumerSourceGroup(NameSource);
-SSNSummary: => TranslatedFnLnSources := NameSummary{NameFirstName,  NameLastName,TranslatedSourceCode};
+SSNSummary: => TranslatedFnLnSources := NameSummary(TranslatedSourceCode!=''){NameFirstName,  NameLastName,TranslatedSourceCode};
 SSNSummary: =>TranslatedFnLnSourcesList :=TranslatedFnLnSources{
 		FirstName:=NameFirstName,
 		LastName :=NameLastName,
-		TranslatedSourceCode :=IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+		TranslatedSourceCode,
 		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 SSNSummary: => SortedFnLnTranslatedSourceList := TOPN(TranslatedFnLnSourcesList(FirstName = SSNSummary.P_InpClnNameFirst AND LastName =SSNSummary.P_InpClnNameLast),1000,SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 SSNSummary: => PI_SrcWInpFLSListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		ALL(SortedFnLnTranslatedSourceList,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+		NOT EXISTS(SortedFnLnTranslatedSourceList) =>NO_DATA_FOUND,
 		CONCAT(SortedFnLnTranslatedSourceList, TranslatedSourceCode,'|'));
 SSNSummary: => PI_SrcWInpFLSEmrgDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLSListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(SortedFnLnTranslatedSourceList,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(SortedFnLnTranslatedSourceList, SourceDateFirstSeen, '|'));
 SSNSummary: => PI_SrcWInpFLSLastDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLSListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		ALL(SortedFnLnTranslatedSourceList,SourceDateLastSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 		CONCAT(SortedFnLnTranslatedSourceList, SourceDateLastSeen, '|'));
 				    
 /**************************************************************************/
@@ -2098,6 +2120,7 @@ Person: => CurrentAddrType :=   Current.AddressType;
 Person: => CurrentAddrStatus :=   Current.AddressStatus;
 Person: => CurrentAddrLat :=   Current.Latitude;
 Person: => CurrentAddrLng :=   Current.Longitude;
+Person: => CurrentAddrCity :=   Current.PostalCity;
 
 Person: => PreviousAddrPrimRng :=  Previous.PrimaryRange;
 Person: => PreviousAddrPreDir :=   Previous.Predirectional;
@@ -2452,6 +2475,30 @@ Person: => PL_EduCollRecSpanEv := MAP(
 		BOUNDSFOLD(MONTHSBETWEEN(MIN(EduCollRecVerSourceList(SourceDateFirstSeen<>Person.NO_DATA_FOUND_97), DATE(SourceDateFirstSeen)),
 														 MAX(EduCollRecVerSourceList(SourceDateLastSeen<>Person.NO_DATA_FOUND_97), DATE(SourceDateLastSeen))),0,999)); 
 														 
+/**************************************************************************/
+/*                                                                        */
+/*                  Utility Attributes                        			      */
+/*                                                                        */
+/**************************************************************************/
+
+Person: => UtilListPre := UtilityPerson{Util, DateFirstSeenMin := MIN(GROUP, Util:DateFirstSeen)};
+Person: => UtilList := UtilListPre{
+	Util,
+	UtilDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMin), DATETOSTRING(DateFirstSeenMin, '%Y%m%d'), SeleUtility.NO_DATA_FOUND_97)};
+Person: => UtilListSorted := TOPN(UtilList, 100, UtilDateFirstSeen = Person.NO_DATA_FOUND_97, UtilDateFirstSeen);
+Person: => PL_UtilCntEv := IF(P_LexIDSeenFlag = '0', SeleUtility.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(UtilityPerson), 0, 999));
+Person: => PL_UtilOldDtListEv := MAP(P_LexIDSeenFlag = '0' => SeleUtility.MISSING_INPUT_DATA,
+		PL_UtilCntEv = 0 => SeleUtility.NO_DATA_FOUND,
+		CONCAT(UtilListSorted, UtilDateFirstSeen, '|'));
+Person: => PL_UtilOldDtEv := MAP(P_LexIDSeenFlag = '0' => SeleUtility.MISSING_INPUT_DATA,
+		PL_UtilCntEv = 0 => SeleUtility.NO_DATA_FOUND,
+		PL_UtilCntEv > 0 AND ALL(UtilListSorted, UtilDateFirstSeen = SeleUtility.NO_DATA_FOUND_97) => SeleUtility.NO_DATA_FOUND_97,
+		DATETOSTRING(MIN(UtilListSorted(UtilDateFirstSeen != SeleUtility.NO_DATA_FOUND_97),DATE(UtilDateFirstSeen)) ,'%Y%m%d'));
+Person: => PL_UtilOldMsncEv := MAP(P_LexIDSeenFlag = '0' => SeleUtility.MISSING_INPUT_DATA_INT,
+		PL_UtilCntEv = 0 => SeleUtility.NO_DATA_FOUND_INT,
+		PL_UtilCntEv > 0 AND ALL(UtilListSorted, UtilDateFirstSeen = SeleUtility.NO_DATA_FOUND_97) => SeleUtility.NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_UtilOldDtEv),Person.BUILD_DATE_UTIL),0,999)); 
+
 /**************************************************************************/
 /*                                                                        */
 /*                  Vehicle Helper Attributes                             */
@@ -4560,7 +4607,6 @@ BusinessSele: => AssetPropertyCurrentStateCountCapped := MIN(COUNT(AssetProperty
 
 // Due to a KEL compiler bug, need to pull DateFirstSeen into an attribute definition so that the following date calculations function correctly. 
 PropertyEvent: => DtFirstSeen := LNFaresID:DateFirstSeen; 
-PropertyEvent: => DtLastSeen := LNFaresID:DateLastSeen; 
 
 SeleProperty: => PropertyMinDateFirstSeen := MIN(Prop.PropertyEvent(EXISTS(SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal))), DtFirstSeen);
 SeleProperty: => PropertyMaxDateFirstSeen := MAX(Prop.PropertyEvent(EXISTS(SelePropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Legal = SeleProperty.Legal))), DtFirstSeen);
@@ -6483,61 +6529,111 @@ BusinessSele: => BE_BestAddrIsVacantFlag := MAP(SeleID = MISSING_INPUT_DATA_INT 
                                                                                         Vacant => 1, 
                                                                                         NotVacant => 0,
                                                                                         NO_DATA_FOUND_97_INT);
+																																												
 //4823 attributes
-PropertyEvent: => PropertyEventDateFirstSeen := UID:DateFirstSeen;
-PropertyEvent: => AgeHelper := DAYSBETWEEN(PropertyEventDateFirstSeen, Property.CURRENT_DATE);
+BusinessSele: => BestAddressPropertyEventData := SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent(EXISTS(AddressCharacteristics(IsPropertyAddress))).Event{
+													UID,
+													MarketTotalValue,
+													MarketValueYearClean := IF(NOT ISVALIDDATE(MarketValueYear) OR MarketValueYear:Null, BusinessSele.NO_DATA_FOUND_97, DATETOSTRING(MarketValueYear,'%Y')),
+													AssessedTotalValue,
+													AssessedValueYearClean := IF(NOT ISVALIDDATE(AssessedValueYear) OR AssessedValueYear:Null, BusinessSele.NO_DATA_FOUND_97, DATETOSTRING(AssessedValueYear,'%Y')),
+													LandSquareFootage,
+													BuildingArea,
+													PropertyEventDateFirstSeen := IF(NOT ISVALIDDATE(DtFirstSeen) OR DtFirstSeen:Null, BusinessSele.NO_DATA_FOUND_97, DATETOSTRING(DtFirstSeen, '%Y%m%d'))};
 
-BusinessSele: => minBestAddressPropertyEventAge := MIN(SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent(EXISTS(AddressCharacteristics(IsPropertyAddress))).Event,AgeHelper);
-BusinessSele: => bestPropertyEventFromAddress := ONLY(SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent(EXISTS(AddressCharacteristics(IsPropertyAddress)) AND Event.AgeHelper = BusinessSele.minBestAddressPropertyEventAge),Event);
-BusinessSele: => BestAddressOwnerMatches := EXISTS(bestPropertyEventFromAddress.SelePropertyEvent(Event.AgeHelper = MIN(BusinessSele.bestPropertyEventFromAddress.SelePropertyEvent.Event,AgeHelper) AND Legal.UID = BusinessSele.UID)); // newest info shows that the company owns the address.
+BusinessSele: => BestAddressMostRecentRecord := ONLY(TOPN(BestAddressPropertyEventData, 1, -INTEGER(PropertyEventDateFirstSeen)), UID);
+BusinessSele: => BestAddressIsOwned := 
+		EXISTS(SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent(EXISTS(AddressCharacteristics(IsPropertyAddress))).Event(UID = BusinessSele.BestAddressMostRecentRecord).SelePropertyEvent(Legal.UID = BusinessSele.UID));
+
+BusinessSele: => BestAddressMarketValue := ONLY(TOPN(BestAddressPropertyEventData(MarketTotalValue > 0), 1, -INTEGER(PropertyEventDateFirstSeen), -INTEGER(MarketValueYearClean), -MarketTotalValue), MarketTotalValue);
+BusinessSele: => BestAddressMarketValueYear := ONLY(TOPN(BestAddressPropertyEventData(MarketTotalValue > 0), 1, -INTEGER(PropertyEventDateFirstSeen), -INTEGER(MarketValueYearClean), -MarketTotalValue), MarketValueYearClean);
+
+BusinessSele: => BestAddressAssessedValue := ONLY(TOPN(BestAddressPropertyEventData(AssessedTotalValue > 0), 1, -INTEGER(PropertyEventDateFirstSeen), -INTEGER(AssessedValueYearClean), -AssessedTotalValue), AssessedTotalValue);
+BusinessSele: => BestAddressAssessedValueYear := ONLY(TOPN(BestAddressPropertyEventData(AssessedTotalValue > 0), 1, -INTEGER(PropertyEventDateFirstSeen), -INTEGER(AssessedValueYearClean), -AssessedTotalValue), AssessedValueYearClean);
+
+BusinessSele: => BestAddressLandSquareFootage := ONLY(TOPN(BestAddressPropertyEventData(LandSquareFootage > 0), 1, -INTEGER(PropertyEventDateFirstSeen), -LandSquareFootage), LandSquareFootage);
+BusinessSele: => BestAddressBuildingArea := ONLY(TOPN(BestAddressPropertyEventData(BuildingArea > 0), 1, -INTEGER(PropertyEventDateFirstSeen), -BuildingArea), BuildingArea);
+
 BusinessSele: => BE_BestAddrIsOwnedFlag := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
-                                                                                                                                                                        bestPropertyEventFromAddress:Null => NO_DATA_FOUND_INT,
-                                                                                                                                                                        BestAddressOwnerMatches => 1,
+		NOT EXISTS(BestAddressPropertyEventData) => NO_DATA_FOUND_INT,
+		BestAddressIsOwned => 1,
                                                                                                                                                                         0);
-BusinessSele: => MarketAssessEvent := ONLY(SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent(NOT Event.MarketTotalValue:Null AND Event.PropertyEventDateFirstSeen = MAX(BusinessSele.SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent.Event(NOT MarketTotalValue:Null),PropertyEventDateFirstSeen)),Event);
-BusinessSele: => MarketAssessData := ONLY(MarketAssessEvent{NoMarketValue:= MarketTotalValue:Null, NoMarketValueYear:= MarketValueYear:Null OR DATETOSTRING(MarketValueYear,'%Y') IN ['0',''],  MarketValueYear, MarketTotalValue});
-BusinessSele: => TaxAssessEvent := ONLY(SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent(NOT Event.AssessedTotalValue:Null AND Event.PropertyEventDateFirstSeen = MAX(BusinessSele.SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent.Event(NOT AssessedTotalValue:Null),PropertyEventDateFirstSeen)),Event);
-BusinessSele: => TaxAssessData := ONLY(TaxAssessEvent{NoAssessedValue:= AssessedTotalValue:Null, NoAssessedValueYear:= AssessedValueYear:Null OR DATETOSTRING(AssessedValueYear,'%Y') IN ['0',''],  AssessedValueYear, AssessedTotalValue});
+																																																																																				
 BusinessSele: => BE_BestAddrNewMktValEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
-                                                                                                                                                                        bestPropertyEventFromAddress:Null => NO_DATA_FOUND_INT,
-                                                                                                                                                                        MarketAssessEvent:Null OR MarketAssessData.NoMarketValue => NO_DATA_FOUND_97_INT,
-                                                                                                                                                                        MarketAssessData.MarketTotalValue);
+		NOT EXISTS(BestAddressPropertyEventData) => NO_DATA_FOUND_INT,
+		ALL(BestAddressPropertyEventData, MarketTotalValue:Null)  => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(BestAddressMarketValue, 0, 999999999));
+		
 BusinessSele: => BE_BestAddrNewTaxValEv :=  MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
-                                                                                                                                                                        bestPropertyEventFromAddress:Null => NO_DATA_FOUND_INT,
-                                                                                                                                                                        TaxAssessEvent:Null OR TaxAssessData.NoAssessedValue => NO_DATA_FOUND_97_INT,
-                                                                                                                                                                        TaxAssessData.AssessedTotalValue);
-BusinessSele: => BE_BestAddrNewMktValYrEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
-                                                                                                                                                                        bestPropertyEventFromAddress:Null => NO_DATA_FOUND_INT,
-                                                                                                                                                                        MarketAssessEvent:Null OR MarketAssessData.NoMarketValueYear OR MarketAssessData.NoMarketValue => NO_DATA_FOUND_97_INT,
-                                                                                                                                                                        DATETOSTRING(MarketAssessData.MarketValueYear,'%Y'));                                                                               
-BusinessSele: => BE_BestAddrNewTaxValYrEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
-                                                                                                                                                                        bestPropertyEventFromAddress:Null => NO_DATA_FOUND_INT,
-                                                                                                                                                                        TaxAssessEvent:Null OR TaxAssessData.NoAssessedValueYear OR TaxAssessData.NoAssessedValue => NO_DATA_FOUND_97_INT,
-                                                                                                                                                                        DATETOSTRING(TaxAssessData.AssessedValueYear,'%Y'));
-BusinessSele: => LotSizeEvent := ONLY(SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent(NOT Event.LandSquareFootage:Null AND Event.PropertyEventDateFirstSeen = MAX(BusinessSele.SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent.Event(NOT LandSquareFootage:Null),PropertyEventDateFirstSeen)),Event);
+		NOT EXISTS(BestAddressPropertyEventData) => NO_DATA_FOUND_INT,
+		ALL(BestAddressPropertyEventData, AssessedTotalValue:Null)  => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(BestAddressAssessedValue, 0, 999999999));
 
-BusinessSele: => BuildingSizeEvent := ONLY(SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent(NOT Event.BuildingArea:Null AND Event.PropertyEventDateFirstSeen = MAX(BusinessSele.SeleAddress(MatchesIsBestHelperAttr).Location.AddressPropertyEvent.Event(NOT BuildingArea:Null),PropertyEventDateFirstSeen)),Event);
+BusinessSele: => BE_BestAddrNewMktValYrEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA,
+		NOT EXISTS(BestAddressPropertyEventData) => NO_DATA_FOUND,
+		BE_BestAddrNewMktValEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97,
+		BestAddressMarketValueYear);
+		
+BusinessSele: => BE_BestAddrNewTaxValYrEv := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA,
+		NOT EXISTS(BestAddressPropertyEventData) => NO_DATA_FOUND,
+		BE_BestAddrNewTaxValEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97,
+		BestAddressAssessedValueYear);
+		
 BusinessSele: => BE_BestAddrLotSize := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
-                                                                                                                                                                        bestPropertyEventFromAddress:Null => NO_DATA_FOUND_INT,
-                                                                                                                                                                        LotSizeEvent:Null OR LotSizeEvent.LandSquareFootage:Null => NO_DATA_FOUND_97_INT,
-                                                                                                                                                                        LotSizeEvent.LandSquareFootage);
+		NOT EXISTS(BestAddressPropertyEventData) => NO_DATA_FOUND_INT,
+		BestAddressLandSquareFootage:Null => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(BestAddressLandSquareFootage, 0, 999999999));
+		
 BusinessSele: => BE_BestAddrBldgSize := MAP(SeleID = MISSING_INPUT_DATA_INT OR B_LexIDLegalSeenFlag = 0 OR BE_BestAddrSeenFlag IN [0,NO_DATA_FOUND_INT] => MISSING_INPUT_DATA_INT,
-                                                                                                                                                                        bestPropertyEventFromAddress:Null => NO_DATA_FOUND_INT,
-                                                                                                                                                                        BuildingSizeEvent:Null OR BuildingSizeEvent.BuildingArea:Null => NO_DATA_FOUND_97_INT,
-                                                                                                                                                                        BuildingSizeEvent.BuildingArea);
+		NOT EXISTS(BestAddressPropertyEventData) => NO_DATA_FOUND_INT,
+		BestAddressBuildingArea:Null => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(BestAddressBuildingArea, 0, 999999999));
+
+// PII Corroboration 
 
 
+//PhoneSummary Attributes
+//Get the inputPII values
 PhoneSummary: =>PII :=ONLY(InputPII);
 PhoneSummary: =>P_InpClnPhoneHome :=PII.P_InpClnPhoneHome;
 PhoneSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
+PhoneSummary: =>P_InpClnNameLast := PII.InputLastClnNameValue;
+PhoneSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
+PhoneSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
+PhoneSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
+
+//Translate the source codes to friendly values
 
 PhoneSummary.DateOfBirthSummary: => TranslatedSource := ConsumerSourceGroup(Source);
+PhoneSummary.LastNameSummary: => TranslatedSource := ConsumerSourceGroup(Source);
+PhoneSummary.AddressSummary: => TranslatedSource := ConsumerSourceGroup(Source);
 
-PhoneSummary: => TranslatedDOBSources := DateOfBirthSummary{DateOfBirth, Source := TranslatedSource};
-PhoneSummary.TranslatedDOBSources: => MyDateFirstSeen := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),'-99997');
-PhoneSummary.TranslatedDOBSources: => MyDateLastSeen := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', '-99997', DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
+//Make new submodel for translatedDOB sources
+PhoneSummary: => TranslatedDOBSources := DateOfBirthSummary(TranslatedSource != ''){DateOfBirth, Source := TranslatedSource};
+PhoneSummary.TranslatedDOBSources: => MyDateFirstSeen := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
+PhoneSummary.TranslatedDOBSources: => MyDateLastSeen := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
 PhoneSummary.TranslatedDOBSources: => NewDateAge := IsBlank(DAYSBETWEEN(Source:DateFirstSeen,PhoneSummary.CURRENT_DATE),-999999);
 PhoneSummary: => SortedDOBTranslatedSourceList := TOPN(TranslatedDOBSources(DATETOSTRING(DateOfBirth,'%Y%m%d') = PhoneSummary.P_InpClnDOB),99999,-NewDateAge,Source){Source,MyDateFirstSeen,MyDateLastSeen};
+
+//Make new submodel for translatedLastName sources
+PhoneSummary: => TranslatedLastNameSources := LastNameSummary(TranslatedSource != ''){LastName, Source := TranslatedSource};
+PhoneSummary.TranslatedLastNameSources: => MyDateFirstSeen := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
+PhoneSummary.TranslatedLastNameSources: => MyDateLastSeen := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
+PhoneSummary.TranslatedLastNameSources: => NewDateAge := IsBlank(DAYSBETWEEN(Source:DateFirstSeen,PhoneSummary.CURRENT_DATE),-999999);
+PhoneSummary: => SortedLastNameTranslatedSourceList := TOPN(TranslatedLastNameSources(LastName = PhoneSummary.P_InpClnNameLast),99999,-NewDateAge,Source){Source,MyDateFirstSeen,MyDateLastSeen};
+
+//Make new submodel for translatedaddress sources
+PhoneSummary: => TranslatedAddressSources := AddressSummary(TranslatedSource != ''){PrimaryName, PrimaryRange, Zip, Source := TranslatedSource};
+PhoneSummary.TranslatedAddressSources: => MyDateFirstSeen_pre := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
+PhoneSummary.TranslatedAddressSources: => MyDateLastSeen_pre := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
+PhoneSummary.TranslatedAddressSources: => MyDateFirstSeen := IF(MyDateFirstSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateLastSeen_pre,MyDateFirstSeen_pre);
+PhoneSummary.TranslatedAddressSources: => MyDateLastSeen := IF(MyDateLastSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateFirstSeen_pre,MyDateLastSeen_pre);
+PhoneSummary.TranslatedAddressSources: => NewDateAge := IsBlank(DAYSBETWEEN(Source:DateFirstSeen,PhoneSummary.CURRENT_DATE),-999999);
+PhoneSummary: => SortedAddressTranslatedSourceList := TOPN(TranslatedAddressSources(PrimaryName=PhoneSummary.P_InpClnAddrPrimName AND PrimaryRange=PhoneSummary.P_InpClnAddrPrimRng AND Zip=P_InpClnAddrZip5), 99999, -NewDateAge, Source){Source,MyDateFirstSeen,MyDateLastSeen};
+
+
+//Actual date of birth attributes for phone summary
+
 PhoneSummary: => PI_SrcWInpPDListEv := MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 																				NOT EXISTS(TranslatedDOBSources(DATETOSTRING(DateOfBirth,'%Y%m%d') = PhoneSummary.P_InpClnDOB){Source}) => NO_DATA_FOUND,
 																				CONCAT(SortedDOBTranslatedSourceList, Source,'|'));
@@ -6549,14 +6645,41 @@ PhoneSummary: => PI_SrcWInpPDEmrgDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_I
 PhoneSummary: => PI_SrcWInpPDLastDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 																				PI_SrcWInpPDListEv = NO_DATA_FOUND => NO_DATA_FOUND,
 																				CONCAT(SortedDOBTranslatedSourceList,MyDateLastSeen ,'|'));
+//Actual last name attributes for phone summary
+PhoneSummary: => PI_SrcWInpLPListEv := MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				NOT EXISTS(TranslatedLastNameSources(LastName = PhoneSummary.P_InpClnNameLast){Source}) => NO_DATA_FOUND,
+																				CONCAT(SortedLastNameTranslatedSourceList, Source,'|'));
+
+PhoneSummary: => PI_SrcWInpLPEmrgDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				PI_SrcWInpLPListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																				CONCAT(SortedLastNameTranslatedSourceList,MyDateFirstSeen ,'|'));
+
+PhoneSummary: => PI_SrcWInpLPLastDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				PI_SrcWInpLPListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																				CONCAT(SortedLastNameTranslatedSourceList,MyDateLastSeen ,'|'));																				
+//Actual address attributes for phone summary
+PhoneSummary: => PI_SrcWInpAPListEv := MAP(	P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				NOT EXISTS(TranslatedAddressSources(PrimaryName=PhoneSummary.P_InpClnAddrPrimName,PrimaryRange=PhoneSummary.P_InpClnAddrPrimRng, Zip=P_InpClnAddrZip5){Source}) => NO_DATA_FOUND,
+																				CONCAT(SortedAddressTranslatedSourceList, Source, '|'));
+
+PhoneSummary: => PI_SrcWInpAPEmrgDtListEv := MAP(	P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				PI_SrcWInpAPListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																				CONCAT(SortedAddressTranslatedSourceList, MyDateFirstSeen, '|'));
+
+PhoneSummary: => PI_SrcWInpAPLastDtListEv := MAP(	P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				PI_SrcWInpAPListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																				CONCAT(SortedAddressTranslatedSourceList, MyDateLastSeen, '|'));
+
+
 //Address Summary Attributes 
 
 AddressSummary: => PII :=ONLY(InputPII);
-AddressSummary: => P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
-AddressSummary: => P_InpClnNameLast :=PII.InputLastNameCleanValue;
+AddressSummary: => P_InpClnNameFirst :=PII.InputFirstClnNameValue;
+AddressSummary: => P_InpClnNameLast :=PII.InputLastClnNameValue;
 AddressSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
 AddressSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
 AddressSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
+AddressSummary: => P_InpClnDOB :=PII.InputDOBCleanValue;
 																					 
 // Name Sources take from the submodel NameSource																					 
 AddressSummary.NameSummary: => TranslatedSourceCode := ConsumerSourceGroup(NameSource);
@@ -6565,7 +6688,7 @@ AddressSummary: => TranslatedSources := NameSummary{NameFirstName, NameLastName,
 AddressSummary: => AddressSummarySourceList := TranslatedSources{
 											FirstName := NameFirstName,
 											LastName := NameLastName,
-											TranslatedSourceCode := IF(TranslatedSourceCode ='' OR TranslatedSourceCode:Null,NO_DATA_FOUND,TranslatedSourceCode),
+											TranslatedSourceCode ,
 											SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
 											SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 
@@ -6574,110 +6697,46 @@ AddressSummary: => AddressSummarySourceListSorted := TOPN(AddressSummarySourceLi
 AddressSummary: => PI_SrcWInpFLAListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
 																								OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
 																								OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				  ALL(AddressSummarySourceListSorted,TranslatedSourceCode=NO_DATA_FOUND) =>NO_DATA_FOUND,
+																				  NOT EXISTS(AddressSummarySourceListSorted) =>NO_DATA_FOUND,
 																				  CONCAT(AddressSummarySourceListSorted,TranslatedSourceCode,'|'));
  
 AddressSummary: => PI_SrcWInpFLAEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
 																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
 																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 																								PI_SrcWInpFLAListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-																								ALL(AddressSummarySourceListSorted,SourceDateFirstSeen =NO_DATA_FOUND_97 ) =>NO_DATA_FOUND_97,
 																								CONCAT(AddressSummarySourceListSorted,SourceDateFirstSeen,'|'));
 		
 AddressSummary: => PI_SrcWInpFLALastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
 																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
 																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 																								PI_SrcWInpFLAListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-																								ALL(AddressSummarySourceListSorted,SourceDateLastSeen = NO_DATA_FOUND_97) =>NO_DATA_FOUND_97,
 																								CONCAT(AddressSummarySourceListSorted,SourceDateLastSeen,'|'));	
                                                                                                                     
+AddressSummary.DateOfBirthSummary: => DOBTranslatedSourceCode := ConsumerSourceGroup(DobSource);
+AddressSummary: => DOBTranslatedSources := DateOfBirthSummary(DOBTranslatedSourceCode != ''){DobDateOfBirth, DOBTranslatedSourceCode};
 
-// Property is considered Ever Owned if there is a SelePropertyEvent record on file for the Business marked as PartyIsBuyerOrOwner or PartyIsSeller.
-// Since a Property or PropertyEvent can be tied to multiple people/businesses, we need to specifically check that the record we are grabbing data from is tied to this Person.
-PersonProperty: => IsEverOwned := EXISTS(Prop.PropertyEvent.PersonPropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Subject = PersonProperty.Subject));
-Person: => AssetPropertyCountEver := COUNT(PersonProperty(IsEverOwned));
+AddressSummary: => DOBSourceList := DOBTranslatedSources{
+											DateOfBirth := DobDateOfBirth,
+											DOBTranslatedSourceCode := DOBTranslatedSourceCode,
+											SourceDateFirstSeen := IF(ISVALIDDATE(DOBTranslatedSourceCode:DateFirstSeen), DATETOSTRING(DOBTranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+											SourceDateLastSeen :=  IF(ISVALIDDATE(DOBTranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(DOBTranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
 
-// Property Sale logic
-PersonProperty: => PropertyIsSold := EXISTS(Prop.PropertyEvent.PersonPropertyEvent(PartyDetails.PartyIsSeller AND Subject = PersonProperty.Subject));
-PersonProperty: PropertyIsSold => PropertySaleInfo := Prop.PropertyEvent(EXISTS(PersonPropertyEvent(PartyDetails.PartyIsSeller AND Subject = PersonProperty.Subject))){LNFaresID, DtFirstSeen, SalePrice};
-PersonProperty: PropertyIsSold => BestPropertySaleInfo := ONLY(TOPN(PropertySaleInfo, 1, -DtFirstSeen, -SalePrice));
-PersonProperty: PropertyIsSold => PropertySaleDate := BestPropertySaleInfo.DtFirstSeen;
-PersonProperty: PropertyIsSold => PropertySalePrice := BestPropertySaleInfo.SalePrice;
-
-// We consider a deed record to indicate ownership if the Subject is listed as buyer on the record. An assessment record indicates ownership if it is current (from the past year) and the Subject is listed as owner on the record.
-PersonProperty: => PropertyIsOwnedDeed := EXISTS(Prop.PropertyEvent(IsDeed).PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject));
-PersonProperty: => PropertyIsOwnedAssessment := EXISTS(Prop.PropertyEvent(IsCurrentAssessmentRecord).PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject));
-
-// A property is considerd currently owned by the person if it has not been sold by the person AND there is either a deed record on file where the person is marked as PartyIsBuyerOrOwner OR there is an assessment record on file for the person/property within the past year.
-PersonProperty: => IsCurrentlyOwned := (PropertyIsOwnedAssessment OR PropertyIsOwnedDeed) AND NOT PropertyIsSold;
-
-PersonProperty: => PropertyMinDateFirstSeen := MIN(Prop.PropertyEvent(EXISTS(PersonPropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Subject = PersonProperty.Subject))), DtFirstSeen);
-PersonProperty: => PropertyMaxDateLastSeenUncapped := MAX(Prop.PropertyEvent(EXISTS(PersonPropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Subject = PersonProperty.Subject))), DtLastSeen);
-PersonProperty: => PropertyMaxDateLastSeen := MIN(PropertyMaxDateLastSeenUncapped, Property.CURRENT_DATE);
-
-Person: => PropertyDataSet := PersonProperty{
-										Prop, 
-										PropertyIsSold,
-										PropertySaleDateClean := IF(ISVALIDDATE(PropertySaleDate), DATETOSTRING(PropertySaleDate, '%Y%m%d'), Person.NO_DATA_FOUND_97),
-										PropertySalePriceClean := IF(PropertySalePrice:Null OR PropertySalePrice < 0, Person.NO_DATA_FOUND_97_INT, PropertySalePrice),
-										DateFirstSeenClean := IF(ISVALIDDATE(PropertyMinDateFirstSeen), DATETOSTRING(PropertyMinDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
-										DateLastSeenClean := IF(ISVALIDDATE(PropertyMaxDateLastSeen), DATETOSTRING(PropertyMaxDateLastSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97)};
-										
-Person: => PropertyDateFirstSeenSorted := TOPN(PropertyDataSet, 999, DateFirstSeenClean = Person.NO_DATA_FOUND_97, DateFirstSeenClean);
-Person: => PropertyDateLastSeenSorted := TOPN(PropertyDataSet, 999, DateLastSeenClean = Person.NO_DATA_FOUND_97, DateLastSeenClean);
-Person: => PropertySalesSorted := TOPN(PropertyDataSet(PropertyIsSold), 999, PropertySaleDateClean = Person.NO_DATA_FOUND_97, PropertySaleDateClean, -PropertySalePriceClean);
-
-Person: => AssetPropertyCurrentCount := COUNT(PersonProperty(IsCurrentlyOwned));
-
-Person: => AssentPropertySaleCount := COUNT(PersonProperty(PropertyIsSold));
-// Property Ownership
-Person: => PL_AstPropCntEv := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
-				BOUNDSFOLD(AssetPropertyCountEver, 0, 999));
-				
-Person: => PL_AstPropNewDtListEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-				PL_AstPropCntEv = 0 => NO_DATA_FOUND,
-				CONCAT(PropertyDateLastSeenSorted, DateLastSeenClean, '|'));
-
-Person: => PL_AstPropOldDtListEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-				PL_AstPropCntEv = 0 => NO_DATA_FOUND,
-				CONCAT(PropertyDateFirstSeenSorted, DateFirstSeenClean, '|'));
-							
-Person: => PL_AstPropCurrCnt := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
-				BOUNDSFOLD(AssetPropertyCurrentCount, 0, 999));
-				
-// Property Sales
-Person: => PL_AstPropSaleCntEv := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
-				BOUNDSFOLD(AssentPropertySaleCount, 0, 999));
-				
-Person: => PL_AstPropSaleAmtListEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND,
-				CONCAT(PropertySalesSorted, PropertySalePriceClean, '|'));
-				
-Person: => PL_AstPropSaleTotEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
-				ALL(PropertyDataSet(PropertyIsSold), PropertySalePriceClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(SUM(PropertyDataSet(PropertyIsSold AND PropertySalePriceClean <> Person.NO_DATA_FOUND_97_INT), PropertySalePriceClean), 0, 999999999));
-
-Person: => PL_AstPropSaleDtListEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND,
-				CONCAT(PropertySalesSorted, PropertySaleDateClean, '|'));
-
-Person: => PL_AstPropSaleNewDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND,
-				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropertySaleDateClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97,
-				DATETOSTRING(MAX(PropertyDataSet(PropertyIsSold AND PropertySaleDateClean <> Person.NO_DATA_FOUND_97_INT), DATE(PropertySaleDateClean)), '%Y%m%d'));
-				
-Person: => PL_AstPropSaleOldDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND,
-				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropertySaleDateClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97,
-				DATETOSTRING(MIN(PropertyDataSet(PropertyIsSold AND PropertySaleDateClean <> Person.NO_DATA_FOUND_97_INT), DATE(PropertySaleDateClean)), '%Y%m%d'));
-				
-Person: => PL_AstPropSaleNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
-				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropertySaleDateClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstPropSaleNewDtEv),Property.CURRENT_DATE),0,999)); 
-					
-Person: => PL_AstPropSaleOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
-				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropertySaleDateClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstPropSaleOldDtEv),Property.CURRENT_DATE),0,999)); 
+// Match the input DOB and Sorting by earliest associated date
+AddressSummary: => DOBSourceListSorted := TOPN(DOBSourceList(DATETOSTRING(DateOfBirth,'%Y%m%d') = AddressSummary.P_InpClnDOB), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, DOBTranslatedSourceCode);
+AddressSummary: => PI_SrcWInpADListEv := MAP(P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																								OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																								OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																				      NOT EXISTS(DOBSourceListSorted) =>NO_DATA_FOUND,
+																				      CONCAT(DOBSourceListSorted,DOBTranslatedSourceCode,'|'));
+ 
+AddressSummary: => PI_SrcWInpADEmrgDtListEv := MAP(P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																									PI_SrcWInpADListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																									CONCAT(DOBSourceListSorted,SourceDateFirstSeen,'|'));
+		
+AddressSummary: => PI_SrcWInpADLastDtListEv := MAP(P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
+																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
+																									PI_SrcWInpADListEv = NO_DATA_FOUND => NO_DATA_FOUND,
+																									CONCAT(DOBSourceListSorted,SourceDateLastSeen,'|'));																																																											

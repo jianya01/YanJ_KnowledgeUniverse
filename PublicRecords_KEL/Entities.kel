@@ -423,7 +423,6 @@ PERMITS Restricted, // 1
 		SDA,	// 397
 		SDAA,	// 398
 		// SEC_Broker_Dealer,	// 399
-		// sexoffender,	// 400//we will be adding this
 		// Sheila_Greco,	// 401
 		// SKA,	// 402
 		// FL_SO,	// 403
@@ -598,6 +597,7 @@ PERMITS Restricted, // 1
 		src_Cortera, // 572
 		src_TransUnion, // 573
 		src_Equifax, // 574
+		sexoffender,	// 400//we will be adding this
 		// Unused source codes	
 		Unassigned225,	
 		Unassigned224,	
@@ -623,8 +623,8 @@ PERMITS Restricted, // 1
 		Unassigned204,	
 		Unassigned203,	
 		Unassigned202,	
-		Unassigned201,	
-		Unassigned200;		
+		Unassigned201;	
+		// Unassigned200;		
 		// Unassigned199,	
 		// Unassigned198,	
 		// Unassigned197,	
@@ -2608,6 +2608,32 @@ Employment := ENTITY(FLAT(UID=contact_id,
 	MODEL(UID,
 		JobTitle, InternalSourceScore, FromHDR, OldInternalSourceScore, GLB,
 		DataSources{Source}));
+		
+	SexOffender := ENTITY(FLAT(UID(SeisintPrimaryKey),
+		STRING SeisintPrimaryKey, 
+		STRING Source), 
+	MODEL(UID,
+		SeisintPrimaryKey, Sources{Source}));
+
+PersonSexOffender := ASSOCIATION(FLAT(
+		Person Subject, 
+		SexOffender Offender= UID(SeisintPrimaryKey),
+		STRING SeisintPrimaryKey, 		
+		DATE FCRADate,
+		STRING FcraConvictionFlag,
+		STRING FcraTrafficFlag,
+		STRING SexOffenderRegistryNumber,
+		STRING Source),
+	MODEL(
+		Subject, 
+		Offender,
+		SeisintPrimaryKey,
+		FCRADate,
+		FcraConvictionFlag,
+		FcraTrafficFlag,
+		SexOffenderRegistryNumber,
+		DataSources{Source}));
+
 
 Utility := ENTITY(FLAT(UID=ID,
 		STRING UtilityID,
@@ -2697,6 +2723,7 @@ InputPII := ENTITY(QUERY(UID=G_ProcUID,
 		STRING P_InpClnDLState,
 		DATE P_InpClnDOB,
 		STRING P_InpClnSSN,
+		SocialSecurityNumber InputCleanSSN,
 		INTEGER P_InpClnArchDt,
 		INTEGER G_ProcBusUID,
 		STRING PhoneVerificationBureau,
@@ -3585,7 +3612,6 @@ PersonProperty := ASSOCIATION(FLAT(Person Subject, Property Prop = UID(PrimaryRa
 	STRING VanityCity,
 	STRING State,
 	ZipCode ZIP5,
-	DATE ProcessDate,
 	STRING VendorSourceCode,
 	STRING Source),	
 	MODEL(
@@ -3599,7 +3625,7 @@ PersonProperty := ASSOCIATION(FLAT(Person Subject, Property Prop = UID(PrimaryRa
 		SecondaryRange,
 		ZIP5,
 		AddressComponents{UnitDesignation, PostalCity, VanityCity, State, Source},		
-		ReportedDates{ProcessDate , VendorSourceCode},
+		ReportedDates{VendorSourceCode},
 		DataSources{Source}));
 
 PersonPropertyEvent := ASSOCIATION(FLAT(Person Subject, PropertyEvent Event = UID(LNFaresID), 
@@ -3610,7 +3636,6 @@ PersonPropertyEvent := ASSOCIATION(FLAT(Person Subject, PropertyEvent Event = UI
 	BOOLEAN PartyIsBorrower, 
 	BOOLEAN PartyIsSeller, 
 	BOOLEAN PartyIsCareOf,
-	DATE ProcessDate,
 	STRING VendorSourceCode,	
 	STRING Source),
 	MODEL(
@@ -3618,7 +3643,7 @@ PersonPropertyEvent := ASSOCIATION(FLAT(Person Subject, PropertyEvent Event = UI
 		Event,
 		LNFaresID,
 		PartyDetails{PersonNumber,ConjunctiveNameSequence,PartyIsBuyerOrOwner,PartyIsBorrower,PartyIsSeller,PartyIsCareOf},
-		ReportedDates{ProcessDate,VendorSourceCode},
+		ReportedDates{VendorSourceCode},
 		DataSources{Source}));
 
 AddressProperty := ASSOCIATION(FLAT(Property Prop = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
@@ -3633,7 +3658,6 @@ AddressProperty := ASSOCIATION(FLAT(Property Prop = UID(PrimaryRange, Predirecti
 	STRING VanityCity,
 	STRING State,
 	ZipCode ZIP5,
-	DATE ProcessDate,
 	STRING VendorSourceCode,	
 	STRING Source),
 	MODEL(
@@ -3647,7 +3671,7 @@ AddressProperty := ASSOCIATION(FLAT(Property Prop = UID(PrimaryRange, Predirecti
 		ZIP5, 
 		SecondaryRange,
 		AddressComponents{UnitDesignation, PostalCity, VanityCity, State, Source},
-		ReportedDates{ProcessDate, VendorSourceCode},
+		ReportedDates{VendorSourceCode},
 		DataSources{Source}));
 		
 AddressPropertyEvent := ASSOCIATION(FLAT(PropertyEvent Event = UID(LNFaresID), Address Location = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
@@ -3663,7 +3687,6 @@ AddressPropertyEvent := ASSOCIATION(FLAT(PropertyEvent Event = UID(LNFaresID), A
 	BOOLEAN IsSellerAddress, 
 	BOOLEAN IsPropertyAddress, 
 	BOOLEAN IsBorrowerAddress, 
-	DATE ProcessDate,
 	STRING VendorSourceCode,
 	STRING Source),
 	MODEL(
@@ -3678,7 +3701,6 @@ AddressPropertyEvent := ASSOCIATION(FLAT(PropertyEvent Event = UID(LNFaresID), A
 		ZIP5, 
 		SecondaryRange,
 		AddressCharacteristics{IsOwnerAddress, IsSellerAddress, IsPropertyAddress, IsBorrowerAddress, VendorSourceCode},
-		ReportedDates{ProcessDate },
 		DataSources{Source}));
 		
 SeleProperty := ASSOCIATION(FLAT(BusinessSele Legal=UID(UltID,OrgID,SeleID), Property Prop = UID(PrimaryRange, Predirectional, PrimaryName, Suffix, Postdirectional, ZIP5, SecondaryRange), 
@@ -3696,7 +3718,6 @@ SeleProperty := ASSOCIATION(FLAT(BusinessSele Legal=UID(UltID,OrgID,SeleID), Pro
 	STRING VanityCity,
 	STRING State,
 	ZipCode ZIP5,
-	DATE ProcessDate,
 	STRING VendorSourceCode,
 	STRING Source),	
 	MODEL(
@@ -3713,7 +3734,7 @@ SeleProperty := ASSOCIATION(FLAT(BusinessSele Legal=UID(UltID,OrgID,SeleID), Pro
 		SecondaryRange,
 		ZIP5,
 		AddressComponents{UnitDesignation, PostalCity, VanityCity, State, Source},
-		ReportedDates{ProcessDate , VendorSourceCode},
+		ReportedDates{VendorSourceCode},
 		DataSources{Source}));
 		
 SelePropertyEvent := ASSOCIATION(FLAT(BusinessSele Legal=UID(UltID,OrgID,SeleID), PropertyEvent Event = UID(LNFaresID), 
@@ -3727,7 +3748,6 @@ SelePropertyEvent := ASSOCIATION(FLAT(BusinessSele Legal=UID(UltID,OrgID,SeleID)
 	BOOLEAN PartyIsBorrower, 
 	BOOLEAN PartyIsSeller, 
 	BOOLEAN PartyIsCareOf,
-	DATE ProcessDate,
 	STRING VendorSourceCode,	
 	STRING Source),
 	MODEL(
@@ -3738,7 +3758,7 @@ SelePropertyEvent := ASSOCIATION(FLAT(BusinessSele Legal=UID(UltID,OrgID,SeleID)
 		SeleID,
 		LNFaresID,
 		PartyDetails{PersonNumber,ConjunctiveNameSequence,PartyIsBuyerOrOwner,PartyIsBorrower,PartyIsSeller,PartyIsCareOf},
-		ReportedDates{ProcessDate, VendorSourceCode},
+		ReportedDates{VendorSourceCode},
 		DataSources{Source}));
 		
 

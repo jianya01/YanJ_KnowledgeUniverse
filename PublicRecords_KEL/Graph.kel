@@ -1,4 +1,4 @@
-﻿#OPTION(keyfetchlimit, 10000) // Maximum number of rows to return for any key fetch. HPCC Defaults to 10,000
+﻿﻿#OPTION(keyfetchlimit, 10000) // Maximum number of rows to return for any key fetch. HPCC Defaults to 10,000
 #OPTION(keyfetchlimitaction, 'atmost') // Instead of using LIMIT(N) for ECL JOIN's, use ATMOST(N). The N is specified by the keyfetchlimit #OPTION above.
 
 // --- ENTITY Definitions Section --- 
@@ -17,18 +17,24 @@ QUERY: NonFCRAPhoneSummaryAttributesV1(STRING Phone,
 		
 		PI_SrcWInpPDListEv,
 		PI_SrcWInpPDEmrgDtListEv,
-		PI_SrcWInpPDLastDtListEv
+		PI_SrcWInpPDLastDtListEv,
+		PI_SrcWInpLPListEv,
+		PI_SrcWInpLPEmrgDtListEv,
+		PI_SrcWInpLPLastDtListEv,
+		PI_SrcWInpAPListEv,
+		PI_SrcWInpAPEmrgDtListEv,
+		PI_SrcWInpAPLastDtListEv
 		}
 	ASOF ArchiveDated(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT,
-			InputPII(UID = G_ProcUID, Subject = P_LexID));
+			InputPII(UID = G_ProcUID, Subject = P_LexID, InputCleanSSN = P_InpClnSSN));
 
 
 
 QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset, 
 					P_InpClnArchDt, 
-					PERMITS DPM) <= InputPII{
+					PERMITS DPM,BOOLEAN isFCRA) <= InputPII{
 		G_ProcUID := UID, 
 		P_InpAcct := InputAccountValue,
 		P_InpLexID := InputLexIDValue, 
@@ -195,6 +201,11 @@ QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.Layo
 		PI_InpAddrOWGMFlag,
 		PI_InpAddrIsMultiUnitFlag,
 		PI_InpAddrIsAptFlag,
+		PI_InpDOBAge,
+		PI_InpSSNIsDeceasedFlag,
+		PI_InpSSNDeceasedDt,
+		PI_InpAddrStateDLAvailFlag := IF(isFCRA,'',PI_InpAddrStateDLAvailFlag_NonFCRA),
+		PI_InpAddrStateVoterAvailFlag := IF(isFCRA,PI_InpAddrStateVoterAvailFlag_FCRA,PI_InpAddrStateVoterAvailFlag_NonFCRA),
 		G_ProcBusUID,
 		RepNumber := IRepNumberValue,
 		PhoneVerificationBureau,
@@ -209,14 +220,14 @@ QUERY: InputAttributesV1(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.Layo
 	ASOF ArchiveDated(P_InpClnArchDt)
 	USING DPM
 	USE InputPIIDataset(FLAT, 
-			InputPII(UID = G_ProcUID, Subject = P_LexID));// We are linking the Input PII to the Person ENTITY via the G_ProcUID
+			InputPII(UID = G_ProcUID, Subject = P_LexID, InputCleanSSN = P_InpClnSSN));// We are linking the Input PII to the Person ENTITY via the G_ProcUID
 
 QUERY: NonFCRASSNSummaryAttributesV1(STRING SSN_in,
                        DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
                      P_InpClnArchDt, 
                      PERMITS DPM) <=SSNSummary(SSN = SSN_in){
 		P_InpClnSSN = SSN,
-   	 	P_InpClnPhoneHome,
+    P_InpClnPhoneHome,
 		SSNSummarySourceListSorted,
 		PI_SrcWInpASListEv,
 		PI_SrcWInpASEmrgDtListEv,
@@ -224,8 +235,8 @@ QUERY: NonFCRASSNSummaryAttributesV1(STRING SSN_in,
 		PI_SrcWInpSDListEv,
 		PI_SrcWInpSDEmrgDtListEv,
 		PI_SrcWInpSDLastDtListEv,
-    		PI_SrcWInpPSListEv,
-    		PI_SrcWInpPSEmrgDtListEv,
+    PI_SrcWInpPSListEv,
+    PI_SrcWInpPSEmrgDtListEv,
     		PI_SrcWInpPSLastDtListEv,
 		PI_SrcWInpFLSListEv,
 		PI_SrcWInpFLSEmrgDtListEv,
@@ -234,7 +245,7 @@ QUERY: NonFCRASSNSummaryAttributesV1(STRING SSN_in,
 ASOF ArchiveDated(P_InpClnArchDt) 
      USING DPM
      USE InputPIIDataset(FLAT,
-             InputPII(UID = G_ProcUID));	
+             InputPII(UID = G_ProcUID, Subject = P_LexID));	
 
  QUERY: NonFCRANameSummaryAttributesV1(STRING FirstName_in,STRING LastName_in,DATE DateOfBirth_in,
 				      DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
@@ -251,7 +262,7 @@ ASOF ArchiveDated(P_InpClnArchDt)
 	ASOF ArchiveDated(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT,
-			InputPII(UID = G_ProcUID, Subject = P_LexID));// We are linking the Input PII to the Person ENTITY via the G_ProcUID
+			InputPII(UID = G_ProcUID, Subject = P_LexID, InputCleanSSN = P_InpClnSSN));// We are linking the Input PII to the Person ENTITY via the G_ProcUID
 
  QUERY: NonFCRAAddressSummaryAttributesV1(STRING PrimaryName_in,STRING PrimaryRange_in,STRING ZIP5_in,
 				      DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
@@ -259,7 +270,10 @@ ASOF ArchiveDated(P_InpClnArchDt)
 					PERMITS DPM) <=AddressSummary(PrimaryName =  PrimaryName_in, PrimaryRange = PrimaryRange_in, Zip = ZIP5_in){
 		PI_SrcWInpFLAListEv,
 		PI_SrcWInpFLAEmrgDtListEv,
-		PI_SrcWInpFLALastDtListEv
+		PI_SrcWInpFLALastDtListEv,		
+		PI_SrcWInpADListEv,
+		PI_SrcWInpADEmrgDtListEv,
+		PI_SrcWInpADLastDtListEv
 		}
 	ASOF ArchiveDated(P_InpClnArchDt) 
 	USING DPM
@@ -923,7 +937,6 @@ ASOF ArchiveDated(P_InpClnArchDt)
 					PERMITS DPM) <= Person(UID = LexID_in){
 		LexID := UID,
 		P_LexIDSeenFlag,
-		
 		PL_AstVehAutoCntEv,
 		PL_AstVehAutoEmrgDtListEv,
 		PL_AstVehAutoLastDtListEv,
@@ -1133,6 +1146,11 @@ ASOF ArchiveDated(P_InpClnArchDt)
 		PL_EduCollSrcNewRecOldMsncEv,
 		PL_EduCollSrcNewRecNewMsncEv,
 		PL_EduCollRecSpanEv,
+		//Utility
+		PL_UtilCntEv,
+		PL_UtilOldDtListEv,
+		PL_UtilOldDtEv,
+		PL_UtilOldMsncEv,
 		// Email Attributes
 		PL_EmailCntEv := PL_EmailCntEvNonFCRA,
 		// Property Attributes
@@ -1154,7 +1172,7 @@ ASOF ArchiveDated(P_InpClnArchDt)
    	ASOF ArchiveDated(P_InpClnArchDt) 
    	USING DPM
 		USE InputPIIDataset(FLAT, 
-			InputPII(UID = G_ProcUID, Subject = P_LexID));// We are linking the Input PII to the Person ENTITY via the G_ProcUID		
+			InputPII(UID = G_ProcUID, Subject = P_LexID, InputCleanSSN = P_InpClnSSN));// We are linking the Input PII to the Person ENTITY via the G_ProcUID		
 
 
 QUERY: FCRAPersonAttributesV1(Person LexID_in, 
@@ -1374,7 +1392,7 @@ QUERY: FCRAPersonAttributesV1(Person LexID_in,
 	ASOF ArchiveDated(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT, 
-			InputPII(UID = G_ProcUID, Subject = P_LexID));// We are linking the Input PII to the Person ENTITY via the G_ProcUID
+			InputPII(UID = G_ProcUID, Subject = P_LexID, InputCleanSSN = P_InpClnSSN));// We are linking the Input PII to the Person ENTITY via the G_ProcUID
 
 QUERY: NonFCRABusinessSeleIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in,  
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
@@ -1977,7 +1995,7 @@ QUERY: NonFCRABusinessProxIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INT
 		InputBIIDataset(FLAT, InputBII(UID = G_ProcBusUID));
 
 
- QUERY: NonFCRAMiniAttributesV1(SET OF Person LexID_in, 
+ QUERY: NonFCRAMiniAttributesV1Roxie(SET OF Person LexID_in, 
 					P_InpClnArchDt, 
 					PERMITS DPM) <= Person(UID IN LexID_in){
 		LexID := UID,
@@ -1993,6 +2011,7 @@ QUERY: NonFCRABusinessProxIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INT
 		CurrentAddrStateCode,
 		CurrentAddrCnty,
 		CurrentAddrGeo,
+		CurrentAddrCity,
 		PreviousAddrPrimRng,
 		PreviousAddrPreDir,
 		PreviousAddrPrimName,
@@ -2014,14 +2033,19 @@ QUERY: NonFCRABusinessProxIDAttributesV1(INTEGER UltID_in, INTEGER OrgID_in, INT
 		EmergingAddrZip5,
 		EmergingAddrStateCode,
 		EmergingAddrCnty,
-		EmergingAddrGeo
+		EmergingAddrGeo,
+		PL_BestNameFirst,
+		PL_BestNameMid,
+		PL_BestNameLast,
+		PL_BestSSN,
+		PL_BestDOB
 		   		} 
 
    	ASOF reportedby(P_InpClnArchDt) 
    	USING DPM;
 			
 			
-QUERY: FCRAMiniAttributesV1(SET OF Person LexID_in, 
+QUERY: FCRAMiniAttributesV1Roxie(SET OF Person LexID_in, 
 					P_InpClnArchDt, 
 					PERMITS DPM) <= Person(UID IN LexID_in){
 		LexID := UID,
@@ -2037,6 +2061,7 @@ QUERY: FCRAMiniAttributesV1(SET OF Person LexID_in,
 		CurrentAddrStateCode,
 		CurrentAddrCnty,
 		CurrentAddrGeo,
+		CurrentAddrCity,
 		PreviousAddrPrimRng,
 		PreviousAddrPreDir,
 		PreviousAddrPrimName,
@@ -2058,11 +2083,71 @@ QUERY: FCRAMiniAttributesV1(SET OF Person LexID_in,
 		EmergingAddrZip5,
 		EmergingAddrStateCode,
 		EmergingAddrCnty,
-		EmergingAddrGeo
+		EmergingAddrGeo,
+		PL_BestNameFirst,
+		PL_BestNameMid,
+		PL_BestNameLast,
+		PL_BestSSN,
+		PL_BestDOB
 		} 
 	ASOF reportedby(P_InpClnArchDt) 
 	USING DPM;
 
+
+QUERY: NonFCRAMiniAttributesV1Thor(Person LexID_in, 
+					P_InpClnArchDt, 
+					PERMITS DPM) <= Person(UID = LexID_in){
+		LexID := UID,
+		P_LexIDSeenFlag,
+		CurrentAddrPrimRng,
+		CurrentAddrPreDir,
+		CurrentAddrPrimName,
+		CurrentPostdirectional,
+		CurrentAddrSffx,
+		CurrentAddrSecRng,
+		CurrentAddrState,
+		CurrentAddrZip5,
+		CurrentAddrStateCode,
+		CurrentAddrCnty,
+		CurrentAddrGeo,
+		CurrentAddrCity,
+
+		PL_BestNameFirst,
+		PL_BestNameMid,
+		PL_BestNameLast,
+		PL_BestSSN,
+		PL_BestDOB
+		   		} 
+
+   	ASOF reportedby(P_InpClnArchDt) 
+   	USING DPM;
+			
+			
+QUERY: FCRAMiniAttributesV1Thor(Person LexID_in, 
+					P_InpClnArchDt, 
+					PERMITS DPM) <= Person(UID = LexID_in){
+		LexID := UID,
+		P_LexIDSeenFlag,
+		CurrentAddrPrimRng,
+		CurrentAddrPreDir,
+		CurrentAddrPrimName,
+		CurrentPostdirectional,
+		CurrentAddrSffx,
+		CurrentAddrSecRng,
+		CurrentAddrState,
+		CurrentAddrZip5,
+		CurrentAddrStateCode,
+		CurrentAddrCnty,
+		CurrentAddrGeo,
+	
+		PL_BestNameFirst,
+		PL_BestNameMid,
+		PL_BestNameLast,
+		PL_BestSSN,
+		PL_BestDOB
+		} 
+	ASOF reportedby(P_InpClnArchDt) 
+	USING DPM;
 
  QUERY: NonFCRASixthRepAttributesV1(Person LexID_in, 
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
@@ -2073,7 +2158,7 @@ QUERY: FCRAMiniAttributesV1(SET OF Person LexID_in,
    	ASOF ArchiveDated(P_InpClnArchDt) 
    	USING DPM
 		USE InputPIIDataset(FLAT, 
-			InputPII(UID = G_ProcUID, Subject = P_LexID));// We are linking the Input PII to the Person ENTITY via the G_ProcUID	
+			InputPII(UID = G_ProcUID, Subject = P_LexID, InputCleanSSN = P_InpClnSSN));// We are linking the Input PII to the Person ENTITY via the G_ProcUID	
 
 // --- Index Build QUERY ---
 /* This QUERY Ensures we are generating all of the ECL Code necessary for building any of the ENTITY or ASSOCIATION Indexes at any given time (That KEL doesn't optimize them away completely
@@ -2082,6 +2167,7 @@ QUERY: FCRAMiniAttributesV1(SET OF Person LexID_in,
 QUERY: IndexBuildEntity(P_InpClnArchDt, PERMITS DPM) <= 
 		Accident,
 		Address,
+		AddressSummary,
 		Aircraft,
 		Bankruptcy,
 		BusinessUlt,
@@ -2101,12 +2187,16 @@ QUERY: IndexBuildEntity(P_InpClnArchDt, PERMITS DPM) <=
 		Inquiry,
 		LienJudgment,
 		GeoLink,
+		NameSummary,
 		Person, 
 		Phone,
+		PhoneSummary,
 		ProfessionalLicense,
 		Property,
 		PropertyEvent,
+		SexOffender,
 		SocialSecurityNumber,
+		SSNSummary,
 		Surname,
 		TIN,
 		Tradeline,
@@ -2114,11 +2204,7 @@ QUERY: IndexBuildEntity(P_InpClnArchDt, PERMITS DPM) <=
 		Utility,
 		Vehicle,
 		Watercraft,
-		ZipCode,
-    	NameSummary,
-		SSNSummary,
-		PhoneSummary,
-		AddressSummary
+		ZipCode
 	ASOF ArchiveDated(P_InpClnArchDt) 
 	USING DPM;
 
@@ -2131,6 +2217,7 @@ QUERY:  IndexBuildAssociation(Address AddressUID,
 			Phone PhoneUID,
 			Email EmailUID,
 			Property PropertyUID,
+			SexOffender SexOffenderUID,			
 			SocialSecurityNumber SocialSecurityNumberUID,
 			TIN TINUID,
 			ZipCode ZipCodeUID,
@@ -2193,6 +2280,7 @@ QUERY:  IndexBuildAssociation(Address AddressUID,
 		Person(UID=PersonUID).PersonPhone.PhoneNumber, // Person -> Phone
 		Person(UID=PersonUID).PersonProperty.Prop, // Person -> Property
 		Person(UID=PersonUID).PersonPropertyEvent.Event, // Person -> PropertyEvent
+		Person(UID=PersonUID).PersonSexOffender.Offender, // Person -> Sexoffender
 		Person(UID=PersonUID).PersonSSN.Social, // Person -> SSN
 		Person(UID=PersonUID).PersonVehicle.Automobile, // Person -> Vehicle
 		Person(UID=PersonUID).ProfessionalLicensePerson.ProfLic,  // Person -> ProfessionalLicense
