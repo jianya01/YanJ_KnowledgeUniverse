@@ -3355,6 +3355,33 @@ Person: => PL_ProfLicActvNewSrcType := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
 			PL_ProfLicActvFlag = '0' OR PL_ProfLicFlagEv = '0' => ProfessionalLicense.NO_DATA_FOUND_PROF,
 			ActiveProfessionalLicenseSource);
+//KS-6168
+Property: => IsBusinessAddress := EXISTS(AddressProperty.Location.ADVOSummary(ResidentialOrBusinessIndicator IN ['B','D']));
+PersonProperty: => IsEverOwnedBusinessAddress := EXISTS(Prop(IsBusinessAddress).PropertyEvent.PersonPropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Subject = PersonProperty.Subject));
+PersonProperty: => IsCurrentlyOwnedBusinessAddress := EXISTS(Prop(IsBusinessAddress).PropertyEvent.PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject))
+																											AND NOT EXISTS(Prop(IsBusinessAddress).PropertyEvent.PersonPropertyEvent(PartyDetails.PartyIsSeller AND Subject = PersonProperty.Subject));
+Property: => BestMostRecentPropertyEvent := ONLY(TOPN(PropertyEvent,1,VendorSourceCode IN ['F','S'],DtFirstSeen));
+
+Person: => PL_AstPropBusCntEv := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA,
+																BOUNDSFOLD(COUNT(PersonProperty(IsEverOwnedBusinessAddress)),0,999));
+
+Person: => PL_AstPropBusCurrCnt := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(PersonProperty(IsCurrentlyOwnedBusinessAddress)),0,999));
+																
+																
+Person: => PL_AstPropBusCurrWTaxValCnt := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA,
+																							PL_AstPropBusCurrCnt = 0 => Person.NO_DATA_FOUND_INT,
+																BOUNDSFOLD(COUNT(PersonProperty(IsCurrentlyOwnedBusinessAddress).Prop(NOT BestMostRecentPropertyEvent.AssessedTotalValue:Null)),0,999));
+
+Person: => PL_AstPropBusCurrTaxValList := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA,
+																						PL_AstPropBusCurrCnt = 0 => Person.NO_DATA_FOUND_INT,
+																						PL_AstPropBusCurrCnt > 0 AND PL_AstPropBusCurrWTaxValCnt = 0 => Person.NO_DATA_FOUND_97_INT,
+																CONCAT(TOPN(PersonProperty(IsCurrentlyOwnedBusinessAddress).Prop.BestMostRecentPropertyEvent,1000,DtFirstSeen:Null,DtFirstSeen),IsBlank(AssessedTotalValue,Person.NO_DATA_FOUND_97),'|'));
+Person: => PL_AstPropBusCurrTaxValTot := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA,
+																						PL_AstPropBusCurrCnt = 0 => Person.NO_DATA_FOUND_INT,
+																						PL_AstPropBusCurrCnt > 0 AND PL_AstPropBusCurrWTaxValCnt = 0 => Person.NO_DATA_FOUND_97_INT,
+																BOUNDSFOLD(SUM(PersonProperty(IsCurrentlyOwnedBusinessAddress).Prop.BestMostRecentPropertyEvent,AssessedTotalValue),0,999999999));
+
 
 /**************************************************************************/
 /*                                                                        */
