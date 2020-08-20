@@ -1018,11 +1018,11 @@ InputPII: =>PI_InpDOBAge := MAP(P_InpClnDOBFlagValue <>1 => MISSING_INPUT_DATA_I
 																BOUNDSFOLD(YEARSBETWEEN(P_InpClnDOB,FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')),0,120));
 
 InputPII: =>PI_InpSSNIsDeceasedFlag := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')){DateOfDeath}) => 0,
+																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')){DateOfDeath}) => 0,
 																						 1);
 InputPII: =>PI_InpSSNDeceasedDt := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 PI_InpSSNIsDeceasedFlag = 0 => NO_DATA_FOUND_INT,
-																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
+																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
 //KS-6266
 InputPII: =>PI_InpAddrStateDLAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 fnInDriversState(P_InpClnAddrState) => 1,
@@ -6611,15 +6611,19 @@ PhoneSummary.AddressSummary: => TranslatedSource := ConsumerSourceGroup(Source);
 
 //Make new submodel for translatedDOB sources
 PhoneSummary: => TranslatedDOBSources := DateOfBirthSummary(TranslatedSource != ''){DateOfBirth, Source := TranslatedSource};
-PhoneSummary.TranslatedDOBSources: => MyDateFirstSeen := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
-PhoneSummary.TranslatedDOBSources: => MyDateLastSeen := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
+PhoneSummary.TranslatedDOBSources: => MyDateFirstSeen_pre := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
+PhoneSummary.TranslatedDOBSources: => MyDateLastSeen_pre := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
+PhoneSummary.TranslatedDOBSources: => MyDateFirstSeen := IF(MyDateFirstSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateLastSeen_pre,MyDateFirstSeen_pre);
+PhoneSummary.TranslatedDOBSources: => MyDateLastSeen := IF(MyDateLastSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateFirstSeen_pre,MyDateLastSeen_pre);
 PhoneSummary.TranslatedDOBSources: => NewDateAge := IsBlank(DAYSBETWEEN(Source:DateFirstSeen,PhoneSummary.CURRENT_DATE),-999999);
 PhoneSummary: => SortedDOBTranslatedSourceList := TOPN(TranslatedDOBSources(DATETOSTRING(DateOfBirth,'%Y%m%d') = PhoneSummary.P_InpClnDOB),99999,-NewDateAge,Source){Source,MyDateFirstSeen,MyDateLastSeen};
 
 //Make new submodel for translatedLastName sources
 PhoneSummary: => TranslatedLastNameSources := LastNameSummary(TranslatedSource != ''){LastName, Source := TranslatedSource};
-PhoneSummary.TranslatedLastNameSources: => MyDateFirstSeen := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
-PhoneSummary.TranslatedLastNameSources: => MyDateLastSeen := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
+PhoneSummary.TranslatedLastNameSources: => MyDateFirstSeen_pre := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
+PhoneSummary.TranslatedLastNameSources: => MyDateLastSeen_pre := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
+PhoneSummary.TranslatedLastNameSources: => MyDateFirstSeen := IF(MyDateFirstSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateLastSeen_pre,MyDateFirstSeen_pre);
+PhoneSummary.TranslatedLastNameSources: => MyDateLastSeen := IF(MyDateLastSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateFirstSeen_pre,MyDateLastSeen_pre);
 PhoneSummary.TranslatedLastNameSources: => NewDateAge := IsBlank(DAYSBETWEEN(Source:DateFirstSeen,PhoneSummary.CURRENT_DATE),-999999);
 PhoneSummary: => SortedLastNameTranslatedSourceList := TOPN(TranslatedLastNameSources(LastName = PhoneSummary.P_InpClnNameLast),99999,-NewDateAge,Source){Source,MyDateFirstSeen,MyDateLastSeen};
 
