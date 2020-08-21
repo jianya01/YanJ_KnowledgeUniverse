@@ -170,8 +170,9 @@ FUNCTION: IsPhoneMatch(STRING PhoneOnFile, STRING InputPhone) <=
 			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 10 => IsPhone10Match(SUBSTR(InputPhone, 1, 3) + PhoneOnFile, InputPhone),
 			FALSE);
 FUNCTION: FnIPValidate(STRING field1) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_IPValidate(field1)) FROM PublicRecords_KEL RETURNS STRING;	
-			
-			
+FUNCTION: IsFcra(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: IsNonFcra(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsNonFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;			
+				
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -221,6 +222,8 @@ NameSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), C
 SSNSummary: CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
 AddressSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE()); 
 Person: BUILD_DATE_UTIL := MIN(GETBUILDDATE('utility_build_version'), CURRENTDATE());
+Person: CURRENT_DATE_INQ := MIN(GETBUILDDATE('inquiry_update_build_version'), CURRENTDATE());
+PersonInquiry: CURRENT_DATE := MIN(GETBUILDDATE('inquiry_update_build_version'), CURRENTDATE());
 
 /***********************************************************************************************************************/
 /***********************************************************************************************************************/
@@ -417,7 +420,14 @@ PhoneSummary: MISSING_INPUT_DATA_INT := -99999;
 PhoneSummary: NO_DATA_FOUND := '-99998';
 PhoneSummary: NO_DATA_FOUND_INT := -99998;
 PhoneSummary: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-99997';	
-PhoneSummary: RECS_AVAIL_BUT_CANNOT_CALCULATE_INT := -99997;	
+PhoneSummary: RECS_AVAIL_BUT_CANNOT_CALCULATE_INT := -99997;
+
+Inquiry: MISSING_INPUT_DATA := '-99999';
+Inquiry: MISSING_INPUT_DATA_INT := -99999;
+Inquiry: NO_DATA_FOUND_INQ := '-99998';
+Inquiry: NO_DATA_FOUND_INQ_INT := -99998;
+Inquiry: REC_FOUND_BUT_INVALID := '-99997';
+Inquiry: REC_FOUND_BUT_INVALID_INT := -99997;		
 
 /**********************************************************************************************************************/
 /*********                                                                                                  ***********/
@@ -3290,6 +3300,8 @@ Person: =>PL_DrgLnJOldMsnc7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSI
 		PL_DrgLnJCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		ALL(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(LnJ7YOldDate),CURRENT_DATE_LIEN),0,84));
+		
+
 				
 /**************************************************************************/
 /*                                                                        */
@@ -3403,6 +3415,85 @@ Person: => EmailCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(Emails7y, EXISTS
 Person: => EmailCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DataSources(Source IN SOURCESNONFCRA)))),0,999);
 Person: => PL_EmailCntEvFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, EmailCntEvFCRA);
 Person: => PL_EmailCntEvNonFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, EmailCntEvNonFCRA);
+
+/**************************************************************************/
+/*                                                                        */
+/*                      Inquiry Helper Attributes                         */
+/*                                                                        */
+/**************************************************************************/
+
+PersonInquiry: FIVE_YEARS_IN_DAYS := 1826; 
+Inquiry: METHOD :=['BATCH','MONITORING'];
+Inquiry: COLLECTION_INDUSTRY := ['COLLECTIONS','COLLECTION','COLLECTION LAW FIRM','DEBT BUYER','FIRST PARTY', 'THIRD PARTY'];
+Inquiry: COLLECTION_VERTICAL :=['COLLECTIONS', 'RECEIVABLES MANAGEMENT', '1PC','3PC'];
+Inquiry: FOURTEEN_DAYS := 14;
+//14 day dedups
+Inquiry: AUTO_INDUSTRY := ['AUTO', 'AUTO - CAPTIVE'];
+Inquiry: MORTGAGE_INDUSTRY := ['MORTGAGE/REAL ESTATE'];
+//special dedups
+Inquiry: HIGH_RISK_CREDIT_INDUSTRY := ['CARDS - SUBPRIME', 'MSB', 'REFUND ANTICIPATION LOAN', 'RENT TO OWN', 'PAYDAY LOANS', 'PAY DAY LOANS', 'TITLE LOANS', 'PAY DAY', 'PAYDAY'];
+Inquiry: BANKING_INDUSTRY := ['BANKING', 'CARDS', 'CREDIT DECISIONING', 'CREDIT MONITORING', 'CREDIT UNION', 'FINANCE COMPANY', 'FS SERVICES PROVIDER', 'INVESTMENTS/SECURITIES', 'COMMERCIAL LENDING'];
+Inquiry: COMMUNICATIONS_INDUSTRY := ['COMMUNICATIONS'];
+Inquiry: PREPAID_CARD_INDUSTRY := ['PREPAID CARDS'];
+Inquiry: RETAIL_INDUSTRY := ['RETAIL'];
+Inquiry: RETAIL_PAYMENTS_INDUSTRY :=[ 'RETAIL PAYMENTS'];
+Inquiry: UTILITIES_INDUSTRY := ['UTILITIES', 'CABLE/SATELLITE/INTERNET'];
+Inquiry: QUIZ_PROVIDER_INDUSTRY := ['QUIZ PROVIDER'];
+Inquiry: STUDENT_LOAN_INDUSTRY := ['STUDENT LOANS'];
+// Inquiry: OTHER := NOT IN [COLLECTION_INDUSTRY OR AUTO_INDUSTRY OR BANKING_INDUSTRY OR MORTGAGE_INDUSTRY OR HIGH_RISK_CREDIT_INDUSTRY OR RETAIL_INDUSTRY OR COMMUNICATIONS_INDUSTRY OR RETAIL_PAYMENTS_INDUSTRY OR PREPAID_CARD_INDUSTRY OR UTILITIES_INDUSTRY OR QUIZ_PROVIDER_INDUSTRY OR STUDENT_LOAN_INDUSTRY];
+Inquiry.CollectionInquiry: =>TransactionID :=Inquiry.TransactionID;
+PersonInquiry: =>GatherInquiries :=Transaction.CollectionInquiry{
+TransactionID,
+Method,
+ ProductCode,
+ FunctionDescription,
+ FCRAPurpose,	
+ SubMarket,
+ Vertical,
+ Industry,
+ InqDate:=PersonInquiry.TransactionID:DateFirstSeen
+ };
+PersonInquiry.GatherInquiries: =>IsNonFcraOk := IsNonFcra(UPCASE(TRIM(FunctionDescription)) );
+PersonInquiry.GatherInquiries: =>ExcludeFunctionDescription :=UPCASE(TRIM(FunctionDescription)) != 'BANKO BATCH';
+PersonInquiry.GatherInquiries: =>IsMethod :=UPCASE(TRIM(Method)) IN Inquiry.METHOD;
+PersonInquiry.GatherInquiries: =>IsLengthSubMarket :=STARTSWITH(UPCASE(TRIM(SubMarket)),'FIRST PARTY');
+PersonInquiry.GatherInquiries: =>IsCollection  := UPCASE(TRIM(Industry)) IN Inquiry.COLLECTION_INDUSTRY OR UPCASE(TRIM(Vertical)) IN Inquiry.COLLECTION_VERTICAL OR IsLengthSubMarket;
+PersonInquiry.GatherInquiries: =>ValidCollection:=IsNonFcraOk AND IsMethod AND ExcludeFunctionDescription AND IsCollection;
+PersonInquiry.GatherInquiries: =>AgeinDays :=ABSDAYSBETWEEN(InqDate,CURRENT_DATE);
+PersonInquiry.GatherInquiries: =>Seen_In_Five_Years := AgeinDays<=FIVE_YEARS_IN_DAYS;
+Person: =>Inquiries5YListSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidCollection){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: =>Inquiry5YNewDate :=IsBlank(STRING(MAX(Inquiries5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+Person: =>Inquiry5YOldDate :=IsBlank(STRING(MIN(Inquiries5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+Person: =>InquiriesDt5YList:= CONCAT(Inquiries5YListSorted,InqDate,'|');
+
+/**************************************************************************/
+/*                                                                        */
+/*                      Inquiry Attributes                                */
+/*                                                                        */
+/**************************************************************************/
+
+Person: => PL_SrchCollCnt5Y :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(Inquiries5YListSorted ),0,999));
+Person: => PL_SrchCollDtList5Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
+		PL_SrchCollCnt5Y  = 0  => Inquiry.NO_DATA_FOUND_INQ, 
+		InquiriesDt5YList);
+Person: =>PL_SrchCollNewDt5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA,
+		PL_SrchCollCnt5Y   = 0  => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(Inquiries5YListSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID,
+		Inquiry5YNewDate);
+Person: =>PL_SrchCollOldDt5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA,
+		PL_SrchCollCnt5Y   = 0  => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(Inquiries5YListSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID,
+		Inquiry5YOldDate);
+Person: =>PL_SrchCollNewMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_SrchCollCnt5Y   = 0  => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(Inquiries5YListSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(Inquiry5YNewDate),CURRENT_DATE_INQ),0,60));
+Person: =>PL_SrchCollOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_SrchCollCnt5Y   = 0  => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(Inquiries5YListSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(Inquiry5YOldDate),CURRENT_DATE_INQ),0,60));
+
 
 /**************************************************************************/
 /*                                                                        */
