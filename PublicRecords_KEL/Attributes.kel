@@ -224,6 +224,7 @@ AddressSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version')
 Person: BUILD_DATE_UTIL := MIN(GETBUILDDATE('utility_build_version'), CURRENTDATE());
 Person: CURRENT_DATE_INQ := MIN(GETBUILDDATE('inquiry_update_build_version'), CURRENTDATE());
 PersonInquiry: CURRENT_DATE := MIN(GETBUILDDATE('inquiry_update_build_version'), CURRENTDATE());
+PersonAccident: CURRENT_DATE := MIN(GETBUILDDATE('accident_build_version'), CURRENTDATE());
 
 /***********************************************************************************************************************/
 /***********************************************************************************************************************/
@@ -428,6 +429,15 @@ Inquiry: NO_DATA_FOUND_INQ := '-99998';
 Inquiry: NO_DATA_FOUND_INQ_INT := -99998;
 Inquiry: REC_FOUND_BUT_INVALID := '-99997';
 Inquiry: REC_FOUND_BUT_INVALID_INT := -99997;		
+
+PersonAccident: ACCIDENT_REPORT_CODES := ['FA','A','IA','EA','TF'];
+
+PersonAccident: MISSING_INPUT_DATA := '-99999';
+PersonAccident: MISSING_INPUT_DATA_INT := -99999;
+PersonAccident: NO_DATA_FOUND := '-99998';
+PersonAccident: NO_DATA_FOUND_INT := -99998;
+PersonAccident: NO_DATA_FOUND_97 := '-99997';
+PersonAccident: NO_DATA_FOUND_97_INT :=  -99997;
 
 /**********************************************************************************************************************/
 /*********                                                                                                  ***********/
@@ -6955,3 +6965,68 @@ Person: => PL_AstPropSaleOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
 				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropertySaleDateClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstPropSaleOldDtEv),Property.CURRENT_DATE),0,960)); 																																																		
+
+/**************************************************************************/
+/*                                                                        */
+/*              Person Accident Helper Attributes                         */
+/*                                                                        */
+/**************************************************************************/
+PersonAccident: ONE_YEAR_IN_DAYS := 365;
+
+PersonAccident: => IsAccidentRecord := Acc.ReportCode IN ACCIDENT_REPORT_CODES;
+
+Person: => AccidentRecs := PersonAccident(IsAccidentRecord);
+
+Person: => AccidentRecsFormatted := AccidentRecs{
+																	EstimatedVehicleDamage := IF(EstimatedVehicleDamage = '' OR EstimatedVehicleDamage:Null , PersonAccident.NO_DATA_FOUND_97 , EstimatedVehicleDamage), 
+																	DateOfAccident :=  IF(ISVALIDDATE(Acc.AccidentDate), DATETOSTRING(MIN(Acc.AccidentDate, PersonAccident.CURRENT_DATE), '%Y%m%d'), PersonAccident.NO_DATA_FOUND_97),
+																	AccidentAgeInDays := ABSDAYSBETWEEN(Acc.AccidentDate, PersonAccident.CURRENT_DATE)};
+Person: => AccidentRecsSorted := TOPN(AccidentRecsFormatted, 999, DateOfAccident = PersonAccident.NO_DATA_FOUND_97, -DateOfAccident);																	
+Person: => AccidentsCountTotal := COUNT(AccidentRecsSorted);
+Person: => AccidentsCount1Y := COUNT(AccidentRecsSorted(AccidentAgeInDays <= PersonAccident.ONE_YEAR_IN_DAYS AND NOT AccidentAgeInDays:Null));
+
+/**************************************************************************/
+/*                                                                        */
+/*              Person Accident Attributes                         				*/
+/*                                                                        */
+/**************************************************************************/
+
+Person: => PL_AccCntEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA_INT,
+															BOUNDSFOLD(AccidentsCountTotal,0,999));
+
+Person: => PL_AccFlagEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
+															 PL_AccCntEv = 0 => '0',
+															 PL_AccCntEv > 0 => '1');															
+
+Person: => PL_AccDtListEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
+																 PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND,
+																 CONCAT(AccidentRecsSorted, DateOfAccident, '|'));															 
+
+Person: => PL_AccNewDtEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
+																PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND,
+																PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, DateOfAccident = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97,
+																DATETOSTRING(MAX(AccidentRecsSorted(DateOfAccident <> PersonAccident.NO_DATA_FOUND_97), DATE(DateOfAccident)),'%Y%m%d' ));
+
+Person: => PL_AccNewMsncEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
+																	PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND,
+																	PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, DateOfAccident = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97,
+																	MONTHSBETWEEN(DATE(PL_AccNewDtEv),PersonAccident.CURRENT_DATE));
+
+Person: => PL_AccDmgAmtListEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
+																		 PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND,
+																		 CONCAT(AccidentRecsSorted, EstimatedVehicleDamage, '|'));
+
+Person: => PL_AccDmgTotEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA_INT,
+																 PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND_INT,
+																 PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, EstimatedVehicleDamage = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97_INT,
+																 SUM(AccidentRecsSorted(EstimatedVehicleDamage <> PersonAccident.NO_DATA_FOUND_97), INTEGER(EstimatedVehicleDamage)));
+
+Person: => PL_AccNewDmgAmtEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA_INT,
+																		PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND_INT,
+																		PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, EstimatedVehicleDamage = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97_INT,
+																		MAX(AccidentRecsSorted(EstimatedVehicleDamage <> PersonAccident.NO_DATA_FOUND_97), INTEGER(EstimatedVehicleDamage)));																 
+
+Person: => PL_AccCnt1Y := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA_INT,
+															PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, DateOfAccident = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97_INT,
+															BOUNDSFOLD(AccidentsCount1Y,0,999));
+																		 
