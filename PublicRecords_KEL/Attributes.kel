@@ -3310,7 +3310,47 @@ Person: =>PL_DrgLnJOldMsnc7Y  :=MAP(P_LexIDSeenFlag = '0'  => LienJudgment.MISSI
 		PL_DrgLnJCnt7Y < 1  => LienJudgment.NO_DATA_FOUND_LIEN_INT,
 		ALL(AllLienData( Seen_In_Seven_Years AND  IsOverAllLienJudgment ),STRING(OriginalFilingDate)= LienJudgment.REC_FOUND_BUT_INVALID)=>LienJudgment.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(LnJ7YOldDate),CURRENT_DATE_LIEN),0,84));
-		
+
+/**************************************************************************/
+/*                                                                        */
+/*                  Overall Derog History Attributes                      */
+/*                                                                        */
+/**************************************************************************/
+
+
+Person: =>OverAllDrgCnt7Y := PL_DrgLnJCnt7Y + PL_DrgLTDCnt7Y + PL_DrgBkCnt7Y + PL_DrgCrimCnt7Y;		
+Person: =>LnJLTDOldDateMaxMsnc := MAX(PL_DrgLnJOldMsnc7Y,PL_DrgLTDOldMsnc7Y);
+Person: =>BKLnJLTDOldDateMaxMsnc := MAX(LnJLTDOldDateMaxMsnc,PL_DrgBkOldMsnc7Y);
+Person: =>CRBKLnJLTDOldDateMaxMsnc := MAX(BKLnJLTDOldDateMaxMsnc,PL_DrgCrimOldMsnc7Y);
+
+Person: =>LnJLTDNewDateMinMsnc :=IF(MIN(PL_DrgLnJNewMsnc7Y, PL_DrgLTDNewMsnc7Y) = NO_DATA_FOUND_97_INT OR MIN(PL_DrgLnJNewMsnc7Y, PL_DrgLTDNewMsnc7Y) = NO_DATA_FOUND_INT,MAX(PL_DrgLnJNewMsnc7Y, PL_DrgLTDNewMsnc7Y), MIN(PL_DrgLnJNewMsnc7Y, PL_DrgLTDNewMsnc7Y));
+Person: =>BKLnJLTDNewDateMinMsnc :=IF(MIN(LnJLTDNewDateMinMsnc, PL_DrgBkNewMsnc7Y) = NO_DATA_FOUND_97_INT OR MIN(LnJLTDNewDateMinMsnc, PL_DrgBkNewMsnc7Y) = NO_DATA_FOUND_INT,MAX(LnJLTDNewDateMinMsnc, PL_DrgBkNewMsnc7Y), MIN(LnJLTDNewDateMinMsnc, PL_DrgBkNewMsnc7Y)) ;
+Person: =>CRBKLnJLTDNewDateMinMsnc :=IF(MIN(BKLnJLTDNewDateMinMsnc, PL_DrgCrimNewMsnc7Y) = NO_DATA_FOUND_97_INT OR MIN(BKLnJLTDNewDateMinMsnc, PL_DrgCrimNewMsnc7Y) = NO_DATA_FOUND_INT,MAX(BKLnJLTDNewDateMinMsnc, PL_DrgCrimNewMsnc7Y), MIN(BKLnJLTDNewDateMinMsnc, PL_DrgCrimNewMsnc7Y)) ;
+
+Person: =>LnJLTDMinOldDate := IF(MIN(PL_DrgLnJOldDt7Y, LTD7YOldDate) = NO_DATA_FOUND_97 OR MIN(PL_DrgLnJOldDt7Y, LTD7YOldDate) = NO_DATA_FOUND , MAX(PL_DrgLnJOldDt7Y, LTD7YOldDate), MIN(PL_DrgLnJOldDt7Y, LTD7YOldDate));
+Person: =>BKLnJLTDMinOldDate := IF(MIN(LnJLTDMinOldDate, PL_DrgBkOldDt7Y) = NO_DATA_FOUND_97 OR MIN(LnJLTDMinOldDate, PL_DrgBkOldDt7Y) = NO_DATA_FOUND, MAX(LnJLTDMinOldDate, PL_DrgBkOldDt7Y), MIN(LnJLTDMinOldDate, PL_DrgBkOldDt7Y));
+Person: =>CRBKLnJLTDMinOldDate := IF(MIN(BKLnJLTDMinOldDate, PL_DrgCrimOldDt7Y) = NO_DATA_FOUND_97 OR MIN(BKLnJLTDMinOldDate, PL_DrgCrimOldDt7Y) = NO_DATA_FOUND, MAX(BKLnJLTDMinOldDate, PL_DrgCrimOldDt7Y), MIN(BKLnJLTDMinOldDate, PL_DrgCrimOldDt7Y));
+Person: =>BKLnJLTDMinOldDateBlank := IsBlank(CRBKLnJLTDMinOldDate, NO_DATA_FOUND_97);
+
+Person: => CrimList := TOPN(PersonOffenses.Offense(OffenseCharges.IsCriminalCount = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null){OriginalFilingDate := OffenseCharges.CriminalDate}, 999,OriginalFilingDate);
+Person: => BankoList := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){OriginalFilingDate := BestChildRecord.DateFiled},999, OriginalFilingDate);
+Person: =>LnJ7YList :=TOPN(AllLienData(Seen_In_Seven_Years AND IsOverAllLienJudgment){OriginalFilingDate},999,OriginalFilingDate);
+Person : =>LTD7YList :=TOPN(AllLienData(Seen_In_Seven_Years AND IsLandlordTenantDispute){OriginalFilingDate},999,OriginalFilingDate);
+Person: => PL_DrgCRDtList7YList := CrimList{OriginalFilingDate};
+Person: => PL_DrgBkDtList7YList := BankoList{OriginalFilingDate};
+Person: => PL_LnJList := LnJ7YList{OriginalFilingDate};
+Person: => PL_LTDList := LTD7YList{OriginalFilingDate};
+
+Person: => PL_DrgCnt7Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD((OverAllDrgCnt7Y),0,99999));
+Person: => PL_DrgOldMsnc7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_DrgCnt7Y  = 0  => NO_DATA_FOUND_INT,
+		BKLnJLTDMinOldDateBlank = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(CRBKLnJLTDOldDateMaxMsnc, 0, 84));	
+Person: => PL_DrgNewMsnc7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_DrgCnt7Y  = 0  => NO_DATA_FOUND_INT,
+		BKLnJLTDMinOldDateBlank = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(CRBKLnJLTDNewDateMinMsnc, 0, 84));		
 
 				
 /**************************************************************************/
