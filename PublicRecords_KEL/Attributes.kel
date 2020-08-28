@@ -1053,6 +1053,47 @@ InputPII: =>PI_InpAddrStateVoterAvailFlag_FCRA := MAP(P_InpClnAddrStateFlagValue
 InputPII: =>PI_InpAddrStateVoterAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 fnInVotersState(P_InpClnAddrState, FALSE ,STRING(P_InpClnArchDt)) => 1,
 																			 0);
+
+//KS-6157
+InputPII: =>InputDateAsDate :=  FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d');
+Inquiry.CollectionInquiry: =>IsNonFcraOk := IsNonFcra(UPCASE(TRIM(FunctionDescription)) );
+Inquiry.CollectionInquiry: =>ExcludeFunctionDescription :=UPCASE(TRIM(FunctionDescription)) != 'BANKO BATCH';
+Inquiry.CollectionInquiry: =>IsMethod :=UPCASE(TRIM(Method)) IN Inquiry.METHOD;
+Inquiry.CollectionInquiry: =>IsLengthSubMarket :=STARTSWITH(UPCASE(TRIM(SubMarket)),'FIRST PARTY');
+Inquiry.CollectionInquiry: =>IsCollection  := UPCASE(TRIM(Industry)) IN Inquiry.COLLECTION_INDUSTRY OR UPCASE(TRIM(Vertical)) IN Inquiry.COLLECTION_VERTICAL OR IsLengthSubMarket;
+Inquiry.CollectionInquiry: =>ValidCollection:=IsNonFcraOk AND IsMethod AND ExcludeFunctionDescription AND IsCollection;
+Inquiry: =>OverallIsCollection := EXISTS(CollectionInquiry(IsCollection));
+Inquiry: => MyDateFirstSeen := UID:DateFirstSeen;
+Inquiry: => UnderAYear := IsBlank(DAYSBETWEEN(MyDateFirstSeen,Inquiry.CURRENT_DATE),999) <= 365;
+Inquiry: => GoodInquiryNonFCRA := NOT MyDateFirstSeen:Null AND
+																	UnderAYear AND
+																	NOT OverallIsCollection AND
+																	EXISTS(SearchInfo(Method IN  Inquiry.METHOD)) AND
+																	EXISTS(SearchInfo(ProductCode IN [1,2,7])) AND
+																	EXISTS(SearchInfo(IsNonFcra(UPCASE(TRIM(FunctionDescription)))));
+														
+Inquiry.PersonInfo: => CombinedAddress := TRIM(PrimaryName) + TRIM(PrimaryRange)+ TRIM(ZIP5);														
+InputPII: => InquiriesLastYear := InputCleanSSN.SSNInquiry.Transaction(UnderAYear);
+InputPII: => GoodInquiriesLastYear := InputCleanSSN.SSNInquiry.Transaction(GoodInquiryNonFCRA){UID,PersonInfo := PersonInfo{LexID,LastName,CombinedAddress,DateOfBirth,PrimaryName,PrimaryRange,ZIP5}};
+InputPII: => PI_SrchPerInpSSNCnt1Y := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																				BOUNDSFOLD(COUNT(InquiriesLastYear),0,999));
+
+InputPII: => PI_SrchLexIDPerInpSSNCnt1Y := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYear.PersonInfo,999,-LexID,LexID:DateFirstSeen){LexID}),0,999));
+
+InputPII: => PI_SrchLNamePerInpSSNCnt1Y := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYear.PersonInfo,999,-LastName,LastName:DateFirstSeen){LastName}),0,999));
+
+InputPII: => PI_SrchAddrPerInpSSNCnt1Y := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYear.PersonInfo(NOT ZIP5:Null OR ZIP5 = ''),999,-CombinedAddress,CombinedAddress:DateFirstSeen){PrimaryRange, PrimaryName, ZIP5}),0,999));
+
+InputPII: => PI_SrchDOBPerInpSSNCnt1Y := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYear.PersonInfo,999,-DateOfBirth,DateOfBirth:DateFirstSeen){DateOfBirth}),0,999));
+
 //Name Summary attributes		
 NameSummary: =>PII :=ONLY(InputPII);
 NameSummary: =>P_InpClnNameFirst :=PII.InputFirstClnNameValue;
