@@ -3527,6 +3527,14 @@ Person: =>InquiriesHighRisk5YListSorted :=TOPN(PersonInquiry.GatherInquiries(See
 Person: =>InquiriesHighRisk5YDtList:= CONCAT(InquiriesHighRisk5YListSorted,InqDate,'|');
 Person: =>InquiryHighRisk5YNewDate :=IsBlank(STRING(MAX(InquiriesHighRisk5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiryHighRisk5YOldDate :=IsBlank(STRING(MIN(InquiriesHighRisk5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+//////***********
+PersonInquiry.GatherInquiries: =>IsBanking := UPCASE(TRIM(Industry)) IN Inquiry.BANKING_INDUSTRY;
+PersonInquiry.GatherInquiries: =>ValidBanking:=IsNonFcraOk AND IsBanking AND IsMethod AND ExcludeFunctionDescription AND NOT IsCollection;
+Person: =>InquiriesBanking5YSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidBanking){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: =>InquiriesBanking5YList:= CONCAT(InquiriesBanking5YSorted,InqDate,'|');
+Person: =>InquiryBanking5YNewDate :=IsBlank(STRING(MAX(InquiriesBanking5YSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+Person: =>InquiryBanking5YOldDate :=IsBlank(STRING(MIN(InquiriesBanking5YSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+Person: => InquiriesBanking5YCount :=COUNT(InquiriesBanking5YSorted);
 
 /**************************************************************************/
 /*                                                                        */
@@ -3578,6 +3586,28 @@ Person: =>PL_SrchCreditHROldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISS
 		ALL(InquiriesHighRisk5YListSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryHighRisk5YOldDate),CURRENT_DATE_INQ),0,60));
 
+Person: => PL_SrchBankCnt5Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+  																InquiriesBanking5YCount  = 0  => Inquiry.NO_DATA_FOUND_INQ,			
+																	BOUNDSFOLD(InquiriesBanking5YCount,0,999));
+Person: => PL_SrchBankDtList5Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
+																		  InquiriesBanking5YCount  = 0  => Inquiry.NO_DATA_FOUND_INQ,
+																		  InquiriesBanking5YList);
+Person: =>PL_SrchBankNewDt5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA,
+																		InquiriesBanking5YCount  = 0 => Inquiry.NO_DATA_FOUND_INQ,
+																		ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID,
+																		InquiryBanking5YNewDate);
+Person: =>PL_SrchBankOldDt5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA,
+																		InquiriesBanking5YCount  = 0  => Inquiry.NO_DATA_FOUND_INQ,
+																		ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID,
+																		InquiryBanking5YOldDate);		
+Person: =>PL_SrchBankNewMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+																					InquiriesBanking5YCount  = 0 => Inquiry.NO_DATA_FOUND_INQ_INT,
+																					ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
+																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchBankNewDt5Y),CURRENT_DATE_INQ),0,60));
+Person: =>PL_SrchBankOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+																					InquiriesBanking5YCount  = 0  => Inquiry.NO_DATA_FOUND_INQ_INT,
+																					ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
+																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchBankOldDt5Y),CURRENT_DATE_INQ),0,60));																		
 /**************************************************************************/
 /*                                                                        */
 /*                   Business Helper Attributes                           */
