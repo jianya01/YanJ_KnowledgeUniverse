@@ -1,29 +1,31 @@
-tagCreation:
-  stage: build
+default:
+  image: 
+    name: openjdk:8-alpine
   before_script:
+    # Install the required software/updates
     - apk update
     - apk add git
-    - rm -rf KnowledgeUniverse
-  script:
-    - Repo="KnowledgeUniverse"
-    - Group="risk-engineering"
-    - URL="https://$ServiceAcctTokenUsername:$ServiceAcctTokenKey@gitlab.ins.risk.regn.net/$Group/$Repo.git"
-    - git --version
-    - git clone --depth 1 $URL
-    - git remote rm origin
-    - git remote add origin $URL
-    - TagDate=$(date +"%Y%m%d")
-    - TagName="master_$TagDate"
-    - echo "Tag Being Created - $TagName"
-    - git tag $TagName
-    - git push origin $TagName
-  only:
-    refs:
-      - schedules
-    variables:
-      - $JobType == "Tag"
+    - apk add wget
+    - apk add busybox
+    - rm -rf Vault
   tags:
-    - boca
+    # Pick a specific Shared GitLab runner to execute on
+    - icboca # Innovation Cloud
+    #- us-east # Use either Boca or Alpha
     - docker
     - linux
     - privileged
+
+stages:
+    # The order listed here is the order these run inside the pipelines
+    - build
+    - test
+    - documentation
+    - publish
+    - deploy
+
+include:
+  # Generate a new GitLab Tag
+  - local: 'Automation/Repository/tagCreation.yml'
+  # Update our KEL Code Documentation - Finds .kel files in various GitLab Projects
+  - local: 'Automation/Documentation/KELProjects.yml'
