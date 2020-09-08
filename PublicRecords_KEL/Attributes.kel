@@ -170,8 +170,8 @@ FUNCTION: IsPhoneMatch(STRING PhoneOnFile, STRING InputPhone) <=
 			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 10 => IsPhone10Match(SUBSTR(InputPhone, 1, 3) + PhoneOnFile, InputPhone),
 			FALSE);
 FUNCTION: FnIPValidate(STRING field1) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_IPValidate(field1)) FROM PublicRecords_KEL RETURNS STRING;	
-FUNCTION: IsFcra(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;
-FUNCTION: IsNonFcra(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsNonFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;			
+FUNCTION: IsFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: IsNonFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsNonFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
 				
 /**************************************************************************/
 /*                                                                        */
@@ -1053,6 +1053,8 @@ InputPII: =>PI_InpAddrStateVoterAvailFlag_FCRA := MAP(P_InpClnAddrStateFlagValue
 InputPII: =>PI_InpAddrStateVoterAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 fnInVotersState(P_InpClnAddrState, FALSE ,STRING(P_InpClnArchDt)) => 1,
 																			 0);
+
+													
 //Name Summary attributes		
 NameSummary: =>PII :=ONLY(InputPII);
 NameSummary: =>P_InpClnNameFirst :=PII.InputFirstClnNameValue;
@@ -3496,26 +3498,46 @@ Inquiry: RETAIL_PAYMENTS_INDUSTRY :=[ 'RETAIL PAYMENTS'];
 Inquiry: UTILITIES_INDUSTRY := ['UTILITIES', 'CABLE/SATELLITE/INTERNET'];
 Inquiry: QUIZ_PROVIDER_INDUSTRY := ['QUIZ PROVIDER'];
 Inquiry: STUDENT_LOAN_INDUSTRY := ['STUDENT LOANS'];
+Inquiry: VALID_VELOCITY_PRODUCT_CODES := [1, 2, 7];
+Inquiry: CHARGEBACK_FUNCTIONS := ['CHARGEBACK DEFENDER', 'CHARGEBACK DEFENDER SCORE ATTRIBUTES', 'RISKWISE CHARGEBACK DEFENDER (SCORE ONLY CD02)', 'RISKWISE CHARGEBACK DEFENDER W/ RC JOINT APP (FDSL)', 
+							'RISKWISE CHARGEBACK DEFENDER W/ RC SINGLE APP (FDS7)', 'RISKWISE CUSTOM CANADIAN CHARGEBACK DEFENDER', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (CB61)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND03)', 
+							'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND05)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND11)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER W/ IP DOMAIN (ND10)'];
+
 // Inquiry: OTHER := NOT IN [COLLECTION_INDUSTRY OR AUTO_INDUSTRY OR BANKING_INDUSTRY OR MORTGAGE_INDUSTRY OR HIGH_RISK_CREDIT_INDUSTRY OR RETAIL_INDUSTRY OR COMMUNICATIONS_INDUSTRY OR RETAIL_PAYMENTS_INDUSTRY OR PREPAID_CARD_INDUSTRY OR UTILITIES_INDUSTRY OR QUIZ_PROVIDER_INDUSTRY OR STUDENT_LOAN_INDUSTRY];
-Inquiry.CollectionInquiry: =>TransactionID :=Inquiry.TransactionID;
-PersonInquiry: =>GatherInquiries :=Transaction.CollectionInquiry{
-TransactionID,
-Method,
- ProductCode,
- FunctionDescription,
- FCRAPurpose,	
- SubMarket,
- Vertical,
- Industry,
- InqDate:=PersonInquiry.TransactionID:DateFirstSeen
- };
-PersonInquiry.GatherInquiries: =>IsNonFcraOk := IsNonFcra(UPCASE(TRIM(FunctionDescription)) );
+// Inquiry Velocity helper attributes
+Inquiry: => AgeinDays := ABSDAYSBETWEEN(TransactionID:DateFirstSeen, CURRENT_DATE);
+Inquiry: => InquiryIndustry := ONLY(BusIntel, Industry);
+Inquiry: => InquiryVertical := ONLY(BusIntel, Vertical);
+Inquiry: => InquirySubMarket := ONLY(BusIntel, SubMarket);
+Inquiry: => InquiryMethod := DEFAULT(ONLY(SearchInfo, Method), '');
+Inquiry: => InquiryProductCode := ONLY(SearchInfo, ProductCode);
+Inquiry: => InquiryFunctionDescription := ONLY(SearchInfo, FunctionDescription);
+
+Inquiry: => IsLengthSubMarket := STARTSWITH(UPCASE(TRIM(InquirySubMarket)),'FIRST PARTY');
+Inquiry: => IsBatchMonitoringMethod := UPCASE(TRIM(InquiryMethod)) IN Inquiry.METHOD;
+
+Inquiry: => IsCollection := UPCASE(TRIM(InquiryIndustry)) IN Inquiry.COLLECTION_INDUSTRY OR UPCASE(TRIM(InquiryVertical)) IN Inquiry.COLLECTION_VERTICAL OR IsLengthSubMarket;
+Inquiry: => IsNonFcraOk := IsNonFcraInquiry(UPCASE(TRIM(InquiryFunctionDescription)));
+Inquiry: => IsFcraOk := IsFcraInquiry(UPCASE(TRIM(InquiryFunctionDescription)));
+
+PersonInquiry: => GatherInquiries := Transaction{
+																						TransactionID,
+																						Method := InquiryMethod,
+																						ProductCode := InquiryProductCode,
+																						FunctionDescription := InquiryFunctionDescription,
+																						SubMarket := InquirySubMarket,
+																						Vertical := InquiryVertical,
+																						Industry := InquiryIndustry,
+																						InqDate := PersonInquiry.TransactionID:DateFirstSeen,
+																						IsNonFcraOk,
+																						IsFcraOk,
+																						IsCollection,
+																						IsBatchMonitoringMethod,
+																						AgeinDays};
+
 PersonInquiry.GatherInquiries: =>ExcludeFunctionDescription :=UPCASE(TRIM(FunctionDescription)) != 'BANKO BATCH';
 PersonInquiry.GatherInquiries: =>IsMethod :=UPCASE(TRIM(Method)) IN Inquiry.METHOD;
-PersonInquiry.GatherInquiries: =>IsLengthSubMarket :=STARTSWITH(UPCASE(TRIM(SubMarket)),'FIRST PARTY');
-PersonInquiry.GatherInquiries: =>IsCollection  := UPCASE(TRIM(Industry)) IN Inquiry.COLLECTION_INDUSTRY OR UPCASE(TRIM(Vertical)) IN Inquiry.COLLECTION_VERTICAL OR IsLengthSubMarket;
 PersonInquiry.GatherInquiries: =>ValidCollection:=IsNonFcraOk AND IsMethod AND ExcludeFunctionDescription AND IsCollection;
-PersonInquiry.GatherInquiries: =>AgeinDays :=ABSDAYSBETWEEN(InqDate,CURRENT_DATE);
 PersonInquiry.GatherInquiries: =>Seen_In_Five_Years := AgeinDays<=FIVE_YEARS_IN_DAYS;
 Person: =>Inquiries5YListSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidCollection){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 Person: =>Inquiry5YNewDate :=IsBlank(STRING(MAX(Inquiries5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
@@ -3544,6 +3566,14 @@ Person: =>InquiriesAutoSrch5YListSorted :=TOPN(PersonInquiry.GatherInquiries(See
 Person: =>InquiriesAutoSrch5YDtList:= CONCAT(InquiriesAutoSrch5YListSorted,InqDate,'|');
 Person: =>InquiryAutoSrch5YNewDate :=IsBlank(STRING(MAX(InquiriesAutoSrch5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiryAutoSrch5YOldDate :=IsBlank(STRING(MIN(InquiriesAutoSrch5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+
+
+Inquiry: => IsValidVelocityInquiryNonFCRA := AgeinDays <= 365 AND 
+																						NOT IsCollection AND 
+																						NOT IsBatchMonitoringMethod AND
+																						InquiryProductCode IN Inquiry.VALID_VELOCITY_PRODUCT_CODES AND
+																						NOT InquiryFunctionDescription IN Inquiry.CHARGEBACK_FUNCTIONS AND
+																						IsNonFcraOk;
 
 /**************************************************************************/
 /*                                                                        */
@@ -3640,6 +3670,28 @@ Person: =>PL_SrchAutoOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_
 		PL_SrchAutoCnt5Y  < 1  => Inquiry.NO_DATA_FOUND_INQ_INT,
 		ALL(InquiriesAutoSrch5YListSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryAutoSrch5YOldDate),CURRENT_DATE_INQ),0,60));
+//KS-6157
+Inquiry.PersonInfo: => CombinedAddress := TRIM(PrimaryName) + TRIM(PrimaryRange)+ TRIM(ZIP5);														
+InputPII: => GoodInquiriesLastYearForSSN := InputCleanSSN.SSNInquiry.Transaction(IsValidVelocityInquiryNonFCRA){UID,PersonInfo := PersonInfo{LexID,LastName,CombinedAddress,DateOfBirth,PrimaryName,PrimaryRange,ZIP5}};
+InputPII: => PI_SrchPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																				BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN{UID},999,UID,UID:DateFirstSeen)),0,999));
+
+InputPII: => PI_SrchLexIDPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-LexID,LexID:DateFirstSeen){LexID}),0,999));
+
+InputPII: => PI_SrchLNamePerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-LastName,LastName:DateFirstSeen){LastName}),0,999));
+
+InputPII: => PI_SrchAddrPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo(NOT ZIP5:Null OR ZIP5 = ''),999,-CombinedAddress,CombinedAddress:DateFirstSeen){PrimaryRange, PrimaryName, ZIP5}),0,999));
+
+InputPII: => PI_SrchDOBPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-DateOfBirth,DateOfBirth:DateFirstSeen){DateOfBirth}),0,999));
+
 																					
 /**************************************************************************/
 /*                                                                        */
