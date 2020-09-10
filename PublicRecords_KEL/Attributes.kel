@@ -3502,8 +3502,8 @@ Inquiry: VALID_VELOCITY_PRODUCT_CODES := [1, 2, 7];
 Inquiry: CHARGEBACK_FUNCTIONS := ['CHARGEBACK DEFENDER', 'CHARGEBACK DEFENDER SCORE ATTRIBUTES', 'RISKWISE CHARGEBACK DEFENDER (SCORE ONLY CD02)', 'RISKWISE CHARGEBACK DEFENDER W/ RC JOINT APP (FDSL)', 
 							'RISKWISE CHARGEBACK DEFENDER W/ RC SINGLE APP (FDS7)', 'RISKWISE CUSTOM CANADIAN CHARGEBACK DEFENDER', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (CB61)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND03)', 
 							'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND05)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND11)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER W/ IP DOMAIN (ND10)'];
-
 // Inquiry: OTHER := NOT IN [COLLECTION_INDUSTRY OR AUTO_INDUSTRY OR BANKING_INDUSTRY OR MORTGAGE_INDUSTRY OR HIGH_RISK_CREDIT_INDUSTRY OR RETAIL_INDUSTRY OR COMMUNICATIONS_INDUSTRY OR RETAIL_PAYMENTS_INDUSTRY OR PREPAID_CARD_INDUSTRY OR UTILITIES_INDUSTRY OR QUIZ_PROVIDER_INDUSTRY OR STUDENT_LOAN_INDUSTRY];
+
 // Inquiry Velocity helper attributes
 Inquiry: => AgeinDays := ABSDAYSBETWEEN(TransactionID:DateFirstSeen, CURRENT_DATE);
 Inquiry: => InquiryIndustry := ONLY(BusIntel, Industry);
@@ -3574,6 +3574,51 @@ Inquiry: => IsValidVelocityInquiryNonFCRA := AgeinDays <= 365 AND
 																						InquiryProductCode IN Inquiry.VALID_VELOCITY_PRODUCT_CODES AND
 																						NOT InquiryFunctionDescription IN Inquiry.CHARGEBACK_FUNCTIONS AND
 																						IsNonFcraOk;
+Inquiry: => IsValidVelocityInquiryFCRA := AgeinDays <= 365 AND 
+																						NOT IsCollection AND 
+																						NOT IsBatchMonitoringMethod AND
+																						InquiryProductCode IN Inquiry.VALID_VELOCITY_PRODUCT_CODES AND
+																						NOT InquiryFunctionDescription IN Inquiry.CHARGEBACK_FUNCTIONS AND
+																						NOT InquiryIndustry IN Inquiry.COMMUNICATIONS_INDUSTRY AND
+																						IsFcraOk;
+
+Inquiry.PersonInfo: => TransactionID := Inquiry.TransactionID;
+
+Person: => VelocityInquiriesPerLexIDNonFCRA := PersonInquiry.Transaction(IsValidVelocityInquiryNonFCRA).PersonInfo(LexID = Person.UID){
+										TransactionID,
+										SSN := ONLY(TOPN(GROUP(NOT SSN:Null), 1, -SSN), SSN),
+										ZIP5 := ONLY(TOPN(GROUP(NOT ZIP5:Null), 1, -ZIP5), ZIP5),
+										LastName := ONLY(TOPN(GROUP(NOT LastName:Null), 1, -LastName), LastName),
+										FirstName := ONLY(TOPN(GROUP(NOT FirstName:Null), 1, -FirstName), FirstName),
+										PersonalPhoneNumber := ONLY(TOPN(GROUP(NOT PersonalPhoneNumber:Null), 1, -PersonalPhoneNumber), PersonalPhoneNumber),
+										DateOfBirth := ONLY(TOPN(GROUP(NOT DateOfBirth:Null), 1, -DateOfBirth), DateOfBirth)};
+										
+Person: => VelocityInquiriesPerLexIDFCRA := PersonInquiry.Transaction(IsValidVelocityInquiryFCRA).PersonInfo(LexID = Person.UID){
+										TransactionID,
+										SSN := ONLY(TOPN(GROUP(NOT SSN:Null), 1, -SSN), SSN),
+										ZIP5 := ONLY(TOPN(GROUP(NOT ZIP5:Null), 1, -ZIP5), ZIP5),
+										LastName := ONLY(TOPN(GROUP(NOT LastName:Null), 1, -LastName), LastName),
+										FirstName := ONLY(TOPN(GROUP(NOT FirstName:Null), 1, -FirstName), FirstName),
+										PersonalPhoneNumber := ONLY(TOPN(GROUP(NOT PersonalPhoneNumber:Null), 1, -PersonalPhoneNumber), PersonalPhoneNumber),
+										DateOfBirth := ONLY(TOPN(GROUP(NOT DateOfBirth:Null), 1, -DateOfBirth), DateOfBirth)};
+
+Person: => VelocityInquirySSNsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{SSN};
+Person: => VelocityInquirySSNsPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{SSN};
+
+Person: => VelocityInquiryZipsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{ZIP5};
+Person: => VelocityInquiryZipsPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{ZIP5};
+
+Person: => VelocityInquiryLastNamesPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{LastName};
+Person: => VelocityInquiryLastNamesPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{LastName};
+
+Person: => VelocityInquiryFirstNamesPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{FirstName};
+Person: => VelocityInquiryFirstNamesPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{FirstName};
+
+Person: => VelocityInquiryPhonesPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{PersonalPhoneNumber};
+Person: => VelocityInquiryPhonesPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{PersonalPhoneNumber};
+
+Person: => VelocityInquiryDOBsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{DateOfBirth};
+Person: => VelocityInquiryDOBsPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{DateOfBirth};
 
 /**************************************************************************/
 /*                                                                        */
@@ -3670,6 +3715,68 @@ Person: =>PL_SrchAutoOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_
 		PL_SrchAutoCnt5Y  < 1  => Inquiry.NO_DATA_FOUND_INQ_INT,
 		ALL(InquiriesAutoSrch5YListSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryAutoSrch5YOldDate),CURRENT_DATE_INQ),0,60));
+		
+/**************************************************************************/
+/*                                                                        */
+/*                   Velocity Inquiry Attributes                          */
+/*                                                                        */
+/**************************************************************************/
+// NonFCRA
+Person: => PL_SrchPerLexIDCnt1Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,	
+		BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA),0,999));
+		
+Person: => PL_SrchSSNPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquirySSNsPerLexIDNonFCRA),0,999));
+
+Person: => PL_SrchAddrPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryZipsPerLexIDNonFCRA),0,999));
+		
+Person: => PL_SrchLNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryLastNamesPerLexIDNonFCRA), 0, 999));
+		
+Person: => PL_SrchFNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryFirstNamesPerLexIDNonFCRA), 0, 999));
+		
+Person: => PL_SrchPhonePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryPhonesPerLexIDNonFCRA), 0, 999));
+
+Person: => PL_SrchDOBPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryDOBsPerLexIDNonFCRA), 0, 999));
+		
+// FCRA
+Person: => PL_InqPerLexIDCnt1Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,	
+		BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDFCRA), 0, 999));
+		
+Person: => PL_InqSSNPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquirySSNsPerLexIDFCRA), 0, 999));
+
+Person: => PL_InqAddrPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryZipsPerLexIDFCRA), 0, 999));
+		
+Person: => PL_InqLNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryLastNamesPerLexIDFCRA), 0, 999));
+		
+Person: => PL_InqFNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryFirstNamesPerLexIDFCRA), 0, 999));
+		
+Person: => PL_InqPhonePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryPhonesPerLexIDFCRA), 0, 999));
+
+Person: => PL_InqDOBPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryDOBsPerLexIDFCRA), 0, 999));
+
 //KS-6157
 Inquiry.PersonInfo: => CombinedAddress := TRIM(PrimaryName) + TRIM(PrimaryRange)+ TRIM(ZIP5);														
 InputPII: => GoodInquiriesLastYearForSSN := InputCleanSSN.SSNInquiry.Transaction(IsValidVelocityInquiryNonFCRA){UID,PersonInfo := PersonInfo{LexID,LastName,CombinedAddress,DateOfBirth,PrimaryName,PrimaryRange,ZIP5}};
