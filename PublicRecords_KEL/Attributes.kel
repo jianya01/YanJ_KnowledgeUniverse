@@ -3799,7 +3799,35 @@ InputPII: => PI_SrchDOBPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSIN
 																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
 																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-DateOfBirth,DateOfBirth:DateFirstSeen){DateOfBirth}),0,999));
 
-																					
+//KS-6136 Retail search
+Person: => RetailInquiries := TOPN(PersonInquiry.Transaction(NOT IsCollection AND InquiryIndustry IN RETAIL_INDUSTRY AND AgeinDays < 1825){UID, MyDateFirstSeen := UID:DateFirstSeen},999,ISVALIDDATE(MyDateFirstSeen),MyDateFirstSeen);																					
+
+Person: => PL_SrchRetailCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+							NOT EXISTS(PersonInquiry.Transaction(NOT IsCollection AND AgeinDays < 1825)) => NO_DATA_FOUND_INT,
+							BOUNDSFOLD(COUNT(RetailInquiries),0,999));
+							
+Person: => PL_SrchRetailDtList5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND,
+							CONCAT(RetailInquiries,IsBlank(DATETOSTRING(MyDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),'|'));
+							
+Person: => PL_SrchRetailNewDt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND,
+							IsBlank(DATETOSTRING(MAX(RetailInquiries,MyDateFirstSeen),'%Y%m%d'),NO_DATA_FOUND_97));
+							
+Person: => PL_SrchRetailOldDt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND,
+							IsBlank(DATETOSTRING(MIN(RetailInquiries,MyDateFirstSeen),'%Y%m%d'),NO_DATA_FOUND_97));
+							
+							
+Person: => PL_SrchRetailNewMsnc5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+							PL_SrchRetailNewDt5Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+							BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchRetailNewDt5Y),CURRENT_DATE_INQ),0,60));
+							
+Person: => PL_SrchRetailOldMsnc5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+							PL_SrchRetailOldDt5Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+							BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchRetailOldDt5Y),CURRENT_DATE_INQ),0,60));
 /**************************************************************************/
 /*                                                                        */
 /*                   Business Helper Attributes                           */
