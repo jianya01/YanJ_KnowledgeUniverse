@@ -3552,6 +3552,8 @@ Person: =>InquiryHighRisk5YOldDate :=IsBlank(STRING(MIN(InquiriesHighRisk5YListS
 PersonInquiry.GatherInquiries: =>IsBanking := UPCASE(TRIM(Industry)) IN Inquiry.BANKING_INDUSTRY;
 PersonInquiry.GatherInquiries: =>ValidInquiries:=IsNonFcraOk AND NOT IsBatchMonitoringMethod AND ExcludeFunctionDescription AND NOT IsCollection AND NOT IsHighRisk;
 PersonInquiry.GatherInquiries: =>ValidBanking:=ValidInquiries AND IsBanking;
+PersonInquiry.GatherInquiries: => IsRetail := UPCASE(TRIM(Industry)) IN Inquiry.RETAIL_INDUSTRY;
+PersonInquiry.GatherInquiries: => ValidRetail := ValidInquiries AND IsRetail;
 Person: =>AllInquiriesPast5Y :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidInquiries),999,InqDate);
 Person: =>InquiriesBanking5YSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidBanking){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 Person: =>InquiriesBanking5YList:= CONCAT(InquiriesBanking5YSorted,InqDate,'|');
@@ -3888,7 +3890,36 @@ InputPII: => PI_SrchDOBPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSIN
 																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
 																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-DateOfBirth,DateOfBirth:DateFirstSeen){DateOfBirth}),0,999));
 
-																					
+//KS-6136 Retail search
+
+Person: => RetailInquiries5Yrs := TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidRetail){TransactionID, MyDateFirstSeen := TransactionID:DateFirstSeen},999,ISVALIDDATE(MyDateFirstSeen),MyDateFirstSeen);																					
+
+Person: => PL_SrchRetailCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+							NOT EXISTS(PersonInquiry.Transaction(NOT IsCollection AND AgeinDays < 1825)) => NO_DATA_FOUND_INT,
+							BOUNDSFOLD(COUNT(RetailInquiries5Yrs),0,999));
+							
+Person: => PL_SrchRetailDtList5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND,
+							CONCAT(RetailInquiries5Yrs,IsBlank(DATETOSTRING(MyDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),'|'));
+							
+Person: => PL_SrchRetailNewDt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+							IsZero(INTEGER(DATETOSTRING(MAX(RetailInquiries5Yrs,MyDateFirstSeen),'%Y%m%d')),NO_DATA_FOUND_97_INT));
+							
+Person: => PL_SrchRetailOldDt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+							IsZero(INTEGER(DATETOSTRING(MIN(RetailInquiries5Yrs,MyDateFirstSeen),'%Y%m%d')),NO_DATA_FOUND_97_INT));
+							
+							
+Person: => PL_SrchRetailNewMsnc5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+							PL_SrchRetailNewDt5Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+							BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchRetailNewDt5Y),CURRENT_DATE_INQ),0,60));
+							
+Person: => PL_SrchRetailOldMsnc5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+							PL_SrchRetailOldDt5Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+							BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchRetailOldDt5Y),CURRENT_DATE_INQ),0,60));
 /**************************************************************************/
 /*                                                                        */
 /*                   Business Helper Attributes                           */
