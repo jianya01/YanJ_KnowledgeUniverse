@@ -3694,7 +3694,8 @@ Person: => VelocityInquiriesPerLexIDNonFCRA := PersonInquiry.Transaction(IsValid
 										Predirectional := ONLY(TOPN(GROUP(NOT Predirectional:Null), 1, -Predirectional), Predirectional),
 										PrimaryName := ONLY(TOPN(GROUP(NOT PrimaryName:Null), 1, -PrimaryName), PrimaryName),
 										Suffix := ONLY(TOPN(GROUP(NOT Suffix:Null), 1, -Suffix), Suffix),
-										SecondaryRange := ONLY(TOPN(GROUP(NOT SecondaryRange:Null), 1, -SecondaryRange), SecondaryRange)										
+										SecondaryRange := ONLY(TOPN(GROUP(NOT SecondaryRange:Null), 1, -SecondaryRange), SecondaryRange),
+										EmailAddress := ONLY(TOPN(GROUP(NOT EmailAddress:Null), 1, -EmailAddress), EmailAddress)
 										};
 
 Person: => VelocityInquiriesPerLexIDFCRA := PersonInquiry.Transaction(IsValidVelocityInquiryFCRA).PersonInfo(LexID = Person.UID){
@@ -3729,6 +3730,8 @@ Person: => VelocityInquiryPhonesPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{Pe
 
 Person: => VelocityInquiryDOBsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{DateOfBirth};
 Person: => VelocityInquiryDOBsPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{DateOfBirth};
+
+Person: => VelocityInquiryEmailsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{EmailAddress};
 
 Person: => PII := ONLY(InputPII);
 Person: => P_InpClnNameFirst := PII.InputFirstNameCleanValue;
@@ -4284,6 +4287,20 @@ Person: => PL_InqPerLexIDWInpFLAPSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_
 		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
 		PL_InqPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDFCRA, FirstName:Null OR LastName:Null OR ZIP5:Null OR PrimaryName:Null OR PersonalPhoneNumber:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(COUNT(VelocityInquiriesWithFLAPSMatchFCRA), 0, 999));	
+
+							
+// KS-6161
+Person: => PL_SrchEmailPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																						PL_SrchPerLexIDCnt1Y < 1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(VelocityInquiryEmailsPerLexIDNonFCRA), 0, 999));
+InputPII: =>	GoodInquiriesLastYearForEmail := InputCleanEmail.EmailInquiry.Transaction(IsValidVelocityInquiryNonFCRA){UID,PersonInfo := PersonInfo{LexID/*,LastName,CombinedAddress,DateOfBirth,PrimaryName,PrimaryRange,ZIP5*/}};
+InputPII: => PI_SrchPerInpEmailCnt1Y := MAP(P_InpClnEmailFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																				BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForEmail{UID},999,UID,UID:DateFirstSeen)),0,999));
+
+InputPII: => PI_SrchLexIDPerInpEmailCnt1Y := MAP(P_InpClnEmailFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																						PI_SrchPerInpEmailCnt1Y < 1 => NO_DATA_FOUND_INT,
+																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForEmail.PersonInfo,999,-LexID,LexID:DateFirstSeen){LexID}),0,999));
+
 
 /**************************************************************************/
 /*                                                                        */
