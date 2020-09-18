@@ -172,7 +172,58 @@ FUNCTION: IsPhoneMatch(STRING PhoneOnFile, STRING InputPhone) <=
 FUNCTION: FnIPValidate(STRING field1) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_IPValidate(field1)) FROM PublicRecords_KEL RETURNS STRING;	
 FUNCTION: IsFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;
 FUNCTION: IsNonFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsNonFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
-				
+FUNCTION: IsInquirySSNMatch(STRING SSN1, STRING SSN2) <= SSN1 = SSN2; 
+FUNCTION: IsInquiryAddressMatch(INTEGER zip51, STRING PrimRange1, STRING PrimName1, STRING SecRange1, STRING PreDir1, STRING Suffix1, 
+												 INTEGER zip52, STRING PrimRange2, STRING PrimName2, STRING SecRange2, STRING PreDir2, STRING Suffix2) <= 
+												 zip51 = zip52 AND DEFAULT(PrimRange1, '') = DEFAULT(PrimRange2, '') AND DEFAULT(PrimName1, '') = DEFAULT(PrimName2, '') AND DEFAULT(SecRange1, '') = DEFAULT(SecRange2, '') AND DEFAULT(PreDir1, '') = DEFAULT(PreDir2, '') AND DEFAULT(Suffix1, '') = DEFAULT(Suffix2, ''); 
+FUNCTION: IsInquiryPhoneMatch(INTEGER Phone1, INTEGER Phone2) <= Phone1 = Phone2;
+FUNCTION: IsDOBMatch(DATE DOB1, DATE DOB2) <= DOB1 = DOB2;
+/*First Name Matching Logic:
+
+	1. Exact match (Verified)
+		a. (P_InpClnNameFirst = fname)
+	2. Nickname match (Verified)
+		a. Standardized names match based on nickname list: https://gitlab.ins.risk.regn.net/risk-engineering/PublicRecords/-/blob/ThorProd/NID/Set_NamesNew.ecl
+	3. If length(fname) = 1, apply logic below:
+		a. First initial of P_InpClnNameFirst = fname (Verified)
+	4. If length(fname) > 2 AND length(P_InpClnNameFirst) > 2, apply logic below:
+		a. fname starts with or ends with P_InpClnNameFirst (Verified)
+		b.P_InpClnNameFirst starts with or ends with fname (Verified)
+	5. If length(fname) > 4 OR length(P_InpClnNameFirst) > 4, apply logic below:
+		a. Levenshtein similarity between fname and P_InpClnNameFirst > 0.6 (Verified)
+	6. If length(fname) < 5 AND length(P_InpClnNameFirst) < 5, apply logic below:
+		a. Levenshtein similarity between fname and P_InpClnNameFirst > 0.5 (Verified)
+	7. If no above conditions are met, the name is Unverified*/
+FUNCTION: StandardizeNickname(STRING FirstName) <= ECL(NID.PreferredFirstNew(FirstName, TRUE)) FROM NID RETURNS STRING;
+FUNCTION: IsFirstNameMatch(STRING FirstName1, STRING FirstName2) <=
+		MAP(FirstName1:Null OR FirstName2:Null => FALSE,
+		FirstName1 = FirstName2 => TRUE,
+		StandardizeNickname(FirstName1) = StandardizeNickname(FirstName2) => TRUE,
+		LENGTH(FirstName1) = 1 AND STARTSWITH(FirstName2, FirstName1) => TRUE,
+		LENGTH(FirstName1) > 2 AND LENGTH(FirstName2) > 2 AND (ENDSWITH(FirstName1, FirstName2) OR ENDSWITH(FirstName2, FirstName1) OR STARTSWITH(FirstName1, FirstName2) OR STARTSWITH(FirstName2, FirstName1)) => TRUE,
+		(LENGTH(FirstName1) > 4 OR LENGTH(FirstName2) > 4) AND LevenshteinSimilarity(FirstName1, FirstName2) > 0.6 => TRUE,
+		LENGTH(FirstName1) < 5 AND LENGTH(FirstName2) < 5 AND LevenshteinSimilarity(FirstName1, FirstName2) > 0.5 => TRUE,
+		FALSE);
+/*Last Name Matching Logic:
+	1. Exact match (Verified)
+		a. (P_InpClnNameLast = lname)
+	2. If length(lname) > 2, apply logic below:
+		a. lname starts with or ends with P_InpClnNameLast (Verified)
+		b. P_InpClnNameLast starts with or ends with lname (Verified)
+	3. If length(lname) > 4 OR length(P_InpClnNameLast) > 4, apply logic below:
+		a.Levenshtein similarity between lname and P_InpClnNameLast > 0.6 (Verified)
+	4. If length(lname) < 5 AND length(P_InpClnNameLast) < 5, apply logic below:
+		a. Levenshtein similarity between lname and P_InpClnNameLast > 0.5 (Verified)
+	5. If no above conditions are met, the name is Unverified
+*/
+FUNCTION: IsLastNameMatch(STRING LastName1, STRING LastName2) <= 
+		MAP(LastName1:Null OR LastName2:Null => FALSE,
+		LastName1 = LastName2 => TRUE,
+		LENGTH(LastName1) > 2 AND LENGTH(LastName2) > 2 AND (ENDSWITH(LastName1, LastName2) OR ENDSWITH(LastName2, LastName1) OR STARTSWITH(LastName1, LastName2) OR STARTSWITH(LastName2, LastName1)) => TRUE,
+		(LENGTH(LastName1) > 4 OR LENGTH(LastName2) > 4) AND LevenshteinSimilarity(LastName1, LastName2) > 0.6 => TRUE,
+		LENGTH(LastName1) < 5 AND LENGTH(LastName2) < 5 AND LevenshteinSimilarity(LastName1, LastName2) > 0.5 => TRUE,
+		FALSE);
+
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -519,9 +570,6 @@ InputPII: => InputLastNameCleanValue := MAP(P_InpValNameBogusFlag = 1 => NO_DATA
 																			IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameLast, NO_DATA_FOUND)));
 InputPII: => InputSuffixCleanValue := MAP(P_InpValNameBogusFlag = 1 => NO_DATA_FOUND,
 																			IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameSffx, NO_DATA_FOUND)));
-InputPII: => InputFirstClnNameValue := IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameFirst, NO_DATA_FOUND));
-InputPII: => InputMiddleClnNameValue := IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameMid, NO_DATA_FOUND));
-InputPII: => InputLastClnNameValue := IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameLast, NO_DATA_FOUND));
 InputPII: => InputPrimaryRangeCleanValue := MAP(
 				AddrNotPopulated => MISSING_INPUT_DATA, 
 				CityStateZipNotPopulated => NO_DATA_FOUND,
@@ -1057,8 +1105,8 @@ InputPII: =>PI_InpAddrStateVoterAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagVa
 													
 //Name Summary attributes		
 NameSummary: =>PII :=ONLY(InputPII);
-NameSummary: =>P_InpClnNameFirst :=PII.InputFirstClnNameValue;
-NameSummary: =>P_InpClnNameLast :=PII.InputLastClnNameValue;
+NameSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
+NameSummary: =>P_InpClnNameLast :=PII.InputLastNameCleanValue;
 NameSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
 NameSummary.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
 
@@ -1150,8 +1198,8 @@ SSNSummary: => PI_SrcWInpPSLastDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DAT
 		PI_SrcWInpPSListEv = NO_DATA_FOUND => NO_DATA_FOUND,
 		CONCAT(PhoneSummarySourceListSorted,SourceDateLastSeen,'|'));	
 
-SSNSummary: =>P_InpClnNameFirst :=PII.InputFirstClnNameValue;
-SSNSummary: =>P_InpClnNameLast :=PII.InputLastClnNameValue;
+SSNSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
+SSNSummary: =>P_InpClnNameLast :=PII.InputLastNameCleanValue;
 SSNSummary.NameSummary: => TranslatedSourceCode := ConsumerSourceGroup(NameSource);
 SSNSummary: => TranslatedFnLnSources := NameSummary(TranslatedSourceCode!=''){NameFirstName,  NameLastName,TranslatedSourceCode};
 SSNSummary: =>TranslatedFnLnSourcesList :=TranslatedFnLnSources{
@@ -1731,9 +1779,9 @@ InputBII: => B_Rep5InpClnDL := 				AuthRep5.InputDLCleanValue;
 InputBII: => B_Rep5InpClnDLState := 		AuthRep5.InputDLStateCleanValue;
 InputBII: => B_Rep5InpClnEmail := 			AuthRep5.InputEmailCleanValue;
 /*		Auth Rep Clean Input Attributes		*/
-InputBII: => B_Rep6InpClnNameFirst := AuthRep6.InputFirstClnNameValue;
-InputBII: => B_Rep6InpClnNameMid := AuthRep6.InputMiddleClnNameValue;
-InputBII: => B_Rep6InpClnNameLast := AuthRep6.InputLastClnNameValue;
+InputBII: => B_Rep6InpClnNameFirst := AuthRep6.InputFirstNameCleanValue;
+InputBII: => B_Rep6InpClnNameMid := AuthRep6.InputMiddleNameCleanValue;
+InputBII: => B_Rep6InpClnNameLast := AuthRep6.InputLastNameCleanValue;
 InputBII: => B_Rep6InpClnAddrPrimRng := AuthRep6.InputPrimaryRangeCleanValue;
 InputBII: => B_Rep6InpClnAddrPreDir := AuthRep6.InputPreDirectionCleanValue;
 InputBII: => B_Rep6InpClnAddrPrimName := AuthRep6.InputPrimaryNameCleanValue;
@@ -3620,8 +3668,14 @@ Person: => VelocityInquiriesPerLexIDNonFCRA := PersonInquiry.Transaction(IsValid
 										LastName := ONLY(TOPN(GROUP(NOT LastName:Null), 1, -LastName), LastName),
 										FirstName := ONLY(TOPN(GROUP(NOT FirstName:Null), 1, -FirstName), FirstName),
 										PersonalPhoneNumber := ONLY(TOPN(GROUP(NOT PersonalPhoneNumber:Null), 1, -PersonalPhoneNumber), PersonalPhoneNumber),
-										DateOfBirth := ONLY(TOPN(GROUP(NOT DateOfBirth:Null), 1, -DateOfBirth), DateOfBirth)};
-										
+										DateOfBirth := ONLY(TOPN(GROUP(NOT DateOfBirth:Null), 1, -DateOfBirth), DateOfBirth),
+										PrimaryRange := ONLY(TOPN(GROUP(NOT PrimaryRange:Null), 1, -PrimaryRange), PrimaryRange),
+										Predirectional := ONLY(TOPN(GROUP(NOT Predirectional:Null), 1, -Predirectional), Predirectional),
+										PrimaryName := ONLY(TOPN(GROUP(NOT PrimaryName:Null), 1, -PrimaryName), PrimaryName),
+										Suffix := ONLY(TOPN(GROUP(NOT Suffix:Null), 1, -Suffix), Suffix),
+										SecondaryRange := ONLY(TOPN(GROUP(NOT SecondaryRange:Null), 1, -SecondaryRange), SecondaryRange)										
+										};
+
 Person: => VelocityInquiriesPerLexIDFCRA := PersonInquiry.Transaction(IsValidVelocityInquiryFCRA).PersonInfo(LexID = Person.UID){
 										TransactionID,
 										SSN := ONLY(TOPN(GROUP(NOT SSN:Null), 1, -SSN), SSN),
@@ -3629,7 +3683,13 @@ Person: => VelocityInquiriesPerLexIDFCRA := PersonInquiry.Transaction(IsValidVel
 										LastName := ONLY(TOPN(GROUP(NOT LastName:Null), 1, -LastName), LastName),
 										FirstName := ONLY(TOPN(GROUP(NOT FirstName:Null), 1, -FirstName), FirstName),
 										PersonalPhoneNumber := ONLY(TOPN(GROUP(NOT PersonalPhoneNumber:Null), 1, -PersonalPhoneNumber), PersonalPhoneNumber),
-										DateOfBirth := ONLY(TOPN(GROUP(NOT DateOfBirth:Null), 1, -DateOfBirth), DateOfBirth)};
+										DateOfBirth := ONLY(TOPN(GROUP(NOT DateOfBirth:Null), 1, -DateOfBirth), DateOfBirth),
+										PrimaryRange := ONLY(TOPN(GROUP(NOT PrimaryRange:Null), 1, -PrimaryRange), PrimaryRange),
+										Predirectional := ONLY(TOPN(GROUP(NOT Predirectional:Null), 1, -Predirectional), Predirectional),
+										PrimaryName := ONLY(TOPN(GROUP(NOT PrimaryName:Null), 1, -PrimaryName), PrimaryName),
+										Suffix := ONLY(TOPN(GROUP(NOT Suffix:Null), 1, -Suffix), Suffix),
+										SecondaryRange := ONLY(TOPN(GROUP(NOT SecondaryRange:Null), 1, -SecondaryRange), SecondaryRange)		
+										};
 
 Person: => VelocityInquirySSNsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{SSN};
 Person: => VelocityInquirySSNsPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{SSN};
@@ -3649,6 +3709,62 @@ Person: => VelocityInquiryPhonesPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{Pe
 Person: => VelocityInquiryDOBsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{DateOfBirth};
 Person: => VelocityInquiryDOBsPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{DateOfBirth};
 
+Person: => PII := ONLY(InputPII);
+Person: => P_InpClnNameFirst := PII.InputFirstNameCleanValue;
+Person: => P_InpClnNameLast := PII.InputLastNameCleanValue;
+Person: => P_InpClnPhoneHome := PII.InputHomePhoneCleanValue;
+Person: => P_InpClnDOB := PII.InputDOBCleanValue;
+Person: => P_InpClnSSN := PII.InputSSNCleanValue;
+Person: => P_InpClnAddrZip5 := PII.InputZip5CleanValue;
+Person: => P_InpClnAddrPrimRng := PII.InputPrimaryRangeCleanValue;
+Person: => P_InpClnAddrPrimName := PII.InputPrimaryNameCleanValue;
+Person: => P_InpClnAddrSecRng := PII.InputSecondaryRangeCleanValue;
+Person: => P_InpClnAddrPreDir := PII.InputPreDirectionCleanValue;
+Person: => P_InpClnAddrSffx := PII.InputAddressSuffixCleanValue;
+
+// These don't have special values assigned yet. Use them for checking if inputs are verified against our data.
+Person: => P_InpClnNameFirstRaw := PII.P_InpClnNameFirst;
+Person: => P_InpClnNameLastRaw := PII.P_InpClnNameLast;
+Person: => P_InpClnPhoneHomeRaw := PII.P_InpClnPhoneHome;
+Person: => P_InpClnDOBRaw := PII.P_InpClnDOB;
+Person: => P_InpClnSSNRaw := PII.P_InpClnSSN;
+Person: => P_InpClnAddrZip5Raw := PII.P_InpClnAddrZip5;
+Person: => P_InpClnAddrPrimRngRaw := PII.P_InpClnAddrPrimRng;
+Person: => P_InpClnAddrPrimNameRaw := PII.P_InpClnAddrPrimName;
+Person: => P_InpClnAddrSecRngRaw := PII.P_InpClnAddrSecRng;
+Person: => P_InpClnAddrPreDirRaw := PII.P_InpClnAddrPreDir;
+Person: => P_InpClnAddrSffxRaw := PII.P_InpClnAddrSffx;
+
+Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputSSNMatch := IsInquirySSNMatch(SSN, Person.P_InpClnSSNRaw);
+Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputAddressMatch := IsInquiryAddressMatch(INTEGER(ZIP5), PrimaryRange, PrimaryName, SecondaryRange, Predirectional, Suffix, INTEGER(Person.P_InpClnAddrZip5Raw), Person.P_InpClnAddrPrimRngRaw, Person.P_InpClnAddrPrimNameRaw, Person.P_InpClnAddrSecRngRaw, Person.P_InpClnAddrPreDirRaw, Person.P_InpClnAddrSffxRaw);
+Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputPhoneMatch := IsInquiryPhoneMatch(PersonalPhoneNumber, INTEGER(Person.P_InpClnPhoneHomeRaw));
+Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputDOBMatch := IsDOBMatch(DateOfBirth, Person.P_InpClnDOBRaw);
+Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputFirstNameMatch := IsFirstNameMatch(FirstName, Person.P_InpClnNameFirstRaw);
+Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputLastNameMatch := IsLastNameMatch(LastName, Person.P_InpClnNameLastRaw);
+
+Person: => VelocityInquiriesWithFLSMatchNonFCRA := VelocityInquiriesPerLexIDNonFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithASMatchNonFCRA := VelocityInquiriesPerLexIDNonFCRA(IsInputAddressMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithSDMatchNonFCRA := VelocityInquiriesPerLexIDNonFCRA(IsInputDOBMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithPSMatchNonFCRA := VelocityInquiriesPerLexIDNonFCRA(IsInputPhoneMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithFLASMatchNonFCRA := VelocityInquiriesPerLexIDNonFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputAddressMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithFLPSMatchNonFCRA := VelocityInquiriesPerLexIDNonFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputPhoneMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithFLAPSMatchNonFCRA := VelocityInquiriesPerLexIDNonFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputAddressMatch AND IsInputPhoneMatch AND IsInputSSNMatch);
+
+Person.VelocityInquiriesPerLexIDFCRA: => IsInputSSNMatch := IsInquirySSNMatch(SSN, Person.P_InpClnSSNRaw);
+Person.VelocityInquiriesPerLexIDFCRA: => IsInputAddressMatch := IsInquiryAddressMatch(INTEGER(ZIP5), PrimaryRange, PrimaryName, SecondaryRange, Predirectional, Suffix, INTEGER(Person.P_InpClnAddrZip5Raw), Person.P_InpClnAddrPrimRngRaw, Person.P_InpClnAddrPrimNameRaw, Person.P_InpClnAddrSecRngRaw, Person.P_InpClnAddrPreDirRaw, Person.P_InpClnAddrSffxRaw);
+Person.VelocityInquiriesPerLexIDFCRA: => IsInputPhoneMatch := IsInquiryPhoneMatch(PersonalPhoneNumber, INTEGER(Person.P_InpClnPhoneHomeRaw));
+Person.VelocityInquiriesPerLexIDFCRA: => IsInputDOBMatch := IsDOBMatch(DateOfBirth, Person.P_InpClnDOBRaw);
+Person.VelocityInquiriesPerLexIDFCRA: => IsInputFirstNameMatch := IsFirstNameMatch(FirstName, Person.P_InpClnNameFirstRaw);
+Person.VelocityInquiriesPerLexIDFCRA: => IsInputLastNameMatch := IsLastNameMatch(LastName, Person.P_InpClnNameLastRaw);
+
+Person: => VelocityInquiriesWithFLSMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithASMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputAddressMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithSDMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputDOBMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithPSMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputPhoneMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithFLASMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputAddressMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithFLPSMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputPhoneMatch AND IsInputSSNMatch);
+Person: => VelocityInquiriesWithFLAPSMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputAddressMatch AND IsInputPhoneMatch AND IsInputSSNMatch);
+		
 /**************************************************************************/
 /*                                                                        */
 /*                      Inquiry Attributes                                */
@@ -3700,27 +3816,27 @@ Person: =>PL_SrchCreditHROldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISS
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryHighRisk5YOldDate),CURRENT_DATE_INQ),0,60));
 
 Person: => PL_SrchBankCnt5Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
-  																NOT EXISTS(AllInquiriesPast5Y) => Inquiry.NO_DATA_FOUND_INQ,			
-																	BOUNDSFOLD(InquiriesBanking5YCount,0,999));
+		NOT EXISTS(AllInquiriesPast5Y) => Inquiry.NO_DATA_FOUND_INQ,			
+		BOUNDSFOLD(InquiriesBanking5YCount,0,999));
 Person: => PL_SrchBankDtList5Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
-																		  PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
-																		  InquiriesBanking5YList);
+		PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
+		InquiriesBanking5YList);
 Person: =>PL_SrchBankNewDt5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA,
-																		PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
-																		ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID,
-																		InquiryBanking5YNewDate);
+		PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID,
+		InquiryBanking5YNewDate);
 Person: =>PL_SrchBankOldDt5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA,
-																		PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
-																		ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID,
-																		InquiryBanking5YOldDate);		
+		PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID,
+		InquiryBanking5YOldDate);
 Person: =>PL_SrchBankNewMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
-																			PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
-																			ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
-																			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchBankNewDt5Y),CURRENT_DATE_INQ),0,60));
+		PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchBankNewDt5Y),CURRENT_DATE_INQ),0,60));
 Person: =>PL_SrchBankOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
-																			PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
-																			ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
-																			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchBankOldDt5Y),CURRENT_DATE_INQ),0,60));
+		PL_SrchBankCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(InquiriesBanking5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchBankOldDt5Y),CURRENT_DATE_INQ),0,60));
 																			
 Person: => PL_SrchAutoCnt5Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		NOT EXISTS(AllInquiriesPast5Y) => Inquiry.NO_DATA_FOUND_INQ_INT,
@@ -3836,7 +3952,38 @@ Person: =>PL_SrchCommOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_
 		PL_SrchCommCnt5Y < 1  => Inquiry.NO_DATA_FOUND_INQ_INT,
 		ALL(InquiriesComm5YSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchCommOldDt5Y),CURRENT_DATE_INQ),0,60));
-		
+
+//KS-6136 Retail search
+
+Person: => RetailInquiries5Yrs := TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidRetail){TransactionID, MyDateFirstSeen := TransactionID:DateFirstSeen},999,ISVALIDDATE(MyDateFirstSeen),MyDateFirstSeen);																					
+
+Person: => PL_SrchRetailCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		NOT EXISTS(PersonInquiry.Transaction(NOT IsCollection AND AgeinDays < 1825)) => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(RetailInquiries5Yrs),0,999));
+							
+Person: => PL_SrchRetailDtList5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+		PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND,
+		CONCAT(RetailInquiries5Yrs,IsBlank(DATETOSTRING(MyDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),'|'));
+							
+Person: => PL_SrchRetailNewDt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+		IsZero(INTEGER(DATETOSTRING(MAX(RetailInquiries5Yrs,MyDateFirstSeen),'%Y%m%d')),NO_DATA_FOUND_97_INT));
+							
+Person: => PL_SrchRetailOldDt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+		IsZero(INTEGER(DATETOSTRING(MIN(RetailInquiries5Yrs,MyDateFirstSeen),'%Y%m%d')),NO_DATA_FOUND_97_INT));
+							
+							
+Person: => PL_SrchRetailNewMsnc5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+		PL_SrchRetailNewDt5Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchRetailNewDt5Y),CURRENT_DATE_INQ),0,60));
+							
+Person: => PL_SrchRetailOldMsnc5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
+		PL_SrchRetailOldDt5Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchRetailOldDt5Y),CURRENT_DATE_INQ),0,60));
+							
 /**************************************************************************/
 /*                                                                        */
 /*                   Velocity Inquiry Attributes                          */
@@ -3869,7 +4016,29 @@ Person: => PL_SrchPhonePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INP
 Person: => PL_SrchDOBPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
 		BOUNDSFOLD(COUNT(VelocityInquiryDOBsPerLexIDNonFCRA), 0, 999));
-		
+
+//KS-6157
+Inquiry.PersonInfo: => CombinedAddress := TRIM(PrimaryName) + TRIM(PrimaryRange)+ TRIM(ZIP5);														
+InputPII: => GoodInquiriesLastYearForSSN := InputCleanSSN.SSNInquiry.Transaction(IsValidVelocityInquiryNonFCRA){UID,PersonInfo := PersonInfo{LexID,LastName,CombinedAddress,DateOfBirth,PrimaryName,PrimaryRange,ZIP5}};
+InputPII: => PI_SrchPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN{UID},999,UID,UID:DateFirstSeen)),0,999));
+
+InputPII: => PI_SrchLexIDPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+		PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-LexID,LexID:DateFirstSeen){LexID}),0,999));
+
+InputPII: => PI_SrchLNamePerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+		PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-LastName,LastName:DateFirstSeen){LastName}),0,999));
+
+InputPII: => PI_SrchAddrPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+		PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo(NOT ZIP5:Null OR ZIP5 = ''),999,-CombinedAddress,CombinedAddress:DateFirstSeen){PrimaryRange, PrimaryName, ZIP5}),0,999));
+
+InputPII: => PI_SrchDOBPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+		PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-DateOfBirth,DateOfBirth:DateFirstSeen){DateOfBirth}),0,999));
+																						
 // FCRA
 Person: => PL_InqPerLexIDCnt1Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,	
 		BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDFCRA), 0, 999));
@@ -3898,58 +4067,134 @@ Person: => PL_InqDOBPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_
 		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
 		BOUNDSFOLD(COUNT(VelocityInquiryDOBsPerLexIDFCRA), 0, 999));
 
-//KS-6157
-Inquiry.PersonInfo: => CombinedAddress := TRIM(PrimaryName) + TRIM(PrimaryRange)+ TRIM(ZIP5);														
-InputPII: => GoodInquiriesLastYearForSSN := InputCleanSSN.SSNInquiry.Transaction(IsValidVelocityInquiryNonFCRA){UID,PersonInfo := PersonInfo{LexID,LastName,CombinedAddress,DateOfBirth,PrimaryName,PrimaryRange,ZIP5}};
-InputPII: => PI_SrchPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																				BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN{UID},999,UID,UID:DateFirstSeen)),0,999));
 
-InputPII: => PI_SrchLexIDPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
-																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-LexID,LexID:DateFirstSeen){LexID}),0,999));
+/**************************************************************************/
+/*                                                                        */
+/*            Inquiry PII Corroboration Attributes                        */
+/*                                                                        */
+/**************************************************************************/
+// NonFCRA Attributes
+Person: => PL_SrchPerLexIDWInpFLSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_SrchPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDNonFCRA, FirstName:Null OR LastName:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithFLSMatchNonFCRA), 0, 999));
 
-InputPII: => PI_SrchLNamePerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
-																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-LastName,LastName:DateFirstSeen){LastName}),0,999));
+Person: => PL_SrchPerLexIDWInpASCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrPrimName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrZip5 IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_SrchPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDNonFCRA, ZIP5:Null OR PrimaryName:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithASMatchNonFCRA), 0, 999));
 
-InputPII: => PI_SrchAddrPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
-																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo(NOT ZIP5:Null OR ZIP5 = ''),999,-CombinedAddress,CombinedAddress:DateFirstSeen){PrimaryRange, PrimaryName, ZIP5}),0,999));
+Person: => PL_SrchPerLexIDWInpSDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_SrchPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDNonFCRA,  SSN:Null OR DateOfBirth:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithSDMatchNonFCRA), 0, 999));
 
-InputPII: => PI_SrchDOBPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																						PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
-																						BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-DateOfBirth,DateOfBirth:DateFirstSeen){DateOfBirth}),0,999));
+Person: => PL_SrchPerLexIDWInpPSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_SrchPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDNonFCRA, PersonalPhoneNumber:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithPSMatchNonFCRA), 0, 999));
 
-//KS-6136 Retail search
+Person: => PL_SrchPerLexIDWInpFLASCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrPrimName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrZip5 IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_SrchPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDNonFCRA, FirstName:Null OR LastName:Null OR ZIP5:Null OR PrimaryName:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithFLASMatchNonFCRA), 0, 999));
 
-Person: => RetailInquiries5Yrs := TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidRetail){TransactionID, MyDateFirstSeen := TransactionID:DateFirstSeen},999,ISVALIDDATE(MyDateFirstSeen),MyDateFirstSeen);																					
+Person: => PL_SrchPerLexIDWInpFLPSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_SrchPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDNonFCRA, FirstName:Null OR LastName:Null OR PersonalPhoneNumber:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithFLPSMatchNonFCRA), 0, 999));
 
-Person: => PL_SrchRetailCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-							NOT EXISTS(PersonInquiry.Transaction(NOT IsCollection AND AgeinDays < 1825)) => NO_DATA_FOUND_INT,
-							BOUNDSFOLD(COUNT(RetailInquiries5Yrs),0,999));
-							
-Person: => PL_SrchRetailDtList5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND,
-							CONCAT(RetailInquiries5Yrs,IsBlank(DATETOSTRING(MyDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),'|'));
-							
-Person: => PL_SrchRetailNewDt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
-							IsZero(INTEGER(DATETOSTRING(MAX(RetailInquiries5Yrs,MyDateFirstSeen),'%Y%m%d')),NO_DATA_FOUND_97_INT));
-							
-Person: => PL_SrchRetailOldDt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
-							IsZero(INTEGER(DATETOSTRING(MIN(RetailInquiries5Yrs,MyDateFirstSeen),'%Y%m%d')),NO_DATA_FOUND_97_INT));
-							
-							
-Person: => PL_SrchRetailNewMsnc5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
-							PL_SrchRetailNewDt5Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
-							BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchRetailNewDt5Y),CURRENT_DATE_INQ),0,60));
-							
-Person: => PL_SrchRetailOldMsnc5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-							PL_SrchRetailCnt5Y < 1 => NO_DATA_FOUND_INT,
-							PL_SrchRetailOldDt5Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
-							BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrchRetailOldDt5Y),CURRENT_DATE_INQ),0,60));
+Person: => PL_SrchPerLexIDWInpFLAPSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrPrimName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrZip5 IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_SrchPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDNonFCRA, FirstName:Null OR LastName:Null OR ZIP5:Null OR PrimaryName:Null OR PersonalPhoneNumber:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithFLAPSMatchNonFCRA), 0, 999));
+		
+// FCRA Attributes
+Person: => PL_InqPerLexIDWInpFLSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_InqPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDFCRA, FirstName:Null OR LastName:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithFLSMatchFCRA), 0, 999));
+
+Person: => PL_InqPerLexIDWInpASCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrPrimName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrZip5 IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_InqPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDFCRA, ZIP5:Null OR PrimaryName:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithASMatchFCRA), 0, 999));
+
+Person: => PL_InqPerLexIDWInpSDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_InqPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDFCRA,  SSN:Null OR DateOfBirth:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithSDMatchFCRA), 0, 999));
+
+Person: => PL_InqPerLexIDWInpPSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_InqPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDFCRA, PersonalPhoneNumber:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithPSMatchFCRA), 0, 999));
+
+Person: => PL_InqPerLexIDWInpFLASCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrPrimName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrZip5 IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_InqPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDFCRA, FirstName:Null OR LastName:Null OR ZIP5:Null OR PrimaryName:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithFLASMatchFCRA), 0, 999));
+
+Person: => PL_InqPerLexIDWInpFLPSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_InqPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDFCRA, FirstName:Null OR LastName:Null OR PersonalPhoneNumber:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithFLPSMatchFCRA), 0, 999));
+
+Person: => PL_InqPerLexIDWInpFLAPSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrPrimName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnAddrZip5 IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
+		PL_InqPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDFCRA, FirstName:Null OR LastName:Null OR ZIP5:Null OR PrimaryName:Null OR PersonalPhoneNumber:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesWithFLAPSMatchFCRA), 0, 999));	
+
 /**************************************************************************/
 /*                                                                        */
 /*                   Business Helper Attributes                           */
@@ -7169,7 +7414,7 @@ BusinessSele: => BE_BestAddrBldgSize := MAP(SeleID = MISSING_INPUT_DATA_INT OR B
 PhoneSummary: =>PII :=ONLY(InputPII);
 PhoneSummary: =>P_InpClnPhoneHome :=PII.P_InpClnPhoneHome;
 PhoneSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
-PhoneSummary: =>P_InpClnNameLast := PII.InputLastClnNameValue;
+PhoneSummary: =>P_InpClnNameLast := PII.InputLastNameCleanValue;
 PhoneSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
 PhoneSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
 PhoneSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
@@ -7250,8 +7495,8 @@ PhoneSummary: => PI_SrcWInpAPLastDtListEv := MAP(	P_InpClnPhoneHome IN [MISSING_
 //Address Summary Attributes 
 
 AddressSummary: => PII :=ONLY(InputPII);
-AddressSummary: => P_InpClnNameFirst :=PII.InputFirstClnNameValue;
-AddressSummary: => P_InpClnNameLast :=PII.InputLastClnNameValue;
+AddressSummary: => P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
+AddressSummary: => P_InpClnNameLast :=PII.InputLastNameCleanValue;
 AddressSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
 AddressSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
 AddressSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
