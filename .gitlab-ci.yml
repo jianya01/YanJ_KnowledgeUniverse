@@ -1,13 +1,13 @@
 default:
   image: 
-    name: openjdk:8-alpine
+    name: openjdk:11-alpine # OpenJDK 11
   before_script:
-    # Install the required software/updates
-    - apk update
-    - apk add git
-    - apk add wget
-    - apk add busybox
-    - rm -rf Vault
+    # Install the required software/updates - For some reason the default versions are quite old, so specify the "edge" for latest and greatest
+    - apk update --repository http://dl-cdn.alpinelinux.org/alpine/edge/main/
+    - apk add git --repository http://dl-cdn.alpinelinux.org/alpine/edge/main/
+    - apk add git-lfs --repository http://dl-cdn.alpinelinux.org/alpine/edge/community/
+    - apk add wget --repository http://dl-cdn.alpinelinux.org/alpine/v3.9/main/ # Edge version breaks
+    - apk add busybox --repository http://dl-cdn.alpinelinux.org/alpine/edge/main/
   tags:
     # Pick a specific Shared GitLab runner to execute on
     - icboca # Innovation Cloud
@@ -18,11 +18,14 @@ default:
 
 stages:
     # The order listed here is the order these run inside the pipelines
-    - build
-    - test
-    - documentation
-    - publish
-    - deploy
+    - build # Generic build stage
+    - merge # Code Merge
+    - test # Generic test stage
+    - thor_test # Test code on Thor, doesn't need to wait for a Publish step to test
+    - publish # Push code to Roxie
+    - deploy # Generic deploy stage
+    - roxie_test # Test code on Roxie
+    - documentation # Generate or update Documentation
 
 include:
   # YML Scripts that interact with GitLab Repositories (Generating Merge Requests, Pushing Commits/Tags, etc)
