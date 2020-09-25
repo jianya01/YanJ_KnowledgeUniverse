@@ -276,6 +276,7 @@ Person: BUILD_DATE_UTIL := MIN(GETBUILDDATE('utility_build_version'), CURRENTDAT
 Person: CURRENT_DATE_INQ := MIN(GETBUILDDATE('inquiry_update_build_version'), CURRENTDATE());
 PersonInquiry: CURRENT_DATE := MIN(GETBUILDDATE('inquiry_update_build_version'), CURRENTDATE());
 PersonAccident: CURRENT_DATE := MIN(GETBUILDDATE('accident_build_version'), CURRENTDATE());
+Person: CURRENT_DATE_THRIVE := MIN(GETBUILDDATE('thrive_build_version'), CURRENTDATE());
 
 /***********************************************************************************************************************/
 /***********************************************************************************************************************/
@@ -434,6 +435,8 @@ Person: NO_DATA_FOUND_INT := -99998;
 Person: NO_DATA_FOUND := '-99998';
 Person: NO_DATA_FOUND_97 := '-99997';
 Person: NO_DATA_FOUND_97_INT := -99997;
+
+Person: VALID_LENDING_SOURCE := ['T$'];
 
 SelePerson: NO_DATA_FOUND_97 :=  '-99997';
 
@@ -4327,6 +4330,43 @@ InputPII: => PI_SrchLexIDPerInpEmailCnt1Y := MAP(P_InpClnEmailFlagValue <> 1 => 
 
 /**************************************************************************/
 /*                                                                        */
+/*                 Short Term Lending Helper Attributes                   */
+/*                                                                        */
+/**************************************************************************/
+Person: ONE_YEAR_IN_DAYS := 365;
+Person: TWO_YEARS_IN_DAYS := 730;
+Person: THREE_YEARS_IN_DAYS := 1095;
+Person: FIVE_YEARS_IN_DAYS := 1826; 
+
+Person: => ThriveData := Thrive(Source IN Person.VALID_LENDING_SOURCE){LoanDateFirstSeen := IF(ISVALIDDATE(ThriveDateFirstSeen),DATETOSTRING(ThriveDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),
+	LoanAgeInDays := ABSDAYSBETWEEN(ThriveDateFirstSeen, CURRENT_DATE_THRIVE),Source};
+
+Person: => ShortTermLoans1YSorted := TOPN(ThriveData(LoanAgeInDays <= ONE_YEAR_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
+Person: => ShortTermLoans2YSorted := TOPN(ThriveData(LoanAgeInDays <= TWO_YEARS_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
+Person: => ShortTermLoans5YSorted := TOPN(ThriveData(LoanAgeInDays <= FIVE_YEARS_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
+Person: => ShortTermLoans5YList := CONCAT(ShortTermLoans5YSorted,LoanDateFirstSeen,'|');
+
+/**************************************************************************/
+/*                                                                        */
+/*                 Short Term Lending Attributes                          */
+/*                                                                        */
+/**************************************************************************/
+
+Person: => PL_STLCnt1Y := IF(P_LexIDSeenFlag = '0', Person.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(ShortTermLoans1YSorted),0,999));
+		
+Person: => PL_STLCnt2Y := IF(P_LexIDSeenFlag = '0', Person.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(ShortTermLoans2YSorted),0,999));
+		
+Person: => PL_STLCnt5Y := IF(P_LexIDSeenFlag = '0', Person.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(ShortTermLoans5YSorted),0,999));
+	
+Person: => PL_STLDtList5Y := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA,
+		PL_STLCnt5Y = 0  => Person.NO_DATA_FOUND,
+		ShortTermLoans5YList);
+
+/**************************************************************************/
+/*                                                                        */
 /*                   Business Helper Attributes                           */
 /*                                                                        */
 /**************************************************************************/
@@ -7793,7 +7833,7 @@ Person: => PL_AstPropSaleOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 /**************************************************************************/
 PersonAccident: ONE_YEAR_IN_DAYS := 365;
 
-PersonAccident: => IsAccidentRecord := Acc.ReportCode IN ACCIDENT_REPORT_CODES;
+PersonAccident: => IsAccidentRecord := EXISTS(Acc.ReportCodes(ReportCode IN PersonAccident.ACCIDENT_REPORT_CODES));
 
 Person: => AccidentRecs := PersonAccident(IsAccidentRecord);
 
@@ -7801,7 +7841,10 @@ Person: => AccidentRecsFormatted := AccidentRecs{
 																	EstimatedVehicleDamage := IF(EstimatedVehicleDamage = '' OR EstimatedVehicleDamage:Null , PersonAccident.NO_DATA_FOUND_97 , EstimatedVehicleDamage), 
 																	DateOfAccident :=  IF(ISVALIDDATE(Acc.AccidentDate), DATETOSTRING(MIN(Acc.AccidentDate, PersonAccident.CURRENT_DATE), '%Y%m%d'), PersonAccident.NO_DATA_FOUND_97),
 																	AccidentAgeInDays := ABSDAYSBETWEEN(Acc.AccidentDate, PersonAccident.CURRENT_DATE)};
-Person: => AccidentRecsSorted := TOPN(AccidentRecsFormatted, 999, DateOfAccident = PersonAccident.NO_DATA_FOUND_97, DateOfAccident);
+// Same accidents may be reported by multiple sources, dedup by accident date 
+Person: => AccidentRecsFormattedDedup := Sequence.Dedup(AccidentRecsFormatted, LEFT.DateOfAccident = RIGHT.DateOfAccident, DateOfAccident, -EstimatedVehicleDamage);
+
+Person: => AccidentRecsSorted := TOPN(AccidentRecsFormattedDedup, 999, DateOfAccident = PersonAccident.NO_DATA_FOUND_97, DateOfAccident);
 Person: => LatestAccWithAmount := ONLY(TOPN(AccidentRecsSorted(DateOfAccident <> PersonAccident.NO_DATA_FOUND_97 AND EstimatedVehicleDamage <> PersonAccident.NO_DATA_FOUND_97), 1, -DateOfAccident));																		
 Person: => AccidentsCountTotal := COUNT(AccidentRecsSorted);
 Person: => AccidentsCount1Y := COUNT(AccidentRecsSorted(AccidentAgeInDays <= PersonAccident.ONE_YEAR_IN_DAYS AND NOT AccidentAgeInDays:Null));
