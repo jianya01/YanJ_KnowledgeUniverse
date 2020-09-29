@@ -4134,6 +4134,29 @@ InputPII: => PI_SrchAddrPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSI
 InputPII: => PI_SrchDOBPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 		PI_SrchPerInpSSNCnt1Y <1 => NO_DATA_FOUND_INT,
 		BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-DateOfBirth,DateOfBirth:DateFirstSeen){DateOfBirth}),0,999));
+
+//KS-6158
+InputPII: => GoodInquiriesLastYearForAddress := Location.AddressInquiry.Transaction(IsValidVelocityInquiryNonFCRA){TransactionID,
+					SSN := ONLY(TOPN(PersonInfo, 1, -SSN), SSN), 
+					LexID:=ONLY(TOPN(PersonInfo,1,-LexID),LexID),
+					LastName := ONLY(TOPN(PersonInfo, 1, -LastName), LastName)};
+InputPII: => SrchPerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress,999,-TransactionID,TransactionID:DateFirstSeen){TransactionID}),0,999);
+InputPII: => SrchLexIDPerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress,999,-LexID,LexID:DateFirstSeen){LexID}),0,999);
+InputPII: => SrchLNamePerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress,999,-LastName,LastName:DateFirstSeen){LastName}),0,999);
+InputPII: => SrchSSNPerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress,999,-SSN,SSN:DateFirstSeen){SSN}),0,999);
+
+
+InputPII: => PI_SrchPerInpAddrCnt1Y := MAP( P_InpClnAddrFullFlagValue IN [MISSING_INPUT_DATA,'0'] => MISSING_INPUT_DATA_INT,
+			SrchPerInpAddrCnt1Y);
+InputPII: => PI_SrchLexIDPerInpAddrCnt1Y := MAP( P_InpClnAddrFullFlagValue IN [MISSING_INPUT_DATA,'0'] => MISSING_INPUT_DATA_INT,
+			PI_SrchPerInpAddrCnt1Y < 1 => NO_DATA_FOUND_INT,
+			SrchLexIDPerInpAddrCnt1Y);
+InputPII: => PI_SrchLNamePerInpAddrCnt1Y := MAP( P_InpClnAddrFullFlagValue IN [MISSING_INPUT_DATA,'0'] => MISSING_INPUT_DATA_INT,
+			PI_SrchPerInpAddrCnt1Y < 1 => NO_DATA_FOUND_INT,
+			SrchLNamePerInpAddrCnt1Y);
+InputPII: => PI_SrchSSNPerInpAddrCnt1Y := MAP( P_InpClnAddrFullFlagValue IN [MISSING_INPUT_DATA,'0'] => MISSING_INPUT_DATA_INT,
+			PI_SrchPerInpAddrCnt1Y < 1 => NO_DATA_FOUND_INT,
+			SrchSSNPerInpAddrCnt1Y);
 																						
 // FCRA
 Person: => PL_InqPerLexIDCnt1Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,	
@@ -4200,6 +4223,7 @@ Person: => PL_SrchPerLexIDWInpPSCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_IN
 		PL_SrchPerLexIDCnt1Y > 0 AND ALL(VelocityInquiriesPerLexIDNonFCRA, PersonalPhoneNumber:Null OR SSN:Null) => NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(COUNT(VelocityInquiriesWithPSMatchNonFCRA), 0, 999));
 
+//KS-6136 Retail search
 Person: => PL_SrchPerLexIDWInpFLASCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 		P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
