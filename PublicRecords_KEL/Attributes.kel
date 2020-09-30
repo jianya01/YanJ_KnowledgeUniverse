@@ -2274,6 +2274,47 @@ Person: => IsPreviousPostalSource :=EXISTS(PersonAddress(PreviousAddrMatchattrib
 
 Person: => P_LexIDSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
 
+													
+Person: LEXIDCATEGORYDEAD := 'DEAD';
+Person: LEXIDCATEGORYNOISE := 'NOISE';
+Person: LEXIDCATEGORYHMERGE := 'H_MERGE';
+Person: LEXIDCATEGORYCMERGE := 'C_MERGE';
+Person: LEXIDCATEGORYINACTIVE := 'INACTIVE';
+Person: LEXIDCATEGORYAMBIG := 'AMBIG';
+Person: LEXIDCATEGORYSUSPECT := 'SUSPECT';
+Person: LEXIDCATEGORYNOSSN := 'NO_SSN';
+Person: LEXIDCATEGORYCCORENOVSSN := 'CORENOVSSN';
+Person: LEXIDCATEGORYCORE := 'CORE';
+
+
+Person: => P_LexIDCategory := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																			LexIDSegment = LEXIDCATEGORYDEAD => '1 DEAD',
+																			LexIDSegment = LEXIDCATEGORYNOISE => '2 NOISE',
+																			LexIDSegment = LEXIDCATEGORYHMERGE => '3 H_MERGE',
+																			LexIDSegment = LEXIDCATEGORYCMERGE => '4 C_MERGE',
+																			LexIDSegment = LEXIDCATEGORYINACTIVE => '5 INACTIVE',
+																			LexIDSegment = LEXIDCATEGORYAMBIG => '6 AMBIG',
+																			LexIDSegment = LEXIDCATEGORYSUSPECT => '7 SUSPECT',
+																			LexIDSegment = LEXIDCATEGORYNOSSN => '8 NO_SSN',
+																			LexIDSegment = LEXIDCATEGORYCCORENOVSSN => '9 CORENOVSSN',
+																			LexIDSegment = LEXIDCATEGORYCORE => '10 CORE',
+																			LexIDSegment:Null => NO_DATA_FOUND);
+
+Person: => VersonOneHouseHolds := HouseholdMember(Version = 1).Household;//only 1 household id per version #
+Person: => MembersNotSubject := VersonOneHouseHolds.HouseholdMember.Subject(UID <> Person.UID AND (LexIDSegment = LEXIDCATEGORYCCORENOVSSN OR LexIDSegment = LEXIDCATEGORYCORE)){UID};//multiple members per household
+
+Person: => HHID :=  ONLY(TOPN(VersonOneHouseHolds{UID}, 1, -UID), UID);
+
+
+Person: => PL_HHID := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+														HHID:Null => NO_DATA_FOUND_INT,
+														HHID);
+
+Person: => PL_HHMmbrCnt := IF((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT), MISSING_INPUT_DATA_INT, 
+															BOUNDSFOLD((COUNT(MembersNotSubject)+ 1),1,999));//+1 for subject every household has at least 1 memeber
+
+
+
 Person: => PL_CurrAddrFull := MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
       PersonAddressHierarchyValidCnt=0 => NO_DATA_FOUND,
@@ -7894,4 +7935,7 @@ Person: => PL_AccNewDmgAmtEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISS
 Person: => PL_AccCnt1Y := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA_INT,
 															PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, DateOfAccident = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97_INT,
 															BOUNDSFOLD(AccidentsCount1Y,0,999));
-																		 
+								
+
+
+																			
