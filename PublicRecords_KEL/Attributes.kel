@@ -7932,6 +7932,7 @@ Person: => PL_AstPropSaleOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 /*                                                                        */
 /**************************************************************************/
 PersonAccident: ONE_YEAR_IN_DAYS := 365;
+PersonAccident: MAX_DATE := '99999999';
 
 PersonAccident: => IsAccidentRecord := EXISTS(Acc.ReportCodes(ReportCode IN PersonAccident.ACCIDENT_REPORT_CODES));
 
@@ -7940,12 +7941,13 @@ Person: => AccidentRecs := PersonAccident(IsAccidentRecord);
 Person: => AccidentRecsFormatted := AccidentRecs{
 																	EstimatedVehicleDamage := IF(EstimatedVehicleDamage = '' OR EstimatedVehicleDamage:Null , PersonAccident.NO_DATA_FOUND_97 , EstimatedVehicleDamage), 
 																	DateOfAccident :=  IF(ISVALIDDATE(Acc.AccidentDate), DATETOSTRING(MIN(Acc.AccidentDate, PersonAccident.CURRENT_DATE), '%Y%m%d'), PersonAccident.NO_DATA_FOUND_97),
-																	AccidentAgeInDays := ABSDAYSBETWEEN(Acc.AccidentDate, PersonAccident.CURRENT_DATE)};
+																	AccidentAgeInDays := ABSDAYSBETWEEN(Acc.AccidentDate, PersonAccident.CURRENT_DATE),
+																	FormattedDate := IF(ISVALIDDATE(Acc.AccidentDate), DATETOSTRING(MIN(Acc.AccidentDate, PersonAccident.CURRENT_DATE), '%Y%m%d'), PersonAccident.MAX_DATE)};
 // Same accidents may be reported by multiple sources, dedup by accident date 
 Person: => AccidentRecsFormattedDedup := Sequence.Dedup(AccidentRecsFormatted, LEFT.DateOfAccident = RIGHT.DateOfAccident, DateOfAccident, -EstimatedVehicleDamage);
 
 Person: => AccidentRecsSorted := TOPN(AccidentRecsFormattedDedup, 999, DateOfAccident = PersonAccident.NO_DATA_FOUND_97, DateOfAccident);
-Person: => LatestAccWithAmount := ONLY(TOPN(AccidentRecsSorted(DateOfAccident <> PersonAccident.NO_DATA_FOUND_97 AND EstimatedVehicleDamage <> PersonAccident.NO_DATA_FOUND_97), 1, -DateOfAccident));																		
+Person: => LatestAccWithAmount := ONLY(TOPN(AccidentRecsSorted(EstimatedVehicleDamage <> PersonAccident.NO_DATA_FOUND_97), 1, -FormattedDate));																		
 Person: => AccidentsCountTotal := COUNT(AccidentRecsSorted);
 Person: => AccidentsCount1Y := COUNT(AccidentRecsSorted(AccidentAgeInDays <= PersonAccident.ONE_YEAR_IN_DAYS AND NOT AccidentAgeInDays:Null));
 
