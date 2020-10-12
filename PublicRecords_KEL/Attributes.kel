@@ -4256,7 +4256,15 @@ InputPII: => PI_SrchLNamePerInpAddrCnt1Y := MAP( P_InpClnAddrFullFlagValue IN [M
 InputPII: => PI_SrchSSNPerInpAddrCnt1Y := MAP( P_InpClnAddrFullFlagValue IN [MISSING_INPUT_DATA,'0'] => MISSING_INPUT_DATA_INT,
 			PI_SrchPerInpAddrCnt1Y < 1 => NO_DATA_FOUND_INT,
 			SrchSSNPerInpAddrCnt1Y);
-																						
+			
+//KS-6160
+InputPII: => GoodInquiriesLastYearForPhone := InputCleanPhone.PhoneInquiry.Transaction(IsValidVelocityInquiryNonFCRA){TransactionID,LexID := ONLY(TOPN(PersonInfo, 1, -LexID), LexID)};	
+InputPII: => PI_SrchPerInpPhoneCnt1Y := MAP(P_InpClnPhoneHomeFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(GoodInquiriesLastYearForPhone{TransactionID}),0,999));
+InputPII: => PI_SrchLexIDPerInpPhoneCnt1Y := MAP(P_InpClnPhoneHomeFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+		PI_SrchPerInpPhoneCnt1Y < 1 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(GoodInquiriesLastYearForPhone{LexID}),0,999));
+
 // FCRA
 Person: => PL_InqPerLexIDCnt1Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,	
 		BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDFCRA), 0, 999));
