@@ -8004,6 +8004,36 @@ Person: => PL_AccCnt1Y := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_IN
 															PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, DateOfAccident = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97_INT,
 															BOUNDSFOLD(AccidentsCount1Y,0,999));
 								
+/**************************************************************************/
+/*                                                                        */
+/*                     Person Source Verification                         */
+/*                         Helper Attributes                              */
+/*                                                                        */
+/**************************************************************************/
 
+Person.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
+Person: => TranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode};
+Person: => VerSourceList := TranslatedSources{
+	TranslatedSourceCode := TranslatedSourceCode,
+	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+	
+Person: => VerSourceListSorted := TOPN(VerSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
-																			
+Person: => PL_VerSrcCntEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(VerSourceListSorted), 1, 32));
+Person: => PL_VerSrcListEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA, 
+																 CONCAT(VerSourceListSorted, TranslatedSourceCode, '|'));
+Person: => PL_VerSrcEmrgDtListEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA,
+																			 CONCAT(VerSourceListSorted, SourceDateFirstSeen, '|'));
+Person: => PL_VerSrcLastDtListEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA,
+																			 CONCAT(VerSourceListSorted, SourceDateLastSeen, '|'));
+Person: => PL_VerSrcOldDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																	 ALL(VerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 	
+																	 DATETOSTRING(MIN(VerSourceListSorted, DATE(SourceDateFirstSeen)), '%Y%m%d'));
+Person: => PL_VerSrcNewDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																	 ALL(VerSourceListSorted, SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 
+																	 DATETOSTRING(MAX(VerSourceListSorted, DATE(SourceDateLastSeen)), '%Y%m%d'));
+Person: => P_LexIDRstdOnlyFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																	 EXISTS(VerSourceListSorted(NOT TranslatedSourceCode IN ['CY','D','EN','FR','LI','NT','P*','TN','TS','TU','V'])) => '0', 
+																	 '1');
