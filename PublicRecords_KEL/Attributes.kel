@@ -3770,8 +3770,8 @@ Person: => VelocityInquiriesPerLexIDFCRA := PersonInquiry.Transaction(IsValidVel
 Person: => VelocityInquirySSNsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{SSN};
 Person: => VelocityInquirySSNsPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{SSN};
 
-Person: => VelocityInquiryZipsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{ZIP5};
-Person: => VelocityInquiryZipsPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{ZIP5};
+Person: => VelocityInquiryAddrsPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{PrimaryRange,PrimaryName,ZIP5};
+Person: => VelocityInquiryAddrsPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{PrimaryRange,PrimaryName,ZIP5};
 
 Person: => VelocityInquiryLastNamesPerLexIDNonFCRA := VelocityInquiriesPerLexIDNonFCRA{LastName};
 Person: => VelocityInquiryLastNamesPerLexIDFCRA := VelocityInquiriesPerLexIDFCRA{LastName};
@@ -3843,6 +3843,24 @@ Person: => VelocityInquiriesWithFLASMatchFCRA := VelocityInquiriesPerLexIDFCRA(I
 Person: => VelocityInquiriesWithFLPSMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputPhoneMatch AND IsInputSSNMatch);
 Person: => VelocityInquiriesWithFLAPSMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputAddressMatch AND IsInputPhoneMatch AND IsInputSSNMatch);
 		
+Person: => VelocityInquiriesPerCurrAddrNonFCRA := PersonInquiry.Transaction(IsValidVelocityInquiryNonFCRA).PersonInfo(PrimaryRange = Person.CurrentAddrPrimRng 
+			AND (Predirectional = Person.CurrentAddrPreDir OR((Person.CurrentAddrPreDir = '' OR Person.CurrentAddrPreDir:Null) AND (Predirectional = '' OR Predirectional:Null)))
+			AND (PrimaryName = Person.CurrentAddrPrimName)
+			AND (Suffix = Person.CurrentAddrSffx)
+			AND (Postdirectional = Person.CurrentPostdirectional OR ((Person.CurrentPostdirectional= '' OR Person.CurrentPostdirectional:Null) AND (Postdirectional = '' OR Postdirectional:Null)))
+			AND (ZIP5 = Person.CurrentAddrZip5)
+			AND (SecondaryRange =Person.CurrentAddrSecRng OR ((Person.CurrentAddrSecRng= '' OR Person.CurrentAddrSecRng:Null) AND (SecondaryRange = '' OR SecondaryRange:Null))))
+				{
+				TransactionID,
+				SSN := ONLY(TOPN(GROUP(NOT SSN:Null), 1, -SSN), SSN),
+				LexID := ONLY(TOPN(GROUP(NOT LexID:Null), 1, -LexID), LexID),
+				LastName := ONLY(TOPN(GROUP(NOT LastName:Null), 1, -LastName), LastName)
+				};
+
+Person: => VelocityInquiryLexIDsPerCurrAddrNonFCRA := VelocityInquiriesPerCurrAddrNonFCRA{LexID};
+Person: => VelocityInquiryLastNamesPerCurrAddrNonFCRA := VelocityInquiriesPerCurrAddrNonFCRA{LastName};
+Person: => VelocityInquirySSNsPerCurrAddrNonFCRA := VelocityInquiriesPerCurrAddrNonFCRA{SSN};
+
 /**************************************************************************/
 /*                                                                        */
 /*                      Inquiry Attributes                                */
@@ -4194,7 +4212,7 @@ Person: => PL_SrchSSNPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 
 Person: => PL_SrchAddrPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
-		BOUNDSFOLD(COUNT(VelocityInquiryZipsPerLexIDNonFCRA),0,999));
+		BOUNDSFOLD(COUNT(VelocityInquiryAddrsPerLexIDNonFCRA),0,999));
 		
 Person: => PL_SrchLNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
@@ -4211,6 +4229,18 @@ Person: => PL_SrchPhonePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INP
 Person: => PL_SrchDOBPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
 		BOUNDSFOLD(COUNT(VelocityInquiryDOBsPerLexIDNonFCRA), 0, 999));
+		
+Person: => PL_SrchPerCurrAddrCnt1Y := IF((P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND]) , MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiriesPerCurrAddrNonFCRA),0,999));
+Person: => PL_SrchLexIDPerCurrAddrCnt1Y := MAP((P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND]) => MISSING_INPUT_DATA_INT,
+		PL_SrchPerCurrAddrCnt1Y < 1 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryLexIDsPerCurrAddrNonFCRA),0,999));
+Person: => PL_SrchLNamePerCurrAddrCnt1Y := MAP((P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND]) => MISSING_INPUT_DATA_INT,
+		PL_SrchPerCurrAddrCnt1Y < 1 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquiryLastNamesPerCurrAddrNonFCRA),0,999));
+Person: => PL_SrchSSNPerCurrAddrCnt1Y := MAP((P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND]) => MISSING_INPUT_DATA_INT,
+		PL_SrchPerCurrAddrCnt1Y < 1 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(VelocityInquirySSNsPerCurrAddrNonFCRA),0,999));
 
 //KS-6157
 Inquiry.PersonInfo: => CombinedAddress := TRIM(PrimaryName) + TRIM(PrimaryRange)+ TRIM(ZIP5);														
@@ -4258,12 +4288,12 @@ InputPII: => PI_SrchSSNPerInpAddrCnt1Y := MAP( P_InpClnAddrFullFlagValue IN [MIS
 			SrchSSNPerInpAddrCnt1Y);
 			
 //KS-6160
-InputPII: => GoodInquiriesLastYearForPhone := InputCleanPhone.PhoneInquiry.Transaction(IsValidVelocityInquiryNonFCRA){TransactionID,LexID := ONLY(TOPN(PersonInfo, 1, -LexID), LexID)};	
+InputPII: => GoodInquiriesLastYearForPhone := InputCleanPhone.PhoneInquiry.Transaction(IsValidVelocityInquiryNonFCRA).PersonInfo(PersonalPhoneNumber = InputPII.P_InpClnPhoneHome){TransactionID,LexID := ONLY(TOPN(GROUP(NOT LexID:Null), 1, -LexID), LexID)};	
 InputPII: => PI_SrchPerInpPhoneCnt1Y := MAP(P_InpClnPhoneHomeFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT(GoodInquiriesLastYearForPhone{TransactionID}),0,999));
 InputPII: => PI_SrchLexIDPerInpPhoneCnt1Y := MAP(P_InpClnPhoneHomeFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 		PI_SrchPerInpPhoneCnt1Y < 1 => NO_DATA_FOUND_INT,
-		BOUNDSFOLD(COUNT(GoodInquiriesLastYearForPhone{LexID}),0,999));
+		BOUNDSFOLD(COUNT(GoodInquiriesLastYearForPhone(LexID != 0){LexID}),0,999));
 
 // FCRA
 Person: => PL_InqPerLexIDCnt1Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,	
@@ -4275,7 +4305,7 @@ Person: => PL_InqSSNPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_
 
 Person: => PL_InqAddrPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
-		BOUNDSFOLD(COUNT(VelocityInquiryZipsPerLexIDFCRA), 0, 999));
+		BOUNDSFOLD(COUNT(VelocityInquiryAddrsPerLexIDFCRA), 0, 999));
 		
 Person: => PL_InqLNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
@@ -4434,8 +4464,8 @@ InputPII: => PI_SrchPerInpEmailCnt1Y := MAP(P_InpClnEmailFlagValue <> 1 => MISSI
 InputPII: => PI_SrchLexIDPerInpEmailCnt1Y := MAP(P_InpClnEmailFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																						PI_SrchPerInpEmailCnt1Y < 1 => NO_DATA_FOUND_INT,
 																						BOUNDSFOLD(COUNT(GoodInquiriesLastYearForEmail.PersonInfo{LexID}),0,999));
-
-
+																						
+										
 /**************************************************************************/
 /*                                                                        */
 /*                 Short Term Lending Helper Attributes                   */
