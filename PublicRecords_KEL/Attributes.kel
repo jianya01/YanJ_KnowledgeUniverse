@@ -8044,14 +8044,14 @@ Person: => PL_AccCnt1Y := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_IN
 Person: MAX_DATE := '99999999';
 Person.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
 Person: => TranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode};
-Person: => VerSourceList := TranslatedSources{
+
+Person: => VerSourceList := TranslatedSources(TranslatedSourceCode!=''){
 	TranslatedSourceCode := TranslatedSourceCode,
-	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
-	FirstSeenDate := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), Person.MAX_DATE),
+	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97),
+	FirstSeenDate := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.MAX_DATE),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
 
-Person: => VerSourceListDeduped := Sequence.Dedup(VerSourceList, LEFT.TranslatedSourceCode = RIGHT.TranslatedSourceCode, TranslatedSourceCode, FirstSeenDate, -SourceDateLastSeen);
-Person: => VerSourceListSorted := TOPN(VerSourceListDeduped, 1000, FirstSeenDate, TranslatedSourceCode);
+Person: => VerSourceListSorted := TOPN(VerSourceList, 32, FirstSeenDate, TranslatedSourceCode);
 
 Person: => PL_VerSrcCntEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT,
 																BOUNDSFOLD(COUNT(VerSourceListSorted), 1, 32));
