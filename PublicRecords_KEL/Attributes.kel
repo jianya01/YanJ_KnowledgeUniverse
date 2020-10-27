@@ -3629,7 +3629,10 @@ Inquiry: CHARGEBACK_FUNCTIONS := ['CHARGEBACK DEFENDER', 'CHARGEBACK DEFENDER SC
 // Inquiry: OTHER := NOT IN [COLLECTION_INDUSTRY OR AUTO_INDUSTRY OR BANKING_INDUSTRY OR MORTGAGE_INDUSTRY OR HIGH_RISK_CREDIT_INDUSTRY OR RETAIL_INDUSTRY OR COMMUNICATIONS_INDUSTRY OR RETAIL_PAYMENTS_INDUSTRY OR PREPAID_CARD_INDUSTRY OR UTILITIES_INDUSTRY OR QUIZ_PROVIDER_INDUSTRY OR STUDENT_LOAN_INDUSTRY];
 
 // Inquiry Velocity helper attributes
-Inquiry: => AgeinDays := ABSDAYSBETWEEN_TS(TransactionID:DateFirstSeen, CURRENT_DATE);
+Inquiry: => AgeinDays := ABSDAYSBETWEEN(TimeStampToDate(TransactionID:DateFirstSeen), CURRENT_DATE);
+Person: => InquiryDates := CONCAT(PersonInquiry.Transaction{DATETOSTRING(TimeStampToDate(TransactionID:DateFirstSeen),'%Y%m%d')},'|');
+Person: => InquiryAges := CONCAT(PersonInquiry.Transaction{AgeinDays},'|');
+Person: => InquiryIDs := CONCAT(PersonInquiry.Transaction{TransactionID},'|');
 Inquiry: => InquiryIndustry := DEFAULT(ONLY(BusIntel, Industry), '');
 Inquiry: => InquiryVertical := DEFAULT(ONLY(BusIntel, Vertical), '');
 Inquiry: => InquirySubMarket := DEFAULT(ONLY(BusIntel, SubMarket), '');
@@ -3652,7 +3655,7 @@ PersonInquiry: => GatherInquiries := Transaction{
 																						SubMarket := InquirySubMarket,
 																						Vertical := InquiryVertical,
 																						Industry := InquiryIndustry,
-																						InqDate := PersonInquiry.TransactionID:DateFirstSeen,
+																						InqDate := TimeStampToDate(TransactionID:DateFirstSeen),
 																						IsNonFcraOk,
 																						IsFcraOk,
 																						IsCollection,
@@ -4152,7 +4155,7 @@ Person: =>PL_SrchQuizProvOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISS
 
 //KS-6136 Retail search
 
-Person: => RetailInquiries5Yrs := TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidRetail){TransactionID, MyDateFirstSeen := TransactionID:DateFirstSeen},999,ISVALIDDATE(MyDateFirstSeen),MyDateFirstSeen);																					
+Person: => RetailInquiries5Yrs := TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidRetail){TransactionID, MyDateFirstSeen := InqDate},999,ISVALIDDATE(MyDateFirstSeen),MyDateFirstSeen);																					
 
 Person: => PL_SrchRetailCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		NOT EXISTS(AllInquiriesPast5Y) => Inquiry.NO_DATA_FOUND_INQ_INT,
