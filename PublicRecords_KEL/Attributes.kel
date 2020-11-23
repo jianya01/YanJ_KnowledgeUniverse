@@ -2315,21 +2315,6 @@ Person: => P_LexIDIsDeceased := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 													NOT EXISTS(ReportedDatesOfDeath(ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d'))) => '0',
 													'1');
 
-Person: => VersonOneHouseHolds := HouseholdMember(Version = 1).Household;//only 1 household id per version #
-Person: => MembersNotSubject := VersonOneHouseHolds.HouseholdMember.Subject(UID <> Person.UID AND (LexIDSegment = LEXIDCATEGORYCCORENOVSSN OR LexIDSegment = LEXIDCATEGORYCORE)){UID};//multiple members per household
-
-Person: => HHID :=  ONLY(TOPN(VersonOneHouseHolds{UID}, 1, -UID), UID);
-
-
-Person: => PL_HHID := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-														HHID:Null => NO_DATA_FOUND_INT,
-														HHID);
-
-Person: => PL_HHMmbrCnt := IF((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT), MISSING_INPUT_DATA_INT, 
-															BOUNDSFOLD((COUNT(MembersNotSubject)+ 1),1,999));//+1 for subject every household has at least 1 memeber
-
-
-
 Person: => PL_CurrAddrFull := MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
       PersonAddressHierarchyValidCnt=0 => NO_DATA_FOUND,
@@ -8107,3 +8092,28 @@ Person: => PL_VerSrcNewDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 Person: => P_LexIDRstdOnlyFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 																	 EXISTS(VerSourceListSorted(NOT TranslatedSourceCode IN ['CY','D','EN','FR','LI','NT','P*','TN','TS','TU','V'])) => '0', 
 																	 '1');
+
+Person: BUREAU_SOURCES :=['EN', 'EQ','TN'];
+Person: => IsBureauSourceTest := VerSourceListSorted(TranslatedSourceCode IN Person.BUREAU_SOURCES);
+Person: => IsBureauOnlySource := COUNT(VerSourceListSorted) = COUNT(IsBureauSourceTest);
+Person: => VersonOneHouseHolds := HouseholdMember(Version = 1).Household;//only 1 household id per version #
+Person: => MembersNotSubject := VersonOneHouseHolds.HouseholdMember.Subject(UID <> Person.UID AND (LexIDSegment = LEXIDCATEGORYCCORENOVSSN OR LexIDSegment = LEXIDCATEGORYCORE)){UID,BestDOBAge};//multiple members per household
+Person: => HHID :=  ONLY(TOPN(VersonOneHouseHolds{UID}, 1, -UID), UID);
+Person: =>	HHMmbrUnder18Cnt := COUNT(MembersNotSubject(BestDOBAge<18){UID});
+Person: => IsPersonUnder18 := IF((BestDOBAge<18),TRUE,FALSE);
+Person: => HHMmbrWithSujectUnder18cnt := IF(IsPersonUnder18 =TRUE,HHMmbrUnder18Cnt+1,HHMmbrUnder18Cnt);
+
+Person: => PL_HHID := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+														HHID:Null => NO_DATA_FOUND_INT,
+														HHID);
+
+Person: => PL_HHMmbrCnt := IF((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT), MISSING_INPUT_DATA_INT, 
+															BOUNDSFOLD((COUNT(MembersNotSubject)+ 1),1,999));//+1 for subject every household has at least 1 memeber
+
+Person: => PL_HHMmbrBureauOnlyCnt := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT) => MISSING_INPUT_DATA_INT,
+						NOT IsBureauOnlySource => NO_DATA_FOUND_INT,
+ 						BOUNDSFOLD((COUNT(MembersNotSubject)+1),1,999));
+															
+Person: => PL_HHMmbrAge18uCnt := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT) => MISSING_INPUT_DATA_INT,
+						(BestDOBAge= 0 OR BestDOBAge:Null) AND ALL(MembersNotSubject,(BestDOBAge=0 OR BestDOBAge:Null))=>NO_DATA_FOUND_97_INT,
+						BOUNDSFOLD(HHMmbrWithSujectUnder18cnt,0,999));
