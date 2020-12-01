@@ -223,11 +223,22 @@ FUNCTION: IsLastNameMatch(STRING LastName1, STRING LastName2) <=
 		(LENGTH(LastName1) > 4 OR LENGTH(LastName2) > 4) AND LevenshteinSimilarity(LastName1, LastName2) > 0.6 => TRUE,
 		LENGTH(LastName1) < 5 AND LENGTH(LastName2) < 5 AND LevenshteinSimilarity(LastName1, LastName2) > 0.5 => TRUE,
 		FALSE);
+
 //These functions are for inferred performance attributes. If the datefirstseen is within the time frame the data can be used for those attributes.	
 //Unfortunately for now you have to pass in CURRENTDATE() into the second parameter as CURRENTDATE() within a function creates broken ECL. There is no timeline for a fix as this workaround exists.	
 // FUNCTION: WithinF6M(DATE InputDate, DATE reference) <= InputDate <= ADJUSTCALENDAR(reference, -1, -6, 0) AND InputDate >= ADJUSTCALENDAR(reference, -2, 0, 0) AND ISVALIDDATE( InputDate);
 // FUNCTION: WithinF1Y(DATE InputDate, DATE reference) <= InputDate <= ADJUSTCALENDAR(reference, -1, 0, 0) AND InputDate >= ADJUSTCALENDAR(reference, -2, 0, 0) AND ISVALIDDATE( InputDate);
 // FUNCTION: WithinF2Y(DATE InputDate, DATE reference) <= InputDate <= reference AND InputDate >= ADJUSTCALENDAR(reference, -2, 0, 0) AND ISVALIDDATE( InputDate);
+// Gateway code
+FUNCTION: GET_VALUE(SET OF STRING Values, INTEGER Position) <= ECL(Values[Position]) RETURNS STRING;
+FUNCTION: IS_VALID_IP(STRING IPAddress) <= ECL(STD.Str.FilterOut(TRIM(IPAddress),'0123456789')<>'' or TRIM(IPAddress)='') RETURNS BOOLEAN;
+FUNCTION: GET_STORED_GLBPURPOSE(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.GatewayFunctions.GrabGLBPurpose(StoredName)) FROM PublicRecords_KEL  RETURNS INTEGER;
+FUNCTION: GET_STORED_DPPAPURPOSE(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.GatewayFunctions.GrabDPPAPurpose(StoredName)) FROM PublicRecords_KEL  RETURNS INTEGER;
+// NetAcuity specific code - NonFCRA only
+FUNCTION: GET_NETACUITY_URL(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.NetAcuityFunctions.GrabNetAcuityURL(StoredName)) FROM PublicRecords_KEL  RETURNS STRING;
+FUNCTION: GATEWAY_NETACUITY(STRING IPAddress, STRING LexID, STRING GatewayURL, INTEGER DPPAPurpose, INTEGER GLBPurpose) <= ECL(PublicRecords_KEL.MAS_get.Gateway.NetAcuityFunctions.NetAcuityWrapper(IPAddress, LexID, GatewayURL, DPPAPurpose, GLBPurpose)) FROM PublicRecords_KEL RETURNS SET OF STRING;
+FUNCTION: GET_NETACUITY_ROYALTIES(STRING IPAddress, STRING IPType) <= ECL(Royalty.RoyaltyNetAcuity.GetCount(TRIM(IPAddress), TRIM(IPType))) FROM Royalty RETURNS INTEGER;
+
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -511,6 +522,19 @@ PersonAccident: NO_DATA_FOUND_97_INT :=  -99997;
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/ 
 
+/**************************************************************************/
+/*                                                                        */
+/*         Input PII gateway attributes                                   */
+/*                                                                        */
+/**************************************************************************/
+
+InputPII: => GLBPurpose := GET_STORED_GLBPURPOSE('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => DPPAPurpose := GET_STORED_DPPAPURPOSE('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => NetAcuityGatewayIP := GET_NETACUITY_URL('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => NetAcuityResults := GATEWAY_NETACUITY(P_InpIPAddr, P_InpLexID, NetAcuityGatewayIP, DPPAPurpose, GLBPurpose);
+InputPII: NOT NetAcuityGatewayIP:Null => ipaddr := GET_VALUE(NetAcuityResults, 2);
+InputPII: NOT NetAcuityGatewayIP:Null => ipresponse := GET_VALUE(NetAcuityResults, 3);
+InputPII: NOT NetAcuityGatewayIP:Null => netacuityroyalty := GET_NETACUITY_ROYALTIES(ipaddr, GET_VALUE(NetAcuityResults, 4));
 
 /**************************************************************************/
 /*                                                                        */
@@ -2315,21 +2339,6 @@ Person: => P_LexIDIsDeceased := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 													NOT EXISTS(ReportedDatesOfDeath(ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d'))) => '0',
 													'1');
 
-Person: => VersonOneHouseHolds := HouseholdMember(Version = 1).Household;//only 1 household id per version #
-Person: => MembersNotSubject := VersonOneHouseHolds.HouseholdMember.Subject(UID <> Person.UID AND (LexIDSegment = LEXIDCATEGORYCCORENOVSSN OR LexIDSegment = LEXIDCATEGORYCORE)){UID};//multiple members per household
-
-Person: => HHID :=  ONLY(TOPN(VersonOneHouseHolds{UID}, 1, -UID), UID);
-
-
-Person: => PL_HHID := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-														HHID:Null => NO_DATA_FOUND_INT,
-														HHID);
-
-Person: => PL_HHMmbrCnt := IF((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT), MISSING_INPUT_DATA_INT, 
-															BOUNDSFOLD((COUNT(MembersNotSubject)+ 1),1,999));//+1 for subject every household has at least 1 memeber
-
-
-
 Person: => PL_CurrAddrFull := MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
       PersonAddressHierarchyValidCnt=0 => NO_DATA_FOUND,
@@ -3863,10 +3872,10 @@ Person: => VelocityInquiriesWithFLASMatchFCRA := VelocityInquiriesPerLexIDFCRA(I
 Person: => VelocityInquiriesWithFLPSMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputPhoneMatch AND IsInputSSNMatch);
 Person: => VelocityInquiriesWithFLAPSMatchFCRA := VelocityInquiriesPerLexIDFCRA(IsInputFirstNameMatch AND IsInputLastNameMatch AND IsInputAddressMatch AND IsInputPhoneMatch AND IsInputSSNMatch);
 		
-Person: => VelocityInquiriesPerCurrAddrNonFCRA := PersonInquiry.Transaction(IsValidVelocityInquiryNonFCRA).PersonInfo(PrimaryRange = Person.CurrentAddrPrimRng 
+Person: => VelocityInquiriesPerCurrAddrNonFCRA := PersonAddress.Location.AddressInquiry.Transaction(IsValidVelocityInquiryNonFCRA).PersonInfo((PrimaryRange = Person.CurrentAddrPrimRng OR((Person.CurrentAddrPrimRng = '' OR Person.CurrentAddrPrimRng:Null) AND (PrimaryRange = '' OR PrimaryRange:Null)))
 			AND (Predirectional = Person.CurrentAddrPreDir OR((Person.CurrentAddrPreDir = '' OR Person.CurrentAddrPreDir:Null) AND (Predirectional = '' OR Predirectional:Null)))
-			AND (PrimaryName = Person.CurrentAddrPrimName)
-			AND (Suffix = Person.CurrentAddrSffx)
+			AND (PrimaryName = Person.CurrentAddrPrimName OR((Person.CurrentAddrPrimName = '' OR Person.CurrentAddrPrimName:Null) AND (PrimaryName = '' OR PrimaryName:Null)))
+			AND (Suffix = Person.CurrentAddrSffx OR((Person.CurrentAddrSffx = '' OR Person.CurrentAddrSffx:Null) AND (Suffix = '' OR Suffix:Null)))
 			AND (Postdirectional = Person.CurrentPostdirectional OR ((Person.CurrentPostdirectional= '' OR Person.CurrentPostdirectional:Null) AND (Postdirectional = '' OR Postdirectional:Null)))
 			AND (ZIP5 = Person.CurrentAddrZip5)
 			AND (SecondaryRange =Person.CurrentAddrSecRng OR ((Person.CurrentAddrSecRng= '' OR Person.CurrentAddrSecRng:Null) AND (SecondaryRange = '' OR SecondaryRange:Null))))
@@ -8120,3 +8129,28 @@ Person: => PL_VerSrcNewDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 Person: => P_LexIDRstdOnlyFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 																	 EXISTS(VerSourceListSorted(NOT TranslatedSourceCode IN ['CY','D','EN','FR','LI','NT','P*','TN','TS','TU','V'])) => '0', 
 																	 '1');
+
+Person: BUREAU_SOURCES :=['EN', 'EQ','TN'];
+Person: => IsBureauSourceTest := VerSourceListSorted(TranslatedSourceCode IN Person.BUREAU_SOURCES);
+Person: => IsBureauOnlySource := COUNT(VerSourceListSorted) = COUNT(IsBureauSourceTest);
+Person: => VersonOneHouseHolds := HouseholdMember(Version = 1).Household;//only 1 household id per version #
+Person: => MembersNotSubject := VersonOneHouseHolds.HouseholdMember.Subject(UID <> Person.UID AND (LexIDSegment = LEXIDCATEGORYCCORENOVSSN OR LexIDSegment = LEXIDCATEGORYCORE)){UID,BestDOBAge};//multiple members per household
+Person: => HHID :=  ONLY(TOPN(VersonOneHouseHolds{UID}, 1, -UID), UID);
+Person: =>	HHMmbrUnder18Cnt := COUNT(MembersNotSubject(BestDOBAge<18){UID});
+Person: => IsPersonUnder18 := IF((BestDOBAge<18),TRUE,FALSE);
+Person: => HHMmbrWithSujectUnder18cnt := IF(IsPersonUnder18 =TRUE,HHMmbrUnder18Cnt+1,HHMmbrUnder18Cnt);
+
+Person: => PL_HHID := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+														HHID:Null => NO_DATA_FOUND_INT,
+														HHID);
+
+Person: => PL_HHMmbrCnt := IF((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT), MISSING_INPUT_DATA_INT, 
+															BOUNDSFOLD((COUNT(MembersNotSubject)+ 1),1,999));//+1 for subject every household has at least 1 memeber
+
+Person: => PL_HHMmbrBureauOnlyCnt := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT) => MISSING_INPUT_DATA_INT,
+						NOT IsBureauOnlySource => NO_DATA_FOUND_INT,
+ 						BOUNDSFOLD((COUNT(MembersNotSubject)+1),1,999));
+															
+Person: => PL_HHMmbrAge18uCnt := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT) => MISSING_INPUT_DATA_INT,
+						(BestDOBAge= 0 OR BestDOBAge:Null) AND ALL(MembersNotSubject,(BestDOBAge=0 OR BestDOBAge:Null))=>NO_DATA_FOUND_97_INT,
+						BOUNDSFOLD(HHMmbrWithSujectUnder18cnt,0,999));
