@@ -8148,6 +8148,29 @@ Person: => P_LexIDRstdOnlyFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DAT
 																	 EXISTS(VerSourceListSorted(NOT TranslatedSourceCode IN ['CY','D','EN','FR','LI','NT','P*','TN','TS','TU','V'])) => '0', 
 																	 '1');
 
+
+PersonSSN.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
+PersonSSN: => TranslatedSources := DataSources{TranslatedSourceCode};
+
+Person: => VerSSNSourceList := PersonSSN(IsInquirySSNMatch(Social, Person.P_InpClnSSNRaw)).TranslatedSources(TranslatedSourceCode!=''){
+	TranslatedSourceCode := TranslatedSourceCode,
+	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), '-99997'),
+	FirstSeenDate := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.MAX_DATE),
+	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), '-99997')};
+
+Person: => VerSSNSourceListSorted := TOPN(VerSSNSourceList, 32, FirstSeenDate, TranslatedSourceCode);
+
+
+Person: => PL_VerSSNSrcListEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA, 
+																 CONCAT(VerSSNSourceListSorted, TranslatedSourceCode, '|'));
+Person: => PL_VerSSNSrcEmrgDtListEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA,
+																			 CONCAT(VerSSNSourceListSorted, SourceDateFirstSeen, '|'));
+Person: => PL_VerSSNSrcLastDtListEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA,
+																			 CONCAT(VerSSNSourceListSorted, SourceDateLastSeen, '|'));
+Person: => PL_VerSSNSrcCntEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(VerSSNSourceListSorted), 0, 32));
+
+
 Person: BUREAU_SOURCES :=['EN', 'EQ','TN'];
 Person: => IsBureauSourceTest := VerSourceListSorted(TranslatedSourceCode IN Person.BUREAU_SOURCES);
 Person: => IsBureauOnlySource := COUNT(VerSourceListSorted) = COUNT(IsBureauSourceTest);
@@ -8172,6 +8195,8 @@ Person: => PL_HHMmbrBureauOnlyCnt := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_
 Person: => PL_HHMmbrAge18uCnt := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT) => MISSING_INPUT_DATA_INT,
 						(BestDOBAge= 0 OR BestDOBAge:Null) AND ALL(MembersNotSubject,(BestDOBAge=0 OR BestDOBAge:Null))=>NO_DATA_FOUND_97_INT,
 						BOUNDSFOLD(HHMmbrWithSujectUnder18cnt,0,999));
+
+
 
 // Consumer Alerts FCRA current mode only
 Person: => PL_AlrtCorrectedFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA, EXISTS(ConsumerStatementFlags(CorrectedFlag = TRUE)) => '1', '0');
