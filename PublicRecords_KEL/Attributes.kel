@@ -237,11 +237,17 @@ FUNCTION: GET_VALUE(SET OF STRING Values, INTEGER Position) <= ECL(Values[Positi
 FUNCTION: IS_VALID_IP(STRING IPAddress) <= ECL(STD.Str.FilterOut(TRIM(IPAddress),'0123456789')<>'' or TRIM(IPAddress)='') RETURNS BOOLEAN;
 FUNCTION: GET_STORED_GLBPURPOSE(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.GatewayFunctions.GrabGLBPurpose(StoredName)) FROM PublicRecords_KEL  RETURNS INTEGER;
 FUNCTION: GET_STORED_DPPAPURPOSE(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.GatewayFunctions.GrabDPPAPurpose(StoredName)) FROM PublicRecords_KEL  RETURNS INTEGER;
+FUNCTION: GET_STORED_WATCHLISTS_REQUESTED(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.GatewayFunctions.GrabWatchlistsRequested(StoredName)) FROM PublicRecords_KEL  RETURNS STRING;
+FUNCTION: GET_STORED_INCLUDE_OFAC(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.GatewayFunctions.GrabIncludeOFAC(StoredName)) FROM PublicRecords_KEL  RETURNS BOOLEAN;
+FUNCTION: GET_STORED_INCLUDE_ADDITIONAL_WATCHLISTS(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.GatewayFunctions.GrabIncludeAdditionalWatchlists(StoredName)) FROM PublicRecords_KEL  RETURNS BOOLEAN;
+FUNCTION: GET_STORED_GLOBAL_WATCHLIST_THRESHOLD(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.GatewayFunctions.GrabGlobalWatchlistThreshold(StoredName)) FROM PublicRecords_KEL  RETURNS REAL;
 // NetAcuity specific code - NonFCRA only
-// FUNCTION: GET_NETACUITY_URL(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.NetAcuityFunctions.GrabNetAcuityURL(StoredName)) FROM PublicRecords_KEL  RETURNS STRING;
-// FUNCTION: GATEWAY_NETACUITY(STRING IPAddress, STRING LexID, STRING GatewayURL, INTEGER DPPAPurpose, INTEGER GLBPurpose) <= ECL(PublicRecords_KEL.MAS_get.Gateway.NetAcuityFunctions.NetAcuityWrapper(IPAddress, LexID, GatewayURL, DPPAPurpose, GLBPurpose)) FROM PublicRecords_KEL RETURNS SET OF STRING;
-// FUNCTION: GET_NETACUITY_ROYALTIES(STRING IPAddress, STRING IPType) <= ECL(Royalty.RoyaltyNetAcuity.GetCount(TRIM(IPAddress), TRIM(IPType))) FROM Royalty RETURNS INTEGER;
-
+FUNCTION: GET_NETACUITY_URL(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.NetAcuityFunctions.GrabNetAcuityURL(StoredName)) FROM PublicRecords_KEL  RETURNS STRING;
+FUNCTION: GATEWAY_NETACUITY(STRING IPAddress, STRING LexID, STRING GatewayURL, INTEGER DPPAPurpose, INTEGER GLBPurpose) <= ECL(PublicRecords_KEL.MAS_get.Gateway.NetAcuityFunctions.NetAcuityWrapper(IPAddress, LexID, GatewayURL, DPPAPurpose, GLBPurpose)) FROM PublicRecords_KEL RETURNS SET OF STRING;
+FUNCTION: GET_NETACUITY_ROYALTIES(STRING IPAddress, STRING IPType) <= ECL(Royalty.RoyaltyNetAcuity.GetCount(TRIM(IPAddress), TRIM(IPType))) FROM Royalty RETURNS INTEGER;
+// OFAC specific code - NonFCRA and Business only
+FUNCTION: GET_OFAC_URL(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.Gateway.OFACWatchlistsFunctions.GrabOFACURL(StoredName)) FROM PublicRecords_KEL  RETURNS STRING;
+FUNCTION: GATEWAY_OFAC(STRING GatewayURL, STRING FirstName, STRING MiddleName, STRING LastName, STRING DateOfBirth, BOOLEAN IncludeOFAC, BOOLEAN IncludeAdditionalWatchlists, REAL GlobalWatchlistThreshold, STRING WatchlistsRequested) <= ECL(PublicRecords_KEL.MAS_get.Gateway.OFACWatchlistsFunctions.OFACWatchlistsWrapper(GatewayURL, FirstName, MiddleName, LastName, DateOfBirth, IncludeOFAC, IncludeAdditionalWatchlists, GlobalWatchlistThreshold, WatchlistsRequested)) FROM PublicRecords_KEL RETURNS SET OF STRING;
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -531,14 +537,28 @@ PersonAccident: NO_DATA_FOUND_97_INT :=  -99997;
 /*                                                                        */
 /**************************************************************************/
 
+// NetAcuity Attributes
 InputPII: => GLBPurpose := GET_STORED_GLBPURPOSE('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
 InputPII: => DPPAPurpose := GET_STORED_DPPAPURPOSE('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
-// InputPII: => NetAcuityGatewayIP := GET_NETACUITY_URL('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
-// InputPII: => NetAcuityResults := GATEWAY_NETACUITY(P_InpIPAddr, P_InpLexID, NetAcuityGatewayIP, DPPAPurpose, GLBPurpose);
-// InputPII: NOT NetAcuityGatewayIP:Null => ipaddr := GET_VALUE(NetAcuityResults, 2);
-// InputPII: NOT NetAcuityGatewayIP:Null => ipresponse := GET_VALUE(NetAcuityResults, 3);
-// InputPII: NOT NetAcuityGatewayIP:Null => netacuityroyalty := GET_NETACUITY_ROYALTIES(ipaddr, GET_VALUE(NetAcuityResults, 4));
+InputPII: => NetAcuityGatewayIP := GET_NETACUITY_URL('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => NetAcuityResults := GATEWAY_NETACUITY(P_InpIPAddr, P_InpLexID, NetAcuityGatewayIP, DPPAPurpose, GLBPurpose);
+InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => ipaddr := GET_VALUE(NetAcuityResults, 2);
+InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => ipresponse := GET_VALUE(NetAcuityResults, 3);
+InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => netacuityroyalty := GET_NETACUITY_ROYALTIES(ipaddr, GET_VALUE(NetAcuityResults, 4));
 
+// OFAC Attributes
+InputPII: => WatchlistsRequested := GET_STORED_WATCHLISTS_REQUESTED('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => IncludeOFAC := GET_STORED_INCLUDE_OFAC('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => IncludeAdditionalWatchlists := GET_STORED_INCLUDE_ADDITIONAL_WATCHLISTS('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => GlobalWatchlistThreshold := GET_STORED_GLOBAL_WATCHLIST_THRESHOLD('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => OFACGatewayIP := GET_OFAC_URL('DummyValue'); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => OFACResults := GATEWAY_OFAC(OFACGatewayIP, P_InpNameFirst, P_InpNameMid, P_InpNameLast, P_InpDOB, IncludeOFAC, IncludeAdditionalWatchlists, GlobalWatchlistThreshold, WatchlistsRequested);
+InputPII: NOT OFACGatewayIP:Null OR NOT OFACGatewayIP = '' => PI_AlrtInpNameWatchlistRecNum := MAP(P_InpNameLast:Null OR P_InpNameLast = '' => MISSING_INPUT_DATA,
+                                                                     GET_VALUE(OFACResults, 2) = '' => NO_DATA_FOUND,
+                                                                     GET_VALUE(OFACResults, 2));
+InputPII: NOT OFACGatewayIP:Null OR NOT OFACGatewayIP = '' => PI_AlrtInpNameOnWatchlistFlag := MAP(P_InpNameLast:Null OR P_InpNameLast = '' => MISSING_INPUT_DATA,
+                                                                     GET_VALUE(OFACResults, 3)); // Value of 1 or 0 gets assigned in the OFAC function call
+                                                                
 /**************************************************************************/
 /*                                                                        */
 /*         Input PII input Echo attributes                                */
