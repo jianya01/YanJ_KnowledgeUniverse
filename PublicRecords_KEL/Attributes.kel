@@ -8149,28 +8149,55 @@ Person: => P_LexIDRstdOnlyFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DAT
 																	 EXISTS(VerSourceListSorted(NOT TranslatedSourceCode IN ['CY','D','EN','FR','LI','NT','P*','TN','TS','TU','V'])) => '0', 
 																	 '1');
 
+Person: SEVEN_YEARS_IN_DAYS := 2556;
+Person: TEN_YEARS_IN_DAYS := 3652;
 
-PersonSSN.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
-PersonSSN: => TranslatedSources := DataSources{TranslatedSourceCode};
+ 
 
-Person: => VerSSNSourceList := PersonSSN(IsInquirySSNMatch(Social, Person.P_InpClnSSNRaw)).TranslatedSources(TranslatedSourceCode!=''){
-	TranslatedSourceCode := TranslatedSourceCode,
-	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), '-99997'),
-	FirstSeenDate := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.MAX_DATE),
-	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), '-99997')};
+PersonSSN: =>InputSSNMatch :=EditDistanceWithinRadius(Social, Subject.P_InpClnSSN, 2);
+PersonSSN.DataSources: => TranslatedSource := ConsumerSourceGroup(Source);
+PersonSSN.DataSources: => MyDateFirstSeen := Source:DateFirstSeen;
+PersonSSN.DataSources: => MyDateLastSeen := Source:DateLastSeen;
+Person: => PersonSSNMatchSourcesPre := PersonSSN(InputSSNMatch).DataSources(HeaderHitFlag){TranslatedSource, MyDateFirstSeen := MIN(GROUP, MyDateFirstSeen), MyDateLastSeen := MAX(GROUP, MyDateLastSeen)};
+Person: => PersonSSNMatchSources := PersonSSNMatchSourcesPre(TranslatedSource!=''){
+                 TranslatedSource,
+                 DateFirstSeenClean := IF(ISVALIDDATE(MyDateFirstSeen), DATETOSTRING(MyDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
+                 FirstSeenDate := IF(ISVALIDDATE(MyDateFirstSeen), DATETOSTRING(MIN(MyDateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.MAX_DATE),
+                 DateLastSeenClean := IF(ISVALIDDATE(MyDateLastSeen), DATETOSTRING(MIN(MyDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97),
+                 BankruptcyAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
+                 LiensAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE)}; 
+    
+Person.PersonSSNMatchSources: => ValidBankruptcySources := (TranslatedSource = 'BA' AND BankruptcyAgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT BankruptcyAgeInDays:Null);       
+Person.PersonSSNMatchSources: => ValidLiensSources := (TranslatedSource = 'L2' AND LiensAgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT LiensAgeInDays:Null);       
+Person.PersonSSNMatchSources: => OtherSources := (TranslatedSource <> 'BA' AND TranslatedSource <> 'L2'); 
 
-Person: => VerSSNSourceListSorted := TOPN(VerSSNSourceList, 32, FirstSeenDate, TranslatedSourceCode);
+ 
+Person: => VerSSNSourceListSortedFCRA := TOPN(PersonSSNMatchSources(ValidBankruptcySources OR ValidLiensSources OR OtherSources), 32, FirstSeenDate, TranslatedSource);
+Person: => VerSSNSourceListSortedNonFCRA := TOPN(PersonSSNMatchSources, 32, FirstSeenDate, TranslatedSource);
 
+Person: => PL_VerSSNSrcCntEvFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnSSN  IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
+                                                                BOUNDSFOLD(COUNT(VerSSNSourceListSortedFCRA), 0, 32));
+Person: => PL_VerSSNSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+                                                                 PL_VerSSNSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
+                                                                 CONCAT(VerSSNSourceListSortedFCRA, TranslatedSource, '|'));
+Person: => PL_VerSSNSrcEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+                                                                             PL_VerSSNSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
+                                                                             CONCAT(VerSSNSourceListSortedFCRA, DateFirstSeenClean, '|'));
+Person: => PL_VerSSNSrcLastDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+                                                                             PL_VerSSNSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
+                                                                             CONCAT(VerSSNSourceListSortedFCRA, DateLastSeenClean, '|'));           
 
-Person: => PL_VerSSNSrcListEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA, 
-																 CONCAT(VerSSNSourceListSorted, TranslatedSourceCode, '|'));
-Person: => PL_VerSSNSrcEmrgDtListEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA,
-																			 CONCAT(VerSSNSourceListSorted, SourceDateFirstSeen, '|'));
-Person: => PL_VerSSNSrcLastDtListEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA,
-																			 CONCAT(VerSSNSourceListSorted, SourceDateLastSeen, '|'));
-Person: => PL_VerSSNSrcCntEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT,
-																BOUNDSFOLD(COUNT(VerSSNSourceListSorted), 0, 32));
-
+Person: => PL_VerSSNSrcCntEvNonFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnSSN  IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
+                                                                BOUNDSFOLD(COUNT(VerSSNSourceListSortedNonFCRA), 0, 32));
+Person: => PL_VerSSNSrcListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+                                                                 PL_VerSSNSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
+                                                                 CONCAT(VerSSNSourceListSortedNonFCRA, TranslatedSource, '|'));
+Person: => PL_VerSSNSrcEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+                                                                             PL_VerSSNSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
+                                                                             CONCAT(VerSSNSourceListSortedNonFCRA, DateFirstSeenClean, '|'));
+Person: => PL_VerSSNSrcLastDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+                                                                             PL_VerSSNSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
+                                                                             CONCAT(VerSSNSourceListSortedNonFCRA, DateLastSeenClean, '|'));           
 
 Person: BUREAU_SOURCES :=['EN', 'EQ','TN'];
 Person: => IsBureauSourceTest := VerSourceListSorted(TranslatedSourceCode IN Person.BUREAU_SOURCES);
