@@ -302,6 +302,7 @@ Person: CURRENT_DATE_INQ := MIN(GETBUILDDATE('inquiry_update_build_version'), CU
 PersonInquiry: CURRENT_DATE := MIN(GETBUILDDATE('inquiry_update_build_version'), CURRENTDATE());
 PersonAccident: CURRENT_DATE := MIN(GETBUILDDATE('accident_build_version'), CURRENTDATE());
 Person: CURRENT_DATE_THRIVE := MIN(GETBUILDDATE('thrive_build_version'), CURRENTDATE());
+InputPII: CURRENT_DATE_PII  := MIN(GETBUILDDATE('pii_corr_build_version'), CURRENTDATE());
 
 
 //These are the dates for inferred performance attributes. The inferred performance attributes are run with a query 2 years in the future. These are the cut off dates for the 3 time periods wanted.
@@ -1166,8 +1167,7 @@ InputPII: =>PI_InpAddrStateVoterAvailFlag_FCRA := MAP(P_InpClnAddrStateFlagValue
 InputPII: =>PI_InpAddrStateVoterAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 fnInVotersState(P_InpClnAddrState, FALSE ,STRING(P_InpClnArchDt)) => 1,
 																			 0);
-
-													
+	
 //Name Summary attributes		
 NameSummary: =>PII :=ONLY(InputPII);
 NameSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
@@ -1284,6 +1284,52 @@ SSNSummary: => PI_SrcWInpFLSEmrgDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_D
 SSNSummary: => PI_SrcWInpFLSLastDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
 		PI_SrcWInpFLSListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
 		CONCAT(SortedFnLnTranslatedSourceList, SourceDateLastSeen, '|'));
+		
+
+//KS-6126
+
+InputPII: => PhoneSICHighRiskPre := InputCleanPhone.HighRiskPhone{HighRiskSIC, DateFirstSeenMinSICPhone := HighRiskSIC:DateFirstSeen, DateLastSeenMinSICPhone := HighRiskSIC:DateLastSeen};
+InputPII: => PhoneNAICSHighRiskPre := InputCleanPhone.HighRiskPhone{HighRiskNAICS, DateFirstSeenMinNAICSPhone := HighRiskNAICS:DateFirstSeen, DateLastSeenMinNAICSPhone := HighRiskNAICS:DateLastSeen};		
+InputPII: => NXXTypePhone := InputCleanPhone.NXXType;
+InputPII: => ServPhone := InputCleanPhone.Serv;
+InputPII: => LinePhone := InputCleanPhone.Line;
+InputPII: => PhoneListingTypeIsBusiness := EXISTS(InputCleanPhone.ListingTypes(ListingType = 'B'));
+		
+InputPII: => PhoneSICList := PhoneSICHighRiskPre{
+	HighRiskSIC,
+	PhoneSICDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMinSICPhone),DATETOSTRING(DateFirstSeenMinSICPhone, '%Y%m%d'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE),
+	PhoneSICDateLastSeen := IF(ISVALIDDATE(DateLastSeenMinSICPhone),DATETOSTRING(MIN(DateLastSeenMinSICPhone, InputPII.CURRENT_DATE_PII), '%Y%m%d'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)
+	
+	};
+
+InputPII: => PhoneNAICSList := PhoneNAICSHighRiskPre{
+	HighRiskNAICS,
+	PhoneNAICSDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMinNAICSPhone),DATETOSTRING(DateFirstSeenMinNAICSPhone, '%Y%m%d'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE),
+	PhoneNAICSDateLastSeen := IF(ISVALIDDATE(DateLastSeenMinNAICSPhone),DATETOSTRING(MIN(DateLastSeenMinNAICSPhone, InputPII.CURRENT_DATE_PII), '%Y%m%d'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)
+
+	};		
+	
+InputPII: => PhoneSICSortedList := TOPN(PhoneSICList, 1000, PhoneSICDateFirstSeen, PhoneSICDateLastSeen);
+InputPII: => PhoneNAICSSortedList := TOPN(PhoneNAICSList, 1000, PhoneNAICSDateFirstSeen, PhoneNAICSDateLastSeen);
+		
+InputPII: => PI_InpPhoneSICCodeHRList := MAP(P_InpClnPhoneHomeFlagValue != 1 => MISSING_INPUT_DATA,
+	NOT EXISTS(PhoneSICSortedList) OR ALL(PhoneSICSortedList, HighRiskSIC = '' OR HighRiskSIC:Null) => NO_DATA_FOUND,
+	CONCAT(PhoneSICSortedList,HighRiskSIC,'|'));
+InputPII: => PI_InpPhoneNAICSCodeHRList := MAP(P_InpClnPhoneHomeFlagValue != 1 => MISSING_INPUT_DATA,
+	NOT EXISTS(PhoneNAICSSortedList) OR ALL(PhoneNAICSSortedList, HighRiskNAICS = '' OR HighRiskNAICS:Null) => NO_DATA_FOUND,
+	CONCAT(PhoneNAICSSortedList,HighRiskNAICS,'|'));
+InputPII: => PI_InpPhoneIsHRCorrectFacFlag := MAP(P_InpClnPhoneHomeFlagValue != 1 => MISSING_INPUT_DATA,
+	(NOT CONTAINS(PI_InpPhoneSICCodeHRList , '9223')  OR NOT CONTAINS(PI_InpPhoneNAICSCodeHRList, '922140')) OR (PI_InpPhoneSICCodeHRList  = NO_DATA_FOUND AND PI_InpPhoneNAICSCodeHRList  = NO_DATA_FOUND) => '0',
+	'1');
+InputPII: => PI_InpPhoneType := MAP(P_InpClnPhoneHomeFlagValue != 1 => MISSING_INPUT_DATA,
+	(ServPhone = '1' AND LinePhone = '1') OR NXXTypePhone IN ['04', '55', '60', '01', '57', '62'] => '1',
+	(ServPhone = '0' AND LinePhone = '0') OR NXXTypePhone IN ['00', '50', '51', '54', '66', '52'] => '2',
+	ServPhone = '2' AND LinePhone = '2' => '3',
+	NO_DATA_FOUND);
+InputPII: => PI_InpPhoneIsBusPhoneFlag :=  MAP(P_InpClnPhoneHomeFlagValue != 1 => MISSING_INPUT_DATA,
+	NOT PhoneListingTypeIsBusiness => '0',
+	PhoneListingTypeIsBusiness => '1',
+	NO_DATA_FOUND);
 				    
 /**************************************************************************/
 /*                                                                        */
