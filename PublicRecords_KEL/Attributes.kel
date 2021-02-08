@@ -2260,7 +2260,9 @@ Person: => AddressHierarchySet := TOPN(PersonAddress.AddressHierarchy
                                     ZIP5 := IF(IsNotEnoughToClean(STRING(ZIP5)) OR ZIP5=0 OR ZIP5:Null,'',TRIM(STRING(ZIP5))),
                                     ZIP4 := IF(IsNotEnoughToClean(STRING(ZIP4)) OR ZIP4=0 OR ZIP4:Null,'',TRIM(STRING(ZIP4))),
 																		Addr1FromComponents := fnAddr1FromComponents(PrimaryRange,Predirectional,PrimaryName,Suffix,Postdirectional,UnitDesignation,SecondaryRange),
-																		SortField := AddressRank:DateLastSeen
+																		SortField := AddressRank:DateLastSeen,
+																		HierarchyDateFirstSeen := AddressRank:DateFirstSeen,
+																		HierarchyDateLastSeen := AddressRank:DateLastSeen
                                      }, 999, AddressRank, -SortField);
 Person: => RecentAddrFullSet := TOPN(AddressHierarchySet(
 																		 IsNotEnoughToClean(AddressRank)=FALSE AND NOT AddressRank IN Person.INVALIDADDRESSRANK AND 
@@ -2318,6 +2320,9 @@ Person: => CurrentAddrUnitDesignation := Current.UnitDesignation;
 Person: => CurrAddrUnitDsgEmptyCheck :=IF(CurrentAddrUnitDesignation = '',1,0);
 Person: => CurrAddrSecRngEmptyCheck :=IF(CurrentAddrSecRng = '',1,0);
 
+
+Person: => CurrAddrDateFirstSeen := Current.HierarchyDateFirstSeen;
+Person: => CurrAddrDateLastSeen := MIN(Current.HierarchyDateLastSeen, Person.CURRENT_DATE);
 
 Person: => PreviousAddrPrimRng :=  Previous.PrimaryRange;
 Person: => PreviousAddrPreDir :=   Previous.Predirectional;
@@ -2627,7 +2632,74 @@ Person: => PL_BestDOBAge:= MAP(
 			P_LexIDSeenFlag = '0' OR BestDOBAge:Null => MISSING_INPUT_DATA_INT,
 			//BestDOBAge:Null => NO_DATA_FOUND_INT,
 			BestDOBAge);
-			
+
+/**************************************************************************/
+/*                                                                        */
+/*              Input PII address characteristics                         */
+/*                                                                        */
+/**************************************************************************/
+
+InputPII: => AddressRecords := Location.DataSources(HeaderHitFlag)
+  {HeaderHitFlag,
+	AddressDateFirstSeen := IF(ISVALIDDATE(HeaderHitFlag:DateFirstSeen), DATETOSTRING(HeaderHitFlag:DateFirstSeen, '%Y%m01'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE),
+	AddressDateLastSeen :=  IF(ISVALIDDATE(HeaderHitFlag:DateLastSeen), DATETOSTRING(MIN(HeaderHitFlag:DateLastSeen, Person.CURRENT_DATE), '%Y%m01'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)};
+
+InputPII: => InpAddressDateFirstSeen := ONLY(AddressRecords, AddressDateFirstSeen);
+InputPII: => InpAddressDateLastSeen := ONLY(AddressRecords, AddressDateLastSeen);
+
+
+InputPII: => InputAddressMatchesCurrentAddress := P_InpClnAddrPrimRng = Subject.CurrentAddrPrimRng AND P_InpClnAddrPrimName = Subject.CurrentAddrPrimName AND P_InpClnAddrZip5 = Subject.CurrentAddrZip5;
+InputPII: => InputAddressMatchesAddressHierarchyAddress := EXISTS(Subject.AddressHierarchySet(InputPII.P_InpClnAddrPrimRng = PrimaryRange AND InputPII.P_InpClnAddrPrimName = PrimaryName AND InputPII.P_InpClnAddrZip5 = ZIP5));
+
+InputPII: => PI_InpAddrOldDt := MAP(
+		PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND,
+		NOT EXISTS(AddressRecords) => NO_DATA_FOUND,
+		InpAddressDateFirstSeen);
+
+InputPII: => PI_InpAddrNewDt := MAP(
+		PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND,
+		NOT EXISTS(AddressRecords) => NO_DATA_FOUND,
+		InpAddressDateLastSeen);
+
+InputPII: => PI_InpAddrSubjFlag := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND_INT,
+		NOT InputAddressMatchesAddressHierarchyAddress => NO_DATA_FOUND_INT,
+		InputAddressMatchesCurrentAddress => 1,
+		0);
+
+InputPII: => PI_InpAddrSubjOldDt := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND,
+		NOT ISVALIDDATE(Subject.CurrAddrDateFirstSeen) OR Subject.CurrAddrDateFirstSeen:Null => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE,
+		DATETOSTRING(Subject.CurrAddrDateFirstSeen,'%Y%m01'));
+
+InputPII: => PI_InpAddrSubjNewDt := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND,
+		NOT ISVALIDDATE(Subject.CurrAddrDateLastSeen) OR Subject.CurrAddrDateLastSeen:Null => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE,
+		DATETOSTRING(Subject.CurrAddrDateLastSeen,'%Y%m01'));
+
+InputPII: => PI_InpAddrSubjOldMsnc := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND_INT,
+		PI_InpAddrSubjOldDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PI_InpAddrSubjOldDt, '%Y%m%d'), Person.CURRENT_DATE),0,960)); 
+
+InputPII: => PI_InpAddrSubjNewMsnc := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND_INT,
+		PI_InpAddrSubjNewDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PI_InpAddrSubjNewDt, '%Y%m%d'), Person.CURRENT_DATE),0,960)); 
+
+InputPII: => PI_InpAddrSubjResSpan := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND_INT,
+		PI_InpAddrSubjOldDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE OR PI_InpAddrSubjNewDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PI_InpAddrSubjOldDt, '%Y%m%d'), FROMSTRINGTODATE(PI_InpAddrSubjNewDt, '%Y%m%d')),0,960)); 
+
 /**************************************************************************/
 /*                                                                        */
 /*                  Education Helper Attributes                           */
