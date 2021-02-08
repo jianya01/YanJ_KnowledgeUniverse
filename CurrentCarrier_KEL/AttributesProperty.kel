@@ -1,6 +1,6 @@
 ﻿// IMPORT Entities;
 IMPORT KnowledgeUniverse.CurrentCarrier_KEL.Entities;
-//IMPORT CurrentCarrierProperty_KEL.Uses;
+IMPORT CurrentCarrierProperty_KEL.Uses;
 
 //Constant
 Policy: POLICY_TYPE_LIST := ['HO'];
@@ -25,7 +25,7 @@ FUNCTION: ROUND2(REAL inreal) <= ECL(ROUND(inreal + 0.00000000001, 2)) RETURNS R
 
 //Globals
 // Policy: => Subject := PolicyHolder(NOT EndDate:Null AND SubjectNumber = 1).Holder; // Grab the primary policy holder for this policy (Relation = 'B1' would be additional policy holders)
-Policy: => Subject := PolicyHolder(NOT EndDate:Null AND SubjectNumber = 1){SubjectNumber}; // Grab the primary policy holder for this policy (Relation = 'B1' would be additional policy holders)
+Policy: => Subject := PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0){SubjectNumber}; // Grab the primary policy holder for this policy (Relation = 'B1' would be additional policy holders)
 //Policy: => ExistValidTerms := EXISTS(Subject);
 //Audit
 Policy: => ExistValidTerms := EXISTS(Subject) AND InsuranceType = 'PP';
@@ -33,10 +33,10 @@ Policy: => DateOfReport := rReport.DateOfReport;
 Report: => SetDefault1 := COUNT(Policy(ExistValidTerms));//Do not have valid policy terms at all
 Report: => SetDefault2 := COUNT(Policy(ExistValidTerms AND (PolicyType IN POLICY_TYPE_LIST)));//have policy terms but not in type HO
 
-Policy: => SubjectEndDatePolicy := MAX(PolicyHolder(NOT EndDate:Null AND SubjectNumber = 1), EndDate);// null, if not valid records
+Policy: => SubjectEndDatePolicy := MAX(PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0), EndDate);// null, if not valid records
 Policy: => Calculated_End_Date := IF(NOT SubjectEndDatePolicy:Null, MIN(SubjectEndDatePolicy, DateOfReport));//null, if no subject end date at all. of course, not valid policy
 
-Policy: => SubjectBeginDatePolicy := MIN(PolicyHolder(NOT EndDate:Null AND SubjectNumber = 1 AND EndDate = Policy.SubjectEndDatePolicy), StartDate);
+Policy: => SubjectBeginDatePolicy := MIN(PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0 AND EndDate = Policy.SubjectEndDatePolicy), StartDate);
 
 Policy: => Calculated_Start_Date:= IF(NOT SubjectBeginDatePolicy:Null, MIN(InceptionDate,SubjectBeginDatePolicy),InceptionDate);//added inceptiondate if no subjectbegindate
 //set the age to -99999, if (inceptiondate) start date > end date (future terms), or no terms to calcualte (should not happen since I need set this to -1)
