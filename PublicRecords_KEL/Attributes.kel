@@ -274,6 +274,7 @@ CriminalPunishment: CURRENT_DATE  := MIN(GETBUILDDATE('doc_build_version'), CURR
 Email: CURRENT_DATE_FCRA := MIN(GETBUILDDATE('email_build_version'), CURRENTDATE());
 Inquiry:  CURRENT_DATE  := MIN(GETBUILDDATE('inquiry_build_version'), CURRENTDATE());
 Person:  CURRENT_DATE  := MIN(GETBUILDDATE('header_build_version'), CURRENTDATE());
+PersonAddress:  CURRENT_DATE  := MIN(GETBUILDDATE('header_build_version'), CURRENTDATE());
 Phone:  CURRENT_DATE  := MIN(GETBUILDDATE('targus_build_version'), CURRENTDATE());
 PhoneSummary:  CURRENT_DATE  := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE());
 ProfessionalLicense:  CURRENT_DATE  := MIN(GETBUILDDATE('proflic_build_version'), CURRENTDATE());
@@ -2263,7 +2264,7 @@ Person: => AddressHierarchySet := TOPN(PersonAddress.AddressHierarchy
 																		SortField := AddressRank:DateLastSeen,
 																		HierarchyDateFirstSeen := AddressRank:DateFirstSeen,
 																		HierarchyDateLastSeen := AddressRank:DateLastSeen
-                                     }, 999, AddressRank, -SortField);
+                                     }, 9999, AddressRank, -SortField);
 Person: => RecentAddrFullSet := TOPN(AddressHierarchySet(
 																		 IsNotEnoughToClean(AddressRank)=FALSE AND NOT AddressRank IN Person.INVALIDADDRESSRANK AND 
                                      (AddressType <> 'BUS' OR AddressType:Null) AND
@@ -2592,6 +2593,53 @@ Person: => PL_PrevAddrIsBusinessFlag:= MAP(
 			OnlyPreviousAddressHelperFlag.ResBusFlagAC =>0,
 			OnlyPreviousAddressHelperFlag.ResBusFlagBD =>1,
 			NO_DATA_FOUND_97_INT);
+			
+Person: THREE_MONTHS_IN_DAYS := 90;
+Person: SIX_MONTHS_IN_DAYS := 180;
+Person: FIFTEEN_YEARS_IN_DAYS := 5478;
+Person: => UniqueAddresses := AddressHierarchySet(IsNotEnoughToClean(AddressRank)=FALSE AND NOT AddressRank IN Person.INVALIDADDRESSRANK){PrimaryRange,PrimaryName};
+Person.UniqueAddresses: =>HierarchyDateFirstSeen :=PrimaryName:DateFirstSeen;
+Person.UniqueAddresses: => AgeInDays :=ABSDAYSBETWEEN(HierarchyDateFirstSeen,Person.CURRENT_DATE);
+Person.UniqueAddresses: => Seen_In_Three_Months :=AgeInDays<=THREE_MONTHS_IN_DAYS;
+Person.UniqueAddresses: =>Seen_In_Six_Months :=AgeInDays<=SIX_MONTHS_IN_DAYS;
+Person.UniqueAddresses: =>Seen_In_One_Year :=AgeInDays<=ONE_YEAR_IN_DAYS;
+Person.UniqueAddresses: =>Seen_In_Two_Years :=AgeInDays<=TWO_YEARS_IN_DAYS;
+Person.UniqueAddresses: =>Seen_In_Three_Years :=AgeInDays<=THREE_YEARS_IN_DAYS;
+Person.UniqueAddresses: =>Seen_In_Five_Years :=AgeInDays<=FIVE_YEARS_IN_DAYS;
+Person.UniqueAddresses: =>Seen_In_Seven_Years :=AgeInDays<=SEVEN_YEARS_IN_DAYS;
+Person.UniqueAddresses: =>Seen_In_Ten_Years :=AgeInDays<=TEN_YEARS_IN_DAYS;
+Person.UniqueAddresses: =>Seen_In_Fifteen_Years :=AgeInDays<=FIFTEEN_YEARS_IN_DAYS;
+Person: =>AddrHistOnFile :=EXISTS(AddressHierarchySet);
+
+Person: =>PL_AddrHistOnFileFlag :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+		NOT AddrHistOnFile => '0','1');
+Person: =>PL_AddrEmrgCnt3M :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_Three_Months)),0,9999));
+Person: =>PL_AddrEmrgCnt6M :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_Six_Months)),0,9999));
+Person: =>PL_AddrEmrgCnt1Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_One_Year)),0,9999));
+Person: =>PL_AddrEmrgCnt2Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_Two_Years)),0,9999));
+Person: =>PL_AddrEmrgCnt3Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_Three_Years)),0,9999));
+Person: =>PL_AddrEmrgCnt5Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_Five_Years)),0,9999));
+Person: =>PL_AddrEmrgCnt7Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_Seven_Years)),0,9999));
+Person: =>PL_AddrEmrgCnt10Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_Ten_Years)),0,9999));
+Person: =>PL_AddrEmrgCnt15Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_Fifteen_Years)),0,9999));
 
 Person.FullName: => BestNames := (Best = TRUE);
 Person: => BestFirstName := ONLY(FullName(BestNames), FirstName);
