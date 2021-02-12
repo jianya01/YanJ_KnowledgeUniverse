@@ -308,6 +308,7 @@ PersonInquiry: CURRENT_DATE := MIN(GETBUILDDATE('inquiry_build_version'), CURREN
 PersonAccident: CURRENT_DATE := MIN(GETBUILDDATE('accident_build_version'), CURRENTDATE());
 Person: CURRENT_DATE_THRIVE := MIN(GETBUILDDATE('thrive_build_version'), CURRENTDATE());
 InputPII: CURRENT_DATE_BIP  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
+AddressSlim: CURRENT_DATE_BIP  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
 
 
 //These are the dates for inferred performance attributes. The inferred performance attributes are run with a query 2 years in the future. These are the cut off dates for the 3 time periods wanted.
@@ -493,6 +494,13 @@ PersonEducation: NO_DATA_FOUND_97 := '-99997';
 Education: NO_DATA_FOUND_97 :=  '-99997';
 
 Address: NO_DATA_FOUND_97 :='-99997';
+
+AddressSlim: MISSING_INPUT_DATA := '-99999';
+AddressSlim: MISSING_INPUT_DATA_INT := -99999;
+AddressSlim: NO_DATA_FOUND := '-99998';
+AddressSlim: NO_DATA_FOUND_INT := -99998;
+AddressSlim: NO_DATA_FOUND_97_INT := -99997;
+AddressSlim: NO_DATA_FOUND_97 := '-99997';
 
 NameSummary: MISSING_INPUT_DATA := '-99999';
 NameSummary: NO_DATA_FOUND := '-99998';
@@ -1180,7 +1188,54 @@ InputPII: =>PI_InpAddrStateVoterAvailFlag_FCRA := MAP(P_InpClnAddrStateFlagValue
 InputPII: =>PI_InpAddrStateVoterAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 fnInVotersState(P_InpClnAddrState, FALSE ,STRING(P_InpClnArchDt)) => 1,
 																			 0);
-	
+//KS-6125
+AddressSlim: => PII :=ONLY(InputPII);
+AddressSlim: => P_ClnAddrFullFlag := PII.P_InpClnAddrFullFlagValue;
+AddressSlim: => P_AddressTypeClean := PII.InputAddressTypeCleanValue;
+AddressSlim: => P_Zip5Clean := PII.InputZip5CleanValue;
+AddressSlim: => AddressSICHighRiskPre := HighRiskAddress{HighRiskSIC, DateFirstSeenMinAddressSIC := HighRiskSIC:DateFirstSeen, DateLastSeenMinAddressSIC := HighRiskSIC:DateLastSeen};
+AddressSlim: => AddressNIACSHighRiskPre := HighRiskAddress{HighRiskNAICS, DateFirstSeenMinAddressNAICS := HighRiskNAICS:DateFirstSeen, DateLastSeenMinAdressNAICS := HighRiskNAICS:DateLastSeen};
+AddressSlim: => AddressZipHelper := ONLY(ZIP5);
+
+AddressSlim: => AddressSICList := AddressSICHighRiskPre{
+	HighRiskSIC,
+	AddressSICDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMinAddressSIC),DATETOSTRING(DateFirstSeenMinAddressSIC, '%Y%m%d'), NO_DATA_FOUND_97),
+	AddressSICDateLastSeen := IF(ISVALIDDATE(DateLastSeenMinAddressSIC),DATETOSTRING(MIN(DateLastSeenMinAddressSIC, CURRENT_DATE_BIP), '%Y%m%d'), NO_DATA_FOUND_97)
+	};
+
+AddressSlim: => AddressNAICSList := AddressNIACSHighRiskPre{
+	HighRiskNAICS,
+	AddressNAICSDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMinAddressNAICS),DATETOSTRING(DateFirstSeenMinAddressNAICS, '%Y%m%d'), NO_DATA_FOUND_97),
+	AddressNAICSDateLastSeen := IF(ISVALIDDATE(DateLastSeenMinAdressNAICS),DATETOSTRING(MIN(DateLastSeenMinAdressNAICS, CURRENT_DATE_BIP), '%Y%m%d'), NO_DATA_FOUND_97)
+	};
+AddressSlim: => AddressSICSortedList := TOPN(AddressSICList, 1000, AddressSICDateFirstSeen, AddressSICDateLastSeen);
+AddressSlim: => AddressNAICSSortedList := TOPN(AddressNAICSList, 1000, AddressNAICSDateFirstSeen, AddressNAICSDateLastSeen);
+AddressSlim: => AddressSICNotContains := NOT CONTAINS(CONCAT(AddressSICSortedList,HighRiskSIC,'|'), '9223');
+AddressSlim: => AddressNAICSNotContains := NOT CONTAINS(CONCAT(AddressNAICSSortedList,HighRiskNAICS,'|'), '922140');
+AddressSlim: => SICListNotFound := NOT EXISTS(AddressSICSortedList) OR ALL(AddressSICSortedList, HighRiskSIC = '' OR HighRiskSIC:Null);
+AddressSlim: => NAICSListNotFoind := NOT EXISTS(AddressNAICSSortedList) OR ALL(AddressNAICSSortedList, HighRiskNAICS = '' OR HighRiskNAICS:Null);
+
+AddressSlim: => PI_InpAddrSICCodeHRList := MAP(P_ClnAddrFullFlag != '1' => MISSING_INPUT_DATA,
+	SICListNotFound => NO_DATA_FOUND,
+	CONCAT(AddressSICSortedList,HighRiskSIC,'|'));
+AddressSlim: => PI_InpAddrNAICSCodeHRList := MAP(P_ClnAddrFullFlag != '1' => MISSING_INPUT_DATA,
+	NAICSListNotFoind => NO_DATA_FOUND,
+	CONCAT(AddressNAICSSortedList,HighRiskNAICS,'|'));
+AddressSlim: => PI_InpAddrIsHRCorrectFacFlag := MAP(P_ClnAddrFullFlag != '1' => MISSING_INPUT_DATA,
+	(AddressSICNotContains  OR AddressNAICSNotContains) OR (SICListNotFound AND NAICSListNotFoind) => '0',
+	'1');
+
+InputPII: => AddressZipHelperInput := ONLY(ZIP5);
+InputPII: => IsPOBoxADVO := EXISTS(Location.AddressType(AddressTypeCode = '9'));
+InputPII: => PI_InpAddrIsPOBoxFlag := MAP(P_InpClnAddrFullFlagValue != '1' AND InputZip5CleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		InputAddressTypeCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] AND (InputZip5CleanValue = NO_DATA_FOUND OR ALL(AddressZipHelperInput, ZipClass = '' OR ZipClass:Null)) AND NOT IsPostalSource => NO_DATA_FOUND,
+		InputAddressTypeCleanValue = 'P' OR IsPOBoxADVO OR AddressZipHelperInput.ZipClass = 'P' => '1', 
+		'0');												
+InputPII: => PI_InpAddrIsMilitaryFlag := MAP(P_InpClnAddrFullFlagValue != '1' AND InputZip5CleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		InputAddressTypeCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] AND (InputZip5CleanValue = NO_DATA_FOUND OR ALL(AddressZipHelperInput, ZipClass = '' OR ZipClass:Null)) => NO_DATA_FOUND, 
+		InputAddressTypeCleanValue = 'M' OR AddressZipHelperInput.ZipClass = 'M' => '1', 
+		'0');
+
 //Name Summary attributes		
 NameSummary: =>PII :=ONLY(InputPII);
 NameSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
