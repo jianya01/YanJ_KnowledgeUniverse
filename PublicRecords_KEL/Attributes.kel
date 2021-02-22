@@ -277,7 +277,8 @@ Person:  CURRENT_DATE  := MIN(GETBUILDDATE('header_build_version'), CURRENTDATE(
 PersonAddress:  CURRENT_DATE  := MIN(GETBUILDDATE('header_build_version'), CURRENTDATE());
 Phone:  CURRENT_DATE  := MIN(GETBUILDDATE('targus_build_version'), CURRENTDATE());
 PhoneSummary:  CURRENT_DATE  := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE());
-ProfessionalLicense:  CURRENT_DATE  := MIN(GETBUILDDATE('proflic_build_version'), CURRENTDATE());
+ProfessionalLicense:  CURRENT_DATE_PROFLIC  := MIN(GETBUILDDATE('proflic_build_version'), CURRENTDATE());
+ProfessionalLicense:  CURRENT_DATE_MARI  := MIN(GETBUILDDATE('mari_build_version'), CURRENTDATE());
 Property:  CURRENT_DATE  := MIN(GETBUILDDATE('property_build_version'), CURRENTDATE());
 Tradeline:  CURRENT_DATE  := MIN(GETBUILDDATE('cortera_build_version'), CURRENTDATE());
 Watercraft:  CURRENT_DATE  := MIN(GETBUILDDATE('watercraft_build_version'), CURRENTDATE());
@@ -3832,11 +3833,15 @@ Person: => PL_DrgNewMsnc7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_IN
 /*                                                                        */
 /**************************************************************************/	
 
+ProfessionalLicense: => BUILD_DATE := MIN(IF(EXISTS(LicenseDates.Source = 'PL'), CURRENT_DATE_PROFLIC , CURRENT_DATE_MARI), CURRENTDATE());
 
-ProfessionalLicense: => ValidProfessionalLicense := LicenseNumber <> '' AND (MaxIssueDate < CURRENT_DATE OR MaxIssueDate:Null) ;
 ProfessionalLicense: => MaxIssueDate := MAX(LicenseDates, IF(OriginalDateOfIssuance < DATE('19000101'),DATE(''),OriginalDateOfIssuance));
+ProfessionalLicense: => ValidProfessionalLicense := LicenseNumber <> '' AND (MaxIssueDate < BUILD_DATE OR MaxIssueDate:Null) ;
 ProfessionalLicense: => MaxExpireDate := MAX(LicenseDates, DateOfExpiration);
-ProfessionalLicense: => IsActive := MaxExpireDate > CURRENT_DATE;
+ProfessionalLicense: => IsActive := MaxExpireDate > BUILD_DATE;
+
+
+
 Person: => ProfessionalLicenseDates := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 100, MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseIssueExpDate := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseIssueDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxIssueDate);
@@ -3864,7 +3869,7 @@ Person: => PL_ProfLicIndxByLicListEv := TOPN(ProfessionalLicensePerson.ProfLic(V
 Person: => PL_ProfLicActvFlag := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,	
 			NOT(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense)) => ProfessionalLicense.NO_DATA_FOUND_PROF,			
-			ActiveProfessionalLicenseExpDt > STRING(CURRENT_DATE) => '1',
+			ActiveProfessionalLicenseExpDt > STRING(BUILD_DATE) => '1',
 			'0');
 Person: => PL_ProfLicActvNewIssueDt := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
