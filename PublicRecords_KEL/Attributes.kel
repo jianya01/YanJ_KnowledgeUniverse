@@ -253,7 +253,10 @@ FUNCTION: GATEWAY_OFAC(STRING GatewayURL, STRING FirstName, STRING MiddleName, S
 // Targus specific code - NonFCRA and FCRA
 FUNCTION: GET_TARGUS_URL(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.MASGateway.TargusFunctions.GrabTargusURL(StoredName)) FROM PublicRecords_KEL  RETURNS STRING;
 FUNCTION: GATEWAY_TARGUS(STRING GatewayURL, STRING FirstName, STRING LastName, STRING Phone10, INTEGER DPPAPurpose, INTEGER GLBPurpose, BOOLEAN IsFCRA) <= ECL(PublicRecords_KEL.MAS_get.MASGateway.TargusFunctions.TargusWrapper(GatewayURL, FirstName, LastName, Phone10, DPPAPurpose, GLBPurpose, IsFCRA)) FROM PublicRecords_KEL RETURNS SET OF STRING;
-
+// InsurancePhone specific code - NonFCRA and FCRA
+FUNCTION: GET_INSURANCE_PHONE_URL(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.MASGateway.InsurancePhoneFunctions.GrabInsurancePhoneURL(StoredName)) FROM PublicRecords_KEL  RETURNS STRING;
+FUNCTION: GATEWAY_INSURANCE_PHONE(STRING GatewayURL, STRING FirstName, STRING LastName, STRING StreetAddress, STRING City, STRING State, STRING Zip, STRING Phone10, INTEGER GLBPurpose, BOOLEAN IsFCRA) <= ECL(PublicRecords_KEL.MAS_get.MASGateway.InsurancePhoneFunctions.InsurancePhoneWrapper(GatewayURL, FirstName, LastName, StreetAddress, City, State, Zip, Phone10, GLBPurpose, IsFCRA)) FROM PublicRecords_KEL RETURNS SET OF STRING;
+										
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -572,7 +575,13 @@ InputPII: => TargusGatewayIP := GET_TARGUS_URL('DummyValue'); // KEL doesn't all
 InputPII: => TargusResults := GATEWAY_TARGUS(TargusGatewayIP, P_InpNameFirst, P_InpNameLast, P_InpPhoneHome, GLBPurpose, DPPAPurpose, GatewayIsFCRA);
 InputPII: NOT TargusGatewayIP:Null OR NOT TargusGatewayIP = '' => TargusRoyalty := GET_VALUE(TargusResults, 2);
 InputPII: NOT TargusGatewayIP:Null OR NOT TargusGatewayIP = '' => TargusSrc := GET_VALUE(TargusResults, 3);
-                                                             
+       
+// InsurancePhone Attributes			 
+InputPII: => InsurancePhoneGatewayIP := IF(TargusRoyalty > 0, '', GET_INSURANCE_PHONE_URL('DummyValue')); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => InsurancePhoneResults := GATEWAY_INSURANCE_PHONE(InsurancePhoneGatewayIP, P_InpNameFirst, P_InpNameLast, P_InpAddrLine1, P_InpAddrCity, P_InpAddrState, P_InpAddrZip, P_InpPhoneHome, GLBPurpose, GatewayIsFCRA);
+InputPII: NOT InsurancePhoneGatewayIP:Null OR NOT InsurancePhoneGatewayIP = '' => InsPhoneHit  := GET_VALUE(InsurancePhoneResults, 2);
+InputPII: NOT InsurancePhoneGatewayIP:Null OR NOT InsurancePhoneGatewayIP = '' => InsPhoneSrc := GET_VALUE(InsurancePhoneResults, 3);
+
 /**************************************************************************/
 /*                                                                        */
 /*         Input PII input Echo attributes                                */
