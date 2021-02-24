@@ -173,6 +173,7 @@ FUNCTION: IsPhoneMatch(STRING PhoneOnFile, STRING InputPhone) <=
 FUNCTION: FnIPValidate(STRING field1) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_IPValidate(field1)) FROM PublicRecords_KEL RETURNS STRING;	
 FUNCTION: IsFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;
 FUNCTION: IsNonFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsNonFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
+FUNCTION: IsValidInquiryProductCode(INTEGER ProductCode) <= ECL((STRING)ProductCode IN PublicRecords_KEL.ECL_Functions.AccLogs_Constants.valid_product_codes) FROM PublicRecords_KEL RETURNS BOOLEAN;	
 FUNCTION: IsInquirySSNMatch(STRING SSN1, STRING SSN2) <= SSN1 = SSN2; 
 FUNCTION: IsInquiryAddressMatch(INTEGER zip51, STRING PrimRange1, STRING PrimName1, STRING SecRange1, STRING PreDir1, STRING Suffix1, 
 												 INTEGER zip52, STRING PrimRange2, STRING PrimName2, STRING SecRange2, STRING PreDir2, STRING Suffix2) <= 
@@ -3977,7 +3978,6 @@ Inquiry: RETAIL_PAYMENTS_INDUSTRY :=[ 'RETAIL PAYMENTS'];
 Inquiry: UTILITIES_INDUSTRY := ['UTILITIES', 'CABLE/SATELLITE/INTERNET'];
 Inquiry: QUIZ_PROVIDER_INDUSTRY := ['QUIZ PROVIDER'];
 Inquiry: STUDENT_LOAN_INDUSTRY := ['STUDENT LOANS'];
-Inquiry: VALID_VELOCITY_PRODUCT_CODES := [1, 2, 7];
 Inquiry: CHARGEBACK_FUNCTIONS := ['CHARGEBACK DEFENDER', 'CHARGEBACK DEFENDER SCORE ATTRIBUTES', 'RISKWISE CHARGEBACK DEFENDER (SCORE ONLY CD02)', 'RISKWISE CHARGEBACK DEFENDER W/ RC JOINT APP (FDSL)', 
 							'RISKWISE CHARGEBACK DEFENDER W/ RC SINGLE APP (FDS7)', 'RISKWISE CUSTOM CANADIAN CHARGEBACK DEFENDER', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (CB61)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND03)', 
 							'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND05)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND11)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER W/ IP DOMAIN (ND10)'];
@@ -3999,11 +3999,11 @@ Inquiry: => IsBatchMonitoringMethod := UPCASE(TRIM(InquiryMethod)) IN Inquiry.ME
 Inquiry: => IsCollection := UPCASE(TRIM(InquiryIndustry)) IN Inquiry.COLLECTION_INDUSTRY OR UPCASE(TRIM(InquiryVertical)) IN Inquiry.COLLECTION_VERTICAL OR IsLengthSubMarket;
 Inquiry: => IsNonFcraOk := IsNonFcraInquiry(UPCASE(TRIM(InquiryFunctionDescription)));
 Inquiry: => IsFcraOk := IsFcraInquiry(UPCASE(TRIM(InquiryFunctionDescription)));
+Inquiry: => IsProductCodeOk := IsValidInquiryProductCode(InquiryProductCode);
 
 PersonInquiry: => GatherInquiries := Transaction{
 																						TransactionID,
 																						Method := InquiryMethod,
-																						ProductCode := InquiryProductCode,
 																						FunctionDescription := InquiryFunctionDescription,
 																						SubMarket := InquirySubMarket,
 																						Vertical := InquiryVertical,
@@ -4013,6 +4013,7 @@ PersonInquiry: => GatherInquiries := Transaction{
 																						IsFcraOk,
 																						IsCollection,
 																						IsBatchMonitoringMethod,
+																						IsProductCodeOk,
 																						AgeinDays};
 
 PersonInquiry.GatherInquiries: =>ExcludeFunctionDescription :=UPCASE(TRIM(FunctionDescription)) != 'BANKO BATCH';
@@ -4111,13 +4112,13 @@ Person: =>InquiryOther5YOldDate :=IsBlank(STRING(MIN(InquiriesOther5YListSorted,
 Inquiry: => IsValidVelocityInquiryNonFCRA := AgeinDays <= 365 AND 
 																						NOT IsCollection AND 
 																						NOT IsBatchMonitoringMethod AND
-																						InquiryProductCode IN Inquiry.VALID_VELOCITY_PRODUCT_CODES AND
+																						IsProductCodeOk AND
 																						NOT InquiryFunctionDescription IN Inquiry.CHARGEBACK_FUNCTIONS AND
 																						IsNonFcraOk;
 Inquiry: => IsValidVelocityInquiryFCRA := AgeinDays <= 365 AND 
 																						NOT IsCollection AND 
 																						NOT IsBatchMonitoringMethod AND
-																						InquiryProductCode IN Inquiry.VALID_VELOCITY_PRODUCT_CODES AND
+																						IsProductCodeOk AND
 																						NOT InquiryFunctionDescription IN Inquiry.CHARGEBACK_FUNCTIONS AND
 																						NOT InquiryIndustry IN Inquiry.COMMUNICATIONS_INDUSTRY AND
 																						IsFcraOk;
