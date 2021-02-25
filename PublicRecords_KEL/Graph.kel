@@ -16,10 +16,10 @@ IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
 /*                                                                        */
 /*                                                                        */
 /*               Dynamic Archive Query                                    */
-/*                                                                        */
+/*               This mode is for Roxie                                   */
 /*                                                                        */
 /**************************************************************************/
-/**************************************************************************/	
+/**************************************************************************/
 
 QUERY: NonFCRAPhoneSummaryAttributesV1Dynamic(STRING Phone,
 				      DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
@@ -1372,10 +1372,10 @@ QUERY: NonFCRAAddressSummaryAttributesV1Dynamic(STRING PrimaryName_in,STRING Pri
 		PL_SrchPhonePerLexIDCnt1Y,
 		PL_SrchDOBPerLexIDCnt1Y,
 		PL_SrchEmailPerLexIDCnt1Y,
-		PL_SrchPerCurrAddrCnt1Y,
-		PL_SrchLexIDPerCurrAddrCnt1Y,
-		PL_SrchLNamePerCurrAddrCnt1Y,
-		PL_SrchSSNPerCurrAddrCnt1Y,
+		PL_SrchPerCurrAddrCnt1Y := 0,
+		PL_SrchLexIDPerCurrAddrCnt1Y := 0,
+		PL_SrchLNamePerCurrAddrCnt1Y := 0,
+		PL_SrchSSNPerCurrAddrCnt1Y := 0,
 		// Inquiry PII Corroboration
 		PL_SrchPerLexIDWInpFLSCnt1Y,
 		PL_SrchPerLexIDWInpASCnt1Y,
@@ -2354,7 +2354,7 @@ QUERY: NonFCRABusinessProxIDAttributesV1Dynamic(INTEGER UltID_in, INTEGER OrgID_
 /*                                                                        */
 /*                                                                        */
 /*               Hybrid Archive Query                                     */
-/*                                                                        */
+/*               This mode is for Vault only                              */
 /*                                                                        */
 /**************************************************************************/
 /**************************************************************************/
@@ -2362,7 +2362,8 @@ QUERY: NonFCRABusinessProxIDAttributesV1Dynamic(INTEGER UltID_in, INTEGER OrgID_
 
 QUERY: NonFCRAPhoneSummaryAttributesV1Hybrid(STRING Phone,
 				      DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <= PhoneSummary(Phone10 = Phone){
 		PI_SrcWInpPDListEv,
 		PI_SrcWInpPDEmrgDtListEv,
@@ -2374,6 +2375,7 @@ QUERY: NonFCRAPhoneSummaryAttributesV1Hybrid(STRING Phone,
 		PI_SrcWInpAPEmrgDtListEv,
 		PI_SrcWInpAPLastDtListEv
 		}
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT,
@@ -2382,18 +2384,21 @@ QUERY: NonFCRAPhoneSummaryAttributesV1Hybrid(STRING Phone,
  	QUERY: AddressHighRiskHybrid(STRING InputStreetNumber, STRING InputStreetName, INTEGER InputZip,
 								DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
 						DATE P_InpClnArchDt,
+					DATE RunDateToMimic,
 						PERMITS DPM) <= AddressSlim(PrimaryRange = InputStreetNumber AND PrimaryName = InputStreetName AND ZIP5 = InputZip){ // Grab the Pool of Address records not caring about Sec Range
 			PI_InpAddrSICCodeHRList,
 			PI_InpAddrNAICSCodeHRList,
 			PI_InpAddrIsHRCorrectFacFlag
 			}
+		ASOF RunDate(RunDateToMimic)
 			ASOF DynamicArchive(P_InpClnArchDt) 
 			USING DPM
 			USE InputPIIDataset(FLAT,
 	             InputPII(UID = G_ProcUID, Subject = P_LexID));	
 
 QUERY: InputAttributesV1Hybrid(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset, 
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM,BOOLEAN isFCRA) <= InputPII{
 		G_ProcUID := UID, 
 		P_InpAcct := InputAccountValue,
@@ -2618,6 +2623,7 @@ QUERY: InputAttributesV1Hybrid(DATASET OF PublicRecords_KEL.ECL_Functions.Layout
 		InsPhoneHit := InsPhoneHit,
 		InsPhoneSrc := InsPhoneSrc
 		}
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt)
 	USING DPM
 	USE InputPIIDataset(FLAT, 
@@ -2625,7 +2631,8 @@ QUERY: InputAttributesV1Hybrid(DATASET OF PublicRecords_KEL.ECL_Functions.Layout
 
 QUERY: NonFCRASSNSummaryAttributesV1Hybrid(STRING SSN_in,
                        DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
-                     DATE P_InpClnArchDt, 
+                     DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
                      PERMITS DPM) <=SSNSummary(SSN = SSN_in){
 		P_InpClnSSN = SSN,
 		P_InpClnPhoneHome,
@@ -2643,6 +2650,7 @@ QUERY: NonFCRASSNSummaryAttributesV1Hybrid(STRING SSN_in,
 		PI_SrcWInpFLSEmrgDtListEv,
 		PI_SrcWInpFLSLastDtListEv
 }
+		ASOF RunDate(RunDateToMimic)
 ASOF HybridArchive(P_InpClnArchDt) 
      USING DPM
      USE InputPIIDataset(FLAT,
@@ -2650,7 +2658,8 @@ ASOF HybridArchive(P_InpClnArchDt)
 
 QUERY: NonFCRANameSummaryAttributesV1Hybrid(STRING FirstName_in,STRING LastName_in,DATE DateOfBirth_in,
 				      DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <=NameSummary(FirstName =  FirstName_in,LastName =LastName_in,DateOfBirth =DateOfBirth_in){
 		P_InpClnNameFirst :=FirstName,
 		P_InpClnNameLast :=LastName,
@@ -2659,6 +2668,7 @@ QUERY: NonFCRANameSummaryAttributesV1Hybrid(STRING FirstName_in,STRING LastName_
 		PI_SrcWInpFLDEmrgDtListEv,
 		PI_SrcWInpFLDLastDtListEv
 		}
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT,
@@ -2666,7 +2676,8 @@ QUERY: NonFCRANameSummaryAttributesV1Hybrid(STRING FirstName_in,STRING LastName_
 
 QUERY: NonFCRAAddressSummaryAttributesV1Hybrid(STRING PrimaryName_in,STRING PrimaryRange_in,STRING ZIP5_in,
 				      DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <=AddressSummary(PrimaryName =  PrimaryName_in, PrimaryRange = PrimaryRange_in, Zip = ZIP5_in){
 		PI_SrcWInpFLAListEv,
 		PI_SrcWInpFLAEmrgDtListEv,
@@ -2675,6 +2686,7 @@ QUERY: NonFCRAAddressSummaryAttributesV1Hybrid(STRING PrimaryName_in,STRING Prim
 		PI_SrcWInpADEmrgDtListEv,
 		PI_SrcWInpADLastDtListEv
 		}
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT,
@@ -2683,6 +2695,7 @@ QUERY: NonFCRAAddressSummaryAttributesV1Hybrid(STRING PrimaryName_in,STRING Prim
 QUERY: InputBusAttributesV1Hybrid(DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputBII InputBIIDataset, 
 					DATE P_InpClnArchDt,
+					DATE RunDateToMimic,
 					PERMITS DPM) <= InputBII{
 		G_ProcBusUID := UID, 
 		B_InpAcct := BusInputAccountEchoValue,
@@ -3324,6 +3337,7 @@ QUERY: InputBusAttributesV1Hybrid(DATASET OF PublicRecords_KEL.ECL_Functions.Lay
 		SSC,
 		WirelessIndicator	
 		}
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt)
 	USING DPM
 	USE InputPIIDataset(FLAT,
@@ -3333,7 +3347,8 @@ QUERY: InputBusAttributesV1Hybrid(DATASET OF PublicRecords_KEL.ECL_Functions.Lay
 
 QUERY: NonFCRAPersonAttributesV1Hybrid(Person LexID_in, 
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <= Person(UID = LexID_in){
 		LexID := UID,
 		P_LexIDSeenFlag,
@@ -3711,10 +3726,10 @@ QUERY: NonFCRAPersonAttributesV1Hybrid(Person LexID_in,
 		PL_SrchPhonePerLexIDCnt1Y,
 		PL_SrchDOBPerLexIDCnt1Y,
 		PL_SrchEmailPerLexIDCnt1Y,
-		PL_SrchPerCurrAddrCnt1Y,
-		PL_SrchLexIDPerCurrAddrCnt1Y,
-		PL_SrchLNamePerCurrAddrCnt1Y,
-		PL_SrchSSNPerCurrAddrCnt1Y,
+		PL_SrchPerCurrAddrCnt1Y := 0,
+		PL_SrchLexIDPerCurrAddrCnt1Y := 0,
+		PL_SrchLNamePerCurrAddrCnt1Y := 0,
+		PL_SrchSSNPerCurrAddrCnt1Y := 0,
 		// Inquiry PII Corroboration
 		PL_SrchPerLexIDWInpFLSCnt1Y,
 		PL_SrchPerLexIDWInpASCnt1Y,
@@ -3764,6 +3779,7 @@ QUERY: NonFCRAPersonAttributesV1Hybrid(Person LexID_in,
 		// PL_VerSSNSrcLastDtListEv := PL_VerSSNSrcLastDtListEvNonFCRA,
 		PL_EmrgAge
 		} 
+		ASOF RunDate(RunDateToMimic)
 		ASOF HybridArchive(P_InpClnArchDt) 
 		USING DPM
 		USE InputPIIDataset(FLAT, 
@@ -3772,7 +3788,8 @@ QUERY: NonFCRAPersonAttributesV1Hybrid(Person LexID_in,
 
 QUERY: FCRAPersonAttributesV1Hybrid(Person LexID_in, 
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset, 
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <= Person(UID = LexID_in){
 		LexID := UID,
 		P_LexIDSeenFlag,
@@ -4067,6 +4084,7 @@ QUERY: FCRAPersonAttributesV1Hybrid(Person LexID_in,
 		// PL_VerSSNSrcLastDtListEv := PL_VerSSNSrcLastDtListEvFCRA,
 		PL_EmrgAge
 		} 
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT, 
@@ -4075,7 +4093,8 @@ QUERY: FCRAPersonAttributesV1Hybrid(Person LexID_in,
 QUERY: NonFCRABusinessSeleIDAttributesV1Hybrid(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in,  
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputBII InputBIIDataset, 
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <= BusinessSele(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
 		B_LexIDUlt := UltID,
 		B_LexIDOrg := OrgID,
@@ -4618,6 +4637,7 @@ QUERY: NonFCRABusinessSeleIDAttributesV1Hybrid(INTEGER UltID_in, INTEGER OrgID_i
 		BE_BestAddrLotSize,
 		BE_BestAddrBldgSize
 		}
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT,
@@ -4633,20 +4653,23 @@ QUERY: NonFCRABusinessSeleIDAttributesV1Hybrid(INTEGER UltID_in, INTEGER OrgID_i
 	// And therefore should only be calculated when master results are requested so that we do not impact production performance.		
 
 QUERY: NonFCRABusinessSeleIDNoDatesAttributesV1Hybrid(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in,  
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <= BusinessSele(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in){
 		B_LexIDUlt := UltID,
 		B_LexIDOrg := OrgID,
 		B_LexIDLegal := SeleID,
 		B_LexIDLegalRstdOnlyFlag
 		}
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt) 
 	USING DPM;
 
 QUERY: NonFCRABusinessProxIDAttributesV1Hybrid(INTEGER UltID_in, INTEGER OrgID_in, INTEGER SeleID_in, INTEGER ProxID_in,  
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputBII InputBIIDataset, 
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <= BusinessProx(UltID = UltID_in, OrgID = OrgID_in, SeleID = SeleID_in,ProxID = ProxID_in){
 		B_LexIDUlt := UltID,
 		B_LexIDOrg := OrgID,
@@ -4664,6 +4687,7 @@ QUERY: NonFCRABusinessProxIDAttributesV1Hybrid(INTEGER UltID_in, INTEGER OrgID_i
 		BP_BestTIN,
 		BP_BestPhone
 		}
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt) 
 	USING DPM
 	USE InputPIIDataset(FLAT,
@@ -4673,10 +4697,12 @@ QUERY: NonFCRABusinessProxIDAttributesV1Hybrid(INTEGER UltID_in, INTEGER OrgID_i
 
 QUERY: NonFCRASixthRepAttributesV1Hybrid(Person LexID_in, 
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <= Person(UID = LexID_in){
 		LexID := UID
 			} 
+		ASOF RunDate(RunDateToMimic)
 		ASOF HybridArchive(P_InpClnArchDt) 
 		USING DPM
 		USE InputPIIDataset(FLAT, 
@@ -4703,7 +4729,8 @@ QUERY: InferredPerformanceDynamic(Person LexID_in,
 
 QUERY: InferredPerformanceHybrid(Person LexID_in, 
 					DATASET OF PublicRecords_KEL.ECL_Functions.Layouts.LayoutInputPII InputPIIDataset,
-					P_InpClnArchDt, 
+					P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <= Person(UID = LexID_in){
 					PL_DrgCrimFelCnt1YF1Y,
 					PL_DrgLienCnt1YF1Y,
@@ -4713,6 +4740,7 @@ QUERY: InferredPerformanceHybrid(Person LexID_in,
 					P_InpClnArchDtF6M,
 					P_InpClnArchDtF1Y,
 					P_InpClnArchDtF2Y}
+		ASOF RunDate(RunDateToMimic)
 			ASOF HybridArchive(ADJUSTCALENDAR(P_InpClnArchDt, 2, 0, 0))
 			USING DPM
 		USE InputPIIDataset(FLAT,
@@ -4783,7 +4811,8 @@ QUERY: FCRAMiniAttributesV1ThorDynamic(Person LexID_in,
 /*               Thor Hybrid Queries                                     */
 
 QUERY: NonFCRAMiniAttributesV1ThorHybrid(Person LexID_in, 
-					DATE P_InpClnArchDt, 
+					DATE P_InpClnArchDt,
+					DATE RunDateToMimic, 
 					PERMITS DPM) <= Person(UID = LexID_in){
 		LexID := UID,
 		P_LexIDSeenFlag,
@@ -4805,11 +4834,13 @@ QUERY: NonFCRAMiniAttributesV1ThorHybrid(Person LexID_in,
 		PL_BestSSN,
 		PL_BestDOB
 					} 
+		ASOF RunDate(RunDateToMimic)
 		ASOF HybridArchive(P_InpClnArchDt) 
 		USING DPM;
 
 QUERY: FCRAMiniAttributesV1ThorHybrid(Person LexID_in, 
 					DATE P_InpClnArchDt, 
+					DATE RunDateToMimic,
 					PERMITS DPM) <= Person(UID = LexID_in){
 		LexID := UID,
 		P_LexIDSeenFlag,
@@ -4830,6 +4861,7 @@ QUERY: FCRAMiniAttributesV1ThorHybrid(Person LexID_in,
 		PL_BestSSN,
 		PL_BestDOB
 		} 
+		ASOF RunDate(RunDateToMimic)
 	ASOF HybridArchive(P_InpClnArchDt) 
 	USING DPM;
 
