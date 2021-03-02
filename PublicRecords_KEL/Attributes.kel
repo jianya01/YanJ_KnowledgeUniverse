@@ -2472,6 +2472,9 @@ Person: => IsPreviousPostalSource :=EXISTS(PersonAddress(PreviousAddrMatchattrib
 
 Person: => P_LexIDSeenFlag := IF(EXISTS(DataSources(HeaderHitFlag)), '1', '0');
 
+ Person.DataSources: => AgeInDays := ABSDAYSBETWEEN(Source:DateLastSeen, Person.CURRENT_DATE);
+	
+Person: => P_LexIDSeenFlagFCRA := IF(EXISTS(DataSources(Source = 'BA') AND DataSources.AgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT DataSources.AgeInDays:Null) OR EXISTS(DataSources(Source = 'L2') AND DataSources.AgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT DataSources.AgeInDays:Null) OR EXISTS(DataSources(Source != 'BA' OR Source != 'L2')), '1', '0') ;
 													
 Person: LEXIDCATEGORYDEAD := 'DEAD';
 Person: LEXIDCATEGORYNOISE := 'NOISE';
@@ -3003,7 +3006,8 @@ AircraftOwner: => DateLastSeenCapped := IF(AircraftOwner.Plane:DateLastSeen > CU
 AircraftOwner: => AircraftMaxDate := IF(ISVALIDDATE(DateLastSeenCapped), DATETOSTRING(DateLastSeenCapped,'%Y%m%d'), AircraftOwner.REC_FOUND_BUT_INVALID);
 Person: => PL_AstVehAirCntEv:= IF(P_LexIDSeenFlag = '0', AircraftOwner.MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(COUNT(AircraftOwner), 0, 99));
-Person: => PL_AstVehAirEmrgDtListEv := TOPN(AircraftOwner{Plane, AircraftFirstSeenDate := (AircraftMinDate)},999,-AircraftFirstSeenDate);
+Person: => PL_AstVehAirEmrgDtListEvPre := TOPN(AircraftOwner{Plane, AircraftFirstSeenDate := (AircraftMinDate)},999,-AircraftFirstSeenDate);
+Person: => PL_AstVehAirEmrgDtListEv := CONCAT(PL_AstVehAirEmrgDtListEvPre, AircraftFirstSeenDate, '|');
 Person: => PL_AstVehAirEmrgNewDtEv := MAP(
 				P_LexIDSeenFlag = '0' => AircraftOwner.MISSING_INPUT_DATA,
    			PL_AstVehAirCntEv = 0 => AircraftOwner.NO_DATA_FOUND,
@@ -3040,7 +3044,8 @@ WatercraftOwner: => DateLastSeenCapped := IF(WCraft:DateLastSeen > CURRENT_DATE,
 WatercraftOwner: => WatercraftMaxDate := IF(ISVALIDDATE(DateLastSeenCapped), DATETOSTRING(DateLastSeenCapped,'%Y%m%d'), WatercraftOwner.REC_FOUND_BUT_INVALID);
 Person: => PL_AstVehWtrCntEv:= IF(P_LexIDSeenFlag = '0', WatercraftOwner.MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(COUNT(WatercraftOwner), 0, 99));
-Person:	=>	PL_AstVehWtrEmrgDtListEv := TOPN(WatercraftOwner{WCraft,WatercraftFirstSeenDate := (WatercraftMinDate)},999,-WatercraftFirstSeenDate);
+Person:	=>	PL_AstVehWtrEmrgDtListEvPre := TOPN(WatercraftOwner{WCraft,WatercraftFirstSeenDate := (WatercraftMinDate)},999,-WatercraftFirstSeenDate);
+Person:	=>	PL_AstVehWtrEmrgDtListEv := CONCAT(PL_AstVehWtrEmrgDtListEvPre, WatercraftFirstSeenDate, '|');
 Person:	=>	PL_AstVehWtrEmrgNewDtEv := MAP(
 				P_LexIDSeenFlag = '0' => WatercraftOwner.MISSING_INPUT_DATA,
 				PL_AstVehWtrCntEv = 0 => WatercraftOwner.NO_DATA_FOUND,
@@ -3383,9 +3388,12 @@ Person: => MostRecentDispoDte10Y := ONLY(MostRecentDispoList10Y,STRING(Bankruptc
 Person: => PL_DrgBkCnt1Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year)), 0, 99));			
 Person: => PL_DrgBkCnt7Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year)), 0, 999));
 Person: => PL_DrgBkCnt10Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year)), 0, 999));
-Person: => PL_DrgBkDtList1Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => PL_DrgBkDtList7Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => PL_DrgBkDtList10Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkDtList1YPre := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode, BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkDtList1Y := CONCAT(PL_DrgBkDtList1YPre, DATETOSTRING(BankruptcyDate, '%Y%m%d'), '|');
+Person: => PL_DrgBkDtList7YPre := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkDtList7Y := CONCAT(PL_DrgBkDtList7YPre, DATETOSTRING(BankruptcyDate, '%Y%m%d'), '|');
+Person: => PL_DrgBkDtList10YPre := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkDtList10Y := CONCAT(PL_DrgBkDtList10YPre, DATETOSTRING(BankruptcyDate, '%Y%m%d'), '|');
 Person: => PL_DrgBkNewDt1Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
 Person: => PL_DrgBkNewDt7Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
 Person: => PL_DrgBkNewDt10Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year), BankruptcyDate)),Bankruptcy.NO_DATA_FOUND_BANKRUPTCY));
@@ -3416,9 +3424,12 @@ Person: => PL_DrgBkOldMsnc10Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			PL_DrgBkOldDt10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_DrgBkOldDt10Y), ONLY(PersonBankruptcy.Bankrupt, PersonBankruptcy.CURRENT_DATE)), 0, 120));	
-Person: => PL_DrgBkChList1Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => PL_DrgBkChList7Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => PL_DrgBkChList10Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkChList1YPre := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko1Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkChList1Y := CONCAT(PL_DrgBkChList1YPre, OriginalChapter, '|');
+Person: => PL_DrgBkChList7YPre := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko7Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkChList7Y := CONCAT(PL_DrgBkChList7YPre, OriginalChapter, '|');
+Person: => PL_DrgBkChList10YPre := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(Banko10Year){OriginalChapter:=IF(OriginalChapter:Null,Bankruptcy.NO_DATA_FOUND_97,OriginalChapter),TMSID,CaseNumber,CourtCode, BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkChList10Y := CONCAT(PL_DrgBkChList10YPre, OriginalChapter, '|');
 Person: => PL_DrgBkNewChType1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(PL_DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
@@ -3509,9 +3520,12 @@ Person: => PL_DrgBkUpdtNewMsnc10Y := MAP(
 			(MostRecentUpdate10Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentUpdate10Y), ONLY(PersonBankruptcy.Bankrupt, CURRENT_DATE)), 0, 120)
 			); 
-Person: => PL_DrgBkDispList1Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => PL_DrgBkDispList7Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
-Person: => PL_DrgBkDispList10Y := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkDispList1YPre := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko1Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkDispList1Y := CONCAT(PL_DrgBkDispList1YPre, Disposition, '|');
+Person: => PL_DrgBkDispList7YPre := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko7Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkDispList7Y := CONCAT(PL_DrgBkDispList7YPre, Disposition, '|');
+Person: => PL_DrgBkDispList10YPre := TOPN(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year){Disposition:=IF(BestChildRecord.Disposition:Null,Bankruptcy.NO_DATA_FOUND_97,UPCASE(TRIMALL(BestChildRecord.Disposition))), BestChildRecord.TMSID,BestChildRecord.CaseNumber,BestChildRecord.CourtCode,BestChildRecord.BankruptcyDate, BestChildRecord.LastStatusUpdate, BestChildRecord.DateFiled}, PL_DrgBkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);
+Person: => PL_DrgBkDispList10Y := CONCAT(PL_DrgBkDispList10YPre, Disposition, '|');
 Person: => PL_DrgBkNewDispType1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(PL_DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
@@ -3608,9 +3622,12 @@ Person: => PL_DrgBkDschCnt10Y := MAP(
 			(PL_DrgBkCnt10Y > 0 AND PL_DrgBkDispCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
 			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(BestChildRecord.Banko10Year AND BestChildRecord.ModifiedDisposition = 'DISCHARGED')), 0, 999)
 			); 
-Person: => PL_DrgBkTypeList1Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);			
-Person: => PL_DrgBkTypeList7Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);			
-Person: => PL_DrgBkTypeList10Y := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);		
+Person: => PL_DrgBkTypeList1YPre := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt1Y, BankruptcyDate,LastStatusUpdate,DateFiled);			
+Person: => PL_DrgBkTypeList1Y := CONCAT(PL_DrgBkTypeList1YPre, FilingType, '|');			
+Person: => PL_DrgBkTypeList7YPre := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt7Y, BankruptcyDate,LastStatusUpdate,DateFiled);			
+Person: => PL_DrgBkTypeList7Y := CONCAT(PL_DrgBkTypeList7YPre, FilingType, '|');			
+Person: => PL_DrgBkTypeList10YPre := TOPN(PersonBankruptcy.Bankrupt.BestChildRecord(IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS AND NOT FilingAgeInDays:Null){FilingType:=IF(FilingType:Null,Bankruptcy.NO_DATA_FOUND_97,FilingType), BankruptcyDate, LastStatusUpdate, DateFiled}, PL_DrgBkCnt10Y, BankruptcyDate,LastStatusUpdate,DateFiled);		
+Person: => PL_DrgBkTypeList10Y := CONCAT(PL_DrgBkTypeList10YPre, FilingType, '|');	
 Person: => PL_DrgBkBusFlag1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(PL_DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
@@ -3875,9 +3892,10 @@ Person: => PL_ProfLicFlagEv := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
 			ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense) => '1',
 			'0');
-Person: => PL_ProfLicIssueDtListEv := ProfessionalLicenseDates{ProfLicUID, MaxIssueDate};
-Person: => PL_ProfLicExpDtListEv := ProfessionalLicenseDates{ProfLicUID, MaxExpireDate};
-Person: => PL_ProfLicIndxByLicListEv := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID,LicenseCategory := IF(LicenseDescription.LicenseCategory:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, LicenseDescription.LicenseCategory)}, 100, LicenseCategory);
+Person: => PL_ProfLicIssueDtListEv := CONCAT(ProfessionalLicenseDates{ProfLicUID, MaxIssueDate}, MaxIssueDate, '|');
+Person: => PL_ProfLicExpDtListEv := CONCAT(ProfessionalLicenseDates{ProfLicUID, MaxExpireDate}, MaxExpireDate, '|');
+Person: => PL_ProfLicIndxByLicListEvPre := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID,LicenseCategory := IF(LicenseDescription.LicenseCategory:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, LicenseDescription.LicenseCategory)}, 100, LicenseCategory);
+Person: => PL_ProfLicIndxByLicListEv := CONCAT(PL_ProfLicIndxByLicListEvPre, LicenseCategory, '|');
 Person: => PL_ProfLicActvFlag := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,	
 			NOT(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense)) => ProfessionalLicense.NO_DATA_FOUND_PROF,			
