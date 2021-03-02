@@ -8355,6 +8355,25 @@ Person: =>PropertyMinDate :=STRING(MIN(PropertyDateFirstSeenSorted,DATE(DateFirs
 Person: =>MonthsSince :=MONTHSBETWEEN(DATE(PropertyMinDate),Property.CURRENT_DATE);
 PersonProperty: => BestMostRecentProperty := ONLY(TOPN(Prop.AutomatedValuationModel,1,-AVMValueDate));
 Person: =>AVMList :=TOPN(PersonProperty(IsCurrentlyOwned){ModAVMValue:=IF(BestMostRecentProperty.AVMAutomatedValuation:Null OR BestMostRecentProperty.AVMAutomatedValuation='',Person.NO_DATA_FOUND_97,BestMostRecentProperty.AVMAutomatedValuation),BestMostRecentProperty.AVMValueDate,BestMostRecentProperty.AVMUnformattedAPN},999,-AVMValueDate);
+//Property Purchase History Helpers
+PersonProperty:ONE_YEAR_IN_DAYS :=365;
+PersonProperty:FIVE_YEARS_IN_DAYS :=1826;
+PropertyEvent: DOCUMENT_TYPE_CODE:=['G','T','WD','DE','GD','SW','TD','X','BS','SD','CP','LW','SV','CH','OT','PA','PR','JT','ID','EX','LD','CS','RD','CD','FD','LT','CM','AD','AG','LH','D','PD','LC','AS','RC','CO','DG','MD','DC','RA'];
+PropertyEvent: => PropertyPurchaseRecord := DocumentTypeCode IN DOCUMENT_TYPE_CODE OR SalePrice>0;
+PersonProperty: => PropertyIsPurchased := IsEverOwned AND EXISTS(Prop.PropertyEvent(PropertyPurchaseRecord AND IsDeed).PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject));//{LNFaresID,DtFirstSeen};
+PersonProperty: => PropertyPurchaseDateFirstSeen := MIN(Prop.PropertyEvent(PropertyPurchaseRecord AND IsDeed AND EXISTS(PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject))), DtFirstSeen);    
+PersonProperty: => PropertyPurchaseDateLastSeenCapped := MAX(Prop.PropertyEvent(PropertyPurchaseRecord AND IsDeed AND EXISTS(PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject))), DtLastSeen); 
+PersonProperty: => PropertyPurchaseDateLastSeen :=MIN(PropertyPurchaseDateLastSeenCapped,Property.CURRENT_DATE); 
+PersonProperty: =>AgeInDays :=ABSDAYSBETWEEN(PropertyPurchaseDateLastSeen,Property.CURRENT_DATE);
+PersonProperty: =>Seen_In_One_Year :=AgeInDays<=PersonProperty.ONE_YEAR_IN_DAYS;
+PersonProperty: =>Seen_In_Five_Years :=AgeInDays<=PersonProperty.FIVE_YEARS_IN_DAYS;
+Person: =>Purchase1YCount :=COUNT(PersonProperty(PropertyIsPurchased AND Seen_In_One_Year));
+Person: =>Purchase5YCount :=COUNT(PersonProperty(PropertyIsPurchased AND Seen_In_Five_Years));
+Person: =>PurchaseCountEver :=COUNT(PersonProperty(PropertyIsPurchased));
+Person: => PurchaseDateListSorted :=TOPN(PersonProperty(PropertyIsPurchased),999,-PropertyPurchaseDateFirstSeen){PropertyPurchaseDateFirstSeen:=IF(ISVALIDDATE(PropertyPurchaseDateFirstSeen),DATETOSTRING(PropertyPurchaseDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),Prop};
+Person: =>DateList :=CONCAT(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen,'|');
+Person: =>PurchaseOldDateEv :=IsBlank(STRING(MIN(PurchaseDateListSorted,DATE(PropertyPurchaseDateFirstSeen))),Person.NO_DATA_FOUND_97);
+Person: =>PurchaseNewDateEv :=IsBlank(STRING(MAX(PurchaseDateListSorted,DATE(PropertyPurchaseDateFirstSeen))),Person.NO_DATA_FOUND_97);
 // Property Ownership
 Person: => PL_AstPropCntEv := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(AssetPropertyCountEver, 0, 999));
@@ -8462,7 +8481,36 @@ Person: => PL_AstPropSaleNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 Person: => PL_AstPropSaleOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
 				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropertySaleDateClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstPropSaleOldDtEv),Property.CURRENT_DATE),0,960)); 																																																		
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstPropSaleOldDtEv),Property.CURRENT_DATE),0,960)); 
+				
+//Property Purchase History
+Person: => PL_AstPropPurchCnt1Y := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(Purchase1YCount,0,999));
+Person: => PL_AstPropPurchCnt5Y := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(Purchase5YCount,0,999));
+Person: => PL_AstPropPurchCntEv := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(PurchaseCountEver,0,999));
+Person: => PL_AstPropPurchDtListEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+				PL_AstPropPurchCntEv = 0 => NO_DATA_FOUND,
+				NOT EXISTS(PurchaseDateListSorted) =>NO_DATA_FOUND_97,
+				DateList);
+Person: => PL_AstPropPurchNewDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+				PL_AstPropPurchCntEv = 0 => NO_DATA_FOUND,
+				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97)=>NO_DATA_FOUND_97,
+				PurchaseNewDateEv);
+Person: => PL_AstPropPurchOldDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+				PL_AstPropPurchCntEv = 0 => NO_DATA_FOUND,
+				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97)=>NO_DATA_FOUND_97,
+				PurchaseOldDateEv);
+Person: => PL_AstPropPurchNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT, 
+				PL_AstPropPurchCntEv = 0 => NO_DATA_FOUND_INT,
+				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97)=>NO_DATA_FOUND_97,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PurchaseNewDateEv),Property.CURRENT_DATE),0,960));
+Person: => PL_AstPropPurchOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+				PL_AstPropPurchCntEv = 0 => NO_DATA_FOUND_INT,
+				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97)=>NO_DATA_FOUND_97,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PurchaseOldDateEv),Property.CURRENT_DATE),0,960));
+
 
 /**************************************************************************/
 /*                                                                        */
