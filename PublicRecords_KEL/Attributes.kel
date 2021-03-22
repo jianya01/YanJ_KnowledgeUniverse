@@ -4975,6 +4975,7 @@ Person: FIVE_YEARS_IN_DAYS := 1826;
 Person: => ThriveData := Thrive(Source IN Person.VALID_LENDING_SOURCE){LoanDateFirstSeen := IF(ISVALIDDATE(ThriveDateFirstSeen),DATETOSTRING(ThriveDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),
 	LoanAgeInDays := ABSDAYSBETWEEN(ThriveDateFirstSeen, CURRENT_DATE_THRIVE),Source};
 
+Person: => ShortTermLoansSorted := TOPN(ThriveData,999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
 Person: => ShortTermLoans1YSorted := TOPN(ThriveData(LoanAgeInDays <= ONE_YEAR_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
 Person: => ShortTermLoans2YSorted := TOPN(ThriveData(LoanAgeInDays <= TWO_YEARS_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
 Person: => ShortTermLoans5YSorted := TOPN(ThriveData(LoanAgeInDays <= FIVE_YEARS_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
@@ -4985,6 +4986,22 @@ Person: => ShortTermLoans5YList := CONCAT(ShortTermLoans5YSorted,LoanDateFirstSe
 /*                 Short Term Lending Attributes                          */
 /*                                                                        */
 /**************************************************************************/
+Person: => PL_STLCntEv := IF(P_LexIDSeenFlag = '0', Person.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(ShortTermLoansSorted),0,999));
+	
+Person: => PL_STLDtListEv := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA,
+		PL_STLCntEv = 0 => NO_DATA_FOUND,
+		CONCAT(ShortTermLoansSorted, LoanDateFirstSeen, '|'));
+			
+Person: => PL_STLOldDtEv := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA,
+		PL_STLCntEv = 0 => NO_DATA_FOUND,
+		ALL(ShortTermLoansSorted, LoanDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+		DATETOSTRING(MIN(ShortTermLoansSorted, DATE(LoanDateFirstSeen)), '%Y%m%d'));
+	
+Person: => PL_STLNewDtEv := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA,
+		PL_STLCntEv = 0 => NO_DATA_FOUND,
+		ALL(ShortTermLoansSorted, LoanDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+		DATETOSTRING(MAX(ShortTermLoansSorted, DATE(LoanDateFirstSeen)), '%Y%m%d'));
 
 Person: => PL_STLCnt1Y := IF(P_LexIDSeenFlag = '0', Person.MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT(ShortTermLoans1YSorted),0,999));
