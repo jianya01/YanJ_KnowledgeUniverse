@@ -2650,7 +2650,33 @@ Person: => PL_CurrAddrIsAptFlag:= MAP(
 			PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
 			NOT IsPostalSource =>NO_DATA_FOUND_INT,
 			OnlyCurrAddressHelperFlag.ResBusFlagAC AND PL_CurrAddrIsMultiUnitFlag = 1 => 1,0);
-			
+
+// KS-4687: Current Address Characteristics
+Person: => CurrAddrDtFirstSn := ONLY(CurrAddrFullSet, AddressRank:DateFirstSeen);
+Person: => CurrAddrDtLastSn := ONLY(CurrAddrFullSet, AddressRank:DateLastSeen);
+Person: => ValidCurrAddrDtFirstSn := IF(ISVALIDDATE(CurrAddrDtFirstSn), DATETOSTRING(CurrAddrDtFirstSn, '%Y%m%d'), Person.NO_DATA_FOUND_97);
+Person: => ValidCurrAddrDtLastSn := IF(ISVALIDDATE(CurrAddrDtLastSn), DATETOSTRING(MIN(CurrAddrDtLastSn, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97);
+Person: => PL_CurrAddrSubjOldDt := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+			ValidCurrAddrDtFirstSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+			ValidCurrAddrDtFirstSn);
+Person: => PL_CurrAddrSubjNewDt := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+			ValidCurrAddrDtLastSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+			ValidCurrAddrDtLastSn);
+Person: => PL_CurrAddrSubjOldMsnc := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+			PL_CurrAddrSubjOldDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+            BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_CurrAddrSubjOldDt), Person.CURRENT_DATE),0,960));
+Person: => PL_CurrAddrSubjNewMsnc := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+			PL_CurrAddrSubjNewDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+            BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_CurrAddrSubjNewDt), Person.CURRENT_DATE),0,960));
+Person: => PL_CurrAddrSubjResSpan := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+			PL_CurrAddrSubjOldMsnc = NO_DATA_FOUND_97_INT OR PL_CurrAddrSubjNewMsnc = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+            BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_CurrAddrSubjOldDt), DATE(PL_CurrAddrSubjNewDt)),0,960));
+
 Person: => PL_PrevAddrIsSimpAddrFlag:= MAP(
 			PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
 			NOT IsPreviousPostalSource =>NO_DATA_FOUND_INT,
@@ -2665,6 +2691,32 @@ Person: => PL_PrevAddrIsBusinessFlag:= MAP(
 			OnlyPreviousAddressHelperFlag.ResBusFlagAC =>0,
 			OnlyPreviousAddressHelperFlag.ResBusFlagBD =>1,
 			NO_DATA_FOUND_97_INT);
+
+// KS-4688: Previous Address Characteristics
+Person: => PrevAddrDtFirstSn := ONLY(PrevAddrFullSet, AddressRank:DateFirstSeen);
+Person: => PrevAddrDtLastSn := ONLY(PrevAddrFullSet, AddressRank:DateLastSeen);
+Person: => ValidPrevAddrDtFirstSn := IF(ISVALIDDATE(PrevAddrDtFirstSn), DATETOSTRING(PrevAddrDtFirstSn, '%Y%m%d'), Person.NO_DATA_FOUND_97);
+Person: => ValidPrevAddrDtLastSn := IF(ISVALIDDATE(PrevAddrDtLastSn), DATETOSTRING(MIN(PrevAddrDtLastSn, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97);
+Person: => PL_PrevAddrSubjOldDt := MAP(
+			PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+			ValidPrevAddrDtFirstSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+			ValidPrevAddrDtFirstSn);
+Person: => PL_PrevAddrSubjNewDt := MAP(
+			PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+			ValidPrevAddrDtLastSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+			ValidPrevAddrDtLastSn);
+Person: => PL_PrevAddrSubjOldMsnc := MAP(
+			PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+			PL_PrevAddrSubjOldDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+            BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSubjOldDt), Person.CURRENT_DATE),0,960));
+Person: => PL_PrevAddrSubjNewMsnc := MAP(
+			PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+			PL_PrevAddrSubjNewDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+            BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSubjNewDt), Person.CURRENT_DATE),0,960));
+Person: => PL_PrevAddrSubjResSpan := MAP(
+			PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+			PL_PrevAddrSubjOldMsnc = NO_DATA_FOUND_97_INT OR PL_PrevAddrSubjNewMsnc = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+            BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSubjOldDt), DATE(PL_PrevAddrSubjNewDt)),0,960));
 			
 Person: THREE_MONTHS_IN_DAYS := 90;
 Person: SIX_MONTHS_IN_DAYS := 180;
