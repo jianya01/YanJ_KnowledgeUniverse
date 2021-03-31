@@ -134,6 +134,11 @@ Vehicle: => CurrentOwnerAnnualMileage := MAP(cntValidCOAM1EventDate <2 OR (DAYSB
 // CURRENT_OWNER_ANNUALIZED_MILEAGE2
 Events: => validCOAM2Records := DAYSBETWEEN(EventDate, rVehicle.SearchDate) >= 0 AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 AND (NOT Odometer:Null);
 
+// Added per request from Prod by only return COAM2 when there has one odo reading in the past 3 years and all rest do readings are older than 3 years.
+Events: => odoReadingIn3Yr := DAYSBETWEEN(EventDate, rVehicle.SearchDate) <= DAYS_IN_3_YEAR AND EventDate <= rVehicle.SearchDate AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 AND Odometer > 0;
+Vehicle: => cntOdoReadingIn3Yr := COUNT(Events(odoReadingIn3Yr));
+
+
 Vehicle: => cntValidCOAM2EventDate := COUNT(Events(validCOAM2Records));
 Vehicle: => minValidCOAM2EventDate := MIN(Events(validCOAM2Records), EventDate);
 Vehicle: => maxValidCOAM2EventDate := MAX(Events(validCOAM2Records), EventDate);
@@ -145,9 +150,11 @@ Vehicle: => CurrentOwnerAnnualMileage2Tmp := ROUND(Stats.Slope(CurrentOwnerAnnua
 Vehicle: => CurrentOwnerAnnualMileage2 := MAP(CurrentOwnerAnnualMileage != LVL1_DEFAULT => CurrentOwnerAnnualMileage,
 																							CurrentOwnerStartDate:Null AND CurrentOwnerAnnualMileage = LVL1_DEFAULT => LVL1_DEFAULT,
 																							cntValidCOAM2EventDate < 2 OR (DAYSBETWEEN(minValidCOAM2EventDate, maxValidCOAM2EventDate) < 100) => LVL1_DEFAULT,
+																							cntOdoReadingIn3Yr < 1 => LVL1_DEFAULT,
 																							CurrentOwnerAnnualMileage2Tmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
 																							CurrentOwnerAnnualMileage2Tmp <= 0 => LVL1_DEFAULT,
 																							CurrentOwnerAnnualMileage2Tmp);
+
 
 // CURRENT_OWNER_ANNUALIZED_MILEAGE3
 Events: => validCOAM3Records := DAYSBETWEEN(EventDate, rVehicle.SearchDate) > DAYS_IN_3_YEAR AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 
