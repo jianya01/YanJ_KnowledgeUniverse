@@ -571,6 +571,14 @@ PersonAccident: NO_DATA_FOUND_INT := -99998;
 PersonAccident: NO_DATA_FOUND_97 := '-99997';
 PersonAccident: NO_DATA_FOUND_97_INT :=  -99997;
 
+
+Phone: MISSING_INPUT_DATA := '-99999';
+Phone: MISSING_INPUT_DATA_INT := -99999;
+Phone: NO_DATA_FOUND := '-99998';
+Phone: NO_DATA_FOUND_INT := -99998;
+Phone: NO_DATA_FOUND_97_INT := -99997;
+Phone: NO_DATA_FOUND_97 := '-99997';
+
 /**********************************************************************************************************************/
 /*********                                                                                                  ***********/
 /*********                        Attributes Section                                                        ***********/
@@ -10229,7 +10237,6 @@ Person: => PL_AlrtSecurityAlertFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPU
 Person: => PL_AlrtIDTheftFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA, EXISTS(ConsumerStatementFlags(IDTheftFlag = TRUE)) => '1', '0');
 
 Person: => P_InpClnAddrState := PII.InputStateCleanValue;
-Person: => PL_VerPhoneSrcCntEvFCRA := 0; // stubbing out for use in PL_VerRIRestrictedFlag. Replace with attribute logic in KS-6536.
 Person: => PL_VerDOBSrcCntEvFCRA := 0; // stubbing out for use in PL_VerRIRestrictedFlag. Replace with attribute logic in KS-6178.
 
 Person: => PL_VerRIRestrictedFlag := IF(
@@ -10382,3 +10389,85 @@ Person: => PL_DrgCrimDtList1YFCRA := MAP(P_LexIDSeenFlag = '0' => CriminalOffens
 Person: => PL_DrgCrimDtList7YFCRA := MAP(P_LexIDSeenFlag = '0' => CriminalOffense.MISSING_INPUT_DATA,
 		PL_DrgCrimCnt7YFCRA < 1 => CriminalOffense.NO_DATA_FOUND_CRIM,
 		CONCAT(CrimListFCRA,OriginalFilingDate,'|'));
+			YEAR(DATE(AssesdValueYear)));// AddressProperty: =>BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsDeed OR IsAssessment),1 ,-DtFirstSeen));
+// AddressProperty: =>BestMostRecentPropertyEventPurchase:=ONLY(TOPN(Prop.PropertyEvent(IsDeed AND PropertyPurchaseRecord),1 ,-DtFirstSeen));
+// Person: =>CurrAddrPropPurchase :=TOPN(PersonAddress(CurenntAddrMatchattribute).Location.AddressProperty
+		// {
+			// ModSalePrice:=IF(BestMostRecentPropertyEventPurchase.SalePrice:Null OR BestMostRecentPropertyEventPurchase.SalePrice='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEventPurchase.SalePrice),
+			// BestMostRecentPropertyEventPurchase.DtFirstSeen,
+			// BestMostRecentPropertyEventPurchase},1,-DtFirstSeen);
+// Person: =>CurrAddrProp :=TOPN(PersonAddress(CurenntAddrMatchattribute).Location.AddressProperty
+		// {
+			// ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.MarketTotalValue),
+			// ModAssesdValue:=IF(BestMostRecentPropertyEvent.AssessedTotalValue:Null OR BestMostRecentPropertyEvent.AssessedTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.AssessedTotalValue),
+			// AssesdValueYear :=IF(ISVALIDDATE(BestMostRecentPropertyEvent.AssessedValueYear),DATETOSTRING(BestMostRecentPropertyEvent.AssessedValueYear,'%Y%m%d'),Person.NO_DATA_FOUND_97),
+			// BestMostRecentPropertyEvent.DtFirstSeen,
+			// BestMostRecentPropertyEvent},1,-DtFirstSeen);			
+// Person: =>CurrAddrPropertyPurchaseRecord :=EXISTS(CurrAddrPropPurchase);
+// Person: =>CurrAddrPropertyRecord :=EXISTS(CurrAddrProp);
+// Person: =>PropertyModSalePrice :=ONLY(CurrAddrPropPurchase,ModSalePrice);
+// Person: =>PurchaseDt :=ONLY(CurrAddrPropPurchase,BestMostRecentPropertyEventPurchase.DtFirstSeen);
+// Person: =>ValidPropertyPurchaseDt := IF(ISVALIDDATE(PurchaseDt),DATETOSTRING(PurchaseDt,'%Y%m%d'),Person.NO_DATA_FOUND_97);
+// Person: =>PropertyTaxValYr :=ONLY(CurrAddrProp,AssesdValueYear);
+// Person: =>PropertyModMarketValue :=ONLY(CurrAddrProp,ModMarketValue);
+// Person: =>PropertyModAssesdValue :=ONLY(CurrAddrProp,ModAssesdValue);
+// Person: =>PL_CurrAddrPurchDt :=MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA,
+			// NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND,
+			// ValidPropertyPurchaseDt = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97,
+			// ValidPropertyPurchaseDt);
+// Person: =>PL_CurrAddrPurchMsnc :=MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
+			// NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND_INT,
+			// PL_CurrAddrPurchDt  = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97_INT,
+			// MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt),Property.CURRENT_DATE));
+// Person: =>PL_CurrAddrPurchAmt :=MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
+			// NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND_INT,
+			// PropertyModSalePrice = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT, 
+			// BOUNDSFOLD(PropertyModSalePrice,0,9999999));
+// Person: =>PL_CurrAddrMktVal :=MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
+			// NOT CurrAddrPropertyRecord =>NO_DATA_FOUND_INT,
+			// PropertyModMarketValue = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT,
+			// BOUNDSFOLD(PropertyModMarketValue,0,9999999));
+// Person: =>PL_CurrAddrTaxVal :=MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
+			// NOT CurrAddrPropertyRecord =>NO_DATA_FOUND_INT,
+			// PropertyModAssesdValue = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT,
+			// BOUNDSFOLD(PropertyModAssesdValue,0,9999999));
+// Person: =>PL_CurrAddrTaxValYr :=MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA,
+			// NOT CurrAddrPropertyRecord =>NO_DATA_FOUND,
+			// PropertyTaxValYr = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97,
+			// YEAR(DATE(PropertyTaxValYr)));
+	1, 0);
+	
+Phone.DataSources: => TranslatedSourceCode := SourceGroup(Source);
+Phone: => TranslatedSources := DataSources{TranslatedSourceCode};
+Phone: => PhoneVerSourceList := TranslatedSources{
+	TranslatedSourceCode := TranslatedSourceCode,
+	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), Phone.NO_DATA_FOUND_97),
+	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Phone.CURRENT_DATE), '%Y%m%d'), Phone.NO_DATA_FOUND_97)};
+Person: =>PhoneVerSourceList	:= PersonPhone.PhoneNumber(IsPhoneMatch(Phone10,Person.PII.P_InpClnPhoneHome)).PhoneVerSourceList{TranslatedSourceCode,SourceDateFirstSeen,SourceDateLastSeen};
+Person: => PhoneVerSourceListSorted := TOPN(PhoneVerSourceList, 1000, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+Person: => PL_VerPhoneSrcCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																 NOT EXISTS(PhoneVerSourceListSorted) => MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(PhoneVerSourceListSorted), 1, 51));
+Person: => PL_VerPhoneSrcListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+																 PL_VerPhoneSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneVerSourceListSorted, TranslatedSourceCode, '|'));
+Person: => PL_VerPhoneSrcEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_VerPhoneSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneVerSourceListSorted, SourceDateFirstSeen, '|'));
+Person: => PL_VerPhoneSrcLastDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_VerPhoneSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneVerSourceListSorted, SourceDateLastSeen, '|'));
+																			 
+																			 
+Person: => PL_VerPhoneSrcCntEvFCRA := MAP(P_LexIDSeenFlag = '0'  OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																 NOT EXISTS(VerSourceListSorted) => MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(VerSourceListSorted), 1, 24));
+Person: => PL_VerPhoneSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+																 PL_VerPhoneSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneVerSourceListSorted, TranslatedSourceCode, '|'));
+Person: => PL_VerPhoneSrcEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_VerPhoneSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneVerSourceListSorted, SourceDateFirstSeen, '|'));
+Person: => PL_VerPhoneSrcLastDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_VerPhoneSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneVerSourceListSorted, SourceDateLastSeen, '|'));																
