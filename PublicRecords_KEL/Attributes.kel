@@ -2721,8 +2721,7 @@ Person: => PL_PrevAddrSubjResSpan := MAP(
 Person: THREE_MONTHS_IN_DAYS := 90;
 Person: SIX_MONTHS_IN_DAYS := 180;
 Person: FIFTEEN_YEARS_IN_DAYS := 5478;
-Person: => UniqueAddresses := AddressHierarchySet(IsNotEnoughToClean(AddressRank)=FALSE AND NOT AddressRank IN Person.INVALIDADDRESSRANK){PrimaryRange,PrimaryName};
-Person.UniqueAddresses: =>HierarchyDateFirstSeen :=PrimaryName:DateFirstSeen;
+Person: => UniqueAddresses := AddressHierarchySet(IsNotEnoughToClean(AddressRank)=FALSE AND NOT AddressRank IN Person.INVALIDADDRESSRANK){PrimaryRange,PrimaryName,HierarchyDateLastSeen,HierarchyDateFirstSeen};
 Person.UniqueAddresses: => AgeInDays :=ABSDAYSBETWEEN(HierarchyDateFirstSeen,Person.CURRENT_DATE);
 Person.UniqueAddresses: => Seen_In_Three_Months :=AgeInDays<=THREE_MONTHS_IN_DAYS;
 Person.UniqueAddresses: =>Seen_In_Six_Months :=AgeInDays<=SIX_MONTHS_IN_DAYS;
@@ -2764,7 +2763,11 @@ Person: =>PL_AddrEmrgCnt10Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_IN
 Person: =>PL_AddrEmrgCnt15Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
 		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_In_Fifteen_Years)),0,9999));
-
+Person: => PL_AddrMaxMonCnt := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT,
+		ALL(UniqueAddresses, NOT ISVALIDDATE(HierarchyDateFirstSeen) OR NOT ISVALIDDATE(HierarchyDateLastSeen)) => NO_DATA_FOUND_97_INT,
+		MAX(UniqueAddresses, BOUNDSFOLD(MONTHSBETWEEN(HierarchyDateFirstSeen, HierarchyDateLastSeen),0,960))); 
+		
 Person.FullName: => BestNames := (Best = TRUE);
 Person: => BestFirstName := ONLY(FullName(BestNames), FirstName);
 Person: => BestMidName := ONLY(FullName(BestNames), MiddleName);
