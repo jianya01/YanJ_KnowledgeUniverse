@@ -10443,8 +10443,14 @@ Phone: => PhoneVerSourceList := TranslatedSources{
 	TranslatedSourceCode := TranslatedSourceCode,
 	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), Phone.NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Phone.CURRENT_DATE), '%Y%m%d'), Phone.NO_DATA_FOUND_97)};
-Person: =>PhoneVerSourceList	:= PersonPhone.PhoneNumber(IsPhoneMatch(Phone10,Person.PII.P_InpClnPhoneHome)).PhoneVerSourceList{TranslatedSourceCode,SourceDateFirstSeen,SourceDateLastSeen};
+
+PersonPhone: => PhoneIsVerified := IsPhoneMatch(PhoneNumber,Subject.PII.P_InpClnPhoneHome);
+
+Person: =>PhoneVerSourceList	:= PersonPhone(PhoneIsVerified).PhoneNumber.PhoneVerSourceList{TranslatedSourceCode,SourceDateFirstSeen,SourceDateLastSeen};
+
 Person: => PhoneVerSourceListSorted := TOPN(PhoneVerSourceList, 1000, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+
+
 Person: => PL_VerPhoneSrcCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																 NOT EXISTS(PhoneVerSourceListSorted) => MISSING_INPUT_DATA_INT,
 																BOUNDSFOLD(COUNT(PhoneVerSourceListSorted), 1, 51));
@@ -10460,8 +10466,8 @@ Person: => PL_VerPhoneSrcLastDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII
 																			 
 																			 
 Person: => PL_VerPhoneSrcCntEvFCRA := MAP(P_LexIDSeenFlag = '0'  OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-																 NOT EXISTS(VerSourceListSorted) => MISSING_INPUT_DATA_INT,
-																BOUNDSFOLD(COUNT(VerSourceListSorted), 1, 24));
+																 NOT EXISTS(PhoneVerSourceListSorted) => MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(PhoneVerSourceListSorted), 1, 24));
 Person: => PL_VerPhoneSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 																 PL_VerPhoneSrcCntEvFCRA < 1 => NO_DATA_FOUND,
 																 CONCAT(PhoneVerSourceListSorted, TranslatedSourceCode, '|'));
