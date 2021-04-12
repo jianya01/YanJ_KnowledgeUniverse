@@ -1,0 +1,22 @@
+﻿IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Entities; 
+IMPORT VehicleMasterFile_KEL.Uses;
+
+IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
+FUNCTION: TimeStampToDate(TIMESTAMP x) <= ECL((STRING) x[..8]) RETURNS DATE; //most date functions are not supported by timestamp. This casts to date so you just use that.
+
+PersonPolicy: => IsPrimaryPolicyHolder := PolicyHolderRelation = 'A1';
+Policy: => PrimaryPolicyHolderLexID := ONLY(PersonPolicy(IsPrimaryPolicyHolder){Subject.UID});
+
+VehiclePolicy: => minAppearanceDate := MIN(MIN(CoverageStartDates,CoverageStartDate),MIN(NotificationDates,NotificationDate),FirstLoadDate);
+VehiclePolicy: => PreviousCandidatesMinDate := MIN(Vehicle.VehiclePolicy,minAppearanceDate);
+VehiclePolicy: => firstPurchase := minAppearanceDate = PreviousCandidatesMinDate;
+
+
+
+VehiclePolicy: => hasBeforeV2 := EXISTS(Policy.PersonPolicy.Subject.PersonPolicy.Policy.VehiclePolicy(VIN = VehiclePolicy.VIN AND minAppearanceDate < VehiclePolicy.minAppearanceDate,ISVALIDDATE(minAppearanceDate)));
+
+VehiclePolicy: => changedOwnership := NOT(firstPurchase OR hasBeforeV2);
+VehiclePolicy: => minminAppearanceDate := IF(firstPurchase OR changedOwnership, minAppearanceDate);
+VehiclePolicy: => minminAppearanceDate2 := IF(NOT minminAppearanceDate:Null, minminAppearanceDate, PreviousCandidatesMinDate);
+VehiclePolicy : => hhKey := Vehicle.VIN + '_' + DATETOSTRING(minminAppearanceDate2,'%Y%m%d');
+Vehicle: => myResultTable := VehiclePolicy{Policy.PersonPolicy(Policy = VehiclePolicy.Policy AND MIN(StartDates,StartDate) = VehiclePolicy.minAppearanceDate).Subject.LexID, minAppearanceDate, hhKey};
