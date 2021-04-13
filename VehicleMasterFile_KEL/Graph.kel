@@ -8,17 +8,25 @@ IMPORT VehicleMasterFile_KEL.Uses;
 IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Attributes;
 
 
-QUERY: VehicleMasterFile(PERMITS DPM) <= Policy{VIN := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).Vehicle.VIN,
-																								GroupVehicleID := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).hhKey,
-																								LexID := PersonPolicy.Subject(LexID != '' AND NOT LexID:Null).UID,
-																								OwnershipStartDate := DATETOSTRING(VehiclePolicy.minAppearanceDate,'%Y%m%d'),
-																								OwnershipEndDate := DATETOSTRING(MAX(VehiclePolicy.CoverageEndDates,CoverageEndDate),'%Y%m%d'),
-																								PrimaryPolicyHolderLexID := PrimaryPolicyHolderLexID}
-																								(VIN != '',NOT VIN:Null,LexID != '',NOT LexID:Null) //conditions on output eliminate empty outputs
-																								USING DPM;
-																								
-QUERY: GroupVehicleIDLexIDMasterFile(PERMITS DPM) <= Policy{
-																								LexID := PersonPolicy.Subject(LexID != '' AND NOT LexID:Null).UID,
-																								GroupVehicleID := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).hhKey}
-																								USING DPM;
-																																																
+QUERY: VehicleMasterFile(PERMITS DPM) <= 
+	Policy{
+		VIN := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).Vehicle.VIN,
+		ValidVIN := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).Vehicle.ValidVIN,
+		LexID := PersonPolicy.Subject(LexID != '' AND NOT LexID:Null).UID,
+		PrimaryPolicyHolderFlag := PersonPolicy.Subject(LexID != '' AND NOT LexID:Null).UID = PrimaryPolicyHolderLexID,
+		PrimaryPolicyHolderLexID := PrimaryPolicyHolderLexID,
+		LexIDStart := DATETOSTRING(VehiclePolicy.minAppearanceDate,'%Y%m%d'), // Will be replaced with Attribute logic, just a placeholder for now
+		LexIDEnd := DATETOSTRING(MAX(VehiclePolicy.CoverageEndDates,CoverageEndDate),'%Y%m%d'), // Will be replaced with Attribute logic, just a placeholder for now
+		VehicleGroupID := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).hhKey,
+		VehicleGroupStart := DATETOSTRING(VehiclePolicy.minAppearanceDate,'%Y%m%d'),
+		VehicleGroupEnd := DATETOSTRING(MAX(VehiclePolicy.CoverageEndDates,CoverageEndDate),'%Y%m%d')
+		}
+			(VIN != '', NOT VIN:Null, LexID != '', NOT LexID:Null), // Conditions on output eliminate empty outputs
+	Policy{
+		LexID := PersonPolicy.Subject(LexID != '' AND NOT LexID:Null).UID,
+		VehicleGroupID := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).hhKey,
+		VehicleGroupStart := DATETOSTRING(VehiclePolicy.minAppearanceDate,'%Y%m%d'),
+		VehicleGroupEnd := DATETOSTRING(MAX(VehiclePolicy.CoverageEndDates,CoverageEndDate),'%Y%m%d')
+		}
+			(LexID != '', NOT LexID:Null) // Conditions on output eliminate empty outputs
+	USING DPM;
