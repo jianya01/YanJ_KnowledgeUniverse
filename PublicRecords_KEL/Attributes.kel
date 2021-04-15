@@ -9025,10 +9025,12 @@ Person: => AssetPropertyCountEver := COUNT(PersonProperty(IsEverOwned));
 
 // Property Sale logic
 PersonProperty: => PropertyIsSold := EXISTS(Prop.PropertyEvent(IsDeed).PersonPropertyEvent(PartyDetails.PartyIsSeller AND Subject = PersonProperty.Subject));
-PersonProperty: PropertyIsSold => PropertySaleInfo := Prop.PropertyEvent(EXISTS(PersonPropertyEvent(PartyDetails.PartyIsSeller AND Subject = PersonProperty.Subject))){LNFaresID, DtFirstSeen, SalePrice};
+PersonProperty: PropertyIsSold => PropertySaleInfo := Prop.PropertyEvent(EXISTS(PersonPropertyEvent(PartyDetails.PartyIsSeller AND Subject = PersonProperty.Subject))){LNFaresID, DtFirstSeen, SalePrice, PreviousSalePrice, PreviousRecordingDate};
 PersonProperty: PropertyIsSold => BestPropertySaleInfo := ONLY(TOPN(PropertySaleInfo, 1, -DtFirstSeen, -SalePrice));
 PersonProperty: PropertyIsSold => PropertySaleDate := BestPropertySaleInfo.DtFirstSeen;
 PersonProperty: PropertyIsSold => PropertySalePrice := BestPropertySaleInfo.SalePrice;
+PersonProperty: PropertyIsSold => PropertyPreviousSalePrice := BestPropertySaleInfo.PreviousSalePrice;
+PersonProperty: PropertyIsSold => PropertyPreviousRecordingDate := BestPropertySaleInfo.PreviousRecordingDate;
 
 // We consider a deed record to indicate ownership if the Subject is listed as buyer on the record. An assessment record indicates ownership if it is current (from the past year) and the Subject is listed as owner on the record.
 PersonProperty: => PropertyIsOwnedDeed := EXISTS(Prop.PropertyEvent(IsDeed).PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject));
@@ -9044,14 +9046,17 @@ PersonProperty: => PropertyMaxDateLastSeen := MIN(PropertyMaxDateLastSeenUncappe
 Person: => PropertyDataSet := PersonProperty(IsEverOwned){
 										Prop, 
 										PropertyIsSold,
+										PropertyPreviousSalePriceClean := IF(PropertyPreviousSalePrice:Null OR PropertyPreviousSalePrice < 0, Person.NO_DATA_FOUND_97_INT, PropertyPreviousSalePrice),
 										PropertySaleDateClean := IF(ISVALIDDATE(PropertySaleDate), DATETOSTRING(PropertySaleDate, '%Y%m%d'), Person.NO_DATA_FOUND_97),
 										PropertySalePriceClean := IF(PropertySalePrice:Null OR PropertySalePrice < 0, Person.NO_DATA_FOUND_97_INT, PropertySalePrice),
 										DateFirstSeenClean := IF(ISVALIDDATE(PropertyMinDateFirstSeen), DATETOSTRING(PropertyMinDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
-										DateLastSeenClean := IF(ISVALIDDATE(PropertyMaxDateLastSeen), DATETOSTRING(PropertyMaxDateLastSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97)};
+										DateLastSeenClean := IF(ISVALIDDATE(PropertyMaxDateLastSeen), DATETOSTRING(PropertyMaxDateLastSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
+										PropPreviousRecordingDate := IF(ISVALIDDATE(PropertyPreviousRecordingDate), DATETOSTRING(PropertyPreviousRecordingDate, '%Y%m01'), Person.NO_DATA_FOUND_97)};
 
 Person: => PropertyDateFirstSeenSorted := TOPN(PropertyDataSet, 100, DateFirstSeenClean = Person.NO_DATA_FOUND_97, DateFirstSeenClean);
 Person: => PropertyDateLastSeenSorted := TOPN(PropertyDataSet, 100, DateLastSeenClean = Person.NO_DATA_FOUND_97, DateLastSeenClean);
 Person: => PropertySalesSorted := TOPN(PropertyDataSet(PropertyIsSold), 100, PropertySaleDateClean = Person.NO_DATA_FOUND_97, PropertySaleDateClean, -PropertySalePriceClean);
+Person: => PropertySalesNewAmt := TOPN(PropertyDataSet(PropertyIsSold), 1, -DateLastSeenClean);
 
 Person: => AssetPropertyCurrentCount := COUNT(PersonProperty(IsCurrentlyOwned));
 
@@ -9188,7 +9193,31 @@ Person: => PL_AstPropSaleOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
 				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropertySaleDateClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstPropSaleOldDtEv),Property.CURRENT_DATE),0,960)); 
+
+Person: => PL_AstPropSaleNewAmtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
+				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropertySalePriceClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+				ONLY(PropertySalesNewAmt, PropertySalePriceClean));
 				
+Person: => PL_AstPropSaleNewPurchAmtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
+				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropertyPreviousSalePriceClean = Person.NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+				ONLY(PropertySalesNewAmt, PropertyPreviousSalePriceClean));
+
+Person: => PL_AstPropSaleNewAmtRatioEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
+				PL_AstPropSaleNewAmtEv = NO_DATA_FOUND_97_INT OR PL_AstPropSaleNewPurchAmtEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+				MIN(ROUND(PL_AstPropSaleNewAmtEv/PL_AstPropSaleNewPurchAmtEv,2),99.99));
+				
+Person: => PL_AstPropSaleNewPurchDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND,
+				PL_AstPropSaleCntEv > 0 AND ALL(PropertyDataSet(PropertyIsSold), PropPreviousRecordingDate = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(PropertyDataSet(PropertyIsSold AND PropPreviousRecordingDate <> Person.NO_DATA_FOUND_97), DATE(PropPreviousRecordingDate)), '%Y%m%d'));
+				
+Person: => PL_AstPropSaleNewOwnedSpanEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
+				PL_AstPropSaleCntEv > 0 AND (PL_AstPropSaleDtListEv = NO_DATA_FOUND_97_INT OR PL_AstPropSaleNewPurchDtEv = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstPropSaleNewPurchDtEv),DATE(PL_AstPropSaleNewDtEv)),0,960)); 			
 //Property Purchase History
 Person: => PL_AstPropPurchCnt1Y := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(Purchase1YCount,0,999));
