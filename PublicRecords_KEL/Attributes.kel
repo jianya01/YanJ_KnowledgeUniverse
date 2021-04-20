@@ -9740,3 +9740,40 @@ Person: => PL_VerRIRestrictedFlag := IF(
 			// NOT CurrAddrPropertyRecord =>NO_DATA_FOUND,
 			// PropertyTaxValYr = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97,
 			// YEAR(DATE(PropertyTaxValYr)));
+
+//InputAddressProperty
+InputPII: => BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsDeed OR IsAssessment),1,-DtFirstSeen));
+InputPII: => BestMostRecentPropertyEventPurchase:=ONLY(TOPN(Prop.PropertyEvent(IsDeed AND PropertyPurchaseRecord),1 ,-DtFirstSeen));
+InputPII: => ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEvent.MarketTotalValue);
+InputPII: => ModAssesdValue:=IF(BestMostRecentPropertyEvent.AssessedTotalValue:Null OR BestMostRecentPropertyEvent.AssessedTotalValue='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEvent.AssessedTotalValue);
+InputPII: => AssesdValueYear:=IF(ISVALIDDATE(BestMostRecentPropertyEvent.AssessedValueYear),DATETOSTRING(BestMostRecentPropertyEvent.AssessedValueYear,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE);
+InputPII: => ModSalePrice:=IF(BestMostRecentPropertyEventPurchase.SalePrice:Null OR BestMostRecentPropertyEventPurchase.SalePrice='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEventPurchase.SalePrice);
+InputPII: => InpAddrPropertyPurchaseRecord:=EXISTS(BestMostRecentPropertyEventPurchase);
+InputPII: => InpAddrPropertyRecord:=EXISTS(BestMostRecentPropertyEvent);
+InputPII: => PurchaseDt:=BestMostRecentPropertyEventPurchase.DtFirstSeen;
+InputPII: => ValidPropertyPurchaseDt:=IF(ISVALIDDATE(PurchaseDt),DATETOSTRING(PurchaseDt,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE);
+
+InputPII: => PI_InpAddrPurchDt:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND,
+			ValidPropertyPurchaseDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+			ValidPropertyPurchaseDt);
+InputPII: => PI_InpAddrPurchMsnc:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND_INT,
+			PI_InpAddrPurchDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt),Property.CURRENT_DATE));
+InputPII: => PI_InpAddrPurchAmt:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND_INT,
+			ModSalePrice = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT, 
+			BOUNDSFOLD(ModSalePrice,0,9999999));
+InputPII: => PI_InpAddrMktVal:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND_INT,
+			ModMarketValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			BOUNDSFOLD(ModMarketValue,0,9999999));
+InputPII: => PI_InpAddrTaxVal:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND_INT,
+			ModAssesdValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			BOUNDSFOLD(ModAssesdValue,0,9999999));
+InputPII: => PI_InpAddrTaxValYr:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND,
+			AssesdValueYear = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+			YEAR(DATE(AssesdValueYear)));
