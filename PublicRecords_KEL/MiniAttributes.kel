@@ -1,0 +1,72 @@
+﻿IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities; 
+IMPORT PublicRecords_KEL.Uses;
+
+IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
+IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
+
+
+// These attributes precalculate the current and previous address attributes, and from here, they are output in the Mini KEL query and mapped back into our other queries through the InputPII ENTITY.
+// This reduces the extra search we do of the indexes. 
+// This code is being split out to this MiniAttributes file so that these attributes cannot accidentally be referenced in queries besides the Mini KEL query
+// Other queries should ONLY reference the current/previous address attributes that have been mapped back through the InputPII entity and that appear in Attributes.kel.
+
+Person: => RecentAddrFullSet := TOPN(AddressHierarchySet(
+																		 IsNotEnoughToClean(AddressRank)=FALSE AND NOT AddressRank IN Person.INVALIDADDRESSRANK AND 
+                                     (AddressType <> Person.BUSADDRESSTYPE OR AddressType:Null) AND
+                                     (Addr1FromComponents<>'P' 
+																		  OR
+																			Addr1FromComponents:Null
+																		 )	
+                                    ), 2, AddressRank, -SortField);
+Person: => CurrAddrFullSet := TOPN(RecentAddrFullSet,1,AddressRank,-SortField);
+Person: => PrepCurrentAddrFull := ONLY(Person.CurrAddrFullSet,AddrFull);
+
+Person: => Current := ONLY(CurrAddrFullSet);
+
+Person: => PrevAddrFullSet := TOPN(RecentAddrFullSet(AddrFull<>Person.PrepCurrentAddrFull),1,-SortField);
+																									 
+//These are used for current and previous addr searching for the mini FDC
+Person: => Previous := ONLY(PrevAddrFullSet);
+
+Person: => PrepCurrentAddrPrimRng := IF(P_LexIDSeenFlag = '1', Current.PrimaryRange);
+Person: => PrepCurrentAddrPreDir := IF(P_LexIDSeenFlag = '1', Current.Predirectional);
+Person: => PrepCurrentAddrPrimName := IF(P_LexIDSeenFlag = '1', Current.PrimaryName);
+Person: => PrepCurrentPostdirectional := IF(P_LexIDSeenFlag = '1', Current.Postdirectional);
+Person: => PrepCurrentAddrSffx := IF(P_LexIDSeenFlag = '1', Current.Suffix);
+Person: => PrepCurrentAddrSecRng := IF(P_LexIDSeenFlag = '1', Current.SecondaryRange);
+Person: => PrepCurrentAddrState := IF(P_LexIDSeenFlag = '1', Current.State);
+Person: => PrepCurrentAddrZip5 := IF(P_LexIDSeenFlag = '1', Current.ZIP5);
+Person: => PrepCurrentAddrZip4 := IF(P_LexIDSeenFlag = '1', Current.ZIP4);
+Person: => PrepCurrentAddrStateCode := IF(P_LexIDSeenFlag = '1', Current.StateCode);
+Person: => PrepCurrentAddrCnty := IF(P_LexIDSeenFlag = '1', Current.CountyCode);
+Person: => PrepCurrentAddrGeo := IF(P_LexIDSeenFlag = '1', Current.GeoBlk);
+Person: => PrepCurrentAddrType := IF(P_LexIDSeenFlag = '1', Current.AddressType); 
+Person: => PrepCurrentAddrStatus := IF(P_LexIDSeenFlag = '1', Current.AddressStatus);
+Person: => PrepCurrentAddrLat := IF(P_LexIDSeenFlag = '1', Current.Latitude);
+Person: => PrepCurrentAddrLng := IF(P_LexIDSeenFlag = '1', Current.Longitude);
+Person: => PrepCurrentAddrCity := IF(P_LexIDSeenFlag = '1', Current.PostalCity);
+Person: => PrepCurrentAddrUnitDesignation :=  IF(P_LexIDSeenFlag = '1', Current.UnitDesignation);
+Person: => PrepCurrentAddrDateFirstSeen := IF(P_LexIDSeenFlag = '1', DATETOSTRING(Current.HierarchyDateFirstSeen, '%Y%m%d'));
+Person: => PrepCurrentAddrDateLastSeen := IF(P_LexIDSeenFlag = '1', DATETOSTRING(MIN(Current.HierarchyDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'));
+
+Person: => PrepPreviousAddrPrimRng := IF(P_LexIDSeenFlag = '1', Previous.PrimaryRange);
+Person: => PrepPreviousAddrPreDir := IF(P_LexIDSeenFlag = '1', Previous.Predirectional);
+Person: => PrepPreviousAddrPrimName := IF(P_LexIDSeenFlag = '1', Previous.PrimaryName);
+Person: => PrepPreviousPostdirectional := IF(P_LexIDSeenFlag = '1', Previous.Postdirectional);
+Person: => PrepPreviousAddrSffx := IF(P_LexIDSeenFlag = '1', Previous.Suffix);
+Person: => PrepPreviousAddrSecRng := IF(P_LexIDSeenFlag = '1', Previous.SecondaryRange);
+Person: => PrepPreviousAddrState := IF(P_LexIDSeenFlag = '1', Previous.State);
+Person: => PrepPreviousAddrZip5 := IF(P_LexIDSeenFlag = '1', Previous.ZIP5);
+Person: => PrepPreviousAddrZip4 := IF(P_LexIDSeenFlag = '1', Previous.ZIP4);
+Person: => PrepPreviousAddrStateCode := IF(P_LexIDSeenFlag = '1', Previous.StateCode);
+Person: => PrepPreviousAddrCnty := IF(P_LexIDSeenFlag = '1', Previous.CountyCode);
+Person: => PrepPreviousAddrGeo := IF(P_LexIDSeenFlag = '1', Previous.GeoBlk);
+Person: => PrepPreviousAddrType := IF(P_LexIDSeenFlag = '1', Previous.AddressType); 
+Person: => PrepPreviousAddrStatus := IF(P_LexIDSeenFlag = '1', Previous.AddressStatus); 
+Person: => PrepPreviousAddrLat := IF(P_LexIDSeenFlag = '1', Previous.Latitude); 
+Person: => PrepPreviousAddrLng := IF(P_LexIDSeenFlag = '1', Previous.Longitude);
+Person: => PrepPreviousAddrCity := IF(P_LexIDSeenFlag = '1', Previous.PostalCity);
+Person: => PrepPreviousAddrUnitDesignation :=  IF(P_LexIDSeenFlag = '1', Previous.UnitDesignation);
+Person: => PrepPreviousAddrDateFirstSeen := IF(P_LexIDSeenFlag = '1', DATETOSTRING(Previous.HierarchyDateFirstSeen, '%Y%m%d'));
+Person: => PrepPreviousAddrDateLastSeen := IF(P_LexIDSeenFlag = '1', DATETOSTRING(MIN(Previous.HierarchyDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'));
+Person: => PrepPreviousAddrFull := IF(P_LexIDSeenFlag = '1', Previous.AddrFull);
