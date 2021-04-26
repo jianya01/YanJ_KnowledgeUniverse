@@ -184,6 +184,17 @@ FUNCTION: IsDOBMatch(DATE DOB1, DATE DOB2) <= DOB1 = DOB2;
 FUNCTION: ABSDAYSBETWEEN_TS(TIMESTAMP x,DATE y) <= ECL(ABS(STD.Date.DaysBetween((UNSIGNED4)((STRING) x)[..8],y))) FROM STD RETURNS INTEGER;
 FUNCTION: TimeStampToDate(TIMESTAMP x) <= ECL((STRING) x[..8]) RETURNS DATE; //most date functions are not supported by timestamp. This casts to date so you just use that.
 
+FUNCTION: Fn_Clean_Date_YearFilled (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].YearFilled) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: Fn_Clean_Date_MonthFilled (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].MonthFilled) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: Fn_Clean_Date_DayFilled (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].DayFilled) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: Fn_Clean_Date_YearNonZero (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].YearNonZero) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: Fn_Clean_Date_MonthNonZero (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].MonthNonZero) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: Fn_Clean_Date_DayNonZero (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].DayNonZero) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: Fn_Clean_Date_YearValid (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].YearValid) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: Fn_Clean_Date_MonthValid (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].MonthValid) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: Fn_Clean_Date_DayValid (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].DayValid) FROM PublicRecords_KEL RETURNS BOOLEAN;
+FUNCTION: Fn_Clean_Date_ChronStateUnknown (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].ChronStateUnknown) FROM PublicRecords_KEL RETURNS BOOLEAN;
+
 /*First Name Matching Logic:
 
 	1. Exact match (Verified)
@@ -355,6 +366,20 @@ InputPII: => AddrNotPopulated := IsNotEnoughToClean(P_InpAddr);
 InputPII: => CityStateZipNotPopulated := CityStateZipNotPopulatedCheck(P_InpAddrCity, P_InpAddrState, P_InpAddrZip);
 InputPII: => CleanCityStateZipNotPopulated := CityStateZipNotPopulatedCheck(P_InpClnAddrCity, P_InpClnAddrState, P_InpClnAddrZip5);
 InputPII: => NameNotPopulated := IF(NameNotPopulatedCheck(P_InpNameFirst, P_InpNameMid, P_InpNameLast), TRUE, FALSE);
+
+InputPII: => DateLowYear := 1800;
+InputPII: => DateHighYear := ADJUSTCALENDAR(FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d'), 100, 0, 0);
+
+InputPII: => P_InpValDOBYearMissingFunc := Fn_Clean_Date_YearFilled(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
+InputPII: => P_InpValDOBMonMissingFunc := Fn_Clean_Date_MonthFilled(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
+InputPII: => P_InpValDOBDayMissingFunc := Fn_Clean_Date_DayFilled(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
+InputPII: => P_InpValDOBYearAllZeroFunc := Fn_Clean_Date_YearNonZero(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
+InputPII: => P_InpValDOBMonAllZeroFunc := Fn_Clean_Date_MonthNonZero(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
+InputPII: => P_InpValDOBDayAllZeroFunc := Fn_Clean_Date_DayNonZero(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
+InputPII: => P_InpValDOBYearInvalidFunc := Fn_Clean_Date_YearValid(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
+InputPII: => P_InpValDOBMonInvalidFunc := Fn_Clean_Date_MonthValid(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
+InputPII: => P_InpValDOBDayInvalidFunc := Fn_Clean_Date_DayValid(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
+InputPII: => P_InpValDOBFmtAmbiguousFunc := Fn_Clean_Date_ChronStateUnknown(P_InpDOB, DateLowYear, INTEGER(DATETOSTRING(DateHighYear,'%Y%m%d')), FALSE);
 
 Vehicle: MISSING_INPUT_DATA_INT := -99999;
 Vehicle: NO_DATA_FOUND_INT := -99998;
@@ -973,10 +998,60 @@ InputPII: => P_InpValDLStateInvalidFlag := MAP(
 				LENGTH(TRIM(P_InpDLState)) != 2 => NO_DATA_FOUND,
 				P_InpClnDLStateFlagValue='1' => '0',
 				P_InpClnDLStateFlagValue='0' => '1');
+
+InputPII: => CleanedDOB := Filter(P_InpDOB, '0123456789');
+InputPII: => DOBLengthValue := LENGTH(CleanedDOB);
+
 InputPII: => P_InpValDOBInvalidFlag := MAP(
 				P_InpClnDOBFlagValue=MISSING_INPUT_DATA => MISSING_INPUT_DATA,
 				P_InpClnDOBFlagValue='1' => '0',
 				P_InpClnDOBFlagValue='0' => '1');
+InputPII: => P_InpValDOBYearMissingFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBYearMissingFunc = FALSE => '1',
+				P_InpValDOBYearMissingFunc = TRUE => '0');
+InputPII: => P_InpValDOBMonMissingFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBMonMissingFunc = FALSE => '1',
+				P_InpValDOBMonMissingFunc = TRUE => '0');
+InputPII: => P_InpValDOBDayMissingFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBDayMissingFunc = FALSE => '1',
+				P_InpValDOBDayMissingFunc = TRUE => '0');
+InputPII: => P_InpValDOBYearAllZeroFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBYearAllZeroFunc = FALSE => '1',
+				P_InpValDOBYearAllZeroFunc = TRUE => '0');
+InputPII: => P_InpValDOBMonAllZeroFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBMonAllZeroFunc = FALSE => '1',
+				P_InpValDOBMonAllZeroFunc = TRUE => '0');
+InputPII: => P_InpValDOBDayAllZeroFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBDayAllZeroFunc = FALSE => '1',
+				P_InpValDOBDayAllZeroFunc = TRUE => '0');
+InputPII: => P_InpValDOBYearInvalidFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBYearInvalidFunc = FALSE => '1',
+				P_InpValDOBYearInvalidFunc = TRUE => '0');
+InputPII: => P_InpValDOBMonInvalidFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBMonInvalidFunc = FALSE => '1',
+				P_InpValDOBMonInvalidFunc = TRUE =>'0');
+InputPII: => P_InpValDOBDayInvalidFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBDayInvalidFunc = FALSE => '1',
+				P_InpValDOBDayInvalidFunc = TRUE => '0');
+InputPII: => P_InpValDOBInFutureFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				DOBLengthValue != 8 => NO_DATA_FOUND,
+				INTEGER(CleanedDOB) >= INTEGER(P_InpClnArchDt) => '1',
+				'0');
+InputPII: => P_InpValDOBFmtAmbiguousFlag := MAP(
+				P_InpClnDOBFlagValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				P_InpValDOBFmtAmbiguousFunc = FALSE => '1',
+				P_InpValDOBFmtAmbiguousFunc = TRUE => '0');
+
 InputPII: => P_InpValEmailInvalidFlag := MAP(
 				P_InpClnEmailFlagValue=MISSING_INPUT_DATA => MISSING_INPUT_DATA,
 				P_InpClnEmailFlagValue='1' => '0',
