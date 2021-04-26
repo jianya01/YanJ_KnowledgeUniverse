@@ -1247,7 +1247,23 @@ InputPII: => PI_InpAddrIsMilitaryFlag := MAP(P_InpClnAddrFullFlagValue != '1' AN
 		InputAddressTypeCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] AND (InputZip5CleanValue = NO_DATA_FOUND OR ALL(AddressZipHelperInput, ZipClass = '' OR ZipClass:Null)) => NO_DATA_FOUND, 
 		InputAddressTypeCleanValue = 'M' OR AddressZipHelperInput.ZipClass = 'M' => '1', 
 		'0');
+//KS3397
 
+InputPII: => MostRecentPropertyEvent := ONLY(Prop.PropertyEvent(EXISTS(PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner)) AND DtFirstSeen = MAX(Prop.PropertyEvent(IsDeed OR IsAssessment),DtFirstSeen) AND (IsDeed OR IsAssessment)));
+
+InputPII: => PI_InpAddrNamePropMatchIndx := MAP(PI_InpAddrOnFileFlagEv != '1' => MISSING_INPUT_DATA_INT,
+                                                Location:Null OR Prop:Null => NO_DATA_FOUND_INT,
+                                                NOT EXISTS(MostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND (FirstName != '' OR LastName != '')){FirstName, LastName}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+                                                EXISTS(MostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 3,
+                                                EXISTS(MostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 2,
+                                                EXISTS(MostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))))) => 1,
+                                                0);
+InputPII: => PI_InpAddrFamilyOwnedFlag := MAP(PI_InpAddrOnFileFlagEv != '1' => MISSING_INPUT_DATA_INT,
+																								Location:Null OR Prop:Null => NO_DATA_FOUND_INT,
+																								PI_InpAddrNamePropMatchIndx = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+																								PI_InpAddrNamePropMatchIndx IN [0,1,3] => 0,
+																								PI_InpAddrNamePropMatchIndx = 2 => 1);
+																								
 //Name Summary attributes		
 NameSummary: =>PII :=ONLY(InputPII);
 NameSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
