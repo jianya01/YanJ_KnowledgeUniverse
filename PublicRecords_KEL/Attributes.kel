@@ -9739,7 +9739,7 @@ PersonAddress: => InputAddressMatch := (
 		Subject.P_InpClnAddrPostDir = Postdirectional AND
 		Subject.P_InpClnAddrSffx = Suffix AND
 		Subject.P_InpClnAddrZip5 = ZIP5 AND
-		(Subject.P_InpClnAddrSecRng = SecondaryRange OR ((Subject.P_InpClnAddrSecRng = '' OR Subject.P_InpClnAddrSecRng:Null) AND SecondaryRange <> '') OR (Subject.P_InpClnAddrSecRng <> '' AND (SecondaryRange = '' OR SecondaryRange:Null))));
+		(Subject.P_InpClnAddrSecRng = SecondaryRange OR ((Subject.P_InpClnAddrSecRng = '' OR Subject.P_InpClnAddrSecRng:Null) AND SecondaryRange != '') OR (Subject.P_InpClnAddrSecRng != '' AND (SecondaryRange = '' OR SecondaryRange:Null))));
 PersonAddress: => GroupedAddress := 
 		TRIMALL(PrimaryRange) +
 		TRIMALL(PrimaryName) +
@@ -9758,7 +9758,7 @@ PersonAddress: => GroupedInputAddress :=
 		TRIMALL(Subject.P_InpClnAddrSecRng);
 PersonAddress: => AddressSimilarityMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedInputAddress)>= 0.75, 1,0) ;
 PersonAddress.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
-Person: => AddressTranslatedSources := PersonAddress(InputAddressMatch AND AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSourceCode != ''){TranslatedSourceCode};
+Person: => AddressTranslatedSources := PersonAddress(InputAddressMatch OR AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSourceCode != ''){TranslatedSourceCode};
 Person.AddressTranslatedSources: => AgeInDays := ABSDAYSBETWEEN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE);
 Person: => PersonAddressMatchSourcesAll := AddressTranslatedSources(TranslatedSourceCode != ''){
 	TranslatedSourceCode := TranslatedSourceCode,
@@ -9772,7 +9772,7 @@ Person: => AddressVerSourceListSortedFCRA := TOPN(PersonAddressMatchSourcesAll(V
 Person: => AddressVerSourceListSorted := TOPN(PersonAddressMatchSourcesAll{TranslatedSourceCode, SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 32, FirstSeenDate, TranslatedSourceCode);
 PersonAddress.DataSources: => AddressSourceDateFirstSeen := Source:DateFirstSeen;
 PersonAddress.DataSources: => AddressSourceDateLastSeen := Source:DateLastSeen;
-Person: => PersonAddressMatchSourcesAllPre := PersonAddress(InputAddressMatch AND AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSourceCode != ''){TranslatedSourceCode, AddressSourceDateFirstSeen, AddressSourceDateLastSeen};
+Person: => PersonAddressMatchSourcesAllPre := PersonAddress(InputAddressMatch OR AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSourceCode != ''){TranslatedSourceCode, AddressSourceDateFirstSeen, AddressSourceDateLastSeen};
 Person: => PersonAddressMatchSourcesGroupAll := PersonAddressMatchSourcesAllPre(TranslatedSourceCode != ''){
 									TranslatedSourceCode,
 									AddressSourceDateFirstSeen,
@@ -9817,13 +9817,13 @@ Person: => PL_VerAddrSrcLastDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_In
 Person: => PL_VerAddrSrcCntEvFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
 																BOUNDSFOLD(COUNT(AddressVerSourceListSortedFCRA), 0, 32));
 Person: => PL_VerAddrSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
-																 PL_VerAddrSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
+																 PL_VerAddrSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
 																 CONCAT(AddressVerSourceListSortedFCRA, TranslatedSourceCode, '|'));
 Person: => PL_VerAddrSrcEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerAddrSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
+																			 PL_VerAddrSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
 																			 CONCAT(AddressVerSourceListSortedFCRA, SourceDateFirstSeen, '|'));
 Person: => PL_VerAddrSrcLastDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerAddrSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
+																			 PL_VerAddrSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
 																			 CONCAT(AddressVerSourceListSortedFCRA, SourceDateLastSeen, '|'));
 Person: => PL_VerAddrFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 																					EXISTS(AddressVerSourceListSorted) => '1','0');
