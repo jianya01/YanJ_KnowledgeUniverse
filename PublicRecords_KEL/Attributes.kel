@@ -9775,32 +9775,34 @@ Person: => PL_VerSSNSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN
 																					PL_VerSSNSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
 																					PL_VerSSNSrcNewDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
 																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerSSNSrcNewDtEvFCRA),Person.CURRENT_DATE),0,960));   
+
+
 // Address Verification Sources Helper Attributes
 PersonAddress: => InputAddressMatch := ( 
-		Subject.P_InpClnAddrPrimRng = PrimaryRange AND
-		Subject.P_InpClnAddrPrimName = PrimaryName AND
-		Subject.P_InpClnAddrPreDir = Predirectional AND
-		Subject.P_InpClnAddrPostDir = Postdirectional AND
-		Subject.P_InpClnAddrSffx = Suffix AND
-		Subject.P_InpClnAddrZip5 = ZIP5 AND
-		(Subject.P_InpClnAddrSecRng = SecondaryRange OR ((Subject.P_InpClnAddrSecRng = '' OR Subject.P_InpClnAddrSecRng:Null) AND SecondaryRange != '') OR (Subject.P_InpClnAddrSecRng != '' AND (SecondaryRange = '' OR SecondaryRange:Null))));
+		Subject.P_InpClnAddrPrimRng = TRIMBOTH(PrimaryRange) AND
+		Subject.P_InpClnAddrPrimName = TRIMBOTH(PrimaryName) AND
+		Subject.P_InpClnAddrPreDir = TRIMBOTH(Predirectional) AND
+		Subject.P_InpClnAddrPostDir = TRIMBOTH(Postdirectional) AND
+		Subject.P_InpClnAddrSffx = TRIMBOTH(Suffix) AND
+		Subject.P_InpClnAddrZip5 = TRIMBOTH(INTFORMAT(ZIP5,5,1)) AND
+		(Subject.P_InpClnAddrSecRng = TRIMBOTH(SecondaryRange) OR ((Subject.P_InpClnAddrSecRng = '' OR Subject.P_InpClnAddrSecRng:Null) AND SecondaryRange != '') OR (Subject.P_InpClnAddrSecRng != '' AND (SecondaryRange = '' OR SecondaryRange:Null))));
 PersonAddress: => GroupedAddress := 
-		TRIMALL(PrimaryRange) +
-		TRIMALL(PrimaryName) +
-		TRIMALL(Predirectional) + 
-		TRIMALL(Postdirectional) +
-		TRIMALL(Suffix) +
-		TRIMALL(STRING(ZIP5)) +
-		TRIMALL(SecondaryRange);
+		TRIMALL(DEFAULT(PrimaryRange,'')) +
+		TRIMALL(DEFAULT(PrimaryName,'')) +
+		TRIMALL(DEFAULT(Predirectional,'')) +
+		TRIMALL(DEFAULT(Postdirectional,'')) +
+		TRIMALL(DEFAULT(Suffix,'')) +
+		TRIMALL(DEFAULT(INTFORMAT(ZIP5,5,1),'')) +
+		TRIMALL(DEFAULT(SecondaryRange,''));
 PersonAddress: => GroupedInputAddress := 
-		TRIMALL(Subject.P_InpClnAddrPrimRng) +
-		TRIMALL(Subject.P_InpClnAddrPrimName) +
-		TRIMALL(Subject.P_InpClnAddrPreDir) +
-		TRIMALL(Subject.P_InpClnAddrPostDir) +
-		TRIMALL(Subject.P_InpClnAddrSffx) +
-		TRIMALL(Subject.P_InpClnAddrZip5) +
-		TRIMALL(Subject.P_InpClnAddrSecRng);
-PersonAddress: => AddressSimilarityMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedInputAddress)>= 0.75, 1,0) ;
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPrimRng,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPrimName,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPreDir,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPostDir,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrSffx,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrZip5,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrSecRng,''));
+PersonAddress: => AddressSimilarityMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedInputAddress) >= 0.75, 1,0) ;
 PersonAddress.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
 Person: => AddressTranslatedSources := PersonAddress(InputAddressMatch OR AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSourceCode != ''){TranslatedSourceCode};
 Person.AddressTranslatedSources: => AgeInDays := ABSDAYSBETWEEN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE);
