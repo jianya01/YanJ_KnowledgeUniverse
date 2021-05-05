@@ -691,6 +691,12 @@ InputPII: => InputMiddleNameCleanValue := MAP(P_InpValNameBogusFlag = 1 => NO_DA
 																			IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameMid, NO_DATA_FOUND)));
 InputPII: => InputLastNameCleanValue := MAP(P_InpValNameBogusFlag = 1 => NO_DATA_FOUND,
 																			IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameLast, NO_DATA_FOUND)));
+InputPII: => InputSurName1CleanValue := MAP(InputLastNameCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+																			InputLastNameCleanValue = NO_DATA_FOUND=>NO_DATA_FOUND,
+																			P_InpClnSurname1);
+InputPII: => InputSurName2CleanValue := MAP(InputLastNameCleanValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+																			InputLastNameCleanValue = NO_DATA_FOUND => NO_DATA_FOUND,
+																			P_InpClnSurname2);
 InputPII: => InputSuffixCleanValue := MAP(P_InpValNameBogusFlag = 1 => NO_DATA_FOUND,
 																			IF(NameNotPopulated, MISSING_INPUT_DATA, IsBlank(P_InpClnNameSffx, NO_DATA_FOUND)));
 InputPII: => InputPrimaryRangeCleanValue := MAP(
@@ -1257,6 +1263,91 @@ InputPII: => PI_InpAddrIsAptFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DA
 		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
 		PI_InpAddrIsBusinessFlag =0 AND PI_InpAddrIsMultiUnitFlag =1 =>1,0);
 		
+//KS-1170
+GeoLink: => GivenWhite := ONLY(TOPN(BlockGroup, 1, -HereGivenWhite:Archive_Date, -HereGivenWhite), HereGivenWhite);
+GeoLink: => GivenBlack := ONLY(TOPN(BlockGroup, 1, -HereGivenBlack:Archive_Date, -HereGivenBlack), HereGivenBlack);
+GeoLink: => GivenHispanic := ONLY(TOPN(BlockGroup, 1, -HereGivenHispanic:Archive_Date, -HereGivenHispanic), HereGivenHispanic);
+GeoLink: => GivenAmericanIndianAlaskaNative := ONLY(TOPN(BlockGroup, 1, -HereGivenAmericanIndianAlaskaNative:Archive_Date, -HereGivenAmericanIndianAlaskaNative), HereGivenAmericanIndianAlaskaNative);
+GeoLink: => GivenAsianPacificIslander := ONLY(TOPN(BlockGroup, 1, -HereGivenAsianPacificIslander:Archive_Date, -HereGivenAsianPacificIslander), HereGivenAsianPacificIslander);
+GeoLink: => GivenMultiracial := ONLY(TOPN(BlockGroup, 1, -HereGivenMultiracial:Archive_Date, -HereGivenMultiracial), HereGivenMultiracial);
+InputPII: => IsSensus := EXISTS(LastName1.DataSources) OR EXISTS(LastName2.DataSources);
+InputPII: => IsSurname1Sensus := EXISTS(LastName1.DataSources);
+InputPII: => IsSurname2Sensus := EXISTS(LastName2.DataSources);
+InputPII: => GivenWhite := GeoLinkID.GivenWhite;
+InputPII: => GivenBlack := GeoLinkID.GivenBlack;
+InputPII: => GivenHispanic := GeoLinkID.GivenHispanic;
+InputPII: => GivenAmericanIndianAlaskaNative := GeoLinkID.GivenAmericanIndianAlaskaNative;
+InputPII: => GivenAsianPacificIslander := GeoLinkID.GivenAsianPacificIslander;
+InputPII: => GivenMultiracial := GeoLinkID.GivenMultiracial;
+InputPII: => PercentWhite := LastName1.PercentWhite;
+InputPII: => PercentWhite2 := LastName2.PercentWhite;
+InputPII: => PercentBlack := LastName1.PercentBlack;
+InputPII: => PercentBlack2 := LastName2.PercentBlack;
+InputPII: => PercentHispanic := LastName1.PercentHispanic;
+InputPII: => PercentHispanic2 := LastName2.PercentHispanic;
+InputPII: => PercentAmericanIndianAlaskaNative := LastName1.PercentAmericanIndianAlaskaNative;
+InputPII: => PercentAmericanIndianAlaskaNative2 := LastName2.PercentAmericanIndianAlaskaNative;
+InputPII: => PercentAsianPacificIslander := LastName1.PercentAsianPacificIslander;
+InputPII: => PercentAsianPacificIslander2 := LastName2.PercentAsianPacificIslander;
+InputPII: => PercentMultiracial := LastName1.PercentMultiracial;
+InputPII: => PercentMultiracial2 := LastName2.PercentMultiracial;
+
+
+InputPII: => PI_CFPBRaceJointWhiteProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		IsSurname1Sensus => GivenWhite * PercentWhite,
+		NOT IsSurname1Sensus AND IsSurname2Sensus => GivenWhite * PercentWhite2);
+InputPII: => PI_CFPBRaceJointBlackProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		IsSurname1Sensus => GivenBlack * PercentBlack,
+		NOT IsSurname1Sensus AND IsSurname2Sensus => GivenBlack * PercentBlack2);
+InputPII: => PI_CFPBRaceJointHispanicProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		IsSurname1Sensus => GivenHispanic * PercentHispanic,
+		NOT IsSurname1Sensus AND IsSurname2Sensus => GivenHispanic * PercentHispanic2);
+InputPII: => PI_CFPBRaceJointAIANProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		IsSurname1Sensus => GivenAmericanIndianAlaskaNative * PercentAmericanIndianAlaskaNative,
+		NOT IsSurname1Sensus AND IsSurname2Sensus => GivenAmericanIndianAlaskaNative * PercentAmericanIndianAlaskaNative2);
+InputPII: => PI_CFPBRaceJointAsianPIProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		IsSurname1Sensus => GivenAsianPacificIslander * PercentAsianPacificIslander,
+		NOT IsSurname1Sensus AND IsSurname2Sensus => GivenAsianPacificIslander * PercentAsianPacificIslander2);
+InputPII: => PI_CFPBRaceJointMultiRaceProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		IsSurname1Sensus => GivenMultiracial * PercentMultiracial,
+		NOT IsSurname1Sensus AND IsSurname2Sensus => GivenMultiracial * PercentMultiracial2);
+InputPII: => PropTotal := PI_CFPBRaceJointWhiteProb + PI_CFPBRaceJointBlackProb + PI_CFPBRaceJointHispanicProb + PI_CFPBRaceJointAIANProb + PI_CFPBRaceJointAsianPIProb + PI_CFPBRaceJointMultiRaceProb;
+InputPII: => PI_CFPBRaceJointTotalProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		PropTotal);
+InputPII: => PI_CFPBRaceIsWhiteProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		ROUND((PI_CFPBRaceJointWhiteProb/PI_CFPBRaceJointTotalProb)*100,2));
+InputPII: => PI_CFPBRaceIsBlackProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		ROUND((PI_CFPBRaceJointBlackProb/PI_CFPBRaceJointTotalProb)*100,2));
+InputPII: => PI_CFPBRaceIsHispanicProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		ROUND((PI_CFPBRaceJointHispanicProb/PI_CFPBRaceJointTotalProb)*100,2));
+InputPII: => PI_CFPBRaceIsAIANProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		ROUND((PI_CFPBRaceJointAIANProb/PI_CFPBRaceJointTotalProb)*100,2));
+InputPII: => PI_CFPBRaceIsAsianPIProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		ROUND((PI_CFPBRaceJointAsianPIProb/PI_CFPBRaceJointTotalProb)*100,2));
+InputPII: => PI_CFPBRaceIsMultiRaceProb := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		NOT IsSensus => NO_DATA_FOUND_INT,
+		ROUND((PI_CFPBRaceJointMultiRaceProb/PI_CFPBRaceJointTotalProb)*100,2));
+InputPII: => PI_CFPBRaceProbType := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA,
+		NOT IsSensus => NO_DATA_FOUND,
+		IsSensus AND PI_CFPBRaceIsWhiteProb < 80 AND PI_CFPBRaceIsBlackProb < 80 AND PI_CFPBRaceIsHispanicProb < 80 AND PI_CFPBRaceIsAIANProb < 80 AND PI_CFPBRaceIsAsianPIProb < 80 AND PI_CFPBRaceIsMultiRaceProb < 80 => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+		MAP(PI_CFPBRaceIsWhiteProb >= 80.00 =>'WHITE',
+		PI_CFPBRaceIsBlackProb >= 80.00 =>'BLACK',
+		PI_CFPBRaceIsHispanicProb >= 80.00 =>'HISPANIC',
+		PI_CFPBRaceIsAIANProb >= 80.00 =>'AMERICAN INDIAN OR ALASKA NATIVE',
+		PI_CFPBRaceIsAsianPIProb >= 80.00 =>'ASIAN OR PACIFIC ISLANDER', 
+		PI_CFPBRaceIsMultiRaceProb >= 80.00 =>'MULTIRACIAL',RECS_AVAIL_BUT_CANNOT_CALCULATE));
 
 //KS-1192
 InputPII: =>PI_InpDOBAge := MAP(P_InpClnDOBFlagValue <>1 => MISSING_INPUT_DATA_INT,
