@@ -5672,7 +5672,8 @@ InputPII: => PI_SrchLexIDPerInpEmailCnt1Y := MAP(P_InpClnEmailFlagValue <> 1 => 
 Person: ONE_YEAR_IN_DAYS := 365;
 Person: TWO_YEARS_IN_DAYS := 730;
 Person: THREE_YEARS_IN_DAYS := 1095;
-Person: FIVE_YEARS_IN_DAYS := 1826; 
+Person: FIVE_YEARS_IN_DAYS := 1826;
+Person: SEVEN_YEARS_IN_DAYS := 2556;
 
 Person: => ThriveData := Thrive(Source IN Person.VALID_LENDING_SOURCE){LoanDateFirstSeen := IF(ISVALIDDATE(ThriveDateFirstSeen),DATETOSTRING(ThriveDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),
 	LoanAgeInDays := ABSDAYSBETWEEN(ThriveDateFirstSeen, CURRENT_DATE_THRIVE),Source};
@@ -5681,7 +5682,10 @@ Person: => ShortTermLoansSorted := TOPN(ThriveData,999,LoanDateFirstSeen = Perso
 Person: => ShortTermLoans1YSorted := TOPN(ThriveData(LoanAgeInDays <= ONE_YEAR_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
 Person: => ShortTermLoans2YSorted := TOPN(ThriveData(LoanAgeInDays <= TWO_YEARS_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
 Person: => ShortTermLoans5YSorted := TOPN(ThriveData(LoanAgeInDays <= FIVE_YEARS_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
+Person: => ShortTermLoans7YSorted := TOPN(ThriveData(LoanAgeInDays <= SEVEN_YEARS_IN_DAYS),999,LoanDateFirstSeen = Person.NO_DATA_FOUND_97,LoanDateFirstSeen);
+
 Person: => ShortTermLoans5YList := CONCAT(ShortTermLoans5YSorted,LoanDateFirstSeen,'|');
+Person: => ShortTermLoans7YList := CONCAT(ShortTermLoans7YSorted,LoanDateFirstSeen,'|');
 
 /**************************************************************************/
 /*                                                                        */
@@ -5717,6 +5721,20 @@ Person: => PL_STLCnt5Y := IF(P_LexIDSeenFlag = '0', Person.MISSING_INPUT_DATA_IN
 Person: => PL_STLDtList5Y := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA,
 		PL_STLCnt5Y = 0  => Person.NO_DATA_FOUND,
 		ShortTermLoans5YList);
+
+Person: => PL_STLCnt7Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(ShortTermLoans7YSorted),0,999));
+Person: => PL_STLDtList7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+		PL_STLCnt7Y = 0 => NO_DATA_FOUND,
+		ShortTermLoans7YList);
+Person: => PL_STLNewDt7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+		PL_STLCnt7Y = 0 => NO_DATA_FOUND,
+		ALL(ShortTermLoans7YSorted, LoanDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+		DATETOSTRING(MAX(ShortTermLoans7YSorted, DATE(LoanDateFirstSeen)), '%Y%m%d'));
+Person: => PL_STLNewMsnc7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_STLCnt7Y = 0 => NO_DATA_FOUND_INT,
+		PL_STLNewDt7Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_STLNewDt7Y), CURRENT_DATE_THRIVE), 0, 84));
 
 /**************************************************************************/
 /*                                                                        */
@@ -9392,7 +9410,6 @@ Person: => PL_AccCnt1Y := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_IN
 /*                                                                        */
 /**************************************************************************/
 Person: MAX_DATE := '99999999';
-Person: SEVEN_YEARS_IN_DAYS := 2556;
 Person: TEN_YEARS_IN_DAYS := 3652;
 
 
