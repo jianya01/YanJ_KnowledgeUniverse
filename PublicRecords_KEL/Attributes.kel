@@ -9693,7 +9693,165 @@ Person: => PL_VerSrcRecCntEvFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA
 																	BOUNDSFOLD(SUM(VerSourceGroupListSortedFCRA, RecordCount), 1, 9999));
 Person: => PL_VerSrcRecCntListEvFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA,
 																	CONCAT(VerSourceGroupListSortedFCRA, RecordCount, '|'));																	
-																	
+								
+Person.DataSources: => IsProperty := Source IN ['FA', 'FP', 'LA', 'LP', 'FB'];
+Person.DataSources: => IsVoter := Source IN ['VO'];
+Person.DataSources: => IsCollege := Source IN ['AY', 'SL'];
+Person.DataSources: => IsBureau := Source IN ['EN', 'EQ', 'QH', 'WH', 'TN'];
+Person.DataSources: => IsPersonalProperty := Source IN ['AM', 'AR', 'CG', 'EB', '#W', '%W', '1W', '2W', '3W', '5W', '9W', '@W', 'BW', 'FW', 'GW', 'HW', 'JW', 'KW', 'LW', 'NW', 'OW', 'PW', 'QW', 'RW', 'SW', 'TW', 'WW', 'XW', 'YW', 'ZW', '[W'];
+Person.DataSources: => IsLicense := Source IN ['AK', 'CY', '2X', '3X', '4X', '5X', '8X', 'AD', 'CD', 'FD', 'ID', 'KD', 'MD', 'ND', 'OD', 'PD', 'QD', 'SD', 'TD', 'WD', 'XX', 'YD', 'DA', 'E1', 'E2', 'E3', 'FE', 'FF', 'PL', '^W'];
+
+Person: => NonDerogSources := DataSources(HeaderHitFlag AND (IsProperty OR IsVoter OR IsCollege OR IsBureau OR IsPersonalProperty OR IsLicense)){NonDerogCatSources := DataSources.Source};
+Person: => PersonNonDerogMatchSourcesAll := NonDerogSources(NonDerogCatSources != ''){
+	NonDerogCatSources,
+	IsProperty := NonDerogCatSources IN ['FA', 'FP', 'LA', 'LP', 'FB'],
+	IsVoter := NonDerogCatSources IN ['VO'],
+	IsCollege := NonDerogCatSources IN ['AY', 'SL'],
+	IsBureau := NonDerogCatSources IN ['EN', 'EQ', 'QH', 'WH', 'TN'],
+	IsPersonalProperty := NonDerogCatSources IN ['AM', 'AR', 'CG', 'EB', '#W', '%W', '1W', '2W', '3W', '5W', '9W', '@W', 'BW', 'FW', 'GW', 'HW', 'JW', 'KW', 'LW', 'NW', 'OW', 'PW', 'QW', 'RW', 'SW', 'TW', 'WW', 'XW', 'YW', 'ZW', '[W'],
+	IsLicense := NonDerogCatSources IN ['AK', 'CY', '2X', '3X', '4X', '5X', '8X', 'AD', 'CD', 'FD', 'ID', 'KD', 'MD', 'ND', 'OD', 'PD', 'QD', 'SD', 'TD', 'WD', 'XX', 'YD', 'DA', 'E1', 'E2', 'E3', 'FE', 'FF', 'PL', '^W'],
+	NonDerogSourceDateLastSeen :=  IF(ISVALIDDATE(NonDerogCatSources:DateLastSeen), DATETOSTRING(MIN(NonDerogCatSources:DateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+Person: => NonDerogSourceListSortedProperty := TOPN(PersonNonDerogMatchSourcesAll(IsProperty), 100, -NonDerogSourceDateLastSeen);
+Person: => NonDerogSourceListSortedVoter := TOPN(PersonNonDerogMatchSourcesAll(IsVoter), 100, -NonDerogSourceDateLastSeen);
+Person: => NonDerogSourceListSortedCollege := TOPN(PersonNonDerogMatchSourcesAll(IsCollege), 100, -NonDerogSourceDateLastSeen);
+Person: => NonDerogSourceListSortedBureau := TOPN(PersonNonDerogMatchSourcesAll(IsBureau), 100, -NonDerogSourceDateLastSeen);
+Person: => NonDerogSourceListSortedPersonalProperty := TOPN(PersonNonDerogMatchSourcesAll(IsPersonalProperty), 100, -NonDerogSourceDateLastSeen);
+Person: => NonDerogSourceListSortedLicense := TOPN(PersonNonDerogMatchSourcesAll(IsLicense), 100, -NonDerogSourceDateLastSeen);
+
+Person: => NonDerogCntProperty := IF(EXISTS(NonDerogSourceListSortedProperty), 1, 0);
+Person: => NonDerogCntVoter := IF(EXISTS(NonDerogSourceListSortedVoter), 1, 0);
+Person: => NonDerogCntCollege := IF(EXISTS(NonDerogSourceListSortedCollege), 1, 0);
+Person: => NonDerogCntBureau := IF(EXISTS(NonDerogSourceListSortedBureau), 1, 0);
+Person: => NonDerogCntPersonalProperty := IF(EXISTS(NonDerogSourceListSortedPersonalProperty), 1, 0);
+Person: => NonDerogCntLicense := IF(EXISTS(NonDerogSourceListSortedLicense), 1, 0);
+
+Person: => NonDerogCntEv := NonDerogCntProperty + NonDerogCntVoter + NonDerogCntCollege + NonDerogCntBureau + NonDerogCntPersonalProperty + NonDerogCntLicense;
+
+Person.NonDerogSourceListSortedProperty: => NonDerogSourceAgeInDaysProperty := ABSDAYSBETWEEN(NonDerogSourceDateLastSeen:DateLastSeen, Person.CURRENT_DATE);
+Person.NonDerogSourceListSortedVoter: => NonDerogSourceAgeInDaysVoter := ABSDAYSBETWEEN(NonDerogSourceDateLastSeen:DateLastSeen, Person.CURRENT_DATE);
+Person.NonDerogSourceListSortedCollege: => NonDerogSourceAgeInDaysCollege := ABSDAYSBETWEEN(NonDerogSourceDateLastSeen:DateLastSeen, Person.CURRENT_DATE);
+Person.NonDerogSourceListSortedBureau: => NonDerogSourceAgeInDaysBureau := ABSDAYSBETWEEN(NonDerogSourceDateLastSeen:DateLastSeen, Person.CURRENT_DATE);
+Person.NonDerogSourceListSortedPersonalProperty: => NonDerogSourceAgeInDaysPersonalProperty := ABSDAYSBETWEEN(NonDerogSourceDateLastSeen:DateLastSeen, Person.CURRENT_DATE);
+Person.NonDerogSourceListSortedLicense: => NonDerogSourceAgeInDaysLicense := ABSDAYSBETWEEN(NonDerogSourceDateLastSeen:DateLastSeen, Person.CURRENT_DATE);
+
+Person.NonDerogSourceListSortedProperty: => SeenIn3MProperty := NonDerogSourceAgeInDaysProperty <= Person.THREE_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedVoter: => SeenIn3MVoter := NonDerogSourceAgeInDaysVoter <= Person.THREE_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedCollege: => SeenIn3MCollege := NonDerogSourceAgeInDaysCollege <= Person.THREE_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedBureau: => SeenIn3MBureau := NonDerogSourceAgeInDaysBureau <= Person.THREE_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedPersonalProperty: => SeenIn3MPersonalProperty := NonDerogSourceAgeInDaysPersonalProperty <= Person.THREE_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedLicense: => SeenIn3MLicense := NonDerogSourceAgeInDaysLicense <= Person.THREE_MONTHS_IN_DAYS;
+
+Person: => NonDerogCntProperty3M := IF(EXISTS(NonDerogSourceListSortedProperty(SeenIn3MProperty)), 1, 0);
+Person: => NonDerogCntVoter3M := IF(EXISTS(NonDerogSourceListSortedVoter(SeenIn3MVoter)), 1, 0);
+Person: => NonDerogCntCollege3M := IF(EXISTS(NonDerogSourceListSortedCollege(SeenIn3MCollege)), 1, 0);
+Person: => NonDerogCntBureau3M := IF(EXISTS(NonDerogSourceListSortedBureau(SeenIn3MBureau)), 1, 0);
+Person: => NonDerogCntPersonalProperty3M := IF(EXISTS(NonDerogSourceListSortedPersonalProperty(SeenIn3MPersonalProperty)), 1, 0);
+Person: => NonDerogCntLicense3M := IF(EXISTS(NonDerogSourceListSortedLicense(SeenIn3MLicense)), 1, 0);
+
+Person: => NonDerogSourceCnt3M := NonDerogCntProperty3M + NonDerogCntVoter3M + NonDerogCntCollege3M + NonDerogCntBureau3M + NonDerogCntPersonalProperty3M + NonDerogCntLicense3M;
+
+Person.NonDerogSourceListSortedProperty: => SeenIn6MProperty := NonDerogSourceAgeInDaysProperty <= Person.SIX_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedVoter: => SeenIn6MVoter := NonDerogSourceAgeInDaysVoter <= Person.SIX_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedCollege: => SeenIn6MCollege := NonDerogSourceAgeInDaysCollege <= Person.SIX_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedBureau: => SeenIn6MBureau := NonDerogSourceAgeInDaysBureau <= Person.SIX_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedPersonalProperty: => SeenIn6MPersonalProperty := NonDerogSourceAgeInDaysPersonalProperty <= Person.SIX_MONTHS_IN_DAYS;
+Person.NonDerogSourceListSortedLicense: => SeenIn6MLicense := NonDerogSourceAgeInDaysLicense <= Person.SIX_MONTHS_IN_DAYS;
+
+Person: => NonDerogCntProperty6M := IF(EXISTS(NonDerogSourceListSortedProperty(SeenIn6MProperty)), 1, 0);
+Person: => NonDerogCntVoter6M := IF(EXISTS(NonDerogSourceListSortedVoter(SeenIn6MVoter)), 1, 0);
+Person: => NonDerogCntCollege6M := IF(EXISTS(NonDerogSourceListSortedCollege(SeenIn6MCollege)), 1, 0);
+Person: => NonDerogCntBureau6M := IF(EXISTS(NonDerogSourceListSortedBureau(SeenIn6MBureau)), 1, 0);
+Person: => NonDerogCntPersonalProperty6M := IF(EXISTS(NonDerogSourceListSortedPersonalProperty(SeenIn6MPersonalProperty)), 1, 0);
+Person: => NonDerogCntLicense6M := IF(EXISTS(NonDerogSourceListSortedLicense(SeenIn6MLicense)), 1, 0);
+
+Person: => NonDerogSourceCnt6M := NonDerogCntProperty6M + NonDerogCntVoter6M + NonDerogCntCollege6M + NonDerogCntBureau6M + NonDerogCntPersonalProperty6M + NonDerogCntLicense6M;
+
+Person.NonDerogSourceListSortedProperty: => SeenIn1YProperty := NonDerogSourceAgeInDaysProperty <= Person.ONE_YEAR_IN_DAYS;
+Person.NonDerogSourceListSortedVoter: => SeenIn1YVoter := NonDerogSourceAgeInDaysVoter <= Person.ONE_YEAR_IN_DAYS;
+Person.NonDerogSourceListSortedCollege: => SeenIn1YCollege := NonDerogSourceAgeInDaysCollege <= Person.ONE_YEAR_IN_DAYS;
+Person.NonDerogSourceListSortedBureau: => SeenIn1YBureau := NonDerogSourceAgeInDaysBureau <= Person.ONE_YEAR_IN_DAYS;
+Person.NonDerogSourceListSortedPersonalProperty: => SeenIn1YPersonalProperty := NonDerogSourceAgeInDaysPersonalProperty <= Person.ONE_YEAR_IN_DAYS;
+Person.NonDerogSourceListSortedLicense: => SeenIn1YLicense := NonDerogSourceAgeInDaysLicense <= Person.ONE_YEAR_IN_DAYS;
+
+Person: => NonDerogCntProperty1Y := IF(EXISTS(NonDerogSourceListSortedProperty(SeenIn1YProperty)), 1, 0);
+Person: => NonDerogCntVoter1Y := IF(EXISTS(NonDerogSourceListSortedVoter(SeenIn1YVoter)), 1, 0);
+Person: => NonDerogCntCollege1Y := IF(EXISTS(NonDerogSourceListSortedCollege(SeenIn1YCollege)), 1, 0);
+Person: => NonDerogCntBureau1Y := IF(EXISTS(NonDerogSourceListSortedBureau(SeenIn1YBureau)), 1, 0);
+Person: => NonDerogCntPersonalProperty1Y := IF(EXISTS(NonDerogSourceListSortedPersonalProperty(SeenIn1YPersonalProperty)), 1, 0);
+Person: => NonDerogCntLicense1Y := IF(EXISTS(NonDerogSourceListSortedLicense(SeenIn1YLicense)), 1, 0);
+
+Person: => NonDerogSourceCnt1Y := NonDerogCntProperty1Y + NonDerogCntVoter1Y + NonDerogCntCollege1Y + NonDerogCntBureau1Y + NonDerogCntPersonalProperty1Y + NonDerogCntLicense1Y;
+
+Person.NonDerogSourceListSortedProperty: => SeenIn2YProperty := NonDerogSourceAgeInDaysProperty <= Person.TWO_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedVoter: => SeenIn2YVoter := NonDerogSourceAgeInDaysVoter <= Person.TWO_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedCollege: => SeenIn2YCollege := NonDerogSourceAgeInDaysCollege <= Person.TWO_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedBureau: => SeenIn2YBureau := NonDerogSourceAgeInDaysBureau <= Person.TWO_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedPersonalProperty: => SeenIn2YPersonalProperty := NonDerogSourceAgeInDaysPersonalProperty <= Person.TWO_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedLicense: => SeenIn2YLicense := NonDerogSourceAgeInDaysLicense <= Person.TWO_YEARS_IN_DAYS;
+
+Person: => NonDerogCntProperty2Y := IF(EXISTS(NonDerogSourceListSortedProperty(SeenIn2YProperty)), 1, 0);
+Person: => NonDerogCntVoter2Y := IF(EXISTS(NonDerogSourceListSortedVoter(SeenIn2YVoter)), 1, 0);
+Person: => NonDerogCntCollege2Y := IF(EXISTS(NonDerogSourceListSortedCollege(SeenIn2YCollege)), 1, 0);
+Person: => NonDerogCntBureau2Y := IF(EXISTS(NonDerogSourceListSortedBureau(SeenIn2YBureau)), 1, 0);
+Person: => NonDerogCntPersonalProperty2Y := IF(EXISTS(NonDerogSourceListSortedPersonalProperty(SeenIn2YPersonalProperty)), 1, 0);
+Person: => NonDerogCntLicense2Y := IF(EXISTS(NonDerogSourceListSortedLicense(SeenIn2YLicense)), 1, 0);
+
+Person: => NonDerogSourceCnt2Y := NonDerogCntProperty2Y + NonDerogCntVoter2Y + NonDerogCntCollege2Y + NonDerogCntBureau2Y + NonDerogCntPersonalProperty2Y + NonDerogCntLicense2Y;
+
+Person.NonDerogSourceListSortedProperty: => SeenIn3YProperty := NonDerogSourceAgeInDaysProperty <= Person.THREE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedVoter: => SeenIn3YVoter := NonDerogSourceAgeInDaysVoter <= Person.THREE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedCollege: => SeenIn3YCollege := NonDerogSourceAgeInDaysCollege <= Person.THREE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedBureau: => SeenIn3YBureau := NonDerogSourceAgeInDaysBureau <= Person.THREE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedPersonalProperty: => SeenIn3YPersonalProperty := NonDerogSourceAgeInDaysPersonalProperty <= Person.THREE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedLicense: => SeenIn3YLicense := NonDerogSourceAgeInDaysLicense <= Person.THREE_YEARS_IN_DAYS;
+
+Person: => NonDerogCntProperty3Y := IF(EXISTS(NonDerogSourceListSortedProperty(SeenIn3YProperty)), 1, 0);
+Person: => NonDerogCntVoter3Y := IF(EXISTS(NonDerogSourceListSortedVoter(SeenIn3YVoter)), 1, 0);
+Person: => NonDerogCntCollege3Y := IF(EXISTS(NonDerogSourceListSortedCollege(SeenIn3YCollege)), 1, 0);
+Person: => NonDerogCntBureau3Y := IF(EXISTS(NonDerogSourceListSortedBureau(SeenIn3YBureau)), 1, 0);
+Person: => NonDerogCntPersonalProperty3Y := IF(EXISTS(NonDerogSourceListSortedPersonalProperty(SeenIn3YPersonalProperty)), 1, 0);
+Person: => NonDerogCntLicense3Y := IF(EXISTS(NonDerogSourceListSortedLicense(SeenIn3YLicense)), 1, 0);
+
+Person: => NonDerogSourceCnt3Y := NonDerogCntProperty3Y + NonDerogCntVoter3Y + NonDerogCntCollege3Y + NonDerogCntBureau3Y + NonDerogCntPersonalProperty3Y + NonDerogCntLicense3Y;
+
+Person.NonDerogSourceListSortedProperty: => SeenIn5YProperty := NonDerogSourceAgeInDaysProperty <= Person.FIVE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedVoter: => SeenIn5YVoter := NonDerogSourceAgeInDaysVoter <= Person.FIVE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedCollege: => SeenIn5YCollege := NonDerogSourceAgeInDaysCollege <= Person.FIVE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedBureau: => SeenIn5YBureau := NonDerogSourceAgeInDaysBureau <= Person.FIVE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedPersonalProperty: => SeenIn5YPersonalProperty := NonDerogSourceAgeInDaysPersonalProperty <= Person.FIVE_YEARS_IN_DAYS;
+Person.NonDerogSourceListSortedLicense: => SeenIn5YLicense := NonDerogSourceAgeInDaysLicense <= Person.FIVE_YEARS_IN_DAYS;
+
+Person: => NonDerogCntProperty5Y := IF(EXISTS(NonDerogSourceListSortedProperty(SeenIn5YProperty)), 1, 0);
+Person: => NonDerogCntVoter5Y := IF(EXISTS(NonDerogSourceListSortedVoter(SeenIn5YVoter)), 1, 0);
+Person: => NonDerogCntCollege5Y := IF(EXISTS(NonDerogSourceListSortedCollege(SeenIn5YCollege)), 1, 0);
+Person: => NonDerogCntBureau5Y := IF(EXISTS(NonDerogSourceListSortedBureau(SeenIn5YBureau)), 1, 0);
+Person: => NonDerogCntPersonalProperty5Y := IF(EXISTS(NonDerogSourceListSortedPersonalProperty(SeenIn5YPersonalProperty)), 1, 0);
+Person: => NonDerogCntLicense5Y := IF(EXISTS(NonDerogSourceListSortedLicense(SeenIn5YLicense)), 1, 0);
+
+Person: => NonDerogSourceCnt5Y := NonDerogCntProperty5Y + NonDerogCntVoter5Y + NonDerogCntCollege5Y + NonDerogCntBureau5Y + NonDerogCntPersonalProperty5Y + NonDerogCntLicense5Y;
+
+Person: => PL_VerSrcNonDrgCatCntEv := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
+																	NonDerogCntEv);
+Person: => PL_VerSrcNonDrgCatCnt3M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																	PL_VerSrcCnt3MNonFCRA < 1 => NO_DATA_FOUND_INT,
+																	NonDerogSourceCnt3M);		
+Person: => PL_VerSrcNonDrgCatCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																	PL_VerSrcCnt6MNonFCRA < 1 => NO_DATA_FOUND_INT,
+																	NonDerogSourceCnt6M);																	
+Person: => PL_VerSrcNonDrgCatCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																	PL_VerSrcCnt1YNonFCRA < 1 => NO_DATA_FOUND_INT,
+																	NonDerogSourceCnt1Y);																		
+Person: => PL_VerSrcNonDrgCatCnt2Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																	PL_VerSrcCnt2YNonFCRA < 1 => NO_DATA_FOUND_INT,
+																	NonDerogSourceCnt2Y);																		
+Person: => PL_VerSrcNonDrgCatCnt3Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																	PL_VerSrcCnt3YNonFCRA < 1 => NO_DATA_FOUND_INT,
+																	NonDerogSourceCnt3Y);																	
+Person: => PL_VerSrcNonDrgCatCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																	PL_VerSrcCnt5YNonFCRA < 1 => NO_DATA_FOUND_INT,
+																	NonDerogSourceCnt5Y);												
+								
 // Name Verification Sources
 
 Person.FullName: => VerifiedFirstName := IsFirstNameMatch(FirstName, Person.P_InpClnNameFirstRaw);
@@ -10311,6 +10469,35 @@ Person: =>PL_CurrAddrTaxValYr :=MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DA
 			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND,
 			PropertyTaxValYr = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97,
 			YEAR(DATE(PropertyTaxValYr)));
+//KS-3406		
+Person: => NameDataSet := TOPN(CurrAddrHelperAttribute.AddressProperty
+    {
+        NonDerogDateFirstSeen := BestMostRecentPropertyEvent.DtFirstSeen,
+        FirstName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.FirstName,
+        LastName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.LastName,
+        PartyIsBuyerOrOwner := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.PartyIsBuyerOrOwner
+    },1,-NonDerogDateFirstSeen);   
+Person: => matchIndex := NameDataSet(PartyIsBuyerOrOwner){
+        NonDerogDateFirstSeen,
+        NameMatch := FirstName != '' OR LastName != '',
+        MatchFirstLastName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
+        MatchLastName := IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
+        MatchFirstName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst)))};  
+		
+Person: => PL_CurrAddrNamePropMatchIndx := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
+			NOT EXISTS(matchIndex(NameMatch)) => NO_DATA_FOUND_97,
+      EXISTS(matchIndex(MatchFirstLastName)) => '3',
+      EXISTS(matchIndex(MatchLastName)) => '2',
+      EXISTS(matchIndex(MatchFirstName)) => '1',
+      '0');				
+Person: => PL_CurrAddrFamilyOwnedFlag := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,			
+			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
+			PL_CurrAddrNamePropMatchIndx = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+			PL_CurrAddrNamePropMatchIndx IN ['0','1','3'] => 0,
+			PL_CurrAddrNamePropMatchIndx = '2' => 1);						
 			
 //InputAddressProperty
 InputPII: => BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsDeed OR IsAssessment),1,-DtFirstSeen));
