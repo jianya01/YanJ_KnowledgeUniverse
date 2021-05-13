@@ -10374,7 +10374,24 @@ Person: => PL_VerAddrSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAd
 																					PL_VerAddrSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
 																					PL_VerAddrSrcNewDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
 																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerAddrSrcNewDtEvFCRA),Person.CURRENT_DATE),0,960)); 
-
+//KS7154
+//DOB Verification
+//Padding logic checks
+Person.ReportedDatesOfBirth: => FullyValidFlag  := IF(DateOfBirthPadded = '', 1,0);
+Person.ReportedDatesOfBirth: => MonthPaddedFlag  := IF(DateOfBirthPadded = 'YYYY0101',1,0);
+Person.ReportedDatesOfBirth: => DayPaddedFlag  := IF(DateOfBirthPadded = 'YYYYMM01',1,0);
+Person: => PL_VerDOBYearFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																		PII.P_InpValDOBYearMissingFlag = 1 OR PII.P_InpValDOBYearAllZeroFlag = 1 => NO_DATA_FOUND_INT,
+																		EXISTS(ReportedDatesOfBirth(HeaderHitFlag AND YEAR(PII.P_InpClnDOB) = YEAR(DateOfBirth))) => 1,
+																		0);
+Person: => PL_VerDOBMonFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																		PII.P_InpValDOBMonMissingFlag = 1 OR PII.P_InpValDOBMonAllZeroFlag = 1 OR ALL(ReportedDatesOfBirth,MonthPaddedFlag = 1) => NO_DATA_FOUND_INT,
+																		EXISTS(ReportedDatesOfBirth(HeaderHitFlag AND MONTH(PII.P_InpClnDOB) = MONTH(DateOfBirth))) => 1,
+																		0);
+Person: => PL_VerDOBDayFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																		PII.P_InpValDOBMonMissingFlag = 1 OR PII.P_InpValDOBMonAllZeroFlag = 1  OR ALL(ReportedDatesOfBirth,DayPaddedFlag = 1)=> NO_DATA_FOUND_INT,
+																		EXISTS(ReportedDatesOfBirth(HeaderHitFlag AND DAY(PII.P_InpClnDOB) = DAY(DateOfBirth))) => 1,
+																		0); 
 
 Person: BUREAU_SOURCES :=['EN', 'EQ','TN'];
 Person: => IsBureauSourceTest := VerSourceListSorted(TranslatedSourceCode IN Person.BUREAU_SOURCES);
