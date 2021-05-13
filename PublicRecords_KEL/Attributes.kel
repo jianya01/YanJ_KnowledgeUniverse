@@ -269,7 +269,11 @@ FUNCTION: GATEWAY_TARGUS(STRING GatewayURL, STRING FirstName, STRING LastName, S
 // InsurancePhone specific code - NonFCRA and FCRA
 FUNCTION: GET_INSURANCE_PHONE_URL(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.MASGateway.InsurancePhoneFunctions.GrabInsurancePhoneURL(StoredName)) FROM PublicRecords_KEL  RETURNS STRING;
 FUNCTION: GATEWAY_INSURANCE_PHONE(STRING GatewayURL, STRING FirstName, STRING LastName, STRING StreetAddress, STRING City, STRING State, STRING Zip, STRING Phone10, INTEGER GLBPurpose, BOOLEAN IsFCRA) <= ECL(PublicRecords_KEL.MAS_get.MASGateway.InsurancePhoneFunctions.InsurancePhoneWrapper(GatewayURL, FirstName, LastName, StreetAddress, City, State, Zip, Phone10, GLBPurpose, IsFCRA)) FROM PublicRecords_KEL RETURNS SET OF STRING;
-										
+						
+FUNCTION: SSNMatchScore(STRING SSN1, STRING SSN2, BOOLEAN FourOnly) <= ECL(did_add.ssn_match_score(SSN1, SSN2, FourOnly)) FROM DID_Add  RETURNS INTEGER;
+FUNCTION: GN(INTEGER I) <= ECL(risk_indicators.iid_constants.gn(I)) FROM Risk_Indicators  RETURNS BOOLEAN;
+						
+						
 /**************************************************************************/
 /*                                                                        */
 /*    Fetch our Build Dates, compare to the Archive Date                  */
@@ -5093,6 +5097,9 @@ Person: => P_InpClnAddrPreDirRaw := PII.P_InpClnAddrPreDir;
 Person: => P_InpClnAddrSffxRaw := PII.P_InpClnAddrSffx;
 Person: => P_InpClnAddrPostDir := PII.InputCityPostCleanValue;
 Person: => P_InpClnAddrFull := PII.InputFullAddressCleanValue;
+Person: => P_InpSSNRaw := PII.P_InpSSN;
+
+
 
 Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputSSNMatch := IsInquirySSNMatch(SSN, Person.P_InpClnSSNRaw);
 Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputAddressMatch := IsInquiryAddressMatch(INTEGER(ZIP5), PrimaryRange, PrimaryName, SecondaryRange, Predirectional, Suffix, INTEGER(Person.P_InpClnAddrZip5Raw), Person.P_InpClnAddrPrimRngRaw, Person.P_InpClnAddrPrimNameRaw, Person.P_InpClnAddrSecRngRaw, Person.P_InpClnAddrPreDirRaw, Person.P_InpClnAddrSffxRaw);
@@ -10678,3 +10685,12 @@ Person: => PL_VerPhoneSrcNewMsncEv := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnP
 																 PL_VerPhoneSrcNewDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
 																	BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerPhoneSrcNewDtEv),CURRENT_DATE),0,960));
 																 
+
+Person: => SSNToUse := IF(SUBSTR(P_InpSSNRaw, 1, 5) = '00000', SUBSTR(P_InpSSNRaw, 6, 9), P_InpSSNRaw);
+Person: => SSNLength := LENGTH(SSNToUse);
+Person: => SocsMatchScore := SSNMatchScore(P_InpSSNRaw, PL_BestSSN, SSNLength = 4);
+Person: => SocsMatch := GN(SocsMatchScore);
+Person: => PL_VerSSNLookupFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN  IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+                                  SSNLength > 4 => NO_DATA_FOUND,
+                                  SSNLength = 4 AND SocsMatch => '1',
+                                  '0');
