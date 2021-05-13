@@ -3062,11 +3062,13 @@ Education: => CollRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['C','H',
 Education: => EduRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['M','C','H','O']));
 Person: => BUILD_DATE := MIN(IF(EXISTS(PersonEducation.Edu(DataSources.Source = 'AY')), Education.ALLOY_MEDIA_BUILD_DATE , Education.ASL_BUILD_DATE), CURRENTDATE());
 
-Person: => EduRecVerSourceListPre := PersonEducation.Edu(EduRecFlag).CollegeCharacteristics{FileType, CollegeCode, CollegeType, DateFirstSeenMin := MIN(GROUP, FileType:DateFirstSeen), DateLastSeenMax := MAX(GROUP, FileType:DateLastSeen)};
+Person: => EduRecVerSourceListPre := PersonEducation.Edu(EduRecFlag).CollegeCharacteristics{FileType, CollegeCode, CollegeType, Tier, Tier2, DateFirstSeenMin := MIN(GROUP, FileType:DateFirstSeen), DateLastSeenMax := MAX(GROUP, FileType:DateLastSeen)};
 Person: => EduRecVerSourceList := EduRecVerSourceListPre{
 	FileType,
 	CollegeCode,
 	CollegeType,
+	Tier,
+	Tier2,
 	CollegeCodeConvert := MAP(CollegeCode = '1' => '3', CollegeCode = '2' => '1', CollegeCode = '4' => '2'),
 	SourceDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMin), DATETOSTRING(DateFirstSeenMin, '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(DateLastSeenMax), DATETOSTRING(MIN(DateLastSeenMax, Person.BUILD_DATE), '%Y%m%d'), PersonEducation.NO_DATA_FOUND_97)};
@@ -3087,6 +3089,11 @@ Person: => CollRecCollegeType := ONLY(EduCollRecVerSourceNewListFiltered, Colleg
 
 Person: => MaxCollegeCode := MAX(EduCollRecVerSourceListSorted, INTEGER(CollegeCodeConvert));
 
+Person: => NewestColTier := ONLY(EduCollRecVerSourceNewListFiltered, INTEGER(Tier));
+Person: => NewestColTier2 := ONLY(EduCollRecVerSourceNewListFiltered, INTEGER(Tier2));
+
+Person: => ColTierAvail := EXISTS(EduCollRecVerSourceListSorted(Tier IN ['1', '2', '3', '4', '5', '6']));
+Person: => ColTier2Avail := EXISTS(EduCollRecVerSourceListSorted(Tier2 IN ['1', '2', '3', '4', '5', '6']));
 /**************************************************************************/
 /*                                                                        */
 /*                  Education Attributes                             */
@@ -3190,6 +3197,20 @@ Person: => PL_EduCollInstPvtFlagEv := MAP(
 		ALL(EduCollRecVerSourceListSorted, CollegeType:Null OR CollegeType IN ['', 'N', 'C']) => NO_DATA_FOUND_97,
 		EXISTS(EduCollRecVerSourceListSorted(CollegeType IN ['P','R'])) => '1',
 		'0');
+		
+Person: => PL_EduCollRecNewTierEv := MAP(
+		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
+		PL_EduCollRecFlagEv != '1' => PersonEducation.NO_DATA_FOUND,	
+		NewestColTier2 > 0 => NewestColTier2,
+		NewestColTier > 0 => NewestColTier,
+		NO_DATA_FOUND_97);
+		
+Person: => PL_EduCollTierBestEv := MAP(
+		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
+		PL_EduCollRecFlagEv != '1' => PersonEducation.NO_DATA_FOUND,	
+		ColTier2Avail => MIN(EduCollRecVerSourceListSorted(Tier2 IN ['1', '2', '3', '4', '5', '6']), INTEGER(Tier2)),
+		ColTierAvail => MIN(EduCollRecVerSourceListSorted(Tier IN ['1', '2', '3', '4', '5', '6']), INTEGER(Tier)),
+		NO_DATA_FOUND_97);
 /**************************************************************************/
 /*                                                                        */
 /*                  EmergingID Attributes                      			      */
