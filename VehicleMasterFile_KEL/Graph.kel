@@ -1,4 +1,9 @@
-﻿	// --- ENTITY Definitions Section --- 
+﻿// #OPTION(persist, 0) // Set to 0 to disable PERSIST functionality
+// #OPTION(querytypes, 'normal') // Only generate the Q_* Functions for execution on Thor against the base files
+// #OPTION(exportpreentity) // Force the Pre-Entity code generation so that the Thor code generated is optimized
+
+
+	// --- ENTITY Definitions Section --- 
 IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Entities;
 
 // --- USE Statements Section ---
@@ -10,23 +15,48 @@ IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Attributes;
 
 QUERY: VehicleMasterFile(PERMITS DPM) <= 
 	Policy{
-		VIN := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).Vehicle.VIN,
-		ValidVIN := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).Vehicle.ValidVIN,
-		LexID := PersonPolicy.Subject(LexID != '' AND NOT LexID:Null).UID,
-		PrimaryPolicyHolderFlag := PersonPolicy.Subject(LexID != '' AND NOT LexID:Null).UID = PrimaryPolicyHolderLexID,
-		LexIDStart := DATETOSTRING(PersonPolicy.BestHolderStartDate,'%Y%m%d'), 
-		LexIDEnd := DATETOSTRING(PersonPolicy.BestHolderEndDate,'%Y%m%d'), 
-		VehicleGroupID := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).hhKey,
-		VehicleGroupStart := DATETOSTRING(VehiclePolicy.minAppearanceDate,'%Y%m%d'),
-		VehicleGroupEnd := DATETOSTRING(MAX(VehiclePolicy.CoverageEndDates,CoverageEndDate),'%Y%m%d')
-		}
-
-			(VIN != '', NOT VIN:Null, LexID != '', NOT LexID:Null,LexIDStart <= VehicleGroupEnd, LexIDEnd >= VehicleGroupStart), // Conditions on output eliminate empty outputs
+		VIN := VehiclePolicy.Vehicle.VIN,
+		ValidVIN := VehiclePolicy.Vehicle.ValidVIN,
+		VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).VehicleGroupID,
+		VehicleGroupStart := VehiclePolicy.VehicleGroupStart,
+		VehicleGroupEnd := VehiclePolicy.VehicleGroupEnd,
+		LexID := PersonPolicy.Subject.UID,
+		PrimaryPolicyHolderFlag := IF(PersonPolicy.Subject.UID = G_PrimaryPolicyHolderLexID, 1, 0),
+		LexIDStart := PersonPolicy.G_BestHolderStartDate, 
+		LexIDEnd := PersonPolicy.G_BestHolderEndDate, 
+		BestCoverageEndDate := VehiclePolicy.G_BestCoverageEndDate,
+		BestCoverageStartDate := VehiclePolicy.G_AppearanceDate
+	}
+		((LexIDStart < BestCoverageEndDate) AND
+		(LexIDEnd > VehicleGroupStart OR NOT ISVALIDDATE(LexIDEnd) OR LexIDEnd:Null))
+	{
+		VIN,
+		ValidVIN,
+		VehicleGroupID,
+		VehicleGroupStart := MIN(GROUP,VehicleGroupStart),
+		VehicleGroupEnd := IF(MAX(GROUP,VehicleGroupEnd) <= CURRENTDATE(),MAX(GROUP,VehicleGroupEnd),Policy.NULLDATEVALUE),
+		LexID,
+		LexIDStart := MAX(MIN(GROUP,LexIDStart),MIN(GROUP,VehicleGroupStart)),
+		LexIDEnd := MAP(MAX(GROUP,VehicleGroupEnd):Null AND MIN(MAX(GROUP,LexIDEnd),MAX(GROUP,BestCoverageEndDate)) <= CURRENTDATE() => MIN(MAX(GROUP,LexIDEnd),MAX(GROUP,BestCoverageEndDate)),
+		MAX(GROUP,VehicleGroupEnd):Null => Policy.NULLDATEVALUE,
+		MIN(MAX(GROUP,LexIDEnd),MAX(GROUP,BestCoverageEndDate), MAX(GROUP,VehicleGroupEnd))),
+		PrimaryPolicyHolderFlag := MAX(GROUP,PrimaryPolicyHolderFlag) = 1
+	}
+		((LexIDStart < VehicleGroupEnd OR NOT ISVALIDDATE(VehicleGroupEnd) OR VehicleGroupEnd:Null OR VehicleGroupEnd = Policy.NULLDATEVALUE) AND
+		(LexIDEnd > VehicleGroupStart OR NOT ISVALIDDATE(LexIDEnd) OR LexIDEnd:Null)), // Conditions on output eliminate empty outputs
 	Policy{
-		LexID := PersonPolicy.Subject(LexID != '' AND NOT LexID:Null).UID,
-		VehicleGroupID := VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).hhKey,
-		VehicleGroupStart := DATETOSTRING(VehiclePolicy.minAppearanceDate,'%Y%m%d'),
-		VehicleGroupEnd := DATETOSTRING(MAX(VehiclePolicy.CoverageEndDates,CoverageEndDate),'%Y%m%d')
-		}
-			(LexID != '', NOT LexID:Null) // Conditions on output eliminate empty outputs
-	USING DPM;
+		VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).VehicleGroupID,
+		VehicleGroupStart := VehiclePolicy.VehicleGroupStart,
+		LexIDStart := PersonPolicy.G_BestHolderStartDate, 
+		LexIDEnd := PersonPolicy.G_BestHolderEndDate, 
+		LexID := PersonPolicy.Subject.UID, 
+		BestCoverageEndDate := VehiclePolicy.G_BestCoverageEndDate
+	}
+		((LexIDStart < BestCoverageEndDate) AND
+		(LexIDEnd > VehicleGroupStart OR NOT ISVALIDDATE(LexIDEnd) OR LexIDEnd:Null))
+	{
+		LexID,
+		VehicleGroupID
+	}		
+USING DPM;
+

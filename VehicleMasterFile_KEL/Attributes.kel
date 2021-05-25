@@ -1,26 +1,35 @@
-﻿IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Entities; 
+﻿﻿IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Entities; 
 IMPORT VehicleMasterFile_KEL.Uses;
 
 IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
 FUNCTION: TimeStampToDate(TIMESTAMP x) <= ECL((STRING) x[..8]) RETURNS DATE; //most date functions are not supported by timestamp. This casts to date so you just use that.
-//Person attributes
 
-PersonPolicy: => IsPrimaryPolicyHolder := PolicyHolderRelation = 'A1';
-PersonPolicy: => BestHolderEndDate := MIN(MAX(CancellationDates,CancellationDate),MAX(EndDates,EndDate));
-PersonPolicy: => BestHolderStartDate := MIN(OriginDates, OriginDate);
-//Vehicle Attributes
-Policy: => PrimaryPolicyHolderLexID := ONLY(PersonPolicy(IsPrimaryPolicyHolder){Subject.UID});
+Policy: NULLDATEVALUE := DATE(0);
 
-VehiclePolicy: => minAppearanceDate := MIN(MIN(CoverageStartDates,CoverageStartDate),MIN(NotificationDates,NotificationDate),FirstLoadDate);
-VehiclePolicy: => PreviousCandidatesMinDate := MIN(Vehicle.VehiclePolicy,minAppearanceDate);
-VehiclePolicy: => firstPurchase := minAppearanceDate = PreviousCandidatesMinDate;
+PersonPolicy: => G_IsPrimaryPolicyHolder := PolicyHolderRelation = 'A1';
+Policy: => G_PrimaryPolicyHolderLexID := ONLY(PersonPolicy(G_IsPrimaryPolicyHolder){Subject.UID});
 
 
+VehiclePolicy: => G_AppearanceDate := MIN(MIN(CoverageStartDates,CoverageStartDate),MIN(NotificationDates,NotificationDate),FirstLoadDate);
 
-VehiclePolicy: => hasBeforeV2 := EXISTS(Policy.PersonPolicy.Subject.PersonPolicy.Policy.VehiclePolicy(VIN = VehiclePolicy.VIN AND minAppearanceDate < VehiclePolicy.minAppearanceDate,ISVALIDDATE(minAppearanceDate)));
+PersonPolicy: => G_BestHolderStartDate := MIN(OriginDates, OriginDate);
+PersonPolicy: => G_BestHolderEndDate := MIN(MAX(CancellationDates,CancellationDate),MAX(EndDates,EndDate));
+VehiclePolicy: => G_BestCoverageEndDate := MIN(CancellationDate,MAX(CoverageEndDates,CoverageEndDate));
 
-VehiclePolicy: => changedOwnership := NOT(firstPurchase OR hasBeforeV2);
-VehiclePolicy: => minminAppearanceDate := IF(firstPurchase OR changedOwnership, minAppearanceDate);
-VehiclePolicy: => minminAppearanceDate2 := IF(NOT minminAppearanceDate:Null, minminAppearanceDate, PreviousCandidatesMinDate);
-VehiclePolicy : => hhKey := TRIMALL(Vehicle.VIN) + '_' + DATETOSTRING(minminAppearanceDate2,'%Y%m%d');
-Vehicle: => myResultTable := VehiclePolicy{Policy.PersonPolicy(Policy = VehiclePolicy.Policy AND MIN(StartDates,StartDate) = VehiclePolicy.minAppearanceDate).Subject.LexID, minAppearanceDate, hhKey};
+
+VehiclePolicy: => G_SameDateEndPolicy := G_AppearanceDate = G_BestCoverageEndDate;
+VehiclePolicy: => G_FirstPurchase := G_AppearanceDate = MIN(Vehicle.VehiclePolicy,G_AppearanceDate);
+VehiclePolicy: => G_PreviousAppearanceDate := MAX(Vehicle.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, G_AppearanceDate < VehiclePolicy.G_AppearanceDate,NOT G_SameDateEndPolicy,ISVALIDDATE(G_AppearanceDate)), G_AppearanceDate);
+
+VehiclePolicy: => G_HasBefore := EXISTS(Policy.PersonPolicy.Subject.PersonPolicy.Policy.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, G_AppearanceDate = VehiclePolicy.G_PreviousAppearanceDate,ISVALIDDATE(G_AppearanceDate)));
+
+
+VehiclePolicy: => G_ChangedOwnership := NOT(G_FirstPurchase OR G_HasBefore);
+VehiclePolicy: => G_MinAppearanceDate := IF(G_FirstPurchase OR G_ChangedOwnership, G_AppearanceDate);
+VehiclePolicy: => G_GetMinAppearanceDate := MAX(VehiclePolicy(Vehicle = VehiclePolicy.Vehicle AND NOT G_MinAppearanceDate:Null AND VehiclePolicy.G_MinAppearanceDate:Null AND G_AppearanceDate < VehiclePolicy.G_AppearanceDate AND NOT Policy.PersonPolicy.Subject:Null AND NOT (G_AppearanceDate = G_BestCoverageEndDate)),G_AppearanceDate);
+
+
+VehiclePolicy: => VehicleGroupStart := IF(NOT G_MinAppearanceDate:Null, G_MinAppearanceDate, G_GetMinAppearanceDate);
+VehiclePolicy: => VehicleGroupEnd := MIN(Vehicle.VehiclePolicy(VehicleGroupStart > VehiclePolicy.VehicleGroupStart AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_SameDateEndPolicy),VehicleGroupStart);
+VehiclePolicy : => VehicleGroupID := TRIMBOTH(Vehicle.VIN) + '_' + DATETOSTRING(VehicleGroupStart,'%Y%m%d');
+
