@@ -296,7 +296,7 @@ Inquiry:  CURRENT_DATE  := MIN(GETBUILDDATE('inquiry_build_version'), CURRENTDAT
 Person:  CURRENT_DATE  := MIN(GETBUILDDATE('header_build_version'), CURRENTDATE());
 PersonAddress:  CURRENT_DATE  := MIN(GETBUILDDATE('header_build_version'), CURRENTDATE());
 Phone:  CURRENT_DATE  := MIN(GETBUILDDATE('targus_build_version'), CURRENTDATE());
-PhoneSummary:  CURRENT_DATE  := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE());
+PhoneSummary:  CURRENT_DATE := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE());
 ProfessionalLicense:  CURRENT_DATE_PROFLIC  := MIN(GETBUILDDATE('proflic_build_version'), CURRENTDATE());
 ProfessionalLicense:  CURRENT_DATE_MARI  := MIN(GETBUILDDATE('mari_build_version'), CURRENTDATE());
 Property:  CURRENT_DATE  := MIN(GETBUILDDATE('property_build_version'), CURRENTDATE());
@@ -320,9 +320,9 @@ Address: ADVO_CURRENT_DATE := MIN(GETBUILDDATE('cds_build_version'), CURRENTDATE
 //Hardcoding the static build date for Alloy Media Student Data since the keys are not updating anymore in Prod
 Education: ALLOY_MEDIA_BUILD_DATE := DATE(20160129); 
 Education: ASL_BUILD_DATE := GETBUILDDATE('asl_build_version');
-NameSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE());
-SSNSummary: CURRENT_DATE_PII  := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE());
-AddressSummary:  CURRENT_DATE_PII  := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE()); 
+NameSummary:  CURRENT_DATE  := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE());
+SSNSummary: CURRENT_DATE  := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE());
+AddressSummary:  CURRENT_DATE := MIN(GETBUILDDATE('RiskTable_build_version'), CURRENTDATE()); 
 Person: BUILD_DATE_UTIL := MIN(GETBUILDDATE('utility_build_version'), CURRENTDATE());
 Person: CURRENT_DATE_INQ := MIN(GETBUILDDATE('inquiry_build_version'), CURRENTDATE());
 PersonInquiry: CURRENT_DATE := MIN(GETBUILDDATE('inquiry_build_version'), CURRENTDATE());
@@ -553,11 +553,8 @@ AddressSummary: NO_DATA_FOUND := '-99998';
 AddressSummary: NO_DATA_FOUND_97 := '-99997';/**********************************************************************************************************************/
 
 PhoneSummary: MISSING_INPUT_DATA := '-99999';
-PhoneSummary: MISSING_INPUT_DATA_INT := -99999;
 PhoneSummary: NO_DATA_FOUND := '-99998';
-PhoneSummary: NO_DATA_FOUND_INT := -99998;
-PhoneSummary: RECS_AVAIL_BUT_CANNOT_CALCULATE := '-99997';	
-PhoneSummary: RECS_AVAIL_BUT_CANNOT_CALCULATE_INT := -99997;
+PhoneSummary: NO_DATA_FOUND_97 := '-99997';	
 
 Inquiry: MISSING_INPUT_DATA := '-99999';
 Inquiry: MISSING_INPUT_DATA_INT := -99999;
@@ -1574,123 +1571,6 @@ InputPII: => PI_InpAddrFamilyOwnedFlag := MAP(PI_InpAddrOnFileFlagEv != '1' => M
 																								PI_InpAddrNamePropMatchIndx IN [0,1,3] => 0,
 																								PI_InpAddrNamePropMatchIndx = 2 => 1);
 																								
-//Name Summary attributes		
-NameSummary: =>PII :=ONLY(InputPII);
-NameSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
-NameSummary: =>P_InpClnNameLast :=PII.InputLastNameCleanValue;
-NameSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
-NameSummary.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
-
-NameSummary: => TranslatedSources := DataSources(TranslatedSourceCode != ''){TranslatedSourceCode};
-NameSummary: => NameSummarySourceList := TranslatedSources{
-
-	TranslatedSourceCode,
-	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
-	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, NameSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-	
-NameSummary: => NameSummarySourceListSorted := TOPN(NameSummarySourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
-NameSummary: => PI_SrcWInpFLDListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		NOT EXISTS(NameSummarySourceListSorted) =>NO_DATA_FOUND,
-		CONCAT(NameSummarySourceListSorted,TranslatedSourceCode,'|')); 
-NameSummary: => PI_SrcWInpFLDEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		PI_SrcWInpFLDListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-		CONCAT(NameSummarySourceListSorted,SourceDateFirstSeen,'|'));
-NameSummary: => PI_SrcWInpFLDLastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		PI_SrcWInpFLDListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-		CONCAT(NameSummarySourceListSorted,SourceDateLastSeen,'|'));		
-
-//SSNSummary		
-SSNSummary: =>PII :=ONLY(InputPII);
-SSNSummary: =>P_InpClnSSN :=PII.InputSSNCleanValue;
-SSNSummary: =>P_InpClnPrimaryName :=PII.InputPrimaryNameCleanValue;
-SSNSummary: =>P_InpClnPrimaryRange :=PII.InputPrimaryRangeCleanValue;
-SSNSummary: =>P_InpClnZip :=PII.InputZip5CleanValue;
-SSNSummary: => P_InpClnPhoneHome := PII.InputHomePhoneCleanValue;
-
-
-SSNSummary.AddressSummary: => TranslatedSourceCode := ConsumerSourceGroup(AddressSource);
-SSNSummary: => TranslatedSources := AddressSummary(TranslatedSourceCode != ''){AddressPrimaryName, AddressPrimaryRange, AddressZip, TranslatedSourceCode};
-SSNSummary: => SSNSummarySourceList := TranslatedSources{
-	PrimaryNameAddress := AddressPrimaryName,
-	PrimaryRangeAddress := AddressPrimaryRange,
-	ZipAddress := AddressZip,
-	TranslatedSourceCode,
-	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
-	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-SSNSummary: => SSNSummarySourceListSorted := TOPN(SSNSummarySourceList(PrimaryNameAddress = P_InpClnPrimaryName AND PrimaryRangeAddress = P_InpClnPrimaryRange AND ZipAddress = P_InpClnZip), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
-
-SSNSummary: => PI_SrcWInpASListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		NOT EXISTS(SSNSummarySourceListSorted) =>NO_DATA_FOUND,
-		CONCAT(SSNSummarySourceListSorted,TranslatedSourceCode,'|'));
-SSNSummary: => PI_SrcWInpASEmrgDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		PI_SrcWInpASListEv = NO_DATA_FOUND => NO_DATA_FOUND,
-		CONCAT(SSNSummarySourceListSorted, SourceDateFirstSeen, '|'));
-SSNSummary: => PI_SrcWInpASLastDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		PI_SrcWInpASListEv = NO_DATA_FOUND => NO_DATA_FOUND,
-		CONCAT(SSNSummarySourceListSorted, SourceDateLastSeen, '|'));
-		
-SSNSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
-SSNSummary.DateOfBirthSummary: => TranslatedSourceCode := ConsumerSourceGroup(DobSource);
-SSNSummary: => TranslatedDOBSources := DateOfBirthSummary(TranslatedSourceCode != ''){DobDateOfBirth,  TranslatedSourceCode};
-SSNSummary: =>TranslatedDOBSourcesList := TranslatedDOBSources{
-		DateOfBirth:=DobDateOfBirth,
-		TranslatedSourceCode,
-		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
-		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-SSNSummary: => SortedDOBTranslatedSourceList := TOPN(TranslatedDOBSourcesList(DATETOSTRING(DateOfBirth,'%Y%m%d') = SSNSummary.P_InpClnDOB),1000,SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
-
-SSNSummary: => PI_SrcWInpSDListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		NOT EXISTS(SortedDOBTranslatedSourceList) =>NO_DATA_FOUND,
-		CONCAT(SortedDOBTranslatedSourceList, TranslatedSourceCode,'|'));
-SSNSummary: => PI_SrcWInpSDEmrgDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		PI_SrcWInpSDListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		CONCAT(SortedDOBTranslatedSourceList, SourceDateFirstSeen, '|'));
-SSNSummary: => PI_SrcWInpSDLastDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		PI_SrcWInpSDListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		CONCAT(SortedDOBTranslatedSourceList, SourceDateLastSeen, '|'));
-    
-SSNSummary.PhoneSummary: => PhoneTranslatedSourceCode := ConsumerSourceGroup(PhoneSource);
-
-SSNSummary: => PhoneTranslatedSources := PhoneSummary(PhoneTranslatedSourceCode != ''){PhoneNumber, PhoneTranslatedSourceCode};
-SSNSummary: => PhoneSummarySourceList := PhoneTranslatedSources{
-  Phone10 := PhoneNumber,
-	PhoneTranslatedSourceCode,
-	SourceDateFirstSeen := IF(ISVALIDDATE(PhoneTranslatedSourceCode:DateFirstSeen), DATETOSTRING(PhoneTranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
-	SourceDateLastSeen :=  IF(ISVALIDDATE(PhoneTranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(PhoneTranslatedSourceCode:DateLastSeen, SSNSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-	
-SSNSummary: => PhoneSummarySourceListSorted := TOPN(PhoneSummarySourceList(Phone10 = SSNSummary.P_InpClnPhoneHome), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), PhoneTranslatedSourceCode);
-SSNSummary: => PI_SrcWInpPSListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		NOT EXISTS(PhoneSummarySourceListSorted) => NO_DATA_FOUND,
-		CONCAT(PhoneSummarySourceListSorted,PhoneTranslatedSourceCode,'|')); 
-SSNSummary: => PI_SrcWInpPSEmrgDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		PI_SrcWInpPSListEv = NO_DATA_FOUND =>NO_DATA_FOUND,
-		CONCAT(PhoneSummarySourceListSorted,SourceDateFirstSeen,'|'));
-SSNSummary: => PI_SrcWInpPSLastDtListEv := MAP(P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		PI_SrcWInpPSListEv = NO_DATA_FOUND => NO_DATA_FOUND,
-		CONCAT(PhoneSummarySourceListSorted,SourceDateLastSeen,'|'));	
-
-SSNSummary: =>P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
-SSNSummary: =>P_InpClnNameLast :=PII.InputLastNameCleanValue;
-SSNSummary.NameSummary: => TranslatedSourceCode := ConsumerSourceGroup(NameSource);
-SSNSummary: => TranslatedFnLnSources := NameSummary(TranslatedSourceCode != ''){NameFirstName,  NameLastName,TranslatedSourceCode};
-SSNSummary: => TranslatedFnLnSourcesList := TranslatedFnLnSources{
-		FirstName:=NameFirstName,
-		LastName :=NameLastName,
-		TranslatedSourceCode,
-		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
-		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-SSNSummary: => SortedFnLnTranslatedSourceList := TOPN(TranslatedFnLnSourcesList(FirstName = SSNSummary.P_InpClnNameFirst AND LastName =SSNSummary.P_InpClnNameLast),1000,SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
-
-SSNSummary: => PI_SrcWInpFLSListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		NOT EXISTS(SortedFnLnTranslatedSourceList) =>NO_DATA_FOUND,
-		CONCAT(SortedFnLnTranslatedSourceList, TranslatedSourceCode,'|'));
-SSNSummary: => PI_SrcWInpFLSEmrgDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		PI_SrcWInpFLSListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		CONCAT(SortedFnLnTranslatedSourceList, SourceDateFirstSeen, '|'));
-SSNSummary: => PI_SrcWInpFLSLastDtListEv := MAP( P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-		PI_SrcWInpFLSListEv =NO_DATA_FOUND =>NO_DATA_FOUND,
-		CONCAT(SortedFnLnTranslatedSourceList, SourceDateLastSeen, '|'));
-		
 
 //KS-6126
 
@@ -1743,7 +1623,329 @@ InputPII: => PI_InpPhoneIsBusPhoneFlag :=  MAP(P_InpClnPhoneHomeFlagValue != 1 =
 	NOT PhoneListingTypeIsBusiness => '0',
 	PhoneListingTypeIsBusiness => '1',
 	NO_DATA_FOUND);
-				    
+
+// PII Corroboration Attributes
+
+// PhoneSummary Attributes
+// Get the inputPII values
+PhoneSummary: => PII := ONLY(InputPII);
+PhoneSummary: => P_InpClnPhoneHome := PII.P_InpClnPhoneHome;
+PhoneSummary: => P_InpClnDOB := PII.InputDOBCleanValue;
+PhoneSummary: => P_InpClnNameLast := PII.InputLastNameCleanValue;
+PhoneSummary: => P_InpClnAddrPrimName := PII.InputPrimaryNameCleanValue;
+PhoneSummary: => P_InpClnAddrPrimRng := PII.InputPrimaryRangeCleanValue;
+PhoneSummary: => P_InpClnAddrZip5 := PII.InputZip5CleanValue;
+
+PhoneSummary: => PhoneNotPopulated := P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
+PhoneSummary: => DOBNotPopulated := P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
+PhoneSummary: => LastNameNotPopulated := P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND];
+PhoneSummary: => AddressNotPopulated := P_InpClnAddrPrimName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
+
+// Get sources that match input Phone and DOB
+PhoneSummary: => PhoneDOBSources := DateOfBirthSummary{
+		DateOfBirth := DATETOSTRING(DateOfBirth,'%Y%m%d'),  
+		TranslatedSourceCode := ConsumerSourceGroup(Source)};
+
+PhoneSummary: => PhoneDOBSourceList := PhoneDOBSources(TranslatedSourceCode != '' AND DateOfBirth = PhoneSummary.P_InpClnDOB){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+PhoneSummary: => PhoneDOBSourceListSorted := TOPN(PhoneDOBSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// Get sources that match input Phone and Last Name
+PhoneSummary: => PhoneLastNameSources := LastNameSummary{
+		LastName,  
+		TranslatedSourceCode := ConsumerSourceGroup(Source)};
+
+PhoneSummary: => PhoneLastNameSourceList := PhoneLastNameSources(TranslatedSourceCode != '' AND LastName = PhoneSummary.P_InpClnNameLast){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+PhoneSummary: => PhoneLastNameSourceListSorted := TOPN(PhoneLastNameSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// Get sources that match input Phone and Address
+PhoneSummary: => PhoneAddressSources := AddressSummary{
+		PrimaryName, 
+		PrimaryRange, 
+		Zip, 
+		TranslatedSourceCode := ConsumerSourceGroup(Source)};
+
+PhoneSummary: => PhoneAddressSourceList := PhoneAddressSources(TranslatedSourceCode != '' AND PrimaryName = PhoneSummary.P_InpClnAddrPrimName AND PrimaryRange = PhoneSummary.P_InpClnAddrPrimRng AND Zip = PhoneSummary.P_InpClnAddrZip5){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+PhoneSummary: => PhoneAddressSourceListSorted := TOPN(PhoneAddressSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// Phone DOB Corroboration Attributes
+PhoneSummary: => PI_SrcWInpPDListEv := MAP(
+		PhoneNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(PhoneDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(PhoneDOBSourceListSorted, TranslatedSourceCode, '|'));
+PhoneSummary: => PI_SrcWInpPDEmrgDtListEv := MAP(
+		PhoneNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(PhoneDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(PhoneDOBSourceListSorted, SourceDateFirstSeen, '|'));
+PhoneSummary: => PI_SrcWInpPDLastDtListEv := MAP(
+		PhoneNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(PhoneDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(PhoneDOBSourceListSorted, SourceDateLastSeen, '|'));
+
+// Phone Last Name Corroboration Attributes
+PhoneSummary: => PI_SrcWInpLPListEv := MAP(
+		PhoneNotPopulated OR LastNameNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(PhoneLastNameSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(PhoneLastNameSourceListSorted, TranslatedSourceCode,'|'));
+PhoneSummary: => PI_SrcWInpLPEmrgDtListEv := MAP(
+		PhoneNotPopulated OR LastNameNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(PhoneLastNameSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(PhoneLastNameSourceListSorted, SourceDateFirstSeen, '|'));
+PhoneSummary: => PI_SrcWInpLPLastDtListEv := MAP(
+		PhoneNotPopulated OR LastNameNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(PhoneLastNameSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(PhoneLastNameSourceListSorted, SourceDateLastSeen, '|'));
+
+// Phone Address Corroboration Attributes
+PhoneSummary: => PI_SrcWInpAPListEv := MAP(
+		PhoneNotPopulated OR AddressNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(PhoneAddressSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(PhoneAddressSourceListSorted, TranslatedSourceCode, '|'));
+PhoneSummary: => PI_SrcWInpAPEmrgDtListEv := MAP(
+		PhoneNotPopulated OR AddressNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(PhoneAddressSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(PhoneAddressSourceListSorted, SourceDateFirstSeen, '|'));
+PhoneSummary: => PI_SrcWInpAPLastDtListEv := MAP(
+		PhoneNotPopulated OR AddressNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(PhoneAddressSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(PhoneAddressSourceListSorted, SourceDateLastSeen, '|'));
+
+// Address Summary Attributes 
+// Get the inputPII values
+AddressSummary: => PII := ONLY(InputPII);
+AddressSummary: => P_InpClnNameFirst := PII.InputFirstNameCleanValue;
+AddressSummary: => P_InpClnNameLast := PII.InputLastNameCleanValue;
+AddressSummary: => P_InpClnAddrPrimName := PII.InputPrimaryNameCleanValue;
+AddressSummary: => P_InpClnAddrPrimRng := PII.InputPrimaryRangeCleanValue;
+AddressSummary: => P_InpClnAddrZip5 := PII.InputZip5CleanValue;
+AddressSummary: => P_InpClnDOB := PII.InputDOBCleanValue;
+
+AddressSummary: => AddressNotPopulated := P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND];
+AddressSummary: => NameNotPopulated := P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND];
+AddressSummary: => DOBNotPopulated := P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND];
+AddressSummary: => AddressNameSources := NameSummary{
+		NameFirstName, 
+		NameLastName, 
+		TranslatedSourceCode := ConsumerSourceGroup(NameSource)};
+
+// Get sources that match input Address and First and Last Name
+AddressSummary: => AddressNameSourceList := AddressNameSources(TranslatedSourceCode != '' AND NameFirstName = AddressSummary.P_InpClnNameFirst AND NameLastName = AddressSummary.P_InpClnNameLast){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+AddressSummary: => AddressNameSourceListSorted := TOPN(AddressNameSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// Get sources that match input Address and DOB
+AddressSummary: => AddressDOBSources := DateOfBirthSummary{
+		DateOfBirth := DATETOSTRING(DobDateOfBirth,'%Y%m%d'),  
+		TranslatedSourceCode := ConsumerSourceGroup(DobSource)};
+		
+AddressSummary: => AddressDOBSourceList := AddressDOBSources(TranslatedSourceCode != '' AND DateOfBirth = AddressSummary.P_InpClnDOB){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+AddressSummary: => AddressDOBSourceListSorted := TOPN(AddressDOBSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// Address and First and Last Name Corroboration Attributes
+AddressSummary: => PI_SrcWInpFLAListEv := MAP(
+		AddressNotPopulated OR NameNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(AddressNameSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(AddressNameSourceListSorted, TranslatedSourceCode, '|'));
+AddressSummary: => PI_SrcWInpFLAEmrgDtListEv := MAP(
+		AddressNotPopulated OR NameNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(AddressNameSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(AddressNameSourceListSorted, SourceDateFirstSeen, '|'));	
+AddressSummary: => PI_SrcWInpFLALastDtListEv := MAP(
+		AddressNotPopulated OR NameNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(AddressNameSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(AddressNameSourceListSorted, SourceDateLastSeen, '|'));	
+
+// Address and DOB Corroboration Attributes
+AddressSummary: => PI_SrcWInpADListEv := MAP(
+		AddressNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(AddressDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(AddressDOBSourceListSorted, TranslatedSourceCode, '|'));
+AddressSummary: => PI_SrcWInpADEmrgDtListEv := MAP(
+		AddressNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(AddressDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(AddressDOBSourceListSorted, SourceDateFirstSeen, '|'));
+AddressSummary: => PI_SrcWInpADLastDtListEv := MAP(
+		AddressNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(AddressDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(AddressDOBSourceListSorted, SourceDateLastSeen, '|'));
+		
+//Name Summary attributes		
+//Get the inputPII values
+NameSummary: => PII := ONLY(InputPII);
+NameSummary: => P_InpClnNameFirst := PII.InputFirstNameCleanValue;
+NameSummary: => P_InpClnNameLast := PII.InputLastNameCleanValue;
+NameSummary: => P_InpClnDOB := PII.InputDOBCleanValue;
+
+NameSummary: => NameNotPopulated := P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND];
+NameSummary: => DOBNotPopulated := P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND];
+
+// Get sources that match input First and Last Name and DOB (DOB is part of the NameSummary UID)
+NameSummary: => NameDOBSources := DataSources{TranslatedSourceCode := ConsumerSourceGroup(Source)};
+
+NameSummary: => NameDOBSourceList := NameDOBSources(TranslatedSourceCode != ''){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, NameSummary.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+NameSummary: => NameDOBSourceListSorted := TOPN(NameDOBSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// First and Last Name and DOB Corroboration Attributes
+NameSummary: => PI_SrcWInpFLDListEv := MAP(
+		NameNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(NameDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(NameDOBSourceListSorted, TranslatedSourceCode, '|')); 
+NameSummary: => PI_SrcWInpFLDEmrgDtListEv := MAP(
+		NameNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(NameDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(NameDOBSourceListSorted, SourceDateFirstSeen, '|'));
+NameSummary: => PI_SrcWInpFLDLastDtListEv := MAP(
+		NameNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(NameDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(NameDOBSourceListSorted, SourceDateLastSeen, '|'));		
+
+//SSNSummary
+//Get the inputPII values
+SSNSummary: => PII := ONLY(InputPII);
+SSNSummary: => P_InpClnSSN := PII.InputSSNCleanValue;
+SSNSummary: => P_InpClnPrimaryName := PII.InputPrimaryNameCleanValue;
+SSNSummary: => P_InpClnPrimaryRange := PII.InputPrimaryRangeCleanValue;
+SSNSummary: => P_InpClnZip := PII.InputZip5CleanValue;
+SSNSummary: => P_InpClnPhoneHome := PII.InputHomePhoneCleanValue;
+SSNSummary: => P_InpClnDOB := PII.InputDOBCleanValue;
+SSNSummary: => P_InpClnNameFirst := PII.InputFirstNameCleanValue;
+SSNSummary: => P_InpClnNameLast := PII.InputLastNameCleanValue;
+
+SSNSummary: => SSNNotPopulated := P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
+SSNSummary: => AddressNotPopulated := P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
+SSNSummary: => DOBNotPopulated := P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
+SSNSummary: => PhoneNotPopulated := P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
+SSNSummary: => NameNotPopulated := P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
+
+// Get sources that match input SSN and Address
+SSNSummary: => SSNAddressSources := AddressSummary{
+		AddressPrimaryName, 
+		AddressPrimaryRange, 
+		AddressZip, 
+		TranslatedSourceCode := ConsumerSourceGroup(AddressSource)};
+		
+SSNSummary: => SSNAddressSourceList := SSNAddressSources(TranslatedSourceCode != '' AND AddressPrimaryName = SSNSummary.P_InpClnPrimaryName AND AddressPrimaryRange = SSNSummary.P_InpClnPrimaryRange AND AddressZip = SSNSummary.P_InpClnZip){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+
+SSNSummary: => SSNSummarySourceListSorted := TOPN(SSNAddressSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// Get sources that match input SSN and DOB
+SSNSummary: => SSNDOBSources := DateOfBirthSummary{
+		DateOfBirth := DATETOSTRING(DobDateOfBirth,'%Y%m%d'),  
+		TranslatedSourceCode := ConsumerSourceGroup(DobSource)};
+
+SSNSummary: => SSNDOBSourceList := SSNDOBSources(TranslatedSourceCode != '' AND DateOfBirth = SSNSummary.P_InpClnDOB){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+		
+SSNSummary: => SSNDOBSourceListSorted := TOPN(SSNDOBSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// Get sources that match input SSN and Phone
+SSNSummary: => SSNPhoneSources := PhoneSummary{
+		PhoneNumber, 
+		TranslatedSourceCode := ConsumerSourceGroup(PhoneSource)};
+
+SSNSummary: => SSNPhoneSourceList := SSNPhoneSources(TranslatedSourceCode != '' AND PhoneNumber = SSNSummary.P_InpClnPhoneHome){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+	
+SSNSummary: => SSNPhoneSourceListSorted := TOPN(SSNPhoneSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// Get sources that match input SSN and First and Last Name
+SSNSummary: => SSNNameSources := NameSummary{
+		NameFirstName,
+		NameLastName,
+		TranslatedSourceCode := ConsumerSourceGroup(NameSource)};
+		
+SSNSummary: => SSNNameSourceList := SSNNameSources(TranslatedSourceCode != '' AND NameFirstName = SSNSummary.P_InpClnNameFirst AND NameLastName = SSNSummary.P_InpClnNameLast){
+		TranslatedSourceCode,
+		SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
+		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
+		
+SSNSummary: => SSNNameSourceListSorted := TOPN(SSNNameSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
+
+// SSN and Address Corroboration Attributes
+SSNSummary: => PI_SrcWInpASListEv := MAP(
+		SSNNotPopulated OR AddressNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNSummarySourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNSummarySourceListSorted, TranslatedSourceCode, '|'));
+SSNSummary: => PI_SrcWInpASEmrgDtListEv := MAP(
+		SSNNotPopulated OR AddressNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNSummarySourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNSummarySourceListSorted, SourceDateFirstSeen, '|'));
+SSNSummary: => PI_SrcWInpASLastDtListEv := MAP(
+		SSNNotPopulated OR AddressNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNSummarySourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNSummarySourceListSorted, SourceDateLastSeen, '|'));
+
+// SSN and DOB Corroboration Attributes
+SSNSummary: => PI_SrcWInpSDListEv := MAP(
+		SSNNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNDOBSourceListSorted, TranslatedSourceCode,'|'));
+SSNSummary: => PI_SrcWInpSDEmrgDtListEv := MAP(
+		SSNNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNDOBSourceListSorted, SourceDateFirstSeen, '|'));
+SSNSummary: => PI_SrcWInpSDLastDtListEv := MAP(
+		SSNNotPopulated OR DOBNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNDOBSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNDOBSourceListSorted, SourceDateLastSeen, '|'));
+
+// SSN and Phone Corroboration Attributes
+SSNSummary: => PI_SrcWInpPSListEv := MAP(
+		SSNNotPopulated OR PhoneNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNPhoneSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNPhoneSourceListSorted, TranslatedSourceCode, '|')); 
+SSNSummary: => PI_SrcWInpPSEmrgDtListEv := MAP(
+		SSNNotPopulated OR PhoneNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNPhoneSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNPhoneSourceListSorted, SourceDateFirstSeen, '|'));
+SSNSummary: => PI_SrcWInpPSLastDtListEv := MAP(
+		SSNNotPopulated OR PhoneNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNPhoneSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNPhoneSourceListSorted, SourceDateLastSeen, '|'));
+
+// SSN and First and Last Name Corroboration Attributes
+SSNSummary: => PI_SrcWInpFLSListEv := MAP(
+		SSNNotPopulated OR NameNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNNameSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNNameSourceListSorted, TranslatedSourceCode,'|'));
+SSNSummary: => PI_SrcWInpFLSEmrgDtListEv := MAP(
+		SSNNotPopulated OR NameNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNNameSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNNameSourceListSorted, SourceDateFirstSeen, '|'));
+SSNSummary: => PI_SrcWInpFLSLastDtListEv := MAP(
+		SSNNotPopulated OR NameNotPopulated => MISSING_INPUT_DATA,
+		NOT EXISTS(SSNNameSourceListSorted) => NO_DATA_FOUND,
+		CONCAT(SSNNameSourceListSorted, SourceDateLastSeen, '|'));
+
 /**************************************************************************/
 /*                                                                        */
 /*    For each Rep, it'll apply the PII input Echo attributes             */
@@ -9386,171 +9588,6 @@ BusinessSele: => BE_BestAddrBldgSize := MAP(SeleID = MISSING_INPUT_DATA_INT OR B
 		NOT EXISTS(BestAddressPropertyEventData) => NO_DATA_FOUND_INT,
 		BestAddressBuildingArea:Null => NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(BestAddressBuildingArea, 0, 999999999));
-
-// PII Corroboration 
-
-
-//PhoneSummary Attributes
-//Get the inputPII values
-PhoneSummary: =>PII :=ONLY(InputPII);
-PhoneSummary: =>P_InpClnPhoneHome :=PII.P_InpClnPhoneHome;
-PhoneSummary: =>P_InpClnDOB :=PII.InputDOBCleanValue;
-PhoneSummary: =>P_InpClnNameLast := PII.InputLastNameCleanValue;
-PhoneSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
-PhoneSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
-PhoneSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
-
-//Translate the source codes to friendly values
-
-PhoneSummary.DateOfBirthSummary: => TranslatedSource := ConsumerSourceGroup(Source);
-PhoneSummary.LastNameSummary: => TranslatedSource := ConsumerSourceGroup(Source);
-PhoneSummary.AddressSummary: => TranslatedSource := ConsumerSourceGroup(Source);
-
-//Make new submodel for translatedDOB sources
-PhoneSummary: => TranslatedDOBSources := DateOfBirthSummary(TranslatedSource != ''){DateOfBirth, Source := TranslatedSource};
-PhoneSummary.TranslatedDOBSources: => MyDateFirstSeen_pre := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
-PhoneSummary.TranslatedDOBSources: => MyDateLastSeen_pre := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
-PhoneSummary.TranslatedDOBSources: => MyDateFirstSeen := IF(MyDateFirstSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateLastSeen_pre,MyDateFirstSeen_pre);
-PhoneSummary.TranslatedDOBSources: => MyDateLastSeen := IF(MyDateLastSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateFirstSeen_pre,MyDateLastSeen_pre);
-PhoneSummary: => SortedDOBTranslatedSourceList := TOPN(TranslatedDOBSources(DATETOSTRING(DateOfBirth,'%Y%m%d') = PhoneSummary.P_InpClnDOB),99999,MyDateFirstSeen,Source){Source,MyDateFirstSeen,MyDateLastSeen};
-
-//Make new submodel for translatedLastName sources
-PhoneSummary: => TranslatedLastNameSources := LastNameSummary(TranslatedSource != ''){LastName, Source := TranslatedSource};
-PhoneSummary.TranslatedLastNameSources: => MyDateFirstSeen_pre := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
-PhoneSummary.TranslatedLastNameSources: => MyDateLastSeen_pre := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
-PhoneSummary.TranslatedLastNameSources: => MyDateFirstSeen := IF(MyDateFirstSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateLastSeen_pre,MyDateFirstSeen_pre);
-PhoneSummary.TranslatedLastNameSources: => MyDateLastSeen := IF(MyDateLastSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateFirstSeen_pre,MyDateLastSeen_pre);
-PhoneSummary: => SortedLastNameTranslatedSourceList := TOPN(TranslatedLastNameSources(LastName = PhoneSummary.P_InpClnNameLast),99999,MyDateFirstSeen,Source){Source,MyDateFirstSeen,MyDateLastSeen};
-
-//Make new submodel for translatedaddress sources
-PhoneSummary: => TranslatedAddressSources := AddressSummary(TranslatedSource != ''){PrimaryName, PrimaryRange, Zip, Source := TranslatedSource};
-PhoneSummary.TranslatedAddressSources: => MyDateFirstSeen_pre := IsBlank(DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE);
-PhoneSummary.TranslatedAddressSources: => MyDateLastSeen_pre := IF(DATETOSTRING(Source:DateLastSeen,'%Y%m%d'):Null OR DATETOSTRING(Source:DateLastSeen,'%Y%m%d') = '', PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, DATETOSTRING(MIN(Source:DateLastSeen,PhoneSummary.CURRENT_DATE),'%Y%m%d'));
-PhoneSummary.TranslatedAddressSources: => MyDateFirstSeen := IF(MyDateFirstSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateLastSeen_pre,MyDateFirstSeen_pre);
-PhoneSummary.TranslatedAddressSources: => MyDateLastSeen := IF(MyDateLastSeen_pre = PhoneSummary.RECS_AVAIL_BUT_CANNOT_CALCULATE, MyDateFirstSeen_pre,MyDateLastSeen_pre);
-PhoneSummary: => SortedAddressTranslatedSourceList := TOPN(TranslatedAddressSources(PrimaryName=PhoneSummary.P_InpClnAddrPrimName AND PrimaryRange=PhoneSummary.P_InpClnAddrPrimRng AND Zip=P_InpClnAddrZip5), 99999, MyDateFirstSeen, Source){Source,MyDateFirstSeen,MyDateLastSeen};
-
-
-//Actual date of birth attributes for phone summary
-
-PhoneSummary: => SrcWInpPDListNoDate := NOT EXISTS(TranslatedDOBSources(DATETOSTRING(DateOfBirth,'%Y%m%d') = PhoneSummary.P_InpClnDOB){Source});
-
-PhoneSummary: => PI_SrcWInpPDListEv := MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				SrcWInpPDListNoDate => NO_DATA_FOUND,
-																				CONCAT(SortedDOBTranslatedSourceList, Source,'|'));
-
-PhoneSummary: => PI_SrcWInpPDEmrgDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				SrcWInpPDListNoDate => NO_DATA_FOUND,
-																				CONCAT(SortedDOBTranslatedSourceList,MyDateFirstSeen ,'|'));
-
-PhoneSummary: => PI_SrcWInpPDLastDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				SrcWInpPDListNoDate => NO_DATA_FOUND,
-																				CONCAT(SortedDOBTranslatedSourceList,MyDateLastSeen ,'|'));
-//Actual last name attributes for phone summary
-PhoneSummary: => SrcWInpLPListNoDate := NOT EXISTS(TranslatedLastNameSources(LastName = PhoneSummary.P_InpClnNameLast){Source});
-
-PhoneSummary: => PI_SrcWInpLPListEv := MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				SrcWInpLPListNoDate => NO_DATA_FOUND,
-																				CONCAT(SortedLastNameTranslatedSourceList, Source,'|'));
-
-PhoneSummary: => PI_SrcWInpLPEmrgDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				SrcWInpLPListNoDate => NO_DATA_FOUND,
-																				CONCAT(SortedLastNameTranslatedSourceList,MyDateFirstSeen ,'|'));
-
-PhoneSummary: => PI_SrcWInpLPLastDtListEv :=MAP( P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				SrcWInpLPListNoDate => NO_DATA_FOUND,
-																				CONCAT(SortedLastNameTranslatedSourceList,MyDateLastSeen ,'|'));																				
-//Actual address attributes for phone summary
-
-PhoneSummary: => SrcWInpAPListNoData := NOT EXISTS(TranslatedAddressSources(PrimaryName=PhoneSummary.P_InpClnAddrPrimName,PrimaryRange=PhoneSummary.P_InpClnAddrPrimRng, Zip=P_InpClnAddrZip5){Source});
-PhoneSummary: => PI_SrcWInpAPListEv := MAP(	P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				SrcWInpAPListNoData => NO_DATA_FOUND,
-																				CONCAT(SortedAddressTranslatedSourceList, Source, '|'));
-
-PhoneSummary: => PI_SrcWInpAPEmrgDtListEv := MAP(	P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				SrcWInpAPListNoData => NO_DATA_FOUND,
-																				CONCAT(SortedAddressTranslatedSourceList, MyDateFirstSeen, '|'));
-
-PhoneSummary: => PI_SrcWInpAPLastDtListEv := MAP(	P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				SrcWInpAPListNoData => NO_DATA_FOUND,
-																				CONCAT(SortedAddressTranslatedSourceList, MyDateLastSeen, '|'));
-
-
-//Address Summary Attributes 
-
-AddressSummary: => PII :=ONLY(InputPII);
-AddressSummary: => P_InpClnNameFirst :=PII.InputFirstNameCleanValue;
-AddressSummary: => P_InpClnNameLast :=PII.InputLastNameCleanValue;
-AddressSummary: => P_InpClnAddrPrimName :=PII.InputPrimaryNameCleanValue;
-AddressSummary: => P_InpClnAddrPrimRng :=PII.InputPrimaryRangeCleanValue;
-AddressSummary: => P_InpClnAddrZip5 :=PII.InputZip5CleanValue;
-AddressSummary: => P_InpClnDOB :=PII.InputDOBCleanValue;
-																					 
-// Name Sources take from the submodel NameSource																					 
-AddressSummary.NameSummary: => TranslatedSourceCode := ConsumerSourceGroup(NameSource);
-AddressSummary: => TranslatedSources := NameSummary(TranslatedSourceCode != ''){NameFirstName, NameLastName, TranslatedSourceCode};
-
-AddressSummary: => AddressSummarySourceList := TranslatedSources{
-											FirstName := NameFirstName,
-											LastName := NameLastName,
-											TranslatedSourceCode ,
-											SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
-											SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-
-// Match the input FirstName and LastName and Sorting by earliest associated date
-AddressSummary: => AddressSummarySourceListSorted := TOPN(AddressSummarySourceList(FirstName= AddressSummary.P_InpClnNameFirst AND LastName = AddressSummary.P_InpClnNameLast), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
-
-AddressSummary: => SrcWInpFLAListNoData := NOT EXISTS(AddressSummarySourceListSorted);
-
-AddressSummary: => PI_SrcWInpFLAListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
-																								OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
-																								OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				  SrcWInpFLAListNoData =>NO_DATA_FOUND,
-																				  CONCAT(AddressSummarySourceListSorted,TranslatedSourceCode,'|'));
- 
-AddressSummary: => PI_SrcWInpFLAEmrgDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
-																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
-																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																								SrcWInpFLAListNoData =>NO_DATA_FOUND,
-																								CONCAT(AddressSummarySourceListSorted,SourceDateFirstSeen,'|'));
-		
-AddressSummary: => PI_SrcWInpFLALastDtListEv := MAP(P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] 
-																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
-																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																								SrcWInpFLAListNoData =>NO_DATA_FOUND,
-																								CONCAT(AddressSummarySourceListSorted,SourceDateLastSeen,'|'));	
-                                                                                                                    
-AddressSummary.DateOfBirthSummary: => DOBTranslatedSourceCode := ConsumerSourceGroup(DobSource);
-AddressSummary: => DOBTranslatedSources := DateOfBirthSummary(DOBTranslatedSourceCode != ''){DobDateOfBirth, DOBTranslatedSourceCode};
-
-AddressSummary: => DOBSourceList := DOBTranslatedSources{
-											DateOfBirth := DobDateOfBirth,
-											DOBTranslatedSourceCode := DOBTranslatedSourceCode,
-											SourceDateFirstSeen := IF(ISVALIDDATE(DOBTranslatedSourceCode:DateFirstSeen), DATETOSTRING(DOBTranslatedSourceCode:DateFirstSeen, '%Y%m%d'), NO_DATA_FOUND_97),
-											SourceDateLastSeen :=  IF(ISVALIDDATE(DOBTranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(DOBTranslatedSourceCode:DateLastSeen, AddressSummary.CURRENT_DATE_PII), '%Y%m%d'), NO_DATA_FOUND_97)};
-
-// Match the input DOB and Sorting by earliest associated date
-AddressSummary: => DOBSourceListSorted := TOPN(DOBSourceList(DATETOSTRING(DateOfBirth,'%Y%m%d') = AddressSummary.P_InpClnDOB), 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), DOBTranslatedSourceCode);
-
-AddressSummary: => SrcWInpADListNoData := NOT EXISTS(DOBSourceListSorted);
-
-AddressSummary: => PI_SrcWInpADListEv := MAP(P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
-																								OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
-																								OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																				      SrcWInpADListNoData =>NO_DATA_FOUND,
-																				      CONCAT(DOBSourceListSorted,DOBTranslatedSourceCode,'|'));
- 
-AddressSummary: => PI_SrcWInpADEmrgDtListEv := MAP(P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
-																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
-																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																									SrcWInpADListNoData => NO_DATA_FOUND,
-																									CONCAT(DOBSourceListSorted,SourceDateFirstSeen,'|'));
-		
-AddressSummary: => PI_SrcWInpADLastDtListEv := MAP(P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
-																										OR P_InpClnAddrPrimName IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA,NO_DATA_FOUND]
-																										OR P_InpClnAddrZip5 IN [MISSING_INPUT_DATA,NO_DATA_FOUND] =>MISSING_INPUT_DATA,
-																									SrcWInpADListNoData => NO_DATA_FOUND,
-																									CONCAT(DOBSourceListSorted,SourceDateLastSeen,'|'));								
 
 // Property is considered Ever Owned if there is a PersonPropertyEvent record on file for the Person marked as PartyIsBuyerOrOwner or PartyIsSeller.
 // Since a Property or PropertyEvent can be tied to multiple people/businesses, we need to specifically check that the record we are grabbing data from is tied to this Person.
