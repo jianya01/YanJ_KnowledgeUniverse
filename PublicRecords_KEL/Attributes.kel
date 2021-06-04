@@ -9857,7 +9857,9 @@ Person: => AccidentRecsFormatted := AccidentRecs{
 Person: => AccidentRecsFormattedDedup := Sequence.Dedup(AccidentRecsFormatted, LEFT.DateOfAccident = RIGHT.DateOfAccident, DateOfAccident, -EstimatedVehicleDamage);
 
 Person: => AccidentRecsSorted := TOPN(AccidentRecsFormattedDedup, 999, DateOfAccident = PersonAccident.NO_DATA_FOUND_97, DateOfAccident);
-Person: => LatestAccWithAmount := ONLY(TOPN(AccidentRecsSorted(EstimatedVehicleDamage <> PersonAccident.NO_DATA_FOUND_97), 1, -FormattedDate));																		
+Person: => AllAccWithAmountFull := TOPN(AccidentRecsSorted(EstimatedVehicleDamage <> PersonAccident.NO_DATA_FOUND_97), 999, -FormattedDate);		
+															
+Person: => LatestAccWithAmount := ONLY(TOPN(AllAccWithAmountFull, 1, -FormattedDate));																		
 Person: => AccidentsCountTotal := COUNT(AccidentRecsSorted);
 Person: => AccidentsCount1Y := COUNT(AccidentRecsSorted(AccidentAgeInDays <= PersonAccident.ONE_YEAR_IN_DAYS AND NOT AccidentAgeInDays:Null));
 
@@ -9866,44 +9868,51 @@ Person: => AccidentsCount1Y := COUNT(AccidentRecsSorted(AccidentAgeInDays <= Per
 /*              Person Accident Attributes                         				*/
 /*                                                                        */
 /**************************************************************************/
+Person: => AccentCountCap := BOUNDSFOLD(AccidentsCountTotal,0,999);
+
 
 Person: => PL_AccCntEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA_INT,
-															BOUNDSFOLD(AccidentsCountTotal,0,999));
+															AccentCountCap);
 
 Person: => PL_AccFlagEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
-															 PL_AccCntEv = 0 => '0',
-															 PL_AccCntEv > 0 => '1');															
+															 AccentCountCap = 0 => '0',
+															 AccentCountCap > 0 => '1');															
 
 Person: => PL_AccDtListEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
-																 PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND,
-																 CONCAT(AccidentRecsSorted, DateOfAccident, '|'));															 
+																 AccentCountCap = 0 => PersonAccident.NO_DATA_FOUND,
+																 CONCAT(AccidentRecsSorted, DateOfAccident, '|'));				
+																 
 Person: => AccNewDt := DATETOSTRING(MAX(AccidentRecsSorted(DateOfAccident <> PersonAccident.NO_DATA_FOUND_97), DATE(DateOfAccident)),'%Y%m%d' );
+
+Person: => AccNoDates := (AccentCountCap > 0 AND ALL(AccidentRecsSorted, DateOfAccident = PersonAccident.NO_DATA_FOUND_97));
+Person: => AccNoDamage := (AccentCountCap > 0 AND ALL(AccidentRecsSorted, EstimatedVehicleDamage = PersonAccident.NO_DATA_FOUND_97));
+
 Person: => PL_AccNewDtEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
-																PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND,
-																PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, DateOfAccident = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97,
+																AccentCountCap = 0 => PersonAccident.NO_DATA_FOUND,
+																AccNoDates => PersonAccident.NO_DATA_FOUND_97,
 																AccNewDt);
 
 Person: => PL_AccNewMsncEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
-																	PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND,
-																	PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, DateOfAccident = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97,
+																	AccentCountCap = 0 => PersonAccident.NO_DATA_FOUND,
+																	AccNoDates => PersonAccident.NO_DATA_FOUND_97,
 																	BOUNDSFOLD(MONTHSBETWEEN(DATE(AccNewDt),PersonAccident.CURRENT_DATE),0,999));
 
 Person: => PL_AccDmgAmtListEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
-																		 PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND,
+																		 AccentCountCap = 0 => PersonAccident.NO_DATA_FOUND,
 																		 CONCAT(AccidentRecsSorted, EstimatedVehicleDamage, '|'));
 
 Person: => PL_AccDmgTotEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA_INT,
-																 PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND_INT,
-																 PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, EstimatedVehicleDamage = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97_INT,
-																 BOUNDSFOLD(SUM(AccidentRecsSorted(EstimatedVehicleDamage <> PersonAccident.NO_DATA_FOUND_97), INTEGER(EstimatedVehicleDamage)),0,999999999));
+																 AccentCountCap = 0 => PersonAccident.NO_DATA_FOUND_INT,
+																 AccNoDamage => PersonAccident.NO_DATA_FOUND_97_INT,
+																 BOUNDSFOLD(SUM(AllAccWithAmountFull, INTEGER(EstimatedVehicleDamage)),0,999999999));
 
 Person: => PL_AccNewDmgAmtEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA_INT,
-																		PL_AccCntEv = 0 => PersonAccident.NO_DATA_FOUND_INT,
-																		PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, EstimatedVehicleDamage = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97_INT,
+																		AccentCountCap = 0 => PersonAccident.NO_DATA_FOUND_INT,
+																		AccNoDamage => PersonAccident.NO_DATA_FOUND_97_INT,
 																		BOUNDSFOLD(INTEGER(LatestAccWithAmount.EstimatedVehicleDamage),0,999999999));														 
 
 Person: => PL_AccCnt1Y := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA_INT,
-															PL_AccCntEv > 0 AND ALL(AccidentRecsSorted, DateOfAccident = PersonAccident.NO_DATA_FOUND_97) => PersonAccident.NO_DATA_FOUND_97_INT,
+															AccNoDates => PersonAccident.NO_DATA_FOUND_97_INT,
 															BOUNDSFOLD(AccidentsCount1Y,0,999));
 								
 /**************************************************************************/
