@@ -11576,6 +11576,42 @@ InputPII: => PI_InpAddrSubjOwnedTaxValYr := MAP(P_LexID = MISSING_INPUT_DATA_INT
 			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
 			AssesdValueYear = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
 			YEAR(DATE(AssesdValueYear)));
+
+			
+Person: => BestPropertyrecord := ONLY(CurrAddrProp, BestMostRecentPropertyEvent);
+Person: => BestPropertyPurchaserecord := ONLY(CurrAddrPropPurchase, BestMostRecentPropertyEventPurchase);
+Person: => CurrAddressIsOwnedSubjectFlag := 
+		EXISTS(CurrAddrHelperAttribute.AddressProperty.Prop.PropertyEvent(UID = Person.BestPropertyrecord AND EXISTS(PersonPropertyEvent(Subject.UID = Person.UID AND PartyDetails.PartyIsBuyerOrOwner)))) OR EXISTS(CurrAddrHelperAttribute.AddressProperty.Prop.PropertyEvent(UID = Person.BestPropertyPurchaserecord AND EXISTS(PersonPropertyEvent(Subject.UID = Person.UID AND PartyDetails.PartyIsBuyerOrOwner))));
+		
+Person: => PL_CurrAddrSubjOwnedFlag := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+		NOT (CurrAddrPropertyPurchaseRecord OR CurrAddrPropertyRecord) => NO_DATA_FOUND,
+		NOT CurrAddressIsOwnedSubjectFlag => '0',
+		CurrAddressIsOwnedSubjectFlag => '1');
+Person: => PL_CurrAddrSubjOwnedPurchDt := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
+		ValidPropertyPurchaseDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+		ValidPropertyPurchaseDt);
+Person: => PL_CurrAddrSubjOwnedPurchMsnc := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PL_CurrAddrSubjOwnedPurchDt  = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt), Property.CURRENT_DATE));
+Person: => PL_CurrAddrSubjOwnedPurchAmt := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PropertyModSalePrice = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT, 
+		BOUNDSFOLD(PropertyModSalePrice, 0, 9999999));
+Person: => PL_CurrAddrSubjOwnedMktVal := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PropertyModMarketValue = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PropertyModMarketValue, 0, 9999999));
+Person: => PL_CurrAddrSubjOwnedTaxVal := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PropertyModAssesdValue = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PropertyModAssesdValue, 0, 9999999));
+Person: => PL_CurrAddrSubjOwnedTaxValYr := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
+		PropertyTaxValYr = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+			YEAR(DATE(PropertyTaxValYr)));
+
 /**************************************************************************/
 /*                                                                        */
 /*     Innovis Attributes														                      */
@@ -11625,3 +11661,4 @@ Person: => PL_TradeAutoSatCnt1Y := MAP(P_LexIDSeenFlagFCRA = '0' => MISSING_INPU
 																							 PL_TradeBureauFlag < 1  OR PL_TradeAutoCntEv < 1 => NO_DATA_FOUND_INT,
 																							 InnovisData.in_TradeAutoSatCnt1Y < 0 OR InnovisData.in_TradeAutoSatCnt1Y:Null => NO_DATA_FOUND_97_INT,
 																							 InnovisData.in_TradeAutoSatCnt1Y);
+
