@@ -1120,69 +1120,11 @@ InputPII: => P_InpClnIPAddr :=
 
 /**************************************************************************/
 /*                                                                        */
-/*              Input PII address AVM Helper Attributes                   */
+/*                      Input Address Characteristics                     */
 /*                                                                        */
 /**************************************************************************/
-Property.AutomatedValuationModel: =>AVMValueDate :=AVMAutomatedValuation:DateFirstSeen;
-Property.AutomatedValuationModel: =>AVMYears :=ABSYEARSBETWEEN(AVMValueDate,Property.CURRENT_DATE);
-InputPII: => InputAddressPropertySet := TOPN(Prop.AutomatedValuationModel(AVMYears<=1)
-                                                {
-																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
-InputPII: => InputAddressPropertySet1Y := TOPN(Prop.AutomatedValuationModel(AVMYears>=1 AND AVMYears<2)
-                                                {
-																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
-InputPII: => InputAddressPropertySet5Y := TOPN(Prop.AutomatedValuationModel(AVMYears>=5 AND AVMYears<6)
-                                                {
-																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);																								
-InputPII: => InputAddressOnAVM := EXISTS(InputAddressPropertySet);
-InputPII: => InputAddressPropertyCnt := COUNT(InputAddressPropertySet);
-InputPII: => InputAddressPropertyCnt1Y := COUNT(InputAddressPropertySet1Y);
-InputPII: => InputAddressPropertyCnt5Y := COUNT(InputAddressPropertySet5Y);
-InputPII: =>AVMValueUnCap :=ONLY(InputAddressPropertySet,AVMAutomatedValuation);
-InputPII: =>AVMValue1YUnCap :=ONLY(InputAddressPropertySet1Y,AVMAutomatedValuation);
-InputPII: =>AVMValue5YUnCap :=ONLY(InputAddressPropertySet5Y,AVMAutomatedValuation);
 
-/**************************************************************************/
-/*                                                                        */
-/*              Input PII address AVM Attributes	                        */
-/*                                                                        */
-/**************************************************************************/
-InputPII: => PI_InpAddrAVMVal := MAP(
-		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-		InputAddressPropertyCnt = 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-		BOUNDSFOLD(AVMValueUnCap,0,999999999));
-InputPII: => PI_InpAddrAVMValA1Y := MAP(
-		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT, 
-		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-		InputAddressPropertyCnt1Y =0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-		BOUNDSFOLD(AVMValue1YUnCap,0,999999999));
-InputPII: => PI_InpAddrAVMRatio1Y := MAP(
-		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMVal <= 0 OR PI_InpAddrAVMValA1Y = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMValA1Y <= 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-		MIN(ROUND(AVMValueUnCap/AVMValue1YUnCap,2),99.99));
-InputPII: => PI_InpAddrAVMValA5Y := MAP(
-		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-		InputAddressPropertyCnt5Y =0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-		BOUNDSFOLD(AVMValue5YUnCap,0,999999999));
-InputPII: => PI_InpAddrAVMRatio5Y := MAP(
-		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMVal <= 0 OR PI_InpAddrAVMValA5Y = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMValA5Y <= 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-		MIN(ROUND(AVMValueUnCap/AVMValue5YUnCap,2),99.99));
-InputPII: => PI_InpAddrAVMConfScore := MAP(
-		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
-		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-		BOUNDSFOLD(ONLY(InputAddressPropertySet,AVMConfidenceScore),0,100));
-
-/**************************************************************************/
-/*                                                                        */
-/*              Input PII Address Flag Helper Attributes                  */
-/*                                                                        */
-/**************************************************************************/
+//Input PII Address Flag Helper Attributes
 
 Address: => BestchildAdvo := TOPN(ADVOSummary, 1, -ADVODateFirstSeen);
 Address: => VacantFlag := ONLY(BestchildAdvo, VacancyIndicator);
@@ -1197,11 +1139,7 @@ Address: => OnlyGMFlag := ONLY(BestchildAdvo, OnlyWayToGetMailIndicator);
 InputPII: => InputAddronfile := EXISTS(Location.DataSources);
 InputPII: => IsPostalSource :=EXISTS(Location.DataSources(Source ='VL')); 
 
-/**************************************************************************/
-/*                                                                        */
-/*              Input PII Address Flag  Attributes                        */
-/*                                                                        */
-/**************************************************************************/
+//Input PII Address Flag  Attributes
 
 InputPII: => PI_InpAddrOnFileFlagEv := MAP(P_InpClnAddrFullFlagValue = MISSING_INPUT_DATA OR P_InpClnAddrFullFlagValue='0' => MISSING_INPUT_DATA_INT, 
 		InputAddronfile => 1,0);
@@ -1268,6 +1206,23 @@ InputPII: => PI_InpAddrOWGMFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DAT
 		Location.OnlyGMFlag = 'N'	=>0,
 		Location.OnlyGMFlag = 'Y'	=>1,
 		RECS_AVAIL_BUT_CANNOT_CALCULATE_INT);
+
+InputPII: => PI_InpAddrUniqMailDlvryFlag := MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND,
+		PI_InpAddrIsThrowbackFlag = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT AND 
+			PI_InpAddrSeasonalType = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT AND
+			PI_InpAddrIsDNDFlag = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT AND
+			PI_InpAddrIsCMRAFlag = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT AND
+			PI_InpAddrIsSimpAddrFlag = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT AND
+			PI_InpAddrIsDropDeliveryFlag = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+		PI_InpAddrIsThrowbackFlag = 0 AND 
+			PI_InpAddrSeasonalType = 0 AND
+			PI_InpAddrIsDNDFlag = 0 AND
+			PI_InpAddrIsCMRAFlag = 0 AND
+			PI_InpAddrIsSimpAddrFlag = 0 AND
+			PI_InpAddrIsDropDeliveryFlag = 0 => '0',
+			'1');
+
 InputPII: => PI_InpAddrMailDlvryIndx	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
 		PI_InpAddrIsSimpAddrFlag = 1 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
@@ -1284,11 +1239,227 @@ InputPII: => InpAddrIsMultiUnit := InputAddressTypeCleanValue  IN ['H','HD'] OR 
 
 InputPII: => PI_InpAddrIsMultiUnitFlag :=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 				InpAddrIsMultiUnit=> 1,0);
-		
-		
+
 InputPII: => PI_InpAddrIsAptFlag	:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
 		NOT IsPostalSource OR PI_InpAddrOnFileFlagEv =0 => NO_DATA_FOUND_INT,
 		InpAddrIsBusinessFlag_A_C AND InpAddrIsMultiUnit =>1,0);
+
+//Input PII address AVM Helper Attributes
+
+Property.AutomatedValuationModel: =>AVMValueDate :=AVMAutomatedValuation:DateFirstSeen;
+Property.AutomatedValuationModel: =>AVMYears :=ABSYEARSBETWEEN(AVMValueDate,Property.CURRENT_DATE);
+InputPII: => InputAddressPropertySet := TOPN(Prop.AutomatedValuationModel(AVMYears<=1)
+                                                {
+																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
+InputPII: => InputAddressPropertySet1Y := TOPN(Prop.AutomatedValuationModel(AVMYears>=1 AND AVMYears<2)
+                                                {
+																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
+InputPII: => InputAddressPropertySet5Y := TOPN(Prop.AutomatedValuationModel(AVMYears>=5 AND AVMYears<6)
+                                                {
+																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);																								
+InputPII: => InputAddressOnAVM := EXISTS(InputAddressPropertySet);
+InputPII: => InputAddressPropertyCnt := COUNT(InputAddressPropertySet);
+InputPII: => InputAddressPropertyCnt1Y := COUNT(InputAddressPropertySet1Y);
+InputPII: => InputAddressPropertyCnt5Y := COUNT(InputAddressPropertySet5Y);
+InputPII: =>AVMValueUnCap :=ONLY(InputAddressPropertySet,AVMAutomatedValuation);
+InputPII: =>AVMValue1YUnCap :=ONLY(InputAddressPropertySet1Y,AVMAutomatedValuation);
+InputPII: =>AVMValue5YUnCap :=ONLY(InputAddressPropertySet5Y,AVMAutomatedValuation);
+
+//Input PII address AVM Attributes
+
+InputPII: => PI_InpAddrAVMVal := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		InputAddressPropertyCnt = 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(AVMValueUnCap,0,999999999));
+InputPII: => PI_InpAddrAVMValA1Y := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT, 
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		InputAddressPropertyCnt1Y =0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(AVMValue1YUnCap,0,999999999));
+InputPII: => PI_InpAddrAVMRatio1Y := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMVal <= 0 OR PI_InpAddrAVMValA1Y = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMValA1Y <= 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		MIN(ROUND(AVMValueUnCap/AVMValue1YUnCap,2),99.99));
+InputPII: => PI_InpAddrAVMValA5Y := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		InputAddressPropertyCnt5Y =0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(AVMValue5YUnCap,0,999999999));
+InputPII: => PI_InpAddrAVMRatio5Y := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMVal <= 0 OR PI_InpAddrAVMValA5Y = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrAVMValA5Y <= 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		MIN(ROUND(AVMValueUnCap/AVMValue5YUnCap,2),99.99));
+InputPII: => PI_InpAddrAVMConfScore := MAP(
+		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
+		NOT InputAddressOnAVM => NO_DATA_FOUND_INT,
+		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(ONLY(InputAddressPropertySet,AVMConfidenceScore),0,100));
+
+//KS-4390
+
+InputPII: => BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsDeed OR IsAssessment),1,-DtFirstSeen));
+InputPII: => BestMostRecentPropertyEventPurchase:=ONLY(TOPN(Prop.PropertyEvent(IsDeed AND PropertyPurchaseRecord),1 ,-DtFirstSeen));
+InputPII: => ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEvent.MarketTotalValue);
+InputPII: => ModAssesdValue:=IF(BestMostRecentPropertyEvent.AssessedTotalValue:Null OR BestMostRecentPropertyEvent.AssessedTotalValue='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEvent.AssessedTotalValue);
+InputPII: => AssesdValueYear:=IF(ISVALIDDATE(BestMostRecentPropertyEvent.AssessedValueYear),DATETOSTRING(BestMostRecentPropertyEvent.AssessedValueYear,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE);
+InputPII: => ModSalePrice:=IF(BestMostRecentPropertyEventPurchase.SalePrice:Null OR BestMostRecentPropertyEventPurchase.SalePrice='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEventPurchase.SalePrice);
+InputPII: => InpAddrPropertyPurchaseRecord:=EXISTS(BestMostRecentPropertyEventPurchase);
+InputPII: => InpAddrPropertyRecord:=EXISTS(BestMostRecentPropertyEvent);
+InputPII: => PurchaseDt:=BestMostRecentPropertyEventPurchase.DtFirstSeen;
+InputPII: => ValidPropertyPurchaseDt:=IF(ISVALIDDATE(PurchaseDt),DATETOSTRING(PurchaseDt,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE);
+
+InputPII: => PI_InpAddrPurchDt:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND,
+			ValidPropertyPurchaseDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+			ValidPropertyPurchaseDt);
+InputPII: => PI_InpAddrPurchMsnc:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND_INT,
+			PI_InpAddrPurchDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt),Property.CURRENT_DATE));
+InputPII: => PI_InpAddrPurchAmt:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND_INT,
+			ModSalePrice = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT, 
+			BOUNDSFOLD(ModSalePrice,0,9999999));
+InputPII: => PI_InpAddrMktVal:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND_INT,
+			ModMarketValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			BOUNDSFOLD(ModMarketValue,0,9999999));
+InputPII: => PI_InpAddrTaxVal:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND_INT,
+			ModAssesdValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			BOUNDSFOLD(ModAssesdValue,0,9999999));
+InputPII: => PI_InpAddrTaxValYr:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND,
+			AssesdValueYear = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+			YEAR(DATE(AssesdValueYear)));
+
+//KS-4736
+
+InputPII: => InpAddressIsOwnedSubjectFlag := 
+		EXISTS(Prop.PropertyEvent(UID = InputPII.BestMostRecentPropertyEvent AND EXISTS(PersonPropertyEvent(Subject.UID = InputPII.P_LexID AND PartyDetails.PartyIsBuyerOrOwner)))) OR EXISTS(Prop.PropertyEvent(UID = InputPII.BestMostRecentPropertyEventPurchase AND EXISTS(PersonPropertyEvent(Subject.UID = InputPII.P_LexID AND PartyDetails.PartyIsBuyerOrOwner))));
+InputPII: => PI_InpAddrSubjOwnedFlag := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+			NOT (InpAddrPropertyPurchaseRecord OR InpAddrPropertyRecord) => NO_DATA_FOUND,
+			NOT InpAddressIsOwnedSubjectFlag => '0',
+			InpAddressIsOwnedSubjectFlag => '1');
+InputPII: => PI_InpAddrSubjOwnedPurchDt := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
+			ValidPropertyPurchaseDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+			ValidPropertyPurchaseDt);
+InputPII: => PI_InpAddrSubjOwnedPurchMsnc := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+			PI_InpAddrSubjOwnedPurchDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt), Property.CURRENT_DATE));
+InputPII: => PI_InpAddrSubjOwnedPurchAmt := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+			ModSalePrice = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT, 
+			BOUNDSFOLD(ModSalePrice, 0, 9999999));
+InputPII: => PI_InpAddrSubjOwnedMktVal := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,			
+			ModMarketValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			BOUNDSFOLD(ModMarketValue, 0, 9999999));
+InputPII: => PI_InpAddrSubjOwnedTaxVal := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+			ModAssesdValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			BOUNDSFOLD(ModAssesdValue, 0, 9999999));
+InputPII: => PI_InpAddrSubjOwnedTaxValYr := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
+			AssesdValueYear = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+			YEAR(DATE(AssesdValueYear)));
+
+//KS-3397
+
+InputPII: => PI_InpAddrNamePropMatchIndx := MAP(PI_InpAddrOnFileFlagEv != '1' => MISSING_INPUT_DATA_INT,
+                                                Location:Null OR Prop:Null => NO_DATA_FOUND_INT,
+                                                NOT EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND (FirstName != '' OR LastName != '')){FirstName, LastName}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+                                                EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 3,
+                                                EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 2,
+                                                EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))))) => 1,
+                                                0);
+InputPII: => PI_InpAddrFamilyOwnedFlag := MAP(PI_InpAddrOnFileFlagEv != '1' => MISSING_INPUT_DATA_INT,
+																								Location:Null OR Prop:Null => NO_DATA_FOUND_INT,
+																								PI_InpAddrNamePropMatchIndx = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+																								PI_InpAddrNamePropMatchIndx IN [0,1,3] => 0,
+																								PI_InpAddrNamePropMatchIndx = 2 => 1);
+
+//KS-6100
+
+InputPII: => AddressRecords := Location.DataSources(HeaderHitFlag)
+  {HeaderHitFlag,
+	AddressDateFirstSeen := IF(ISVALIDDATE(HeaderHitFlag:DateFirstSeen), DATETOSTRING(HeaderHitFlag:DateFirstSeen, '%Y%m01'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE),
+	AddressDateLastSeen :=  IF(ISVALIDDATE(HeaderHitFlag:DateLastSeen), DATETOSTRING(MIN(HeaderHitFlag:DateLastSeen, Person.CURRENT_DATE), '%Y%m01'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)};
+
+InputPII: => InpAddressDateFirstSeen := ONLY(AddressRecords, AddressDateFirstSeen);
+InputPII: => InpAddressDateLastSeen := ONLY(AddressRecords, AddressDateLastSeen);
+
+InputPII: => InputAddressMatchesCurrentAddress := P_InpClnAddrPrimRng = Subject.CurrentAddrPrimRng AND P_InpClnAddrPrimName = Subject.CurrentAddrPrimName AND P_InpClnAddrZip5 = Subject.CurrentAddrZip5;
+InputPII: => InputAddressMatchesAddressHierarchyAddress := EXISTS(Subject.AddressHierarchySet(InputPII.P_InpClnAddrPrimRng = PrimaryRange AND InputPII.P_InpClnAddrPrimName = PrimaryName AND InputPII.P_InpClnAddrZip5 = ZIP5));
+
+InputPII: => PI_InpAddrOldDt := MAP(
+		PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND,
+		NOT EXISTS(AddressRecords) => NO_DATA_FOUND,
+		InpAddressDateFirstSeen);
+
+InputPII: => PI_InpAddrNewDt := MAP(
+		PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND,
+		NOT EXISTS(AddressRecords) => NO_DATA_FOUND,
+		InpAddressDateLastSeen);
+
+InputPII: => PI_InpAddrSubjFlag := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND_INT,
+		NOT InputAddressMatchesAddressHierarchyAddress => NO_DATA_FOUND_INT,
+		InputAddressMatchesCurrentAddress => 1,
+		0);
+
+InputPII: => PI_InpAddrSubjOldDt := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND,
+		NOT ISVALIDDATE(Subject.CurrentAddrDateFirstSeen) OR Subject.CurrentAddrDateFirstSeen:Null => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE,
+		DATETOSTRING(Subject.CurrentAddrDateFirstSeen,'%Y%m01'));
+
+InputPII: => PI_InpAddrSubjNewDt := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND,
+		NOT ISVALIDDATE(Subject.CurrentAddrDateLastSeen) OR Subject.CurrentAddrDateLastSeen:Null => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE,
+		DATETOSTRING(Subject.CurrentAddrDateLastSeen,'%Y%m01'));
+
+InputPII: => PI_InpAddrSubjOldMsnc := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND_INT,
+		PI_InpAddrSubjOldDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PI_InpAddrSubjOldDt, '%Y%m%d'), Person.CURRENT_DATE),0,960)); 
+
+InputPII: => PI_InpAddrSubjNewMsnc := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND_INT,
+		PI_InpAddrSubjNewDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PI_InpAddrSubjNewDt, '%Y%m%d'), Person.CURRENT_DATE),0,960)); 
+
+InputPII: => PI_InpAddrSubjResSpan := MAP(
+		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND_INT,
+		PI_InpAddrSubjOldDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE OR PI_InpAddrSubjNewDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PI_InpAddrSubjOldDt, '%Y%m%d'), FROMSTRINGTODATE(PI_InpAddrSubjNewDt, '%Y%m%d')),0,960)); 
+
+InputPII: => PI_InpClnAddrTypeIndx := MAP(
+		InputFullAddressCleanValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		InputAddressTypeCleanValue = NO_DATA_FOUND => NO_DATA_FOUND,
+		InputAddressTypeCleanValue = 'F' => '1',
+		InputAddressTypeCleanValue IN ['P','G'] => '2',
+		InputAddressTypeCleanValue IN ['R','RD','S','SD','H','HD','UD'] => '3',
+		InputAddressTypeCleanValue = 'M' => '4');
+
+/**************************************************************************/
+/*                                                                        */
+/*                                CFPB Race                               */
+/*                                                                        */
+/**************************************************************************/
+
 //KS-1170
 GeoLink: => GivenWhite := ONLY(TOPN(BlockGroup, 1, -HereGivenWhite:Archive_Date, -HereGivenWhite), HereGivenWhite);
 GeoLink: => GivenBlack := ONLY(TOPN(BlockGroup, 1, -HereGivenBlack:Archive_Date, -HereGivenBlack), HereGivenBlack);
@@ -1375,6 +1546,12 @@ InputPII: => PI_CFPBRaceProbType := MAP(P_InpClnNameLastFlagValue != '1' OR P_In
 		PI_CFPBRaceIsAsianPIProb >= 80.00 =>'ASIAN OR PACIFIC ISLANDER', 
 		PI_CFPBRaceIsMultiRaceProb >= 80.00 =>'MULTIRACIAL',RECS_AVAIL_BUT_CANNOT_CALCULATE));
 
+/**************************************************************************/
+/*                                                                        */
+/*                        Input PII Characteristics                       */
+/*                                                                        */
+/**************************************************************************/
+
 //KS-1192
 InputPII: =>PI_InpDOBAge := MAP(P_InpClnDOBFlagValue <>1 => MISSING_INPUT_DATA_INT,
 																BOUNDSFOLD(YEARSBETWEEN(P_InpClnDOB,FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')),0,120));
@@ -1437,150 +1614,6 @@ InputPII: => PI_InpAddrIsMilitaryFlag := MAP(P_InpClnAddrFullFlagValue != '1' AN
 		InputAddressTypeCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] AND (InputZip5CleanValue = NO_DATA_FOUND OR ALL(AddressZipHelperInput, ZipClass = '' OR ZipClass:Null)) => NO_DATA_FOUND, 
 		InputAddressTypeCleanValue = 'M' OR AddressZipHelperInput.ZipClass = 'M' => '1', 
 		'0');
-//KS3379
-PersonAddress: => PreviousPerfectAddressMatch := 
-	IsNullOrEqual(TRIMBOTH(PrimaryRange), TRIMBOTH(Subject.PII.PreviousAddrPrimRng)) AND  
-	IsNullOrEqual(TRIMBOTH(Predirectional), TRIMBOTH(Subject.PII.PreviousAddrPreDir)) AND
-	IsNullOrEqual(TRIMBOTH(PrimaryName), TRIMBOTH(Subject.PII.PreviousAddrPrimName)) AND
-	IsNullOrEqual(TRIMBOTH(Suffix), TRIMBOTH(Subject.PII.PreviousAddrSffx)) AND
-	IsNullOrEqual(TRIMBOTH(Postdirectional), TRIMBOTH(Subject.PII.PreviousAddrPostDir)) AND
-	IsNullOrEqual(TRIMBOTH(INTFORMAT(ZIP5,5,1)), TRIMBOTH(Subject.PII.PreviousAddrZip5)) AND
-	IsNullOrEqual(TRIMBOTH(SecondaryRange), TRIMBOTH(Subject.PII.PreviousAddrSecRng));
-	
-
-PersonAddress: => GroupedPreviousAddress := 
-		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPrimRng,'')) +
-		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPrimName,'')) +
-		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPreDir,'')) +
-		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPostDir,'')) +
-		TRIMALL(DEFAULT(Subject.PII.PreviousAddrSffx,'')) +
-		TRIMALL(DEFAULT(Subject.PII.PreviousAddrZip5,'')) +
-		TRIMALL(DEFAULT(Subject.PII.PreviousAddrSecRng,''));
-
-PersonAddress: => PreviousLevenshteinMatch := LevenshteinSimilarity(GroupedAddress, GroupedPreviousAddress)>= 0.75;
-PersonAddress: =>TranslatedSources := DataSources{TranslatedSource};
-Person: => PreviousAddressMatchSourcesPre := PersonAddress(PreviousPerfectAddressMatch OR PreviousLevenshteinMatch).TranslatedSources{TranslatedSource,
-					RecordCount := TranslatedSource:Weight,
-					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
-					MyDateLastSeen := TranslatedSource:DateLastSeen};
-					
-Person: => PreviousAddressMatchSources := PreviousAddressMatchSourcesPre{TranslatedSource,
-					RecordCount,
-					BankruptcyAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
-					LiensAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
-					DateFirstSeenCleaned := IF(ISVALIDDATE(MyDateFirstSeen), DATETOSTRING(MyDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
-					DateLastSeenCleaned := IF(ISVALIDDATE(MyDateLastSeen), DATETOSTRING(MIN(MyDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97)};
-
-Person.PreviousAddressMatchSources: => ValidBankruptcySources := (TranslatedSource = 'BA' AND BankruptcyAgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT BankruptcyAgeInDays:Null);       
-Person.PreviousAddressMatchSources: => ValidLiensSources := (TranslatedSource = 'L2' AND LiensAgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT LiensAgeInDays:Null);       
-Person.PreviousAddressMatchSources: => OtherSources := (TranslatedSource <> 'BA' AND TranslatedSource <> 'L2'); 
-
-Person: => PreviousAddressMatchSourcesSorted := TOPN(PreviousAddressMatchSources, 32, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
-Person: => PreviousAddressMatchSourcesSortedFCRA := TOPN(PreviousAddressMatchSources(ValidBankruptcySources OR ValidLiensSources OR OtherSources), 21, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
-			
-Person: => PL_VerPrevAddrFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
-				PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagNonFCRA = 1 AND PII.InputFullAddressCleanValue != PL_PrevAddrFull => 0,
-				PII.InputFullAddressCleanValue = PL_PrevAddrFull => 1,
-				NO_DATA_FOUND_INT);
-Person: => PL_VerPrevAddrFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
-				PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagFCRA = 1 AND PII.InputFullAddressCleanValue != PL_PrevAddrFull => 0,
-				PII.InputFullAddressCleanValue = PL_PrevAddrFull => 1,
-				NO_DATA_FOUND_INT);
-
-
-Person: => PL_PrevAddrSrcCntEv  := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
-				BOUNDSFOLD(COUNT(PreviousAddressMatchSourcesSorted), 0, 32));
-				
-Person: => PL_PrevAddrSrcCntEvFCRA  :=MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
-				BOUNDSFOLD(COUNT(PreviousAddressMatchSourcesSortedFCRA), 0, 21));
-
-Person: => PL_PrevAddrSrcRecCntEv  := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
-				BOUNDSFOLD(SUM(PreviousAddressMatchSourcesSorted,RecordCount), 0, 9999));
-Person: => PL_PrevAddrSrcRecCntEvFCRA  := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
-				BOUNDSFOLD(SUM(PreviousAddressMatchSourcesSortedFCRA,RecordCount), 0, 9999));
-
-Person: => PL_PrevAddrSrcListEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
-				CONCAT(PreviousAddressMatchSourcesSorted, TranslatedSource, '|'));
-Person: => PL_PrevAddrSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
-				CONCAT(PreviousAddressMatchSourcesSortedFCRA, TranslatedSource, '|'));
-				
-Person: => PL_PrevAddrSrcRecCntListEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
-				CONCAT(PreviousAddressMatchSourcesSorted, RecordCount, '|'));
-Person: => PL_PrevAddrSrcRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
-				CONCAT(PreviousAddressMatchSourcesSortedFCRA, RecordCount, '|'));
-
-Person: => PL_PrevAddrSrcEmrgDtListEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
-				CONCAT(PreviousAddressMatchSourcesSorted, DateFirstSeenCleaned, '|'));
-Person: => PL_PrevAddrSrcEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
-				CONCAT(PreviousAddressMatchSourcesSortedFCRA, DateFirstSeenCleaned, '|'));
-
-Person: => PL_PrevAddrSrcLastDtListEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
-				CONCAT(PreviousAddressMatchSourcesSorted, DateLastSeenCleaned, '|'));
-Person: => PL_PrevAddrSrcLastDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
-				CONCAT(PreviousAddressMatchSourcesSortedFCRA, DateLastSeenCleaned, '|'));
-				
-Person: => PL_PrevAddrSrcOldDtEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
-				ALL(PreviousAddressMatchSourcesSorted, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
-				DATETOSTRING(MIN(PreviousAddressMatchSourcesSorted, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
-Person: => PL_PrevAddrSrcOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
-				ALL(PreviousAddressMatchSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
-				DATETOSTRING(MIN(PreviousAddressMatchSourcesSortedFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
-
-Person: => PL_PrevAddrSrcNewDtEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
-				ALL(PreviousAddressMatchSourcesSorted, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
-				DATETOSTRING(MAX(PreviousAddressMatchSourcesSorted, DATE(DateLastSeenCleaned)), '%Y%m%d'));
-Person: => PL_PrevAddrSrcNewDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
-				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
-				ALL(PreviousAddressMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
-				DATETOSTRING(MAX(PreviousAddressMatchSourcesSortedFCRA, DATE(DateLastSeenCleaned)), '%Y%m%d'));
-				
-Person: => PL_PrevAddrSrcOldMsncEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
-				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND_INT,
-				ALL(PreviousAddressMatchSourcesSorted, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcOldDtEv), CURRENT_DATE), 0, 960));
-Person: => PL_PrevAddrSrcOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
-				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
-				ALL(PreviousAddressMatchSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcOldDtEvFCRA), CURRENT_DATE), 0, 960));
-
-Person: => PL_PrevAddrSrcNewMsncEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
-				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND_INT,
-				ALL(PreviousAddressMatchSourcesSorted, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcNewDtEv), CURRENT_DATE), 0, 960));	
-Person: => PL_PrevAddrSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
-				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
-				ALL(PreviousAddressMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));	
-
-
-//KS3397
-
-InputPII: => PI_InpAddrNamePropMatchIndx := MAP(PI_InpAddrOnFileFlagEv != '1' => MISSING_INPUT_DATA_INT,
-                                                Location:Null OR Prop:Null => NO_DATA_FOUND_INT,
-                                                NOT EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND (FirstName != '' OR LastName != '')){FirstName, LastName}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-                                                EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 3,
-                                                EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 2,
-                                                EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))))) => 1,
-                                                0);
-InputPII: => PI_InpAddrFamilyOwnedFlag := MAP(PI_InpAddrOnFileFlagEv != '1' => MISSING_INPUT_DATA_INT,
-																								Location:Null OR Prop:Null => NO_DATA_FOUND_INT,
-																								PI_InpAddrNamePropMatchIndx = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-																								PI_InpAddrNamePropMatchIndx IN [0,1,3] => 0,
-																								PI_InpAddrNamePropMatchIndx = 2 => 1);
-																								
 
 //KS-6126
 
@@ -1634,7 +1667,11 @@ InputPII: => PI_InpPhoneIsBusPhoneFlag :=  MAP(P_InpClnPhoneHomeFlagValue != 1 =
 	PhoneListingTypeIsBusiness => '1',
 	NO_DATA_FOUND);
 
-// PII Corroboration Attributes
+/**************************************************************************/
+/*                                                                        */
+/*                      PII Corroboration Attributes                      */
+/*                                                                        */
+/**************************************************************************/
 
 // PhoneSummary Attributes
 // Get the inputPII values
@@ -2998,12 +3035,33 @@ Person: => IsPostalSource :=EXISTS(PII.CurrentAddress.DataSources(Source ='VL'))
 Person: =>PreviousAddrHelper := PII.PreviousAddress;
 
 Person: =>OnlyPreviousAddressHelperFlag := ONLY(PreviousAddrHelper{
-		StyleFlagNull :=StyleFlag ='' OR StyleFlag:Null,
+		VacantFlagNull := VacantFlag ='' OR VacantFlag:Null,
+		VacantFlagY := VacantFlag = 'Y',
+		VacantFlagN := VacantFlag = 'N',
+		ThrowBackNull := ThrowBackFlag ='' OR ThrowBackFlag:Null,
+		ThrowBackFlagY := ThrowBackFlag ='Y',
+		ThrowBackFlagN := ThrowBackFlag ='N',
+		SeasonalDeliveryFlagNull := SeasonalDeliveryFlag ='' OR SeasonalDeliveryFlag:Null,
+		SeasonalDeliveryFlagN := SeasonalDeliveryFlag ='N',
+		SeasonalDeliveryFlagY := SeasonalDeliveryFlag ='Y',
+		SeasonalDeliveryFlagE := SeasonalDeliveryFlag ='E',
+		DoNotDeliverFlagNull := DoNotDeliverFlag ='' OR DoNotDeliverFlag:Null,
+		DoNotDeliverFlagY := DoNotDeliverFlag ='Y',
+		DoNotDeliverFlagN := DoNotDeliverFlag ='N',
+		CollegeFlagNull := CollegeFlag ='' OR CollegeFlag:Null,
+		CollegeFlagY := CollegeFlag ='Y',
+		CollegeFlagN := CollegeFlag ='N',
+		DropIndicatorFlagNull := DropIndicatorFlag ='' OR DropIndicatorFlag:Null,
+		DropIndicatorFlagC := DropIndicatorFlag ='C',
+		DropIndicatorFlagN := DropIndicatorFlag ='N',
+		DropIndicatorFlagY := DropIndicatorFlag ='Y',		
+		StyleFlagNull := StyleFlag ='' OR StyleFlag:Null,
 		StyleFlagS := StyleFlag ='S',
-		ResBusFlagNull :=ResBusFlag ='' OR ResBusFlag:Null,
-		ResBusFlagAC :=ResBusFlag IN ['A','C'],
-		ResBusFlagBD :=ResBusFlag IN ['B','D']
+		ResBusFlagNull := ResBusFlag ='' OR ResBusFlag:Null,
+		ResBusFlagAC := ResBusFlag IN ['A','C'],
+		ResBusFlagBD := ResBusFlag IN ['B','D']
 		});
+
 Person: => IsPreviousPostalSource :=EXISTS(PII.PreviousAddress.DataSources(Source ='VL'));
 
 /**************************************************************************/
@@ -3049,81 +3107,21 @@ Person: => P_LexIDCategory := MAP(
 Person: => P_LexIDIsDeceasedFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 													NOT EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d'))) => '0',
 													'1');
-Person: => CurrAddrNoClean := IsNotEnoughToClean(CurrentAddrFull);
-Person: => PrevAddrNoClean := IsNotEnoughToClean(PreviousAddrFull);
 
-Person: => PL_CurrAddrFull := MAP(
-			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-      CurrAddrNoClean => NO_DATA_FOUND,
-      CurrentAddrFull);
+/**************************************************************************/
+/*                                                                        */
+/*                     Current Address Characteristics                    */
+/*                                                                        */
+/**************************************************************************/
 
-Person: => PL_CurrAddrLocID := MAP(
-      P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-      CurrAddrNoClean => NO_DATA_FOUND,
-      PersonCurrAddrLocID = 0 => NO_DATA_FOUND,
-      STRING(PersonCurrAddrLocID));
+Person: => PL_CurrAddrIsMultiUnitFlag:= MAP(
+			P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
+			CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1 => 1,0);
+Person: => PL_CurrAddrIsAptFlag:= MAP(
+			P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
+			NOT IsPostalSource =>NO_DATA_FOUND_INT,
+			OnlyCurrAddressHelperFlag.ResBusFlagAC AND PL_CurrAddrIsMultiUnitFlag = 1 => 1,0);
 
-Person: => PL_PrevAddrFull := MAP(
-			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-			PrevAddrNoClean => NO_DATA_FOUND,
-      PreviousAddrFull);
-
-Person: => PL_PrevAddrLocID := MAP(
-      P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-      PrevAddrNoClean => NO_DATA_FOUND,
-      PersonPrevAddrLocID = 0 => NO_DATA_FOUND,
-      STRING(PersonPrevAddrLocID));
-			
-Person: => PL_CurrAddrCnty:= MAP(
-			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
-			CurrentAddrCnty = '' => NO_DATA_FOUND,
-			CurrentAddrCnty);
-Person: => PL_CurrAddrGeo:= MAP(
-			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
-			CurrentAddrGeo = '' => NO_DATA_FOUND,
-			CurrentAddrGeo);
-Person: => PL_CurrAddrLat:= MAP(
-			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
-			CurrentAddrLat = '' => NO_DATA_FOUND,
-			CurrentAddrLat);
-Person: => PL_CurrAddrLng:= MAP(
-			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
-			CurrentAddrLng = '' => NO_DATA_FOUND,
-			CurrentAddrLng);
-Person: => PL_CurrAddrType:= MAP(
-			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
-			CurrentAddrType = '' => NO_DATA_FOUND,
-			CurrentAddrType);
-Person: => PL_CurrAddrStatus:= MAP(
-			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
-			CurrentAddrStatus = '' => NO_DATA_FOUND,
-			CurrentAddrStatus);
-			
-Person: => PL_PrevAddrCnty:= MAP(
-			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
-			PreviousAddrCnty = '' => NO_DATA_FOUND,
-			PreviousAddrCnty);
-Person: => PL_PrevAddrGeo:= MAP(
-			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
-			PreviousAddrGeo = '' => NO_DATA_FOUND,
-			PreviousAddrGeo);
-Person: => PL_PrevAddrLat:= MAP(
-			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
-			PreviousAddrLat = '' => NO_DATA_FOUND,
-			PreviousAddrLat);
-Person: => PL_PrevAddrLng:= MAP(
-			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
-			PreviousAddrLng = '' => NO_DATA_FOUND,
-			PreviousAddrLng);
-Person: => PL_PrevAddrType:= MAP(
-			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
-			PreviousAddrType = '' => NO_DATA_FOUND,
-			PreviousAddrType);
-Person: => PL_PrevAddrStatus:= MAP(
-			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
-			PreviousAddrStatus = '' => NO_DATA_FOUND,
-			PreviousAddrStatus);
-			
 Person: => PL_CurrAddrIsVacantFlag:= MAP(
 			P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
 			NOT IsPostalSource =>NO_DATA_FOUND_INT,
@@ -3188,14 +3186,136 @@ Person: => PL_CurrAddrIsBusinessFlag:= MAP(
 			OnlyCurrAddressHelperFlag.ResBusFlagAC =>0,
 			OnlyCurrAddressHelperFlag.ResBusFlagBD =>1,
 			NO_DATA_FOUND_97_INT);
-			
-Person: => PL_CurrAddrIsMultiUnitFlag:= MAP(
-			P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
-			CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1 => 1,0);
-Person: => PL_CurrAddrIsAptFlag:= MAP(
-			P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
-			NOT IsPostalSource =>NO_DATA_FOUND_INT,
-			OnlyCurrAddressHelperFlag.ResBusFlagAC AND PL_CurrAddrIsMultiUnitFlag = 1 => 1,0);
+
+Person: => PL_CurrAddrUniqMailDlvryFlag := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+	NOT IsPostalSource => NO_DATA_FOUND,
+	PL_CurrAddrIsThrowbackFlag = NO_DATA_FOUND_97_INT AND 
+		PL_CurrAddrSeasonalType = NO_DATA_FOUND_97_INT AND
+		PL_CurrAddrIsDNDFlag = NO_DATA_FOUND_97_INT AND
+		PL_CurrAddrIsCMRAFlag = NO_DATA_FOUND_97_INT AND
+		PL_CurrAddrIsSimpAddrFlag = NO_DATA_FOUND_97_INT AND
+		PL_CurrAddrIsDropDeliveryFlag = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97,
+	PL_CurrAddrIsThrowbackFlag = 0 AND 
+		PL_CurrAddrSeasonalType = 0 AND
+		PL_CurrAddrIsDNDFlag = 0 AND
+		PL_CurrAddrIsCMRAFlag = 0 AND
+		PL_CurrAddrIsSimpAddrFlag = 0 AND
+		PL_CurrAddrIsDropDeliveryFlag = 0 => '0',
+		'1');
+
+//Current address property
+AddressProperty: =>BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsDeed OR IsAssessment),1 ,-DtFirstSeen));
+AddressProperty: =>BestMostRecentPropertyEventPurchase:=ONLY(TOPN(Prop.PropertyEvent(IsDeed AND PropertyPurchaseRecord),1 ,-DtFirstSeen));
+Person: =>CurrAddrPropPurchase :=TOPN(CurrAddrHelperAttribute.AddressProperty
+		{
+			ModSalePrice:=IF(BestMostRecentPropertyEventPurchase.SalePrice:Null OR BestMostRecentPropertyEventPurchase.SalePrice='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEventPurchase.SalePrice),
+			BestMostRecentPropertyEventPurchase.DtFirstSeen,
+			BestMostRecentPropertyEventPurchase},1,-DtFirstSeen);
+Person: =>CurrAddrProp :=TOPN(CurrAddrHelperAttribute.AddressProperty
+		{
+			ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.MarketTotalValue),
+			ModAssesdValue:=IF(BestMostRecentPropertyEvent.AssessedTotalValue:Null OR BestMostRecentPropertyEvent.AssessedTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.AssessedTotalValue),
+			AssesdValueYear :=IF(ISVALIDDATE(BestMostRecentPropertyEvent.AssessedValueYear),DATETOSTRING(BestMostRecentPropertyEvent.AssessedValueYear,'%Y%m%d'),Person.NO_DATA_FOUND_97),
+			BestMostRecentPropertyEvent.DtFirstSeen,
+			BestMostRecentPropertyEvent},1,-DtFirstSeen);			
+Person: =>CurrAddrPropertyPurchaseRecord :=EXISTS(CurrAddrPropPurchase);
+Person: =>CurrAddrPropertyRecord :=EXISTS(CurrAddrProp);
+Person: =>PropertyModSalePrice :=ONLY(CurrAddrPropPurchase,ModSalePrice);
+Person: =>PurchaseDt :=ONLY(CurrAddrPropPurchase,BestMostRecentPropertyEventPurchase.DtFirstSeen);
+Person: =>ValidPropertyPurchaseDt := IF(ISVALIDDATE(PurchaseDt),DATETOSTRING(PurchaseDt,'%Y%m%d'),Person.NO_DATA_FOUND_97);
+Person: =>PropertyTaxValYr :=ONLY(CurrAddrProp,AssesdValueYear);
+Person: =>PropertyModMarketValue :=ONLY(CurrAddrProp,ModMarketValue);
+Person: =>PropertyModAssesdValue :=ONLY(CurrAddrProp,ModAssesdValue);
+Person: =>PL_CurrAddrPurchDt :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA,
+			NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND,
+			ValidPropertyPurchaseDt = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97,
+			ValidPropertyPurchaseDt);
+Person: =>PL_CurrAddrPurchMsnc :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
+			NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND_INT,
+			PL_CurrAddrPurchDt  = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97_INT,
+			MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt),Property.CURRENT_DATE));
+Person: =>PL_CurrAddrPurchAmt :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
+			NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND_INT,
+			PropertyModSalePrice = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT, 
+			BOUNDSFOLD(PropertyModSalePrice,0,9999999));
+Person: =>PL_CurrAddrMktVal :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
+			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND_INT,
+			PropertyModMarketValue = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(PropertyModMarketValue,0,9999999));
+Person: =>PL_CurrAddrTaxVal :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
+			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND_INT,
+			PropertyModAssesdValue = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(PropertyModAssesdValue,0,9999999));
+Person: =>PL_CurrAddrTaxValYr :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA,
+			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND,
+			PropertyTaxValYr = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97,
+			YEAR(DATE(PropertyTaxValYr)));
+
+//KS-4742
+
+Person: => BestPropertyrecord := ONLY(CurrAddrProp, BestMostRecentPropertyEvent);
+Person: => BestPropertyPurchaserecord := ONLY(CurrAddrPropPurchase, BestMostRecentPropertyEventPurchase);
+Person: => CurrAddressIsOwnedSubjectFlag := 
+		EXISTS(CurrAddrHelperAttribute.AddressProperty.Prop.PropertyEvent(UID = Person.BestPropertyrecord AND EXISTS(PersonPropertyEvent(Subject.UID = Person.UID AND PartyDetails.PartyIsBuyerOrOwner)))) OR EXISTS(CurrAddrHelperAttribute.AddressProperty.Prop.PropertyEvent(UID = Person.BestPropertyPurchaserecord AND EXISTS(PersonPropertyEvent(Subject.UID = Person.UID AND PartyDetails.PartyIsBuyerOrOwner))));
+
+Person: => PL_CurrAddrSubjOwnedFlag := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+		NOT (CurrAddrPropertyPurchaseRecord OR CurrAddrPropertyRecord) => NO_DATA_FOUND,
+		NOT CurrAddressIsOwnedSubjectFlag => '0',
+		CurrAddressIsOwnedSubjectFlag => '1');
+Person: => PL_CurrAddrSubjOwnedPurchDt := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
+		ValidPropertyPurchaseDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+		ValidPropertyPurchaseDt);
+Person: => PL_CurrAddrSubjOwnedPurchMsnc := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PL_CurrAddrSubjOwnedPurchDt  = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt), Property.CURRENT_DATE));
+Person: => PL_CurrAddrSubjOwnedPurchAmt := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PropertyModSalePrice = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT, 
+		BOUNDSFOLD(PropertyModSalePrice, 0, 9999999));
+Person: => PL_CurrAddrSubjOwnedMktVal := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PropertyModMarketValue = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PropertyModMarketValue, 0, 9999999));
+Person: => PL_CurrAddrSubjOwnedTaxVal := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PropertyModAssesdValue = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PropertyModAssesdValue, 0, 9999999));
+Person: => PL_CurrAddrSubjOwnedTaxValYr := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
+		PropertyTaxValYr = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+			YEAR(DATE(PropertyTaxValYr)));
+
+//KS-3406		
+Person: => NameDataSet := TOPN(CurrAddrHelperAttribute.AddressProperty
+    {
+        NonDerogDateFirstSeen := BestMostRecentPropertyEvent.DtFirstSeen,
+        FirstName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.FirstName,
+        LastName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.LastName,
+        PartyIsBuyerOrOwner := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.PartyIsBuyerOrOwner
+    },1,-NonDerogDateFirstSeen);   
+Person: => matchIndex := NameDataSet(PartyIsBuyerOrOwner){
+        NonDerogDateFirstSeen,
+        NameMatch := FirstName != '' OR LastName != '',
+        MatchFirstLastName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
+        MatchLastName := IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
+        MatchFirstName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst)))};  
+		
+Person: => PL_CurrAddrNamePropMatchIndx := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
+			NOT EXISTS(matchIndex(NameMatch)) => NO_DATA_FOUND_97,
+      EXISTS(matchIndex(MatchFirstLastName)) => '3',
+      EXISTS(matchIndex(MatchLastName)) => '2',
+      EXISTS(matchIndex(MatchFirstName)) => '1',
+      '0');				
+Person: => PL_CurrAddrFamilyOwnedFlag := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,			
+			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
+			PL_CurrAddrNamePropMatchIndx = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+			PL_CurrAddrNamePropMatchIndx IN ['0','1','3'] => 0,
+			PL_CurrAddrNamePropMatchIndx = '2' => 1);
 
 // KS-4687: Current Address Characteristics
 Person: => ValidCurrAddrDtFirstSn := IF(ISVALIDDATE(CurrentAddrDateFirstSeen), DATETOSTRING(CurrentAddrDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97);
@@ -3229,6 +3349,55 @@ Person: => PL_CurrAddrTypeIndx := MAP(
 			PL_CurrAddrType IN ['R','RD','S','SD','H','HD','UD'] => '3',
 			PL_CurrAddrType = 'M' => '4');
 
+/**************************************************************************/
+/*                                                                        */
+/*                    Previous Address Characteristics                    */
+/*                                                                        */
+/**************************************************************************/
+
+Person: => PL_PrevAddrIsVacantFlag:= MAP(
+			P_LexIDSeenFlag = '0' OR PL_PrevAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+			NOT IsPreviousPostalSource => NO_DATA_FOUND,
+			OnlyPreviousAddressHelperFlag.VacantFlagNull => NO_DATA_FOUND_97,
+			OnlyPreviousAddressHelperFlag.VacantFlagY => 1,
+			OnlyPreviousAddressHelperFlag.VacantFlagN => 0,
+			NO_DATA_FOUND_97);
+Person: => PL_PrevAddrIsThrowbackFlag:= MAP(
+			P_LexIDSeenFlag = '0' OR PL_PrevAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+			NOT IsPreviousPostalSource => NO_DATA_FOUND,
+			OnlyPreviousAddressHelperFlag.ThrowBackNull => NO_DATA_FOUND_97,
+			OnlyPreviousAddressHelperFlag.ThrowBackFlagY => 1,
+			OnlyPreviousAddressHelperFlag.ThrowBackFlagN => 0,
+			NO_DATA_FOUND_97);
+Person: => PL_PrevAddrSeasonalType:= MAP(
+			P_LexIDSeenFlag = '0' OR PL_PrevAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+			NOT IsPreviousPostalSource => NO_DATA_FOUND,
+			OnlyPreviousAddressHelperFlag.SeasonalDeliveryFlagNull => NO_DATA_FOUND_97,
+			OnlyPreviousAddressHelperFlag.SeasonalDeliveryFlagN => 0,
+			OnlyPreviousAddressHelperFlag.SeasonalDeliveryFlagY => 1,
+			OnlyPreviousAddressHelperFlag.SeasonalDeliveryFlagE => 2,
+			NO_DATA_FOUND_97);
+Person: => PL_PrevAddrIsDNDFlag:= MAP(
+			P_LexIDSeenFlag = '0' OR PL_PrevAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+			NOT IsPreviousPostalSource => NO_DATA_FOUND,
+			OnlyPreviousAddressHelperFlag.DoNotDeliverFlagNull => NO_DATA_FOUND_97,
+			OnlyPreviousAddressHelperFlag.DoNotDeliverFlagY => 1,
+			OnlyPreviousAddressHelperFlag.DoNotDeliverFlagN => 0,
+			NO_DATA_FOUND_97);
+Person: => PL_PrevAddrIsCollegeFlag:= MAP(
+			P_LexIDSeenFlag = '0' OR PL_PrevAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+			NOT IsPreviousPostalSource => NO_DATA_FOUND,
+			OnlyPreviousAddressHelperFlag.CollegeFlagNull => NO_DATA_FOUND_97,
+			OnlyPreviousAddressHelperFlag.CollegeFlagY => 1,
+			OnlyPreviousAddressHelperFlag.CollegeFlagN => 0,
+			NO_DATA_FOUND_97);
+Person: => PL_PrevAddrIsCMRAFlag:= MAP(
+			P_LexIDSeenFlag = '0' OR PL_PrevAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+			NOT IsPreviousPostalSource => NO_DATA_FOUND,
+			OnlyPreviousAddressHelperFlag.DropIndicatorFlagNull => NO_DATA_FOUND_97,
+			OnlyPreviousAddressHelperFlag.DropIndicatorFlagC => 1,
+			OnlyPreviousAddressHelperFlag.DropIndicatorFlagY OR OnlyPreviousAddressHelperFlag.DropIndicatorFlagN => 0,
+			NO_DATA_FOUND_97);
 Person: => PL_PrevAddrIsSimpAddrFlag:= MAP(
 			P_LexIDSeenFlag = '0' OR PrevAddrNoClean=> MISSING_INPUT_DATA_INT,
 			NOT IsPreviousPostalSource =>NO_DATA_FOUND_INT,
@@ -3236,6 +3405,13 @@ Person: => PL_PrevAddrIsSimpAddrFlag:= MAP(
 			OnlyPreviousAddressHelperFlag.StyleFlagS =>1,
 			NOT OnlyPreviousAddressHelperFlag.StyleFlagS =>0,
 			NO_DATA_FOUND_97_INT);
+Person: => PL_PrevAddrIsDropDeliveryFlag:= MAP(
+			P_LexIDSeenFlag = '0' OR PL_PrevAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+			NOT IsPreviousPostalSource => NO_DATA_FOUND,
+			OnlyPreviousAddressHelperFlag.DropIndicatorFlagNull => NO_DATA_FOUND_97,
+			OnlyPreviousAddressHelperFlag.DropIndicatorFlagY => 1,
+			OnlyPreviousAddressHelperFlag.DropIndicatorFlagC OR OnlyPreviousAddressHelperFlag.DropIndicatorFlagN => 0,
+			NO_DATA_FOUND_97);
 Person: => PL_PrevAddrIsBusinessFlag:= MAP(
 			P_LexIDSeenFlag = '0' OR PrevAddrNoClean=> MISSING_INPUT_DATA_INT,
 			NOT IsPreviousPostalSource =>NO_DATA_FOUND_INT,
@@ -3243,6 +3419,22 @@ Person: => PL_PrevAddrIsBusinessFlag:= MAP(
 			OnlyPreviousAddressHelperFlag.ResBusFlagAC =>0,
 			OnlyPreviousAddressHelperFlag.ResBusFlagBD =>1,
 			NO_DATA_FOUND_97_INT);
+
+Person: => PL_PrevAddrUniqMailDlvryFlag := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
+		NOT IsPreviousPostalSource => NO_DATA_FOUND,
+		PL_PrevAddrIsThrowbackFlag = NO_DATA_FOUND_97_INT AND 
+			PL_PrevAddrSeasonalType = NO_DATA_FOUND_97_INT AND
+			PL_PrevAddrIsDNDFlag = NO_DATA_FOUND_97_INT AND
+			PL_PrevAddrIsCMRAFlag = NO_DATA_FOUND_97_INT AND
+			PL_PrevAddrIsSimpAddrFlag = NO_DATA_FOUND_97_INT AND
+			PL_PrevAddrIsDropDeliveryFlag = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97,
+		PL_PrevAddrIsThrowbackFlag = 0 AND 
+			PL_PrevAddrSeasonalType = 0 AND
+			PL_PrevAddrIsDNDFlag = 0 AND
+			PL_PrevAddrIsCMRAFlag = 0 AND
+			PL_PrevAddrIsSimpAddrFlag = 0 AND
+			PL_PrevAddrIsDropDeliveryFlag = 0 => '0',
+			'1');
 
 // KS-4688: Previous Address Characteristics
 Person: => ValidPrevAddrDtFirstSn := IF(ISVALIDDATE(PreviousAddrDateFirstSeen), DATETOSTRING(PreviousAddrDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97);
@@ -3267,7 +3459,13 @@ Person: => PL_PrevAddrSubjResSpan := MAP(
 			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA_INT,
 			ValidPrevAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidPrevAddrDtLastSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
             BOUNDSFOLD(MONTHSBETWEEN(DATE(ValidPrevAddrDtFirstSn), DATE(ValidPrevAddrDtLastSn)),0,960));
-			
+
+/**************************************************************************/
+/*                                                                        */
+/*                             Address History                            */
+/*                                                                        */
+/**************************************************************************/
+
 Person: THREE_MONTHS_IN_DAYS := 90;
 Person: SIX_MONTHS_IN_DAYS := 180;
 Person: FIFTEEN_YEARS_IN_DAYS := 5478;
@@ -3315,8 +3513,14 @@ Person: =>PL_AddrEmrgCnt15Y :=MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_IN
 Person: => PL_AddrMaxMonCnt := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		NOT AddrHistOnFile => NO_DATA_FOUND_INT,
 		ALL(UniqueAddresses, NOT ISVALIDDATE(HierarchyDateFirstSeen) OR NOT ISVALIDDATE(HierarchyDateLastSeen)) => NO_DATA_FOUND_97_INT,
-		MAX(UniqueAddresses, BOUNDSFOLD(MONTHSBETWEEN(HierarchyDateFirstSeen, HierarchyDateLastSeen),0,960))); 
-		
+		MAX(UniqueAddresses, BOUNDSFOLD(MONTHSBETWEEN(HierarchyDateFirstSeen, HierarchyDateLastSeen),0,960)));
+
+/**************************************************************************/
+/*                                                                        */
+/*                                Best PII                                */
+/*                                                                        */
+/**************************************************************************/
+
 Person.FullName: => BestNames := (Best = TRUE);
 Person: => BestFirstName := ONLY(FullName(BestNames), FirstName);
 Person: => BestMidName := ONLY(FullName(BestNames), MiddleName);
@@ -3342,6 +3546,82 @@ Person: => PL_BestNameLast:= MAP(
 			BestLastName = '' OR BestLastName:Null => NO_DATA_FOUND,
 			BestLastName);
 
+Person: => CurrAddrNoClean := IsNotEnoughToClean(CurrentAddrFull);
+
+Person: => PL_CurrAddrFull := MAP(
+			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+      CurrAddrNoClean => NO_DATA_FOUND,
+      CurrentAddrFull);
+
+Person: => PL_CurrAddrLocID := MAP(
+      P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+      CurrAddrNoClean => NO_DATA_FOUND,
+      PersonCurrAddrLocID = 0 => NO_DATA_FOUND,
+      STRING(PersonCurrAddrLocID));
+
+Person: => PL_CurrAddrCnty:= MAP(
+			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
+			CurrentAddrCnty = '' => NO_DATA_FOUND,
+			CurrentAddrCnty);
+Person: => PL_CurrAddrGeo:= MAP(
+			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
+			CurrentAddrGeo = '' => NO_DATA_FOUND,
+			CurrentAddrGeo);
+Person: => PL_CurrAddrLat:= MAP(
+			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
+			CurrentAddrLat = '' => NO_DATA_FOUND,
+			CurrentAddrLat);
+Person: => PL_CurrAddrLng:= MAP(
+			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
+			CurrentAddrLng = '' => NO_DATA_FOUND,
+			CurrentAddrLng);
+Person: => PL_CurrAddrType:= MAP(
+			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
+			CurrentAddrType = '' => NO_DATA_FOUND,
+			CurrentAddrType);
+Person: => PL_CurrAddrStatus:= MAP(
+			P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
+			CurrentAddrStatus = '' => NO_DATA_FOUND,
+			CurrentAddrStatus);
+
+Person: => PrevAddrNoClean := IsNotEnoughToClean(PreviousAddrFull);
+
+Person: => PL_PrevAddrFull := MAP(
+			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+			PrevAddrNoClean => NO_DATA_FOUND,
+      PreviousAddrFull);
+
+Person: => PL_PrevAddrLocID := MAP(
+      P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+      PrevAddrNoClean => NO_DATA_FOUND,
+      PersonPrevAddrLocID = 0 => NO_DATA_FOUND,
+      STRING(PersonPrevAddrLocID));
+
+Person: => PL_PrevAddrCnty:= MAP(
+			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
+			PreviousAddrCnty = '' => NO_DATA_FOUND,
+			PreviousAddrCnty);
+Person: => PL_PrevAddrGeo:= MAP(
+			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
+			PreviousAddrGeo = '' => NO_DATA_FOUND,
+			PreviousAddrGeo);
+Person: => PL_PrevAddrLat:= MAP(
+			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
+			PreviousAddrLat = '' => NO_DATA_FOUND,
+			PreviousAddrLat);
+Person: => PL_PrevAddrLng:= MAP(
+			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
+			PreviousAddrLng = '' => NO_DATA_FOUND,
+			PreviousAddrLng);
+Person: => PL_PrevAddrType:= MAP(
+			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
+			PreviousAddrType = '' => NO_DATA_FOUND,
+			PreviousAddrType);
+Person: => PL_PrevAddrStatus:= MAP(
+			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
+			PreviousAddrStatus = '' => NO_DATA_FOUND,
+			PreviousAddrStatus);
+
 Person: => PL_BestSSN:= MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 			NOT EXISTS(PersonSSN(IsBestSSN)) => NO_DATA_FOUND,
@@ -3365,80 +3645,6 @@ Person: => PL_BestDOBAge:= MAP(
 			//BestDOBAge:Null => NO_DATA_FOUND_INT,
 			BestDOBAge);
 
-/**************************************************************************/
-/*                                                                        */
-/*              Input PII address characteristics                         */
-/*                                                                        */
-/**************************************************************************/
-
-InputPII: => AddressRecords := Location.DataSources(HeaderHitFlag)
-  {HeaderHitFlag,
-	AddressDateFirstSeen := IF(ISVALIDDATE(HeaderHitFlag:DateFirstSeen), DATETOSTRING(HeaderHitFlag:DateFirstSeen, '%Y%m01'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE),
-	AddressDateLastSeen :=  IF(ISVALIDDATE(HeaderHitFlag:DateLastSeen), DATETOSTRING(MIN(HeaderHitFlag:DateLastSeen, Person.CURRENT_DATE), '%Y%m01'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)};
-
-InputPII: => InpAddressDateFirstSeen := ONLY(AddressRecords, AddressDateFirstSeen);
-InputPII: => InpAddressDateLastSeen := ONLY(AddressRecords, AddressDateLastSeen);
-
-
-InputPII: => InputAddressMatchesCurrentAddress := P_InpClnAddrPrimRng = Subject.CurrentAddrPrimRng AND P_InpClnAddrPrimName = Subject.CurrentAddrPrimName AND P_InpClnAddrZip5 = Subject.CurrentAddrZip5;
-InputPII: => InputAddressMatchesAddressHierarchyAddress := EXISTS(Subject.AddressHierarchySet(InputPII.P_InpClnAddrPrimRng = PrimaryRange AND InputPII.P_InpClnAddrPrimName = PrimaryName AND InputPII.P_InpClnAddrZip5 = ZIP5));
-
-InputPII: => PI_InpAddrOldDt := MAP(
-		PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-		PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND,
-		NOT EXISTS(AddressRecords) => NO_DATA_FOUND,
-		InpAddressDateFirstSeen);
-
-InputPII: => PI_InpAddrNewDt := MAP(
-		PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-		PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND,
-		NOT EXISTS(AddressRecords) => NO_DATA_FOUND,
-		InpAddressDateLastSeen);
-
-InputPII: => PI_InpAddrSubjFlag := MAP(
-		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-		PI_InpAddrOnFileFlagEv = 0 => NO_DATA_FOUND_INT,
-		NOT InputAddressMatchesAddressHierarchyAddress => NO_DATA_FOUND_INT,
-		InputAddressMatchesCurrentAddress => 1,
-		0);
-
-InputPII: => PI_InpAddrSubjOldDt := MAP(
-		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND,
-		NOT ISVALIDDATE(Subject.CurrentAddrDateFirstSeen) OR Subject.CurrentAddrDateFirstSeen:Null => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE,
-		DATETOSTRING(Subject.CurrentAddrDateFirstSeen,'%Y%m01'));
-
-InputPII: => PI_InpAddrSubjNewDt := MAP(
-		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND,
-		NOT ISVALIDDATE(Subject.CurrentAddrDateLastSeen) OR Subject.CurrentAddrDateLastSeen:Null => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE,
-		DATETOSTRING(Subject.CurrentAddrDateLastSeen,'%Y%m01'));
-
-InputPII: => PI_InpAddrSubjOldMsnc := MAP(
-		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND_INT,
-		PI_InpAddrSubjOldDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-		BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PI_InpAddrSubjOldDt, '%Y%m%d'), Person.CURRENT_DATE),0,960)); 
-
-InputPII: => PI_InpAddrSubjNewMsnc := MAP(
-		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND_INT,
-		PI_InpAddrSubjNewDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-		BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PI_InpAddrSubjNewDt, '%Y%m%d'), Person.CURRENT_DATE),0,960)); 
-
-InputPII: => PI_InpAddrSubjResSpan := MAP(
-		P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-		PI_InpAddrSubjFlag = 0 OR PI_InpAddrSubjFlag = NO_DATA_FOUND => NO_DATA_FOUND_INT,
-		PI_InpAddrSubjOldDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE OR PI_InpAddrSubjNewDt = InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-		BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PI_InpAddrSubjOldDt, '%Y%m%d'), FROMSTRINGTODATE(PI_InpAddrSubjNewDt, '%Y%m%d')),0,960)); 
-
-InputPII: => PI_InpClnAddrTypeIndx := MAP(
-		InputFullAddressCleanValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		InputAddressTypeCleanValue = NO_DATA_FOUND => NO_DATA_FOUND,
-		InputAddressTypeCleanValue = 'F' => '1',
-		InputAddressTypeCleanValue IN ['P','G'] => '2',
-		InputAddressTypeCleanValue IN ['R','RD','S','SD','H','HD','UD'] => '3',
-		InputAddressTypeCleanValue = 'M' => '4');
 /**************************************************************************/
 /*                                                                        */
 /*                  Education Helper Attributes                           */
@@ -11399,10 +11605,135 @@ Person: => PL_CurrAddrSrcNewMsncEv := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFu
 Person: => PL_CurrAddrSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
 				PL_CurrAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
 				ALL(CurrentAddressMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_CurrAddrSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));	
-				
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_CurrAddrSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));
 
-///////KS-6172
+//KS3379
+PersonAddress: => PreviousPerfectAddressMatch := 
+	IsNullOrEqual(TRIMBOTH(PrimaryRange), TRIMBOTH(Subject.PII.PreviousAddrPrimRng)) AND  
+	IsNullOrEqual(TRIMBOTH(Predirectional), TRIMBOTH(Subject.PII.PreviousAddrPreDir)) AND
+	IsNullOrEqual(TRIMBOTH(PrimaryName), TRIMBOTH(Subject.PII.PreviousAddrPrimName)) AND
+	IsNullOrEqual(TRIMBOTH(Suffix), TRIMBOTH(Subject.PII.PreviousAddrSffx)) AND
+	IsNullOrEqual(TRIMBOTH(Postdirectional), TRIMBOTH(Subject.PII.PreviousAddrPostDir)) AND
+	IsNullOrEqual(TRIMBOTH(INTFORMAT(ZIP5,5,1)), TRIMBOTH(Subject.PII.PreviousAddrZip5)) AND
+	IsNullOrEqual(TRIMBOTH(SecondaryRange), TRIMBOTH(Subject.PII.PreviousAddrSecRng));
+	
+
+PersonAddress: => GroupedPreviousAddress := 
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPrimRng,'')) +
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPrimName,'')) +
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPreDir,'')) +
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPostDir,'')) +
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrSffx,'')) +
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrZip5,'')) +
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrSecRng,''));
+
+PersonAddress: => PreviousLevenshteinMatch := LevenshteinSimilarity(GroupedAddress, GroupedPreviousAddress)>= 0.75;
+PersonAddress: =>TranslatedSources := DataSources{TranslatedSource};
+Person: => PreviousAddressMatchSourcesPre := PersonAddress(PreviousPerfectAddressMatch OR PreviousLevenshteinMatch).TranslatedSources{TranslatedSource,
+					RecordCount := TranslatedSource:Weight,
+					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
+					MyDateLastSeen := TranslatedSource:DateLastSeen};
+					
+Person: => PreviousAddressMatchSources := PreviousAddressMatchSourcesPre{TranslatedSource,
+					RecordCount,
+					BankruptcyAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
+					LiensAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
+					DateFirstSeenCleaned := IF(ISVALIDDATE(MyDateFirstSeen), DATETOSTRING(MyDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
+					DateLastSeenCleaned := IF(ISVALIDDATE(MyDateLastSeen), DATETOSTRING(MIN(MyDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97)};
+
+Person.PreviousAddressMatchSources: => ValidBankruptcySources := (TranslatedSource = 'BA' AND BankruptcyAgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT BankruptcyAgeInDays:Null);       
+Person.PreviousAddressMatchSources: => ValidLiensSources := (TranslatedSource = 'L2' AND LiensAgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT LiensAgeInDays:Null);       
+Person.PreviousAddressMatchSources: => OtherSources := (TranslatedSource <> 'BA' AND TranslatedSource <> 'L2'); 
+
+Person: => PreviousAddressMatchSourcesSorted := TOPN(PreviousAddressMatchSources, 32, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
+Person: => PreviousAddressMatchSourcesSortedFCRA := TOPN(PreviousAddressMatchSources(ValidBankruptcySources OR ValidLiensSources OR OtherSources), 21, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
+			
+Person: => PL_VerPrevAddrFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+				PL_VerAddrFlagNonFCRA = 1 AND PII.InputFullAddressCleanValue != PL_PrevAddrFull => 0,
+				PII.InputFullAddressCleanValue = PL_PrevAddrFull => 1,
+				NO_DATA_FOUND_INT);
+Person: => PL_VerPrevAddrFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
+				PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+				PL_VerAddrFlagFCRA = 1 AND PII.InputFullAddressCleanValue != PL_PrevAddrFull => 0,
+				PII.InputFullAddressCleanValue = PL_PrevAddrFull => 1,
+				NO_DATA_FOUND_INT);
+
+
+Person: => PL_PrevAddrSrcCntEv  := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(PreviousAddressMatchSourcesSorted), 0, 32));
+				
+Person: => PL_PrevAddrSrcCntEvFCRA  :=MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(PreviousAddressMatchSourcesSortedFCRA), 0, 21));
+
+Person: => PL_PrevAddrSrcRecCntEv  := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(SUM(PreviousAddressMatchSourcesSorted,RecordCount), 0, 9999));
+Person: => PL_PrevAddrSrcRecCntEvFCRA  := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(SUM(PreviousAddressMatchSourcesSortedFCRA,RecordCount), 0, 9999));
+
+Person: => PL_PrevAddrSrcListEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
+				CONCAT(PreviousAddressMatchSourcesSorted, TranslatedSource, '|'));
+Person: => PL_PrevAddrSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(PreviousAddressMatchSourcesSortedFCRA, TranslatedSource, '|'));
+				
+Person: => PL_PrevAddrSrcRecCntListEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
+				CONCAT(PreviousAddressMatchSourcesSorted, RecordCount, '|'));
+Person: => PL_PrevAddrSrcRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(PreviousAddressMatchSourcesSortedFCRA, RecordCount, '|'));
+
+Person: => PL_PrevAddrSrcEmrgDtListEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
+				CONCAT(PreviousAddressMatchSourcesSorted, DateFirstSeenCleaned, '|'));
+Person: => PL_PrevAddrSrcEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(PreviousAddressMatchSourcesSortedFCRA, DateFirstSeenCleaned, '|'));
+
+Person: => PL_PrevAddrSrcLastDtListEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
+				CONCAT(PreviousAddressMatchSourcesSorted, DateLastSeenCleaned, '|'));
+Person: => PL_PrevAddrSrcLastDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(PreviousAddressMatchSourcesSortedFCRA, DateLastSeenCleaned, '|'));
+				
+Person: => PL_PrevAddrSrcOldDtEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
+				ALL(PreviousAddressMatchSourcesSorted, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(PreviousAddressMatchSourcesSorted, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+Person: => PL_PrevAddrSrcOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				ALL(PreviousAddressMatchSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(PreviousAddressMatchSourcesSortedFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+
+Person: => PL_PrevAddrSrcNewDtEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND,
+				ALL(PreviousAddressMatchSourcesSorted, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(PreviousAddressMatchSourcesSorted, DATE(DateLastSeenCleaned)), '%Y%m%d'));
+Person: => PL_PrevAddrSrcNewDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				ALL(PreviousAddressMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(PreviousAddressMatchSourcesSortedFCRA, DATE(DateLastSeenCleaned)), '%Y%m%d'));
+				
+Person: => PL_PrevAddrSrcOldMsncEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND_INT,
+				ALL(PreviousAddressMatchSourcesSorted, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcOldDtEv), CURRENT_DATE), 0, 960));
+Person: => PL_PrevAddrSrcOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(PreviousAddressMatchSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcOldDtEvFCRA), CURRENT_DATE), 0, 960));
+
+Person: => PL_PrevAddrSrcNewMsncEv := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_PrevAddrSrcCntEv  < 1 => NO_DATA_FOUND_INT,
+				ALL(PreviousAddressMatchSourcesSorted, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcNewDtEv), CURRENT_DATE), 0, 960));	
+Person: => PL_PrevAddrSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_PrevAddrSrcCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(PreviousAddressMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));
 
 Person: => AllDOBSet := ReportedDatesOfBirth(HeaderHitFlag AND TranslatedSourceCode != ''){DateOfBirth};
 Person.ReportedDatesOfBirth: => AllDobCheck := ALL(AllDOBSet,SUBSTR(DATETOSTRING(DateOfBirth,'%Y%m%d'), 7, 8) IN ['00','01']);
@@ -11546,119 +11877,6 @@ Person: => PL_VerRIRestrictedFlag := IF(
 	(PL_VerAddrSrcCntEvFCRA > 0 OR PL_VerSSNSrcCntEvFCRA > 0 OR PL_VerPhoneSrcCntEvFCRA > 0 OR PL_VerDOBSrcCntEvFCRA > 0),
 	1, 0);
 
-//Current address property
-AddressProperty: =>BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsDeed OR IsAssessment),1 ,-DtFirstSeen));
-AddressProperty: =>BestMostRecentPropertyEventPurchase:=ONLY(TOPN(Prop.PropertyEvent(IsDeed AND PropertyPurchaseRecord),1 ,-DtFirstSeen));
-Person: =>CurrAddrPropPurchase :=TOPN(CurrAddrHelperAttribute.AddressProperty
-		{
-			ModSalePrice:=IF(BestMostRecentPropertyEventPurchase.SalePrice:Null OR BestMostRecentPropertyEventPurchase.SalePrice='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEventPurchase.SalePrice),
-			BestMostRecentPropertyEventPurchase.DtFirstSeen,
-			BestMostRecentPropertyEventPurchase},1,-DtFirstSeen);
-Person: =>CurrAddrProp :=TOPN(CurrAddrHelperAttribute.AddressProperty
-		{
-			ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.MarketTotalValue),
-			ModAssesdValue:=IF(BestMostRecentPropertyEvent.AssessedTotalValue:Null OR BestMostRecentPropertyEvent.AssessedTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.AssessedTotalValue),
-			AssesdValueYear :=IF(ISVALIDDATE(BestMostRecentPropertyEvent.AssessedValueYear),DATETOSTRING(BestMostRecentPropertyEvent.AssessedValueYear,'%Y%m%d'),Person.NO_DATA_FOUND_97),
-			BestMostRecentPropertyEvent.DtFirstSeen,
-			BestMostRecentPropertyEvent},1,-DtFirstSeen);			
-Person: =>CurrAddrPropertyPurchaseRecord :=EXISTS(CurrAddrPropPurchase);
-Person: =>CurrAddrPropertyRecord :=EXISTS(CurrAddrProp);
-Person: =>PropertyModSalePrice :=ONLY(CurrAddrPropPurchase,ModSalePrice);
-Person: =>PurchaseDt :=ONLY(CurrAddrPropPurchase,BestMostRecentPropertyEventPurchase.DtFirstSeen);
-Person: =>ValidPropertyPurchaseDt := IF(ISVALIDDATE(PurchaseDt),DATETOSTRING(PurchaseDt,'%Y%m%d'),Person.NO_DATA_FOUND_97);
-Person: =>PropertyTaxValYr :=ONLY(CurrAddrProp,AssesdValueYear);
-Person: =>PropertyModMarketValue :=ONLY(CurrAddrProp,ModMarketValue);
-Person: =>PropertyModAssesdValue :=ONLY(CurrAddrProp,ModAssesdValue);
-Person: =>PL_CurrAddrPurchDt :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA,
-			NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND,
-			ValidPropertyPurchaseDt = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97,
-			ValidPropertyPurchaseDt);
-Person: =>PL_CurrAddrPurchMsnc :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
-			NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND_INT,
-			PL_CurrAddrPurchDt  = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97_INT,
-			MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt),Property.CURRENT_DATE));
-Person: =>PL_CurrAddrPurchAmt :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
-			NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND_INT,
-			PropertyModSalePrice = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT, 
-			BOUNDSFOLD(PropertyModSalePrice,0,9999999));
-Person: =>PL_CurrAddrMktVal :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
-			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND_INT,
-			PropertyModMarketValue = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(PropertyModMarketValue,0,9999999));
-Person: =>PL_CurrAddrTaxVal :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
-			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND_INT,
-			PropertyModAssesdValue = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(PropertyModAssesdValue,0,9999999));
-Person: =>PL_CurrAddrTaxValYr :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA,
-			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND,
-			PropertyTaxValYr = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97,
-			YEAR(DATE(PropertyTaxValYr)));
-//KS-3406		
-Person: => NameDataSet := TOPN(CurrAddrHelperAttribute.AddressProperty
-    {
-        NonDerogDateFirstSeen := BestMostRecentPropertyEvent.DtFirstSeen,
-        FirstName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.FirstName,
-        LastName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.LastName,
-        PartyIsBuyerOrOwner := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.PartyIsBuyerOrOwner
-    },1,-NonDerogDateFirstSeen);   
-Person: => matchIndex := NameDataSet(PartyIsBuyerOrOwner){
-        NonDerogDateFirstSeen,
-        NameMatch := FirstName != '' OR LastName != '',
-        MatchFirstLastName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
-        MatchLastName := IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
-        MatchFirstName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst)))};  
-		
-Person: => PL_CurrAddrNamePropMatchIndx := MAP(
-			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
-			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
-			NOT EXISTS(matchIndex(NameMatch)) => NO_DATA_FOUND_97,
-      EXISTS(matchIndex(MatchFirstLastName)) => '3',
-      EXISTS(matchIndex(MatchLastName)) => '2',
-      EXISTS(matchIndex(MatchFirstName)) => '1',
-      '0');				
-Person: => PL_CurrAddrFamilyOwnedFlag := MAP(
-			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,			
-			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
-			PL_CurrAddrNamePropMatchIndx = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
-			PL_CurrAddrNamePropMatchIndx IN ['0','1','3'] => 0,
-			PL_CurrAddrNamePropMatchIndx = '2' => 1);						
-			
-//InputAddressProperty
-InputPII: => BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsDeed OR IsAssessment),1,-DtFirstSeen));
-InputPII: => BestMostRecentPropertyEventPurchase:=ONLY(TOPN(Prop.PropertyEvent(IsDeed AND PropertyPurchaseRecord),1 ,-DtFirstSeen));
-InputPII: => ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEvent.MarketTotalValue);
-InputPII: => ModAssesdValue:=IF(BestMostRecentPropertyEvent.AssessedTotalValue:Null OR BestMostRecentPropertyEvent.AssessedTotalValue='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEvent.AssessedTotalValue);
-InputPII: => AssesdValueYear:=IF(ISVALIDDATE(BestMostRecentPropertyEvent.AssessedValueYear),DATETOSTRING(BestMostRecentPropertyEvent.AssessedValueYear,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE);
-InputPII: => ModSalePrice:=IF(BestMostRecentPropertyEventPurchase.SalePrice:Null OR BestMostRecentPropertyEventPurchase.SalePrice='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEventPurchase.SalePrice);
-InputPII: => InpAddrPropertyPurchaseRecord:=EXISTS(BestMostRecentPropertyEventPurchase);
-InputPII: => InpAddrPropertyRecord:=EXISTS(BestMostRecentPropertyEvent);
-InputPII: => PurchaseDt:=BestMostRecentPropertyEventPurchase.DtFirstSeen;
-InputPII: => ValidPropertyPurchaseDt:=IF(ISVALIDDATE(PurchaseDt),DATETOSTRING(PurchaseDt,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE);
-
-InputPII: => PI_InpAddrPurchDt:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND,
-			ValidPropertyPurchaseDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-			ValidPropertyPurchaseDt);
-InputPII: => PI_InpAddrPurchMsnc:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND_INT,
-			PI_InpAddrPurchDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-			MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt),Property.CURRENT_DATE));
-InputPII: => PI_InpAddrPurchAmt:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND_INT,
-			ModSalePrice = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT, 
-			BOUNDSFOLD(ModSalePrice,0,9999999));
-InputPII: => PI_InpAddrMktVal:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			NOT InpAddrPropertyRecord => NO_DATA_FOUND_INT,
-			ModMarketValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-			BOUNDSFOLD(ModMarketValue,0,9999999));
-InputPII: => PI_InpAddrTaxVal:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			NOT InpAddrPropertyRecord => NO_DATA_FOUND_INT,
-			ModAssesdValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-			BOUNDSFOLD(ModAssesdValue,0,9999999));
-InputPII: => PI_InpAddrTaxValYr:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-			NOT InpAddrPropertyRecord => NO_DATA_FOUND,
-			AssesdValueYear = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-			YEAR(DATE(AssesdValueYear)));
 //Criminal date list attributes
 Person: => DrgCrimfelDtList1YFCRA := TOPN(PersonOffenses.Offense(OffenseCharges.IsFelonyFCRA = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null){CriminalDate := IF(ISVALIDDATE(OffenseCharges.CriminalDate),DATETOSTRING(OffenseCharges.CriminalDate,'%Y%m%d'),CriminalOffense.NO_DATA_FOUND_97),OffenderKey},99,CriminalDate);
 Person: => DrgCrimfelDtList7YFCRA := TOPN(PersonOffenses.Offense(OffenseCharges.IsFelonyFCRA = TRUE AND OffenseCharges.AgeInDays <= CriminalOffense.SEVEN_YEARS_IN_DAYS AND NOT OffenseCharges.AgeInDays:Null){CriminalDate := IF(ISVALIDDATE(OffenseCharges.CriminalDate),DATETOSTRING(OffenseCharges.CriminalDate,'%Y%m%d'),CriminalOffense.NO_DATA_FOUND_97),OffenderKey},999,CriminalDate);
@@ -11819,73 +12037,7 @@ Person: => PL_VerSSNLookupFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN  IN [
                                   SSNLength > 4 => NO_DATA_FOUND,
                                   SSNLength = 4 AND SocsMatch => '1',
                                   '0');
-InputPII: => InpAddressIsOwnedSubjectFlag := 
-		EXISTS(Prop.PropertyEvent(UID = InputPII.BestMostRecentPropertyEvent AND EXISTS(PersonPropertyEvent(Subject.UID = InputPII.P_LexID AND PartyDetails.PartyIsBuyerOrOwner)))) OR EXISTS(Prop.PropertyEvent(UID = InputPII.BestMostRecentPropertyEventPurchase AND EXISTS(PersonPropertyEvent(Subject.UID = InputPII.P_LexID AND PartyDetails.PartyIsBuyerOrOwner))));
-InputPII: => PI_InpAddrSubjOwnedFlag := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-			NOT (InpAddrPropertyPurchaseRecord OR InpAddrPropertyRecord) => NO_DATA_FOUND,
-			NOT InpAddressIsOwnedSubjectFlag => '0',
-			InpAddressIsOwnedSubjectFlag => '1');
-InputPII: => PI_InpAddrSubjOwnedPurchDt := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
-			ValidPropertyPurchaseDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-			ValidPropertyPurchaseDt);
-InputPII: => PI_InpAddrSubjOwnedPurchMsnc := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
-			PI_InpAddrSubjOwnedPurchDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-			MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt), Property.CURRENT_DATE));
-InputPII: => PI_InpAddrSubjOwnedPurchAmt := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
-			ModSalePrice = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT, 
-			BOUNDSFOLD(ModSalePrice, 0, 9999999));
-InputPII: => PI_InpAddrSubjOwnedMktVal := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,			
-			ModMarketValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-			BOUNDSFOLD(ModMarketValue, 0, 9999999));
-InputPII: => PI_InpAddrSubjOwnedTaxVal := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
-			ModAssesdValue = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-			BOUNDSFOLD(ModAssesdValue, 0, 9999999));
-InputPII: => PI_InpAddrSubjOwnedTaxValYr := MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-			PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
-			AssesdValueYear = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-			YEAR(DATE(AssesdValueYear)));
 
-			
-Person: => BestPropertyrecord := ONLY(CurrAddrProp, BestMostRecentPropertyEvent);
-Person: => BestPropertyPurchaserecord := ONLY(CurrAddrPropPurchase, BestMostRecentPropertyEventPurchase);
-Person: => CurrAddressIsOwnedSubjectFlag := 
-		EXISTS(CurrAddrHelperAttribute.AddressProperty.Prop.PropertyEvent(UID = Person.BestPropertyrecord AND EXISTS(PersonPropertyEvent(Subject.UID = Person.UID AND PartyDetails.PartyIsBuyerOrOwner)))) OR EXISTS(CurrAddrHelperAttribute.AddressProperty.Prop.PropertyEvent(UID = Person.BestPropertyPurchaserecord AND EXISTS(PersonPropertyEvent(Subject.UID = Person.UID AND PartyDetails.PartyIsBuyerOrOwner))));
-		
-Person: => PL_CurrAddrSubjOwnedFlag := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull = NO_DATA_FOUND => MISSING_INPUT_DATA,
-		NOT (CurrAddrPropertyPurchaseRecord OR CurrAddrPropertyRecord) => NO_DATA_FOUND,
-		NOT CurrAddressIsOwnedSubjectFlag => '0',
-		CurrAddressIsOwnedSubjectFlag => '1');
-Person: => PL_CurrAddrSubjOwnedPurchDt := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
-		ValidPropertyPurchaseDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
-		ValidPropertyPurchaseDt);
-Person: => PL_CurrAddrSubjOwnedPurchMsnc := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
-		PL_CurrAddrSubjOwnedPurchDt  = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
-		MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt), Property.CURRENT_DATE));
-Person: => PL_CurrAddrSubjOwnedPurchAmt := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
-		PropertyModSalePrice = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT, 
-		BOUNDSFOLD(PropertyModSalePrice, 0, 9999999));
-Person: => PL_CurrAddrSubjOwnedMktVal := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
-		PropertyModMarketValue = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
-		BOUNDSFOLD(PropertyModMarketValue, 0, 9999999));
-Person: => PL_CurrAddrSubjOwnedTaxVal := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
-		PropertyModAssesdValue = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
-		BOUNDSFOLD(PropertyModAssesdValue, 0, 9999999));
-Person: => PL_CurrAddrSubjOwnedTaxValYr := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
-		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND,
-		PropertyTaxValYr = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
-			YEAR(DATE(PropertyTaxValYr)));
-//VerifiedSSN
-																							 
 Person: => VerSSNSourceBureauListSortedFCRA := SSNVerSourceListSortedFCRA(TranslatedSourceCode IN Person.BUREAU_SOURCES_FCRA);
 Person: => VerSSNSourceBureauListSorted := SSNVerSourceListSorted(TranslatedSourceCode IN Person.BUREAU_SOURCES);
 
@@ -11993,7 +12145,7 @@ Person: => PL_VerSSNSrcBureauOnlyFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_In
 				'0');
 /**************************************************************************/
 /*                                                                        */
-/*     Innovis Attributes														                      */
+/*                           Innovis Attributes                           */
 /*                                                                        */
 /**************************************************************************/
 //Helper Attributes
