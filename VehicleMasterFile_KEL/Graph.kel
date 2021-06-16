@@ -21,11 +21,11 @@ QUERY: VehicleMasterFile(PERMITS DPM) <=
 		VehicleGroupStart := VehiclePolicy.VehicleGroupStart,
 		VehicleGroupEnd := VehiclePolicy.VehicleGroupEnd,
 		LexID := PersonPolicy.Subject.UID,
-		PrimaryPolicyHolderFlag := IF(PersonPolicy.Subject.UID = G_PrimaryPolicyHolderLexID, 1, 0),
+		PrimaryPolicyHolderLexID := VehiclePolicy.G_LatestPrimaryHolder,
 		LexIDStart := PersonPolicy.G_BestHolderStartDate, 
 		LexIDEnd := PersonPolicy.G_BestHolderEndDate, 
 		BestCoverageEndDate := VehiclePolicy.G_BestCoverageEndDate,
-		BestCoverageStartDate := VehiclePolicy.G_AppearanceDate
+		BestCoverageStartDate := VehiclePolicy.G_BestCoverageStartDate
 	}
 		((LexIDStart < BestCoverageEndDate) AND
 		(LexIDEnd > VehicleGroupStart OR NOT ISVALIDDATE(LexIDEnd) OR LexIDEnd:Null))
@@ -38,9 +38,10 @@ QUERY: VehicleMasterFile(PERMITS DPM) <=
 		LexID,
 		LexIDStart := MAX(MIN(GROUP,LexIDStart),MIN(GROUP,VehicleGroupStart)),
 		LexIDEnd := MAP(MAX(GROUP,VehicleGroupEnd):Null AND MIN(MAX(GROUP,LexIDEnd),MAX(GROUP,BestCoverageEndDate)) <= CURRENTDATE() => MIN(MAX(GROUP,LexIDEnd),MAX(GROUP,BestCoverageEndDate)),
-		MAX(GROUP,VehicleGroupEnd):Null => Policy.NULLDATEVALUE,
-		MIN(MAX(GROUP,LexIDEnd),MAX(GROUP,BestCoverageEndDate), MAX(GROUP,VehicleGroupEnd))),
-		PrimaryPolicyHolderFlag := MAX(GROUP,PrimaryPolicyHolderFlag) = 1
+										MAX(GROUP,VehicleGroupEnd):Null => Policy.NULLDATEVALUE,
+										MIN(MAX(GROUP,LexIDEnd),MAX(GROUP,BestCoverageEndDate), MAX(GROUP,VehicleGroupEnd))),
+		PrimaryFlag := MAX(GROUP,IF(LexID = PrimaryPolicyHolderLexID, 1, 0)) = 1
+
 	}
 		((LexIDStart < VehicleGroupEnd OR NOT ISVALIDDATE(VehicleGroupEnd) OR VehicleGroupEnd:Null OR VehicleGroupEnd = Policy.NULLDATEVALUE) AND
 		(LexIDEnd > VehicleGroupStart OR NOT ISVALIDDATE(LexIDEnd) OR LexIDEnd:Null)), // Conditions on output eliminate empty outputs
@@ -59,4 +60,3 @@ QUERY: VehicleMasterFile(PERMITS DPM) <=
 		VehicleGroupID
 	}		
 USING DPM;
-
