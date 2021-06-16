@@ -1,4 +1,4 @@
-﻿﻿IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Entities; 
+﻿IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Entities; 
 IMPORT VehicleMasterFile_KEL.Uses;
 
 IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
@@ -6,30 +6,40 @@ FUNCTION: TimeStampToDate(TIMESTAMP x) <= ECL((STRING) x[..8]) RETURNS DATE; //m
 
 Policy: NULLDATEVALUE := DATE(0);
 
-PersonPolicy: => G_IsPrimaryPolicyHolder := PolicyHolderRelation = 'A1';
-Policy: => G_PrimaryPolicyHolderLexID := ONLY(PersonPolicy(G_IsPrimaryPolicyHolder){Subject.UID});
-
-
-VehiclePolicy: => G_AppearanceDate := MIN(MIN(CoverageStartDates,CoverageStartDate),MIN(NotificationDates,NotificationDate),FirstLoadDate);
 
 PersonPolicy: => G_BestHolderStartDate := MIN(OriginDates, OriginDate);
 PersonPolicy: => G_BestHolderEndDate := MIN(MAX(CancellationDates,CancellationDate),MAX(EndDates,EndDate));
+// this is to rank the person in a policy. Used to find out a primary holder when we have two or none primary holders in a policy for a vehicle due to data issue.
+PersonPolicy: => G_RankHolder := MAP(PolicyHolderRelation = 'A1' => 1,  PolicyHolderRelation = 'B1' => 2, 3);
+
+
+VehiclePolicy: => G_BestCoverageStartDate := MIN(MIN(CoverageStartDates,CoverageStartDate),MIN(NotificationDates,NotificationDate),FirstLoadDate);
 VehiclePolicy: => G_BestCoverageEndDate := MIN(CancellationDate,MAX(CoverageEndDates,CoverageEndDate));
 
+VehiclePolicy: => G_InvalidPolicy := G_BestCoverageStartDate >= G_BestCoverageEndDate OR COUNT(Policy.PersonPolicy(G_BestHolderEndDate > VehiclePolicy.G_BestCoverageStartDate AND G_BestHolderStartDate < VehiclePolicy.G_BestCoverageEndDate)) = 0;
 
-VehiclePolicy: => G_SameDateEndPolicy := G_AppearanceDate = G_BestCoverageEndDate;
-VehiclePolicy: => G_FirstPurchase := G_AppearanceDate = MIN(Vehicle.VehiclePolicy,G_AppearanceDate);
-VehiclePolicy: => G_PreviousAppearanceDate := MAX(Vehicle.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, G_AppearanceDate < VehiclePolicy.G_AppearanceDate,NOT G_SameDateEndPolicy,ISVALIDDATE(G_AppearanceDate)), G_AppearanceDate);
-
-VehiclePolicy: => G_HasBefore := EXISTS(Policy.PersonPolicy.Subject.PersonPolicy.Policy.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, G_AppearanceDate = VehiclePolicy.G_PreviousAppearanceDate,ISVALIDDATE(G_AppearanceDate)));
-
-
+VehiclePolicy: => G_FirstPurchase := G_BestCoverageStartDate = MIN(Vehicle.VehiclePolicy,G_BestCoverageStartDate);
+VehiclePolicy: => G_PreviousAppearanceDate := MAX(Vehicle.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, Policy !=  VehiclePolicy.Policy, G_BestCoverageStartDate <= VehiclePolicy.G_BestCoverageStartDate,NOT G_InvalidPolicy,ISVALIDDATE(G_BestCoverageStartDate)), G_BestCoverageStartDate);
+VehiclePolicy: => G_HasBefore := EXISTS(Policy.PersonPolicy.Subject.PersonPolicy.Policy.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, G_BestCoverageStartDate = VehiclePolicy.G_PreviousAppearanceDate,ISVALIDDATE(G_BestCoverageStartDate)));
 VehiclePolicy: => G_ChangedOwnership := NOT(G_FirstPurchase OR G_HasBefore);
-VehiclePolicy: => G_MinAppearanceDate := IF(G_FirstPurchase OR G_ChangedOwnership, G_AppearanceDate);
-VehiclePolicy: => G_GetMinAppearanceDate := MAX(VehiclePolicy(Vehicle = VehiclePolicy.Vehicle AND NOT G_MinAppearanceDate:Null AND VehiclePolicy.G_MinAppearanceDate:Null AND G_AppearanceDate < VehiclePolicy.G_AppearanceDate AND NOT Policy.PersonPolicy.Subject:Null AND NOT (G_AppearanceDate = G_BestCoverageEndDate)),G_AppearanceDate);
+
+
+// this is to find the min apearance date or G_BestCoverageStartDate for a ownership
+VehiclePolicy: => G_MinAppearanceDate := IF(G_FirstPurchase OR G_ChangedOwnership, G_BestCoverageStartDate);
+// this is to fill in the min apearance date or G_BestCoverageStartDate for policies in one ownership
+VehiclePolicy: => G_GetMinAppearanceDate := MAX(Vehicle.VehiclePolicy(NOT G_MinAppearanceDate:Null AND VehiclePolicy.G_MinAppearanceDate:Null AND G_BestCoverageStartDate < VehiclePolicy.G_BestCoverageStartDate AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_InvalidPolicy),G_BestCoverageStartDate);
+
+// This is to find out the latest policy in an ownership
+VehiclePolicy: => G_LatestPolicy := ONLY(TOPN(Vehicle.VehiclePolicy(VehicleGroupID = VehiclePolicy.VehicleGroupID AND NOT G_InvalidPolicy), 1, -G_BestCoverageStartDate, -G_BestCoverageEndDate), Policy);
+
+
+// this is to find out the primary holder for each policy with the latest holder_end_date																				
+VehiclePolicy: => G_PrimaryPolicyHolderLexID := ONLY(TOPN(Policy.PersonPolicy(G_BestHolderStartDate < VehiclePolicy.G_BestCoverageEndDate AND G_BestHolderEndDate > VehiclePolicy.G_BestCoverageStartDate), 1, G_RankHolder, -G_BestHolderEndDate, G_BestHolderStartDate), Subject);
+// this is to find out the primary holder for each ownership
+VehiclePolicy: => G_LatestPrimaryHolder := ONLY(Vehicle.VehiclePolicy(VehicleGroupID = VehiclePolicy.VehicleGroupID AND Policy = VehiclePolicy.G_LatestPolicy), G_PrimaryPolicyHolderLexID);
 
 
 VehiclePolicy: => VehicleGroupStart := IF(NOT G_MinAppearanceDate:Null, G_MinAppearanceDate, G_GetMinAppearanceDate);
-VehiclePolicy: => VehicleGroupEnd := MIN(Vehicle.VehiclePolicy(VehicleGroupStart > VehiclePolicy.VehicleGroupStart AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_SameDateEndPolicy),VehicleGroupStart);
+VehiclePolicy: => VehicleGroupEnd := MIN(Vehicle.VehiclePolicy(VehicleGroupStart > VehiclePolicy.VehicleGroupStart AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_InvalidPolicy),VehicleGroupStart);
 VehiclePolicy : => VehicleGroupID := TRIMBOTH(Vehicle.VIN) + '_' + DATETOSTRING(VehicleGroupStart,'%Y%m%d');
 
