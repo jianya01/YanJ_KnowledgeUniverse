@@ -6324,14 +6324,17 @@ InputPII: => PI_SrchDOBPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue <> 1 => MISSIN
 		BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForSSN.PersonInfo,999,-DateOfBirth,DateOfBirth:DateFirstSeen){DateOfBirth}),0,999));
 
 //KS-6158
-InputPII: => GoodInquiriesLastYearForAddress := Location.AddressInquiry.Transaction(IsValidVelocityInquiryNonFCRA){TransactionID,
-					SSN := ONLY(TOPN(PersonInfo, 1, -SSN), SSN), 
-					LexID:=ONLY(TOPN(PersonInfo,1,-LexID),LexID),
-					LastName := ONLY(TOPN(PersonInfo, 1, -LastName), LastName)};
-InputPII: => SrchPerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress,999,-TransactionID,TransactionID:DateFirstSeen){TransactionID}),0,999);
-InputPII: => SrchLexIDPerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress,999,-LexID,TransactionID:DateFirstSeen){LexID}),0,999);
-InputPII: => SrchLNamePerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress,999,-LastName,TransactionID:DateFirstSeen){LastName}),0,999);
-InputPII: => SrchSSNPerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress,999,-SSN,TransactionID:DateFirstSeen){SSN}),0,999);
+InputPII: => GoodInquiriesLastYearForAddress := Location.AddressInquiry.Transaction(IsValidVelocityInquiryNonFCRA)
+					{TransactionID,
+					TransactionIDFirstSeen := TransactionID:DateFirstSeen,
+					SSNRec := ONLY(TOPN(PersonInfo, 1, -SSN){SSN, SSNDateFirstSeen := SSN:DateFirstSeen}),
+					LexIDRec := ONLY(TOPN(PersonInfo, 1, -LexID){LexID, LexIDDateFirstSeen := LexID:DateFirstSeen}),
+					LastNameRec := ONLY(TOPN(PersonInfo, 1, -LastName){LastName, LastNameDateFirstSeen := LastName:DateFirstSeen})
+					};
+InputPII: => SrchPerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress, 999, -TransactionID, TransactionIDFirstSeen){TransactionID}), 0, 999);
+InputPII: => SrchSSNPerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress, 999, -SSNRec.SSN, SSNRec.SSNDateFirstSeen){SSNRec.SSN}), 0, 999);
+InputPII: => SrchLexIDPerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress, 999, -LexIDRec.LexID, LexIDRec.LexIDDateFirstSeen){LexIDRec.LexID}), 0, 999);
+InputPII: => SrchLNamePerInpAddrCnt1Y := BOUNDSFOLD(COUNT(TOPN(GoodInquiriesLastYearForAddress, 999, -LastNameRec.LastName, LastNameRec.LastNameDateFirstSeen){LastNameRec.LastName}), 0, 999);
 
 
 InputPII: => PI_SrchPerInpAddrCnt1Y := IF( P_InpClnAddrFullFlagValue IN [MISSING_INPUT_DATA,'0'], MISSING_INPUT_DATA_INT,SrchPerInpAddrCnt1Y);
