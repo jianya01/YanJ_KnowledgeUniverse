@@ -3644,6 +3644,30 @@ Person: => PL_BestDOBAge:= MAP(
 			P_LexIDSeenFlag = '0' OR BestDOBAge:Null => MISSING_INPUT_DATA_INT,
 			//BestDOBAge:Null => NO_DATA_FOUND_INT,
 			BestDOBAge);
+//Best Phone
+// Phone: PHONE_PLUS_RAW_SOURCES := ['IR','01','02','05','IO','PP','WO','WR','WP','GO','IQ','IB','MT','T$','AY','L9','N2'];//Not needed for now but logic might change in the future and this might be required.
+Phone.DataSources : => TranslatedSourceCode := SourceGroup(Source);
+Person: => BestPhoneCandidates := PersonPhone{ PhoneNumber.Phone10, //Neg means add - in the TopN to find biggest
+						SortCriteria1Neg := DEFAULT(IF(YEARSBETWEEN(MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen)),D'19000101'),
+						SortCriteria2Neg := COUNT(DataSources{TranslatedSourceCode}),
+						SortCriteria3ANeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen), Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen)),D'19000101'),//Phones Plus
+						// SortCriteria3ANeg := IF(YEARSBETWEEN(MAX(PhoneNumber.DataSources(Source IN Phone.PHONE_PLUS_RAW_SOURCES),Source:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(PhoneNumber.DataSources(Source IN Phone.PHONE_PLUS_RAW_SOURCES),Source:DateLastSeen),DATE('19000000')),//Phones Plus NonFCRA only
+						SortCriteria3BNeg := DEFAULT(IF(YEARSBETWEEN(MAX(DataSources(HeaderHitFlag),TranslatedSourceCode:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(DataSources(HeaderHitFlag),TranslatedSourceCode:DateLastSeen)),D'19000101'),//Header
+						SortCriteria3CNeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'GN'),Source:DateLastSeen),Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'GN'),Source:DateLastSeen)),D'19000101'),//Gong Current
+						SortCriteria3DNeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'GO'),Source:DateLastSeen),Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'GO'),Source:DateLastSeen)),D'19000101'),//Gong History
+						SortCriteria3ENeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'IR'),Source:DateLastSeen),Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'IR'),Source:DateLastSeen)),D'19000101'),//Infutor
+						SortCriteria4Neg := DEFAULT(ABS(YEARSBETWEEN(ONLY(PhoneNumber,Phone10:DateFirstSeen), ONLY(PhoneNumber,Phone10:DateLastSeen))),0),
+						SortCriteria5Neg := PhoneNumber.Phone10 = Subject.P_InpClnPhoneHome};
+Person: => BestPhoneNonFCRA := ONLY(TOPN(BestPhoneCandidates, 1, -SortCriteria1Neg, -SortCriteria2Neg, -SortCriteria3ANeg,-SortCriteria3BNeg,-SortCriteria3CNeg,-SortCriteria3DNeg,-SortCriteria3ENeg,-SortCriteria4Neg,-SortCriteria5Neg),Phone10);						
+Person: => BestPhoneFCRA := ONLY(TOPN(BestPhoneCandidates, 1, -SortCriteria1Neg, -SortCriteria2Neg, -SortCriteria3BNeg,-SortCriteria3CNeg,-SortCriteria3DNeg,-SortCriteria3ENeg,-SortCriteria4Neg,-SortCriteria5Neg),Phone10);						
+Person: => PL_BestPhoneHomeFCRA:= MAP(
+			P_LexIDSeenFlagFCRA = '0' => MISSING_INPUT_DATA,
+			BestPhoneFCRA:Null => NO_DATA_FOUND,
+			BestPhoneFCRA);
+Person: => PL_BestPhoneHomeNonFCRA:= MAP(
+			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+			BestPhoneNonFCRA:Null => NO_DATA_FOUND,
+			BestPhoneNonFCRA);
 
 /**************************************************************************/
 /*                                                                        */
@@ -11969,7 +11993,7 @@ InputPII: => P_InpValAddrZipMismatchIndx := MAP((P_InpClnAddrCityFlagValue IN [M
 						ZIP5.UID = Subject.P_InpClnAddrZip5 AND ZIP5.State != Subject.P_InpClnAddrState AND ZIP5.City = P_InpClnAddrCity => '2', '3');
 
 	//KS 6536
-// PersonPhone.DataSources: => TranslatedSourceCode := SourceGroup(Source);
+PersonPhone.DataSources: => TranslatedSourceCode := SourceGroup(Source);
 // PersonPhone: => TranslatedSources := DataSources(TranslatedSourceCode IN PersonPhone.GOODPHONESOURCES OR TranslatedSourceCode IN PersonPhone.OTHERSOURCES){TranslatedSourceCode};
 // PersonPhone: => PhoneIsVerified := IsPhoneMatch(PhoneNumber,Subject.PII.P_InpClnPhoneHome);
 // PersonPhone: GOODPHONESOURCES := ['AK', 'AM', 'AR', 'BA', 'CG', 'CY', 'D', 'DA', 'DE', 'EB', 'EL', 'EM', 'EN', 'EQ', 'FE', 'FF', 'FR', 'L2', 'MW', 'NT', 'P', 'PL', 'S1', 'SL', 'TN', 'TS', 'TU', 'U', 'V', 'VO', 'W', 'WP', 'IR', '01', '02', '05', 'IO', 'PN', 'GO', 'VW', 'DW', 'PQ', 'WR', 'WO', 'IQ', 'TM', 'T$', 'AO', 'l9', 'N2', 'GN'];
