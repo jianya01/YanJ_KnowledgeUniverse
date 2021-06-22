@@ -221,6 +221,10 @@ FUNCTION: IsFirstNameMatch(STRING FirstName1, STRING FirstName2) <=
 		(LENGTH(FirstName1) > 4 OR LENGTH(FirstName2) > 4) AND LevenshteinSimilarity(FirstName1, FirstName2) > 0.6 => TRUE,
 		LENGTH(FirstName1) < 5 AND LENGTH(FirstName2) < 5 AND LevenshteinSimilarity(FirstName1, FirstName2) > 0.5 => TRUE,
 		FALSE);
+FUNCTION: IsFirstNameMiskeyMatch(STRING FirstName1, STRING FirstName2) <=
+		MAP((LENGTH(FirstName1) > 4 OR LENGTH(FirstName2) > 4) AND LevenshteinSimilarity(FirstName1, FirstName2) > 0.6 => TRUE,
+		LENGTH(FirstName1) < 5 AND LENGTH(FirstName2) < 5 AND LevenshteinSimilarity(FirstName1, FirstName2) > 0.5 => TRUE,
+		FALSE);
 /*Last Name Matching Logic:
 	1. Exact match (Verified)
 		a. (P_InpClnNameLast = lname)
@@ -240,7 +244,10 @@ FUNCTION: IsLastNameMatch(STRING LastName1, STRING LastName2) <=
 		(LENGTH(LastName1) > 4 OR LENGTH(LastName2) > 4) AND LevenshteinSimilarity(LastName1, LastName2) > 0.6 => TRUE,
 		LENGTH(LastName1) < 5 AND LENGTH(LastName2) < 5 AND LevenshteinSimilarity(LastName1, LastName2) > 0.5 => TRUE,
 		FALSE);
-
+FUNCTION: IsLastNameMiskeyMatch(STRING LastName1, STRING LastName2) <=
+		MAP((LENGTH(LastName1) > 4 OR LENGTH(LastName2) > 4) AND LevenshteinSimilarity(LastName1, LastName2) > 0.6 => TRUE,
+		LENGTH(LastName1) < 5 AND LENGTH(LastName2) < 5 AND LevenshteinSimilarity(LastName1, LastName2) > 0.5 => TRUE,
+		FALSE);
 //These functions are for inferred performance attributes. If the datefirstseen is within the time frame the data can be used for those attributes.	
 //Unfortunately for now you have to pass in CURRENTDATE() into the second parameter as CURRENTDATE() within a function creates broken ECL. There is no timeline for a fix as this workaround exists.	
 FUNCTION: WithinF6M(DATE InputDate, DATE reference) <= InputDate <= ADJUSTCALENDAR(reference, -1, -6, 0) AND InputDate >= ADJUSTCALENDAR(reference, -2, 0, 0) AND ISVALIDDATE( InputDate);
@@ -11193,6 +11200,25 @@ Person: => PL_VerSSNSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN
 																					PL_VerSSNSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
 																					PL_VerSSNSrcNewDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
 																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerSSNSrcNewDtEvFCRA),Person.CURRENT_DATE),0,960));   
+																					
+																					
+Person: => PersonSSNMatchTypeAll := PersonSSN(InputSSNMatch).ValidSSN{
+	ValidSSN,
+	SSNTypeFirstSeenDate := IF(ISVALIDDATE(ValidSSN:DateFirstSeen), DATETOSTRING(MIN(ValidSSN:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.MAX_DATE)};
+
+Person: => SSNVerTypeNewestListSorted := TOPN(PersonSSNMatchTypeAll, 1, -SSNTypeFirstSeenDate);
+
+Person: => SSNVerTypeNewestSSNType := ONLY(SSNVerTypeNewestListSorted, ValidSSN);
+
+Person: => PL_VerSSNType := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,																	 
+																	 PL_VerSSNSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																	 SSNVerTypeNewestSSNType IN ['G','Z','R','O','F'] => SSNVerTypeNewestSSNType,
+																	 NO_DATA_FOUND_97);
+	
+Person: => PL_VerSSNTypeFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,																	 
+																	 PL_VerSSNSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+																	 SSNVerTypeNewestSSNType IN ['G','Z','R','O','F'] => SSNVerTypeNewestSSNType,
+																	 NO_DATA_FOUND_97);
 
 
 // Address Verification Sources Helper Attributes
@@ -12148,6 +12174,58 @@ Person: => PL_VerSSNSrcBureauOnlyFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_In
 				PL_VerSSNSrcBureauCntEvFCRA < 1 => NO_DATA_FOUND,
 				IsBureauOnlySSNSourceFCRA => '1',
 				'0');
+				
+//KS-2362 MiskeyFlags																							 
+																							 
+Person.FullName: => VerifiedMiskeyFirstName := IsFirstNameMiskeyMatch(FirstName, Person.P_InpClnNameFirst);
+
+Person.FullName: => VerifiedMiskeyLastName := IsLastNameMiskeyMatch(LastName, Person.P_InpClnNameLast);
+
+Person: => PL_VerNameFirstMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerNameFirstSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								FullName(VerifiedMiskeyFirstName) => '1',
+								'0');
+Person: => PL_VerNameFirstMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerNameFirstSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								FullName(VerifiedMiskeyFirstName) => '1',
+								'0');
+								
+Person: => PL_VerNameLastMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerNameLastSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								FullName(VerifiedMiskeyLastName) => '1',
+								'0');
+Person: => PL_VerNameLastMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerNameLastSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								FullName(VerifiedMiskeyLastName) => '1',
+								'0');
+								
+Person: => PL_VerAddrMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+								PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+							  PersonAddress(CuurentLevenshteinMatch) => '1',
+								'0');
+Person: => PL_VerAddrMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+								PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+							  PersonAddress(CuurentLevenshteinMatch) => '1',
+								'0');
+
+Person: => PL_VerSSNMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerSSNSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								PersonSSN(InputSSNMatch) => '1',
+								'0');
+Person: => PL_VerSSNMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerSSNSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								PersonSSN(InputSSNMatch) => '1',
+								'0');
+
+Person: => PL_VerDOBMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerDOBSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								ValidDOBLogicCheck4 => '1',
+								'0');
+Person: => PL_VerDOBMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerDOBSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								ValidDOBLogicCheck4 => '1',
+								'0');
+
 /**************************************************************************/
 /*                                                                        */
 /*                           Innovis Attributes                           */
