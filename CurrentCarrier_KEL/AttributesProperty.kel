@@ -207,7 +207,14 @@ PolicyProperty: C_GRACETIME := 10;//lapse
 // Grab the Policy linked to this Report with the most recent PeriodEndDate, using the most recent PeriodStartDate as a tie-breaker
 // Report: => FirstPolicyPeriodEndDate := ONLY(TOPN(Policy, 1, -SubjectEndDatePolicy, -SubjectBeginDatePolicy)); 
 
-Policy: => G_ValidPolicy := EXISTS(Subject) AND InsuranceType = 'PP' AND (SubjectEndDatePolicy > InceptionDate);
+// Policy: => G_ValidPolicy := EXISTS(Subject) AND InsuranceType = 'PP' AND (SubjectEndDatePolicy > InceptionDate);//Intermediate
+// Policy: => G_ValidPolicy := EXISTS(Subject) AND (SubjectEndDatePolicy > InceptionDate) AND DataSource = 'SubjectSearchBatch';//Batch
+
+Policy: => G_ValidPolicy := EXISTS(Subject) AND 
+													(InsuranceType = 'PP' OR (InsuranceType:Null AND NOT DataSource:Null)) AND // For Intermediate the InsuranceType == ‘PP, but for Batch InsuranceType isn’t populated, but DataSource is
+													(SubjectEndDatePolicy > InceptionDate) AND 
+													DataSource != 'RiskAddressSearchBatch';
+
 
 Policy: => G_Current := CheckCP1 OR CheckCP2;
 
@@ -286,7 +293,8 @@ Report: => G_SetDefault3RiskS := NOT EXISTS(Policy(G_ValidPolicy AND G_PolicyTen
 Report: => G_SetDefault3ProptyP := NOT EXISTS(Policy(G_ValidPolicy AND G_PolicyTenure >= 0)); //all are future policies
 
 //drop all future policy when counting
-Policy: => G_CountablePolicy := G_ValidPolicy AND (G_PolicyTenure >= 0);
+Policy: => G_CountablePolicy := G_ValidPolicy AND (G_PolicyTenure >= 0);//intermediate
+// Policy: => G_CountablePolicy := EXISTS(Subject) AND (SubjectEndDatePolicy > InceptionDate) AND (G_PolicyTenure >= 0) AND DataSource = 'SubjectSearchBatch';//batch data
 
 //****************************Attribute Pack 2****************************/
 Report: => H_CntDistAmbestNumber := MAP(G_SetDefault1  => DEFAULT_1,
@@ -302,7 +310,7 @@ Report: => I_CntDistAmbestNumberHO := MIN(H_CntDistAmbestNumberHO,CAP_999);
 
 
 Report: => H_CntDistAmbestNumberProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-																					G_SetDefault2HO => DEFAULT_2,
+																					G_SetDefault2ProptyP => DEFAULT_2,
 																					G_SetDefault3 => DEFAULT_3, 
 																					COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty){Ambest}));
 Report: => I_CntDistAmbestNumberProptyP := MIN(H_CntDistAmbestNumberProptyP,CAP_999);
@@ -333,7 +341,7 @@ Report: => I_CntDistAmbestNumber1YHO := MIN(H_CntDistAmbestNumber1YHO,CAP_999);
 
 
 Report: => H_CntDistAmbestNumber1YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-											G_SetDefault2HO => DEFAULT_2,
+											G_SetDefault2ProptyP => DEFAULT_2,
 											G_SetDefault3 => DEFAULT_3, 
 											COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 12){Ambest}));
 Report: => I_CntDistAmbestNumber1YProptyP := MIN(H_CntDistAmbestNumber1YProptyP,CAP_999);
@@ -364,7 +372,7 @@ Report: => I_CntDistAmbestNumber2YHO := MIN(H_CntDistAmbestNumber2YHO,CAP_999);
 
 
 Report: => H_CntDistAmbestNumber2YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-											G_SetDefault2HO => DEFAULT_2,
+											G_SetDefault2ProptyP => DEFAULT_2,
 											G_SetDefault3 => DEFAULT_3, 
 											COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24){Ambest}));
 Report: => I_CntDistAmbestNumber2YProptyP := MIN(H_CntDistAmbestNumber2YProptyP,CAP_999);
@@ -395,7 +403,7 @@ Report: => I_CntDistAmbestNumber3YHO := MIN(H_CntDistAmbestNumber3YHO,CAP_999);
 
 
 Report: => H_CntDistAmbestNumber3YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-											G_SetDefault2HO => DEFAULT_2,
+											G_SetDefault2ProptyP => DEFAULT_2,
 											G_SetDefault3 => DEFAULT_3, 
 											COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 36){Ambest}));
 Report: => I_CntDistAmbestNumber3YProptyP := MIN(H_CntDistAmbestNumber3YProptyP,CAP_999);
@@ -428,7 +436,7 @@ Report: => I_CntDistAmbestNumber4YHO := MIN(H_CntDistAmbestNumber4YHO,CAP_999);
 
 
 Report: => H_CntDistAmbestNumber4YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-											G_SetDefault2HO => DEFAULT_2,
+											G_SetDefault2ProptyP => DEFAULT_2,
 											G_SetDefault3 => DEFAULT_3, 
 											COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48){Ambest}));
 Report: => I_CntDistAmbestNumber4YProptyP := MIN(H_CntDistAmbestNumber4YProptyP,CAP_999);
@@ -459,7 +467,7 @@ Report: => I_CntDistAmbestNumber5YHO := MIN(H_CntDistAmbestNumber5YHO,CAP_999);
 
 
 Report: => H_CntDistAmbestNumber5YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-											G_SetDefault2HO => DEFAULT_2,
+											G_SetDefault2ProptyP => DEFAULT_2,
 											G_SetDefault3 => DEFAULT_3, 
 											COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60){Ambest}));
 Report: => I_CntDistAmbestNumber5YProptyP := MIN(H_CntDistAmbestNumber5YProptyP,CAP_999);
@@ -491,7 +499,7 @@ Report: => I_CntDistAmbestNumber6YHO := MIN(H_CntDistAmbestNumber6YHO,CAP_999);
 
 
 Report: => H_CntDistAmbestNumber6YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-											G_SetDefault2HO => DEFAULT_2,
+											G_SetDefault2ProptyP => DEFAULT_2,
 											G_SetDefault3 => DEFAULT_3, 
 											COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 72){Ambest}));
 Report: => I_CntDistAmbestNumber6YProptyP := MIN(H_CntDistAmbestNumber6YProptyP,CAP_999);
@@ -522,7 +530,7 @@ Report: => I_CntDistAmbestNumber7YHO := MIN(H_CntDistAmbestNumber7YHO,CAP_999);
 
 
 Report: => H_CntDistAmbestNumber7YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-											G_SetDefault2HO => DEFAULT_2,
+											G_SetDefault2ProptyP => DEFAULT_2,
 											G_SetDefault3 => DEFAULT_3, 
 											COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 84){Ambest}));
 Report: => I_CntDistAmbestNumber7YProptyP := MIN(H_CntDistAmbestNumber7YProptyP,CAP_999);
@@ -3787,7 +3795,7 @@ Report: => H_AvgOverallDeduct3YHO := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2HO => DEFAULT_2,
                                   G_SetDefault3HO => DEFAULT_3, 
 																		G_SetDefault4OverallDeduct3YHO => DEFAULT_4,  
-																		G_SetDefault4OverallDeduct => DEFAULT_4,
+																		// G_SetDefault4OverallDeduct => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 36),OverallDeductible));
 Report: => R_AvgOverallDeduct3YHO := MIN(ROUND2(H_AvgOverallDeduct3YHO), CAP_99999999_99);
 
@@ -3812,86 +3820,90 @@ Report: => R_AvgOverallDeduct3YProptyP := MIN(ROUND2(H_AvgOverallDeduct3YProptyP
 // R_MinTheftDeduct
 // R_MinTheftDeductHO
 // R_MinTheftDeductProptyP
+Policy: => MinTheftDeductible := MIN(PolicyProperty, TheftDeductible);
+Policy: => MinOverallDeductible := MIN(PolicyProperty, OverallDeductible);
+Policy: => MaxTheftDeductible := MAX(PolicyProperty, TheftDeductible);
+Policy: => MaxOverallDeductible := MAX(PolicyProperty, OverallDeductible);
 
 Report: => H_MinOverallDeduct := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3,  
 																		G_SetDefault4OverallDeduct => DEFAULT_4,
-                                    MIN(Policy(G_CountablePolicy),OverallDeductible));
+                                    MIN(Policy(G_CountablePolicy),MinOverallDeductible));
 Report: => R_MinOverallDeduct := MIN(ROUND2(H_MinOverallDeduct), CAP_99999999_99);
 
 Report: => H_MinOverallDeductHO := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2HO => DEFAULT_2,
                                   G_SetDefault3HO => DEFAULT_3,  
 																		G_SetDefault4OverallDeductHO => DEFAULT_4,
-                                    MIN(Policy(G_CountablePolicy AND G_HOPolicy),OverallDeductible));
+                                    MIN(Policy(G_CountablePolicy AND G_HOPolicy),MinOverallDeductible));
 Report: => R_MinOverallDeductHO := MIN(ROUND2(H_MinOverallDeductHO), CAP_99999999_99);
 
 Report: => H_MinOverallDeductProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2ProptyP => DEFAULT_2,
                                   G_SetDefault3ProptyP => DEFAULT_3,  
 																		G_SetDefault4OverallDeductProptyP => DEFAULT_4,
-                                    MIN(Policy(G_CountablePolicy AND G_PrimaryProperty),OverallDeductible));
+                                    MIN(Policy(G_CountablePolicy AND G_PrimaryProperty),MinOverallDeductible));
 Report: => R_MinOverallDeductProptyP := MIN(ROUND2(H_MinOverallDeductProptyP), CAP_99999999_99);
 
 Report: => H_MinTheftDeduct := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3, 
 																		G_SetDefault4TheftDeduct => DEFAULT_4,
-                                    MIN(Policy(G_CountablePolicy),TheftDeductible));
+                                    MIN(Policy(G_CountablePolicy),MinTheftDeductible));
 Report: => R_MinTheftDeduct := MIN(ROUND2(H_MinTheftDeduct), CAP_99999999_99);
 
 Report: => H_MinTheftDeductHO := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2HO => DEFAULT_2,
                                   G_SetDefault3HO => DEFAULT_3, 
 																		G_SetDefault4TheftDeductHO => DEFAULT_4,
-                                    MIN(Policy(G_CountablePolicy AND G_HOPolicy),TheftDeductible));
+                                    MIN(Policy(G_CountablePolicy AND G_HOPolicy),MinTheftDeductible));
 Report: => R_MinTheftDeductHO := MIN(ROUND2(H_MinTheftDeductHO), CAP_99999999_99);
 
 Report: => H_MinTheftDeductProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2ProptyP => DEFAULT_2,
                                   G_SetDefault3ProptyP => DEFAULT_3, 
 																		G_SetDefault4TheftDeductProptyP => DEFAULT_4,
-                                    MIN(Policy(G_CountablePolicy AND G_PrimaryProperty),TheftDeductible));
+                                    MIN(Policy(G_CountablePolicy AND G_PrimaryProperty),MinTheftDeductible));
 Report: => R_MinTheftDeductProptyP := MIN(ROUND2(H_MinTheftDeductProptyP), CAP_99999999_99);
 
 
 Report: => H_MaxOverallDeduct := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3,  
 																		G_SetDefault4OverallDeduct => DEFAULT_4,
-                                    MAX(Policy(G_CountablePolicy),OverallDeductible));
+                                    MAX(Policy(G_CountablePolicy),MaxOverallDeductible));
 Report: => R_MaxOverallDeduct := MIN(ROUND2(H_MaxOverallDeduct), CAP_99999999_99);
 
 Report: => H_MaxOverallDeductHO := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2HO => DEFAULT_2,
                                   G_SetDefault3HO => DEFAULT_3,  
 																		G_SetDefault4OverallDeductHO => DEFAULT_4,
-                                    MAX(Policy(G_CountablePolicy AND G_HOPolicy),OverallDeductible));
+                                    MAX(Policy(G_CountablePolicy AND G_HOPolicy),MaxOverallDeductible));
 Report: => R_MaxOverallDeductHO := MIN(ROUND2(H_MaxOverallDeductHO), CAP_99999999_99);
 
 Report: => H_MaxOverallDeductProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2ProptyP => DEFAULT_2,
                                   G_SetDefault3ProptyP => DEFAULT_3, 
 																		G_SetDefault4OverallDeductProptyP => DEFAULT_4, 
-                                    MAX(Policy(G_CountablePolicy AND G_PrimaryProperty),OverallDeductible));
+                                    MAX(Policy(G_CountablePolicy AND G_PrimaryProperty),MaxOverallDeductible));
 Report: => R_MaxOverallDeductProptyP := MIN(ROUND2(H_MaxOverallDeductProptyP), CAP_99999999_99);
 
 Report: => H_MaxTheftDeduct := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3, 
 																		G_SetDefault4TheftDeduct => DEFAULT_4,
-                                    MAX(Policy(G_CountablePolicy),TheftDeductible));
+                                    MAX(Policy(G_CountablePolicy),MaxTheftDeductible));
 Report: => R_MaxTheftDeduct := MIN(ROUND2(H_MaxTheftDeduct), CAP_99999999_99);
 
 Report: => H_MaxTheftDeductHO := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2HO => DEFAULT_2,
                                   G_SetDefault3HO => DEFAULT_3, 
 																		G_SetDefault4TheftDeductHO => DEFAULT_4,
-                                    MAX(Policy(G_CountablePolicy AND G_HOPolicy),TheftDeductible));
+                                    MAX(Policy(G_CountablePolicy AND G_HOPolicy),MaxTheftDeductible));
 Report: => R_MaxTheftDeductHO := MIN(ROUND2(H_MaxTheftDeductHO), CAP_99999999_99);
 
 Report: => H_MaxTheftDeductProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2ProptyP => DEFAULT_2,
                                   G_SetDefault3ProptyP => DEFAULT_3, 
 																		G_SetDefault4TheftDeductProptyP => DEFAULT_4,
-                                    MAX(Policy(G_CountablePolicy AND G_PrimaryProperty),TheftDeductible));
+                                    MAX(Policy(G_CountablePolicy AND G_PrimaryProperty),MaxTheftDeductible));
 Report: => R_MaxTheftDeductProptyP := MIN(ROUND2(H_MaxTheftDeductProptyP), CAP_99999999_99);
 
 
@@ -3987,9 +3999,9 @@ Report: => H_AvgFLIndivLimit3Y := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => R_AvgFLIndivLimit3Y := MIN(ROUND2(H_AvgFLIndivLimit3Y), CAP_99999999_99);
 
 Report: => H_AvgFLIndivLimit3YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-										G_SetDefault2ProptyP => DEFAULT_2,
-										G_SetDefault3ProptyP => DEFAULT_3, 
-										G_SetDefault4IndLimit3YProptyP => DEFAULT_4,
+																							G_SetDefault2ProptyP => DEFAULT_2,
+																							G_SetDefault3ProptyP => DEFAULT_3, 
+																							G_SetDefault4IndLimit3YProptyP => DEFAULT_4,
                                     MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 36),AvgIndividualLimit));
 Report: => R_AvgFLIndivLimit3YProptyP := MIN(ROUND2(H_AvgFLIndivLimit3YProptyP), CAP_99999999_99);
 
@@ -3998,15 +4010,15 @@ Report: => G_SetDefault4IndLimit4YProptyP := NOT EXISTS(Policy(G_CountablePolicy
 
 Report: => H_AvgFLIndivLimit4Y := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3, 
-									G_SetDefault4IndLimit4Y => DEFAULT_4, 
+																		G_SetDefault4IndLimit4Y => DEFAULT_4, 
                                     MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48),AvgIndividualLimit));
 Report: => R_AvgFLIndivLimit4Y := MIN(ROUND2(H_AvgFLIndivLimit4Y), CAP_99999999_99);
 
 Report: => H_AvgFLIndivLimit4YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-										G_SetDefault2ProptyP => DEFAULT_2,
-										G_SetDefault3ProptyP => DEFAULT_3, 
-										G_SetDefault4IndLimit4YProptyP => DEFAULT_4,
-                                    MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48),AvgIndividualLimit));
+																						G_SetDefault2ProptyP => DEFAULT_2,
+																						G_SetDefault3ProptyP => DEFAULT_3, 
+																						G_SetDefault4IndLimit4YProptyP => DEFAULT_4,
+																			MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48),AvgIndividualLimit));
 Report: => R_AvgFLIndivLimit4YProptyP := MIN(ROUND2(H_AvgFLIndivLimit4YProptyP), CAP_99999999_99);
 
 Report: => G_SetDefault4IndLimit5Y := NOT EXISTS(Policy(G_CountablePolicy AND G_FLPolicy AND NOT AvgIndividualLimit:Null AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60));
@@ -4014,14 +4026,14 @@ Report: => G_SetDefault4IndLimit5YProptyP := NOT EXISTS(Policy(G_CountablePolicy
 
 Report: => H_AvgFLIndivLimit5Y := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3, 
-									G_SetDefault4IndLimit5Y => DEFAULT_4, 
+																		G_SetDefault4IndLimit5Y => DEFAULT_4, 
                                     MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60),AvgIndividualLimit));
 Report: => R_AvgFLIndivLimit5Y := MIN(ROUND2(H_AvgFLIndivLimit5Y), CAP_99999999_99);
 
 Report: => H_AvgFLIndivLimit5YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-										G_SetDefault2ProptyP => DEFAULT_2,
-										G_SetDefault3ProptyP => DEFAULT_3, 
-										G_SetDefault4IndLimit5YProptyP => DEFAULT_4,
+																						G_SetDefault2ProptyP => DEFAULT_2,
+																						G_SetDefault3ProptyP => DEFAULT_3, 
+																						G_SetDefault4IndLimit5YProptyP => DEFAULT_4,
                                     MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60),AvgIndividualLimit));
 Report: => R_AvgFLIndivLimit5YProptyP := MIN(ROUND2(H_AvgFLIndivLimit5YProptyP), CAP_99999999_99);
 
@@ -4031,14 +4043,14 @@ Report: => G_SetDefault4IndLimit6YProptyP := NOT EXISTS(Policy(G_CountablePolicy
 
 Report: => H_AvgFLIndivLimit6Y := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3, 
-									G_SetDefault4IndLimit6Y => DEFAULT_4, 
+																		G_SetDefault4IndLimit6Y => DEFAULT_4, 
                                     MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 72),AvgIndividualLimit));
 Report: => R_AvgFLIndivLimit6Y := MIN(ROUND2(H_AvgFLIndivLimit6Y), CAP_99999999_99);
 
 Report: => H_AvgFLIndivLimit6YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-										G_SetDefault2ProptyP => DEFAULT_2,
-										G_SetDefault3ProptyP => DEFAULT_3, 
-										G_SetDefault4IndLimit6YProptyP => DEFAULT_4,
+																	G_SetDefault2ProptyP => DEFAULT_2,
+																	G_SetDefault3ProptyP => DEFAULT_3, 
+																	G_SetDefault4IndLimit6YProptyP => DEFAULT_4,
                                     MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 72),AvgIndividualLimit));
 Report: => R_AvgFLIndivLimit6YProptyP := MIN(ROUND2(H_AvgFLIndivLimit6YProptyP), CAP_99999999_99);
 
@@ -4047,14 +4059,14 @@ Report: => G_SetDefault4IndLimit7YProptyP := NOT EXISTS(Policy(G_CountablePolicy
 
 Report: => H_AvgFLIndivLimit7Y := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3, 
-									G_SetDefault4IndLimit7Y => DEFAULT_4, 
+																		G_SetDefault4IndLimit7Y => DEFAULT_4, 
                                     MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 84),AvgIndividualLimit));
 Report: => R_AvgFLIndivLimit7Y := MIN(ROUND2(H_AvgFLIndivLimit7Y), CAP_99999999_99);
 
 Report: => H_AvgFLIndivLimit7YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-										G_SetDefault2ProptyP => DEFAULT_2,
-										G_SetDefault3ProptyP => DEFAULT_3, 
-										G_SetDefault4IndLimit7YProptyP => DEFAULT_4,
+																	G_SetDefault2ProptyP => DEFAULT_2,
+																	G_SetDefault3ProptyP => DEFAULT_3, 
+																	G_SetDefault4IndLimit7YProptyP => DEFAULT_4,
                                     MAX(Policy(G_CountablePolicy AND G_FLPolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 84),AvgIndividualLimit));
 Report: => R_AvgFLIndivLimit7YProptyP := MIN(ROUND2(H_AvgFLIndivLimit7YProptyP), CAP_99999999_99);
 
@@ -4099,7 +4111,7 @@ Report: => R_MaxIndivLimitBUSP := MIN(ROUND2(H_MaxIndivLimitBUSP), CAP_99999999_
 Report: => H_MaxIndivLimitBUSPProptyP := MAP(G_SetDefault1  => DEFAULT_1,
 																					G_SetDefault2ProptyP => DEFAULT_2,
 																					G_SetDefault3ProptyP => DEFAULT_3,  
-																		G_SetDefault4IndLimitBUSPProptyP => DEFAULT_4,
+																					G_SetDefault4IndLimitBUSPProptyP => DEFAULT_4,
                                     MAX(Policy(G_CountablePolicy),AvgIndividualLimitBUSP));
 Report: => R_MaxIndivLimitBUSPProptyP := MIN(ROUND2(H_MaxIndivLimitBUSPProptyP), CAP_99999999_99);
 
@@ -4112,7 +4124,7 @@ Report: => R_MinIndivLimitBUSP := MIN(ROUND2(H_MinIndivLimitBUSP), CAP_99999999_
 Report: => H_MinIndivLimitBUSPProptyP := MAP(G_SetDefault1  => DEFAULT_1,
 																					G_SetDefault2ProptyP => DEFAULT_2,
 																					G_SetDefault3ProptyP => DEFAULT_3,  
-																		G_SetDefault4IndLimitBUSP => DEFAULT_4,
+																					G_SetDefault4IndLimitBUSP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitBUSP));
 Report: => R_MinIndivLimitBUSPProptyP := MIN(ROUND2(H_MinIndivLimitBUSPProptyP), CAP_99999999_99);
 
@@ -4126,7 +4138,7 @@ Report: => R_AvgIndivLimitBUSP := MIN(ROUND2(H_AvgIndivLimitBUSP), CAP_99999999_
 Report: => H_AvgIndivLimitBUSPProptyP := MAP(G_SetDefault1  => DEFAULT_1,
 																					G_SetDefault2ProptyP => DEFAULT_2,
 																					G_SetDefault3ProptyP => DEFAULT_3,  
-																		G_SetDefault4IndLimitBUSPProptyP => DEFAULT_4,
+																					G_SetDefault4IndLimitBUSPProptyP => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy),AvgIndividualLimitBUSP));
 Report: => R_AvgIndivLimitBUSPProptyP := MIN(ROUND2(H_AvgIndivLimitBUSPProptyP), CAP_99999999_99);
 
@@ -4140,7 +4152,7 @@ Report: => R_AvgIndivLimitBUSP1Y := MIN(ROUND2(H_AvgIndivLimitBUSP1Y), CAP_99999
 Report: => H_AvgIndivLimitBUSP1YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                           G_SetDefault2ProptyP => DEFAULT_2,
                                           G_SetDefault3ProptyP => DEFAULT_3, 
-																		G_SetDefault4IndLimitBUSP1YProptyP => DEFAULT_4, 
+																					G_SetDefault4IndLimitBUSP1YProptyP => DEFAULT_4, 
                                     AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 12),AvgIndividualLimitBUSP));
 Report: => R_AvgIndivLimitBUSP1YProptyP := MIN(ROUND2(H_AvgIndivLimitBUSP1YProptyP), CAP_99999999_99);
 
@@ -4153,7 +4165,7 @@ Report: => R_AvgIndivLimitBUSP3Y := MIN(ROUND2(H_AvgIndivLimitBUSP3Y), CAP_99999
 Report: => H_AvgIndivLimitBUSP3YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                           G_SetDefault2ProptyP => DEFAULT_2,
                                           G_SetDefault3ProptyP => DEFAULT_3,  
-																		G_SetDefault4IndLimitBUSP3YProptyP => DEFAULT_4,
+																					G_SetDefault4IndLimitBUSP3YProptyP => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 36),AvgIndividualLimitBUSP));
 Report: => R_AvgIndivLimitBUSP3YProptyP := MIN(ROUND2(H_AvgIndivLimitBUSP3YProptyP), CAP_99999999_99);
 
@@ -4171,7 +4183,9 @@ Report: => R_AvgIndivLimitBUSP3YProptyP := MIN(ROUND2(H_AvgIndivLimitBUSP3YPropt
 // PolicyProperty: => AvgIndividualLimitCOVA := AVE(MostRecentTermPerProperty(CoverageType IN C_COVERAGE_COVA),IndividualLimit);
 
 PolicyProperty: => AvgIndividualLimitCOVA := AVE(Coverages((CoverageType IN C_COVERAGE_COVA) AND (IndividualLimit > 0)),IndividualLimit);
-Policy: => AvgIndividualLimitCOVA := AVE(PolicyProperty,AvgIndividualLimitCOVA);
+PolicyProperty: => ExistCOVA := EXISTS(Coverages(CoverageType IN C_COVERAGE_COVA));
+Policy: => AvgIndividualLimitCOVA := AVE(PolicyProperty,AvgIndividualLimitCOVA);// Null if no COVA or no limit for cova
+Policy: => ExistCOVA := EXISTS(PolicyProperty(ExistCOVA));// Null if no COVA or no limit for cova
 
 Report: => G_SetDefault4IndLimitCOVA := NOT EXISTS(Policy(G_CountablePolicy AND NOT AvgIndividualLimitCOVA:Null));
 
@@ -4201,8 +4215,8 @@ Report: => H_MaxIndivLimitCOVAProptyP := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => R_MaxIndivLimitCOVAProptyP := MIN(ROUND2(H_MaxIndivLimitCOVAProptyP), CAP_99999999_99);
 
 Report: => H_MinIndivLimitCOVA := MAP(G_SetDefault1  => DEFAULT_1,
-                                    G_SetDefault3 => DEFAULT_3,  
-                                    G_SetDefault4IndLimitCOVA => DEFAULT_4,
+																			G_SetDefault3 => DEFAULT_3,  
+																			G_SetDefault4IndLimitCOVA => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitCOVA));
 Report: => R_MinIndivLimitCOVA := MIN(ROUND2(H_MinIndivLimitCOVA), CAP_99999999_99);
 
@@ -4215,8 +4229,8 @@ Report: => R_MinIndivLimitCOVAProptyP := MIN(ROUND2(H_MinIndivLimitCOVAProptyP),
 
 
 Report: => H_AvgIndivLimitCOVA := MAP(G_SetDefault1  => DEFAULT_1,
-                                    G_SetDefault3 => DEFAULT_3,  
-                                    G_SetDefault4IndLimitCOVA => DEFAULT_4,
+																			G_SetDefault3 => DEFAULT_3,  
+																			G_SetDefault4IndLimitCOVA => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy),AvgIndividualLimitCOVA));
 Report: => R_AvgIndivLimitCOVA := MIN(ROUND2(H_AvgIndivLimitCOVA), CAP_99999999_99);
 
@@ -4229,8 +4243,8 @@ Report: => R_AvgIndivLimitCOVAProptyP := MIN(ROUND2(H_AvgIndivLimitCOVAProptyP),
 
 
 Report: => H_AvgIndivLimitCOVA1Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                    G_SetDefault3 => DEFAULT_3,  
-                                    G_SetDefault4IndLimitCOVA1Y => DEFAULT_4,
+																			G_SetDefault3 => DEFAULT_3,  
+																			G_SetDefault4IndLimitCOVA1Y => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 12),AvgIndividualLimitCOVA));
 Report: => R_AvgIndivLimitCOVA1Y := MIN(ROUND2(H_AvgIndivLimitCOVA1Y), CAP_99999999_99);
 
@@ -4242,8 +4256,8 @@ Report: => H_AvgIndivLimitCOVA1YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => R_AvgIndivLimitCOVA1YProptyP := MIN(ROUND2(H_AvgIndivLimitCOVA1YProptyP), CAP_99999999_99);
 
 Report: => H_AvgIndivLimitCOVA3Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                    G_SetDefault3 => DEFAULT_3,  
-                                    G_SetDefault4IndLimitCOVA3Y => DEFAULT_4,
+																			G_SetDefault3 => DEFAULT_3,  
+																			G_SetDefault4IndLimitCOVA3Y => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 36),AvgIndividualLimitCOVA));
 Report: => R_AvgIndivLimitCOVA3Y := MIN(ROUND2(H_AvgIndivLimitCOVA3Y), CAP_99999999_99);
 
@@ -4283,8 +4297,8 @@ Report: => G_SetDefault4IndLimitCOVB1YProptyP := NOT EXISTS(Policy(G_CountablePo
 Report: => G_SetDefault4IndLimitCOVB3YProptyP := NOT EXISTS(Policy(G_CountablePolicy AND NOT AvgIndividualLimitCOVB:Null AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 36));
 
 Report: => H_MaxIndivLimitCOVB := MAP(G_SetDefault1  => DEFAULT_1,
-                                    G_SetDefault3 => DEFAULT_3, 
-                                                                        G_SetDefault4IndLimitCOVB => DEFAULT_4,
+																			G_SetDefault3 => DEFAULT_3, 
+                                      G_SetDefault4IndLimitCOVB => DEFAULT_4,
                                     MAX(Policy(G_CountablePolicy),AvgIndividualLimitCOVB));
 Report: => R_MaxIndivLimitCOVB := MIN(ROUND2(H_MaxIndivLimitCOVB), CAP_99999999_99);
 
@@ -4296,8 +4310,8 @@ Report: => H_MaxIndivLimitCOVBProptyP := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => R_MaxIndivLimitCOVBProptyP := MIN(ROUND2(H_MaxIndivLimitCOVBProptyP), CAP_99999999_99);
 
 Report: => H_MinIndivLimitCOVB := MAP(G_SetDefault1  => DEFAULT_1,
-                                    G_SetDefault3 => DEFAULT_3,  
-                                    G_SetDefault4IndLimitCOVB => DEFAULT_4,
+																			G_SetDefault3 => DEFAULT_3,  
+																			G_SetDefault4IndLimitCOVB => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitCOVB));
 Report: => R_MinIndivLimitCOVB := MIN(ROUND2(H_MinIndivLimitCOVB), CAP_99999999_99);
 
@@ -4310,8 +4324,8 @@ Report: => R_MinIndivLimitCOVBProptyP := MIN(H_MinIndivLimitCOVBProptyP, CAP_999
 
 
 Report: => H_AvgIndivLimitCOVB := MAP(G_SetDefault1  => DEFAULT_1,
-                                    G_SetDefault3 => DEFAULT_3,  
-                                    G_SetDefault4IndLimitCOVB => DEFAULT_4,
+																			G_SetDefault3 => DEFAULT_3,  
+																			G_SetDefault4IndLimitCOVB => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy),AvgIndividualLimitCOVB));
 Report: => R_AvgIndivLimitCOVB := MIN(ROUND2(H_AvgIndivLimitCOVB), CAP_99999999_99);
 
@@ -4957,8 +4971,8 @@ Report: => R_MinIndivLimitCOVFProptyP := MIN(ROUND2(H_MinIndivLimitCOVFProptyP),
 
 
 Report: => H_AvgIndivLimitCOVF := MAP(G_SetDefault1  => DEFAULT_1,
-                                    G_SetDefault3 => DEFAULT_3,  
-                                    G_SetDefault4IndLimitCOVF => DEFAULT_4,
+																			G_SetDefault3 => DEFAULT_3,  
+																			G_SetDefault4IndLimitCOVF => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy),AvgIndividualLimitCOVF));
 Report: => R_AvgIndivLimitCOVF := MIN(ROUND2(H_AvgIndivLimitCOVF), CAP_99999999_99);
 
@@ -5109,7 +5123,7 @@ Report: => R_MinIndivLimitEQKI := MIN(ROUND2(H_MinIndivLimitEQKI), CAP_99999999_
 Report: => H_MinIndivLimitEQKIProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitEQKI => DEFAULT_4,
+                                             G_SetDefault4IndLimitEQKIProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitEQKI));
 Report: => R_MinIndivLimitEQKIProptyP := MIN(ROUND2(H_MinIndivLimitEQKIProptyP), CAP_99999999_99);
 
@@ -5268,7 +5282,7 @@ Report: => R_MinIndivLimitERQK := MIN(ROUND2(H_MinIndivLimitERQK), CAP_99999999_
 Report: => H_MinIndivLimitERQKProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitERQK => DEFAULT_4,
+                                             G_SetDefault4IndLimitERQKProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitERQK));
 Report: => R_MinIndivLimitERQKProptyP := MIN(ROUND2(H_MinIndivLimitERQKProptyP), CAP_99999999_99);
 
@@ -5425,7 +5439,7 @@ Report: => R_MinIndivLimitFARM := MIN(ROUND2(H_MinIndivLimitFARM), CAP_99999999_
 Report: => H_MinIndivLimitFARMProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitFARM => DEFAULT_4,
+                                             G_SetDefault4IndLimitFARMProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitFARM));
 Report: => R_MinIndivLimitFARMProptyP := MIN(ROUND2(H_MinIndivLimitFARMProptyP), CAP_99999999_99);
 
@@ -5585,7 +5599,7 @@ Report: => R_MinIndivLimitFIRA := MIN(ROUND2(H_MinIndivLimitFIRA), CAP_99999999_
 Report: => H_MinIndivLimitFIRAProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitFIRA => DEFAULT_4,
+                                             G_SetDefault4IndLimitFIRAProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitFIRA));
 Report: => R_MinIndivLimitFIRAProptyP := MIN(ROUND2(H_MinIndivLimitFIRAProptyP), CAP_99999999_99);
 
@@ -5744,7 +5758,7 @@ Report: => R_MinIndivLimitFLOD := MIN(ROUND2(H_MinIndivLimitFLOD), CAP_99999999_
 Report: => H_MinIndivLimitFLODProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitFLOD => DEFAULT_4,
+                                             G_SetDefault4IndLimitFLODProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitFLOD));
 Report: => R_MinIndivLimitFLODProptyP := MIN(ROUND2(H_MinIndivLimitFLODProptyP), CAP_99999999_99);
 
@@ -5905,7 +5919,7 @@ Report: => R_MinIndivLimitGRPL := MIN(ROUND2(H_MinIndivLimitGRPL), CAP_99999999_
 Report: => H_MinIndivLimitGRPLProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitGRPL => DEFAULT_4,
+                                             G_SetDefault4IndLimitGRPLProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitGRPL));
 Report: => R_MinIndivLimitGRPLProptyP := MIN(ROUND2(H_MinIndivLimitGRPLProptyP), CAP_99999999_99);
 
@@ -6064,7 +6078,7 @@ Report: => R_MinIndivLimitHAIL := MIN(ROUND2(H_MinIndivLimitHAIL), CAP_99999999_
 Report: => H_MinIndivLimitHAILProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitHAIL => DEFAULT_4,
+                                             G_SetDefault4IndLimitHAILProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitHAIL));
 Report: => R_MinIndivLimitHAILProptyP := MIN(ROUND2(H_MinIndivLimitHAILProptyP), CAP_99999999_99);
 
@@ -6224,7 +6238,7 @@ Report: => R_MinIndivLimitHDCR := MIN(ROUND2(H_MinIndivLimitHDCR), CAP_99999999_
 Report: => H_MinIndivLimitHDCRProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitHDCR => DEFAULT_4,
+                                             G_SetDefault4IndLimitHDCRProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitHDCR));
 Report: => R_MinIndivLimitHDCRProptyP := MIN(ROUND2(H_MinIndivLimitHDCRProptyP), CAP_99999999_99);
 
@@ -6383,7 +6397,7 @@ Report: => R_MinIndivLimitHULL := MIN(ROUND2(H_MinIndivLimitHULL), CAP_99999999_
 Report: => H_MinIndivLimitHULLProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitHULL => DEFAULT_4,
+                                             G_SetDefault4IndLimitHULLProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitHULL));
 Report: => R_MinIndivLimitHULLProptyP := MIN(ROUND2(H_MinIndivLimitHULLProptyP), CAP_99999999_99);
 
@@ -6543,7 +6557,7 @@ Report: => R_MinIndivLimitHURR := MIN(ROUND2(H_MinIndivLimitHURR), CAP_99999999_
 Report: => H_MinIndivLimitHURRProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitHURR => DEFAULT_4,
+                                             G_SetDefault4IndLimitHURRProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitHURR));
 Report: => R_MinIndivLimitHURRProptyP := MIN(ROUND2(H_MinIndivLimitHURRProptyP), CAP_99999999_99);
 
@@ -6702,7 +6716,7 @@ Report: => R_MinIndivLimitMOLD := MIN(ROUND2(H_MinIndivLimitMOLD), CAP_99999999_
 Report: => H_MinIndivLimitMOLDProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitMOLD => DEFAULT_4,
+                                             G_SetDefault4IndLimitMOLDProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitMOLD));
 Report: => R_MinIndivLimitMOLDProptyP := MIN(ROUND2(H_MinIndivLimitMOLDProptyP), CAP_99999999_99);
 
@@ -6862,7 +6876,7 @@ Report: => R_MinIndivLimitOTHR := MIN(ROUND2(H_MinIndivLimitOTHR), CAP_99999999_
 Report: => H_MinIndivLimitOTHRProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitOTHR => DEFAULT_4,
+                                             G_SetDefault4IndLimitOTHRProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitOTHR));
 Report: => R_MinIndivLimitOTHRProptyP := MIN(ROUND2(H_MinIndivLimitOTHRProptyP), CAP_99999999_99);
 
@@ -7022,7 +7036,7 @@ Report: => R_MinIndivLimitOVRD := MIN(ROUND2(H_MinIndivLimitOVRD), CAP_99999999_
 Report: => H_MinIndivLimitOVRDProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitOVRD => DEFAULT_4,
+                                             G_SetDefault4IndLimitOVRDProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitOVRD));
 Report: => R_MinIndivLimitOVRDProptyP := MIN(ROUND2(H_MinIndivLimitOVRDProptyP), CAP_99999999_99);
 
@@ -7182,7 +7196,7 @@ Report: => R_MinIndivLimitPPRC := MIN(ROUND2(H_MinIndivLimitPPRC), CAP_99999999_
 Report: => H_MinIndivLimitPPRCProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitPPRC => DEFAULT_4,
+                                             G_SetDefault4IndLimitPPRCProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitPPRC));
 Report: => R_MinIndivLimitPPRCProptyP := MIN(ROUND2(H_MinIndivLimitPPRCProptyP), CAP_99999999_99);
 
@@ -7341,7 +7355,7 @@ Report: => R_MinIndivLimitSCPP := MIN(ROUND2(H_MinIndivLimitSCPP), CAP_99999999_
 Report: => H_MinIndivLimitSCPPProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitSCPP => DEFAULT_4,
+                                             G_SetDefault4IndLimitSCPPProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitSCPP));
 Report: => R_MinIndivLimitSCPPProptyP := MIN(ROUND2(H_MinIndivLimitSCPPProptyP), CAP_99999999_99);
 
@@ -7500,7 +7514,7 @@ Report: => R_MinIndivLimitSINK := MIN(ROUND2(H_MinIndivLimitSINK), CAP_99999999_
 Report: => H_MinIndivLimitSINKProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitSINK => DEFAULT_4,
+                                             G_SetDefault4IndLimitSINKProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitSINK));
 Report: => R_MinIndivLimitSINKProptyP := MIN(ROUND2(H_MinIndivLimitSINKProptyP), CAP_99999999_99);
 
@@ -7658,7 +7672,7 @@ Report: => R_MinIndivLimitTHTD := MIN(ROUND2(H_MinIndivLimitTHTD), CAP_99999999_
 Report: => H_MinIndivLimitTHTDProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitTHTD => DEFAULT_4,
+                                             G_SetDefault4IndLimitTHTDProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitTHTD));
 Report: => R_MinIndivLimitTHTDProptyP := MIN(ROUND2(H_MinIndivLimitTHTDProptyP), CAP_99999999_99);
 
@@ -7817,7 +7831,7 @@ Report: => R_MinIndivLimitUMBR := MIN(ROUND2(H_MinIndivLimitUMBR), CAP_99999999_
 Report: => H_MinIndivLimitUMBRProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitUMBR => DEFAULT_4,
+                                             G_SetDefault4IndLimitUMBRProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitUMBR));
 Report: => R_MinIndivLimitUMBRProptyP := MIN(ROUND2(H_MinIndivLimitUMBRProptyP), CAP_99999999_99);
 
@@ -7976,7 +7990,7 @@ Report: => R_MinIndivLimitWDHL := MIN(ROUND2(H_MinIndivLimitWDHL), CAP_99999999_
 Report: => H_MinIndivLimitWDHLProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitWDHL => DEFAULT_4,
+                                             G_SetDefault4IndLimitWDHLProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitWDHL));
 Report: => R_MinIndivLimitWDHLProptyP := MIN(ROUND2(H_MinIndivLimitWDHLProptyP), CAP_99999999_99);
 
@@ -8135,7 +8149,7 @@ Report: => R_MinIndivLimitWIND := MIN(ROUND2(H_MinIndivLimitWIND), CAP_99999999_
 Report: => H_MinIndivLimitWINDProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitWIND => DEFAULT_4,
+                                             G_SetDefault4IndLimitWINDProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitWIND));
 Report: => R_MinIndivLimitWINDProptyP := MIN(ROUND2(H_MinIndivLimitWINDProptyP), CAP_99999999_99);
 
@@ -8293,7 +8307,7 @@ Report: => R_MinIndivLimitWINX := MIN(ROUND2(H_MinIndivLimitWINX), CAP_99999999_
 Report: => H_MinIndivLimitWINXProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitWINX => DEFAULT_4,
+                                             G_SetDefault4IndLimitWINXProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitWINX));
 Report: => R_MinIndivLimitWINXProptyP := MIN(ROUND2(H_MinIndivLimitWINXProptyP), CAP_99999999_99);
 
@@ -8452,7 +8466,7 @@ Report: => R_MinIndivLimitWTCR := MIN(ROUND2(H_MinIndivLimitWTCR), CAP_99999999_
 Report: => H_MinIndivLimitWTCRProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                              G_SetDefault2ProptyP => DEFAULT_2,
                                              G_SetDefault3ProptyP => DEFAULT_3,  
-                                             G_SetDefault4IndLimitWTCR => DEFAULT_4,
+                                             G_SetDefault4IndLimitWTCRProptyP => DEFAULT_4,
                                     MIN(Policy(G_CountablePolicy),AvgIndividualLimitWTCR));
 Report: => R_MinIndivLimitWTCRProptyP := MIN(ROUND2(H_MinIndivLimitWTCRProptyP), CAP_99999999_99);
 
@@ -8771,14 +8785,14 @@ PolicyProperty: => DaysAdvancedQuote := IF((PolicyCalculated_End_Date > NextCalc
 //********************Added more time window based on request from State Farm********************//
 //2 YEAR
 Report: => H_CntCancelledPol2Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                        G_SetDefault3 => DEFAULT_3, 
-                                                                        COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_MOSPolicyCancelled < 24 AND G_MOSPolicyCancelled >= 0)));
+                                      G_SetDefault3 => DEFAULT_3, 
+                                      COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_MOSPolicyCancelled < 24 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol2Y := MIN(H_CntCancelledPol2Y,CAP_999);     
 
 Report: => H_CntCancelledPol2YHO := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                            G_SetDefault2HO => DEFAULT_2,
-                                                                            G_SetDefault3HO => DEFAULT_3, 
-                                                                            COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_HOPolicy AND G_MOSPolicyCancelled < 24 AND G_MOSPolicyCancelled >= 0)));
+                                        G_SetDefault2HO => DEFAULT_2,
+                                        G_SetDefault3HO => DEFAULT_3, 
+                                        COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_HOPolicy AND G_MOSPolicyCancelled < 24 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol2YHO := MIN(H_CntCancelledPol2YHO,CAP_999);     
 
 
@@ -8789,15 +8803,15 @@ Report: => H_CntCancelledPol2YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => I_CntCancelledPol2YProptyP := MIN(H_CntCancelledPol2YProptyP,CAP_999);       
 
 Report: => H_CntCancelledPol2YRiskP := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2RiskP => DEFAULT_2,
-                                                                                G_SetDefault3RiskP => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypePreferred AND G_MOSPolicyCancelled < 24 AND G_MOSPolicyCancelled >= 0)));
+                                           G_SetDefault2RiskP => DEFAULT_2,
+                                           G_SetDefault3RiskP => DEFAULT_3, 
+                                           COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypePreferred AND G_MOSPolicyCancelled < 24 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol2YRiskP := MIN(H_CntCancelledPol2YRiskP,CAP_999);       
 
 Report: => H_CntCancelledPol2YRiskS := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2RiskS => DEFAULT_2,
-                                                                                G_SetDefault3RiskS => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypeStandard AND G_MOSPolicyCancelled < 24 AND G_MOSPolicyCancelled >= 0)));
+                                           G_SetDefault2RiskS => DEFAULT_2,
+                                           G_SetDefault3RiskS => DEFAULT_3, 
+                                           COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypeStandard AND G_MOSPolicyCancelled < 24 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol2YRiskS := MIN(H_CntCancelledPol2YRiskS,CAP_999);
 
 // I_CntDerogCancellation2Y
@@ -9125,15 +9139,15 @@ Report: => H_CntProptyCancellation2Y := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => I_CntProptyCancellation2Y := MIN(H_CntProptyCancellation2Y,CAP_999);
 
 Report: => H_CntProptyCancellation2YHO := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2HO => DEFAULT_2,
-                                                                                G_SetDefault3HO => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_HOPolicy AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 24)));
+                                              G_SetDefault2HO => DEFAULT_2,
+                                              G_SetDefault3HO => DEFAULT_3, 
+                                              COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_HOPolicy AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 24)));
 Report: => I_CntProptyCancellation2YHO := MIN(H_CntProptyCancellation2YHO,CAP_999);
 
 Report: => H_CntProptyCancellation2YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2ProptyP => DEFAULT_2,
-                                                                                G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_PrimaryProperty AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 24)));
+                                                   G_SetDefault2ProptyP => DEFAULT_2,
+                                                   G_SetDefault3ProptyP => DEFAULT_3, 
+                                                   COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_PrimaryProperty AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 24)));
 Report: => I_CntProptyCancellation2YProptyP := MIN(H_CntProptyCancellation2YProptyP,CAP_999);
 
 // I_CntProptyWithFinTypeFM2Y
@@ -9244,40 +9258,40 @@ Report: => I_CntDistFinType2YProptyP := MIN(H_CntDistFinType2YProptyP, CAP_999);
 // I_CntPropty2Y
 // I_CntPropty2YHO
 Report: => H_CntPropty2Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                G_SetDefault3 => DEFAULT_3, 
-                                                                COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24).PropertyID{UID}));
+                                G_SetDefault3 => DEFAULT_3, 
+                                COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24).PropertyID{UID}));
 Report: => I_CntPropty2Y := MIN(H_CntPropty2Y, CAP_999);
 
 Report: => H_CntPropty2YHO := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                    G_SetDefault2HO => DEFAULT_2,
-                                                                    G_SetDefault3HO => DEFAULT_3, 
-                                                                    COUNT(Policy(G_CountablePolicy AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24).PropertyID{UID}));
+                                  G_SetDefault2HO => DEFAULT_2,
+                                  G_SetDefault3HO => DEFAULT_3, 
+                                  COUNT(Policy(G_CountablePolicy AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24).PropertyID{UID}));
 Report: => I_CntPropty2YHO := MIN(H_CntPropty2YHO, CAP_999);
 
 // I_CntDistProptyType2Y
 Report: => H_CntDistProptyType2Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                        G_SetDefault3 => DEFAULT_3, 
-                                                                        COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24).H_PropertyType{PropertyType}));
+                                        G_SetDefault3 => DEFAULT_3, 
+                                        COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24).H_PropertyType{PropertyType}));
 Report: => I_CntDistProptyType2Y := MIN(H_CntDistProptyType2Y, CAP_999);
 
 // I_CntPolProptyTypeOther2Y
 // I_CntPolProptyTypeOther2YHO
 Report: => H_CntPolProptyTypeOther2Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                G_SetDefault3 => DEFAULT_3, 
-                                                                COUNT(Policy(G_CountablePolicy AND G_OthersProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24)));
+                                            G_SetDefault3 => DEFAULT_3, 
+                                            COUNT(Policy(G_CountablePolicy AND G_OthersProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24)));
 Report: => I_CntPolProptyTypeOther2Y := MIN(H_CntPolProptyTypeOther2Y, CAP_999);
 
 Report: => H_CntPolProptyTypeOther2YHO := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                    G_SetDefault2HO => DEFAULT_2,
-                                                                    G_SetDefault3HO => DEFAULT_3, 
-                                                                    COUNT(Policy(G_CountablePolicy AND G_OthersProperty AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24)));
+                                              G_SetDefault2HO => DEFAULT_2,
+                                              G_SetDefault3HO => DEFAULT_3, 
+                                              COUNT(Policy(G_CountablePolicy AND G_OthersProperty AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24)));
 Report: => I_CntPolProptyTypeOther2YHO := MIN(H_CntPolProptyTypeOther2YHO, CAP_999);
 
 // I_CntPolProptyTypePrim2Y
 // I_CntPolProptyTypePrim2YHO
 Report: => H_CntPolProptyTypePrim2Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                G_SetDefault3 => DEFAULT_3, 
-                                                                COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24)));
+                                           G_SetDefault3 => DEFAULT_3, 
+                                           COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24)));
 Report: => I_CntPolProptyTypePrim2Y := MIN(H_CntPolProptyTypePrim2Y, CAP_999);
 
 Report: => H_CntPolProptyTypePrim2YHO := MAP(G_SetDefault1  => DEFAULT_1,
@@ -9305,9 +9319,9 @@ Report: => H_CntDistPoltype2Y := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => I_CntDistPoltype2Y := MIN(H_CntDistPoltype2Y,CAP_999);
 
 Report: => H_CntDistPoltype2YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                    G_SetDefault2ProptyP => DEFAULT_2,
-                                                                                    G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                                    COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate < 24 AND G_MOSSubjectEndDate >= 0){PolicyType}));
+                                            G_SetDefault2ProptyP => DEFAULT_2,
+                                            G_SetDefault3ProptyP => DEFAULT_3, 
+                                            COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate < 24 AND G_MOSSubjectEndDate >= 0){PolicyType}));
 Report: => I_CntDistPoltype2YProptyP := MIN(H_CntDistPoltype2YProptyP,CAP_999);
 
 // I_CntPolOfHO2Y
@@ -9663,28 +9677,28 @@ Report: => R_AvgTheftDeduct2YHO := MIN(ROUND2(H_AvgTheftDeduct2YHO), CAP_9999999
 Report: => H_AvgTheftDeduct2YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2ProptyP => DEFAULT_2,
                                   G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                        G_SetDefault4TheftDeduct2YProptyP => DEFAULT_4,
+                                  G_SetDefault4TheftDeduct2YProptyP => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24),TheftDeductible));
 Report: => R_AvgTheftDeduct2YProptyP := MIN(ROUND2(H_AvgTheftDeduct2YProptyP), CAP_99999999_99);
 
 Report: => H_AvgOverallDeduct2Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                    G_SetDefault3 => DEFAULT_3,  
-                                                                        G_SetDefault4OverallDeduct2Y => DEFAULT_4,
-                                    AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24),OverallDeductible));
+																				G_SetDefault3 => DEFAULT_3,  
+																				G_SetDefault4OverallDeduct2Y => DEFAULT_4,
+																				AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24),OverallDeductible));
 Report: => R_AvgOverallDeduct2Y := MIN(ROUND2(H_AvgOverallDeduct2Y), CAP_99999999_99);
 
 Report: => H_AvgOverallDeduct2YHO := MAP(G_SetDefault1  => DEFAULT_1,
-                                  G_SetDefault2HO => DEFAULT_2,
-                                  G_SetDefault3HO => DEFAULT_3,  
-                                                                        G_SetDefault4OverallDeduct2YHO => DEFAULT_4,
-                                    AVE(Policy(G_CountablePolicy AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24),OverallDeductible));
+																					G_SetDefault2HO => DEFAULT_2,
+																					G_SetDefault3HO => DEFAULT_3,  
+																					G_SetDefault4OverallDeduct2YHO => DEFAULT_4,
+																				AVE(Policy(G_CountablePolicy AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24),OverallDeductible));
 Report: => R_AvgOverallDeduct2YHO := MIN(ROUND2(H_AvgOverallDeduct2YHO), CAP_99999999_99);
 
 Report: => H_AvgOverallDeduct2YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-                                  G_SetDefault2ProptyP => DEFAULT_2,
-                                  G_SetDefault3ProptyP => DEFAULT_3,  
-                                                                        G_SetDefault4OverallDeduct2YProptyP => DEFAULT_4,
-                                    AVE(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24),OverallDeductible));
+																						G_SetDefault2ProptyP => DEFAULT_2,
+																						G_SetDefault3ProptyP => DEFAULT_3,  
+																						G_SetDefault4OverallDeduct2YProptyP => DEFAULT_4,
+																						AVE(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24),OverallDeductible));
 Report: => R_AvgOverallDeduct2YProptyP := MIN(ROUND2(H_AvgOverallDeduct2YProptyP), CAP_99999999_99);
 
 // Report: => G_SetDefault4IndLimit2Y := NOT EXISTS(Policy(G_CountablePolicy AND G_FLPolicy AND NOT AvgIndividualLimit:Null AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 24));
@@ -10259,14 +10273,14 @@ Report: => R_AvgIndivLimitWTCR2YProptyP := MIN(ROUND2(H_AvgIndivLimitWTCR2YPropt
 //4 year
 //1 YEAR
 Report: => H_CntCancelledPol4Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                        G_SetDefault3 => DEFAULT_3, 
-                                                                        COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_MOSPolicyCancelled < 48 AND G_MOSPolicyCancelled >= 0)));
+                                      G_SetDefault3 => DEFAULT_3,
+																			COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_MOSPolicyCancelled < 48 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol4Y := MIN(H_CntCancelledPol4Y,CAP_999);     
 
 Report: => H_CntCancelledPol4YHO := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                            G_SetDefault2HO => DEFAULT_2,
-                                                                            G_SetDefault3HO => DEFAULT_3, 
-                                                                            COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_HOPolicy AND G_MOSPolicyCancelled < 48 AND G_MOSPolicyCancelled >= 0)));
+                                        G_SetDefault2HO => DEFAULT_2,
+																				G_SetDefault3HO => DEFAULT_3,
+																				COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_HOPolicy AND G_MOSPolicyCancelled < 48 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol4YHO := MIN(H_CntCancelledPol4YHO,CAP_999);     
 
 
@@ -10277,15 +10291,15 @@ Report: => H_CntCancelledPol4YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => I_CntCancelledPol4YProptyP := MIN(H_CntCancelledPol4YProptyP,CAP_999);       
 
 Report: => H_CntCancelledPol4YRiskP := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2RiskP => DEFAULT_2,
-                                                                                G_SetDefault3RiskP => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypePreferred AND G_MOSPolicyCancelled < 48 AND G_MOSPolicyCancelled >= 0)));
+                                           G_SetDefault2RiskP => DEFAULT_2,
+																					 G_SetDefault3RiskP => DEFAULT_3, 
+																					 COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypePreferred AND G_MOSPolicyCancelled < 48 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol4YRiskP := MIN(H_CntCancelledPol4YRiskP,CAP_999);       
 
 Report: => H_CntCancelledPol4YRiskS := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2RiskS => DEFAULT_2,
-                                                                                G_SetDefault3RiskS => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypeStandard AND G_MOSPolicyCancelled < 48 AND G_MOSPolicyCancelled >= 0)));
+                                           G_SetDefault2RiskS => DEFAULT_2,
+																					 G_SetDefault3RiskS => DEFAULT_3,
+																					 COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypeStandard AND G_MOSPolicyCancelled < 48 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol4YRiskS := MIN(H_CntCancelledPol4YRiskS,CAP_999);
 
 // I_CntDerogCancellation4Y
@@ -10608,20 +10622,20 @@ Report: => I_CntTRANCancellation4YProptyP := MIN(H_CntTRANCancellation4YProptyP,
 // I_CntProptyCancellation4Y
 // I_CntProptyCancellation4YHO
 Report: => H_CntProptyCancellation4Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                    G_SetDefault3 => DEFAULT_3, 
-                                                                    COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 48)));
+                                            G_SetDefault3 => DEFAULT_3, 
+																						COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 48)));
 Report: => I_CntProptyCancellation4Y := MIN(H_CntProptyCancellation4Y,CAP_999);
 
 Report: => H_CntProptyCancellation4YHO := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2HO => DEFAULT_2,
-                                                                                G_SetDefault3HO => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_HOPolicy AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 48)));
+                                              G_SetDefault2HO => DEFAULT_2,
+																							G_SetDefault3HO => DEFAULT_3, 
+																							COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_HOPolicy AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 48)));
 Report: => I_CntProptyCancellation4YHO := MIN(H_CntProptyCancellation4YHO,CAP_999);
 
 Report: => H_CntProptyCancellation4YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2ProptyP => DEFAULT_2,
-                                                                                G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_PrimaryProperty AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 48)));
+                                                   G_SetDefault2ProptyP => DEFAULT_2,
+																									 G_SetDefault3ProptyP => DEFAULT_3,
+																									 COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_PrimaryProperty AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 48)));
 Report: => I_CntProptyCancellation4YProptyP := MIN(H_CntProptyCancellation4YProptyP,CAP_999);
 
 // I_CntProptyWithFinTypeFM4Y
@@ -10732,27 +10746,27 @@ Report: => I_CntDistFinType4YProptyP := MIN(H_CntDistFinType4YProptyP, CAP_999);
 // I_CntPropty4Y
 // I_CntPropty4YHO
 Report: => H_CntPropty4Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                G_SetDefault3 => DEFAULT_3, 
-                                                                COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48).PropertyID{UID}));
+                                G_SetDefault3 => DEFAULT_3,
+																COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48).PropertyID{UID}));
 Report: => I_CntPropty4Y := MIN(H_CntPropty4Y, CAP_999);
 
 Report: => H_CntPropty4YHO := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                    G_SetDefault2HO => DEFAULT_2,
-                                                                    G_SetDefault3HO => DEFAULT_3, 
-                                                                    COUNT(Policy(G_CountablePolicy AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48).PropertyID{UID}));
+                                  G_SetDefault2HO => DEFAULT_2,
+																	G_SetDefault3HO => DEFAULT_3, 
+																	COUNT(Policy(G_CountablePolicy AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48).PropertyID{UID}));
 Report: => I_CntPropty4YHO := MIN(H_CntPropty4YHO, CAP_999);
 
 // I_CntDistProptyType4Y
 Report: => H_CntDistProptyType4Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                        G_SetDefault3 => DEFAULT_3, 
-                                                                        COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48).H_PropertyType{PropertyType}));
+                                        G_SetDefault3 => DEFAULT_3, 
+																				COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48).H_PropertyType{PropertyType}));
 Report: => I_CntDistProptyType4Y := MIN(H_CntDistProptyType4Y, CAP_999);
 
 // I_CntPolProptyTypeOther4Y
 // I_CntPolProptyTypeOther4YHO
 Report: => H_CntPolProptyTypeOther4Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                G_SetDefault3 => DEFAULT_3, 
-                                                                COUNT(Policy(G_CountablePolicy AND G_OthersProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48)));
+                                            G_SetDefault3 => DEFAULT_3, 
+																						COUNT(Policy(G_CountablePolicy AND G_OthersProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48)));
 Report: => I_CntPolProptyTypeOther4Y := MIN(H_CntPolProptyTypeOther4Y, CAP_999);
 
 Report: => H_CntPolProptyTypeOther4YHO := MAP(G_SetDefault1  => DEFAULT_1,
@@ -10793,9 +10807,9 @@ Report: => H_CntDistPoltype4Y := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => I_CntDistPoltype4Y := MIN(H_CntDistPoltype4Y,CAP_999);
 
 Report: => H_CntDistPoltype4YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                    G_SetDefault2ProptyP => DEFAULT_2,
-                                                                                    G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                                    COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate < 48 AND G_MOSSubjectEndDate >= 0){PolicyType}));
+                                            G_SetDefault2ProptyP => DEFAULT_2,
+																						G_SetDefault3ProptyP => DEFAULT_3,
+																						COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate < 48 AND G_MOSSubjectEndDate >= 0){PolicyType}));
 Report: => I_CntDistPoltype4YProptyP := MIN(H_CntDistPoltype4YProptyP,CAP_999);
 
 // I_CntPolOfHO4Y
@@ -11118,7 +11132,7 @@ Report: => I_CntFloodZoneType4Y := MIN(H_CntFloodZoneType4Y, CAP_999);
 Report: => H_CntFloodZoneType4YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                           G_SetDefault2ProptyP => DEFAULT_2,
                                           G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48).H_FloodZone{FloodZone}));
+																					COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48).H_FloodZone{FloodZone}));
 Report: => I_CntFloodZoneType4YProptyP := MIN(H_CntFloodZoneType4YProptyP, CAP_999);
 
 //Deduct
@@ -11144,14 +11158,14 @@ Report: => R_AvgTheftDeduct4Y := MIN(ROUND2(H_AvgTheftDeduct4Y), CAP_99999999_99
 Report: => H_AvgTheftDeduct4YHO := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2HO => DEFAULT_2,
                                   G_SetDefault3HO => DEFAULT_3, 
-                                                                    G_SetDefault4TheftDeduct4YHO => DEFAULT_4,
+                                  G_SetDefault4TheftDeduct4YHO => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_HOPolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48),TheftDeductible));
 Report: => R_AvgTheftDeduct4YHO := MIN(ROUND2(H_AvgTheftDeduct4YHO), CAP_99999999_99);
 
 Report: => H_AvgTheftDeduct4YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2ProptyP => DEFAULT_2,
                                   G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                        G_SetDefault4TheftDeduct4YProptyP => DEFAULT_4,
+                                  G_SetDefault4TheftDeduct4YProptyP => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48),TheftDeductible));
 Report: => R_AvgTheftDeduct4YProptyP := MIN(ROUND2(H_AvgTheftDeduct4YProptyP), CAP_99999999_99);
 
@@ -11170,8 +11184,8 @@ Report: => R_AvgOverallDeduct4YHO := MIN(ROUND2(H_AvgOverallDeduct4YHO), CAP_999
 
 Report: => H_AvgOverallDeduct4YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2ProptyP => DEFAULT_2,
-                                  G_SetDefault3ProptyP => DEFAULT_3,  
-                                                                        G_SetDefault4OverallDeduct4YProptyP => DEFAULT_4,
+                                  G_SetDefault3ProptyP => DEFAULT_3,
+																	G_SetDefault4OverallDeduct4YProptyP => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48),OverallDeductible));
 Report: => R_AvgOverallDeduct4YProptyP := MIN(ROUND2(H_AvgOverallDeduct4YProptyP), CAP_99999999_99);
 
@@ -11189,14 +11203,14 @@ Report: => G_SetDefault4IndLimitBUSP4YProptyP := NOT EXISTS(Policy(G_CountablePo
 
 Report: => H_AvgIndivLimitBUSP4Y := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3,  
-									G_SetDefault4IndLimitBUSP4Y => DEFAULT_4,
+																		G_SetDefault4IndLimitBUSP4Y => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48),AvgIndividualLimitBUSP));
 Report: => R_AvgIndivLimitBUSP4Y := MIN(ROUND2(H_AvgIndivLimitBUSP4Y), CAP_99999999_99);
 
 Report: => H_AvgIndivLimitBUSP4YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                           G_SetDefault2ProptyP => DEFAULT_2,
                                           G_SetDefault3ProptyP => DEFAULT_3, 
-										  G_SetDefault4IndLimitBUSP4YProptyP => DEFAULT_4, 
+																					G_SetDefault4IndLimitBUSP4YProptyP => DEFAULT_4, 
                                     AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 48),AvgIndividualLimitBUSP));
 Report: => R_AvgIndivLimitBUSP4YProptyP := MIN(ROUND2(H_AvgIndivLimitBUSP4YProptyP), CAP_99999999_99);
 
@@ -12590,15 +12604,15 @@ Report: => I_CntFloodZonePol5YProptyP := MIN(H_CntFloodZonePol5YProptyP, CAP_999
 // I_CntFloodZoneType5YProptyP
 
 Report: => H_CntFloodZoneType5Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                        G_SetDefault3 => DEFAULT_3, 
-                                                                        COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60).H_FloodZone{FloodZone}));
+                                       G_SetDefault3 => DEFAULT_3,
+																			 COUNT(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60).H_FloodZone{FloodZone}));
 Report: => I_CntFloodZoneType5Y := MIN(H_CntFloodZoneType5Y, CAP_999);
 
 
 Report: => H_CntFloodZoneType5YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                           G_SetDefault2ProptyP => DEFAULT_2,
-                                          G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60).H_FloodZone{FloodZone}));
+                                          G_SetDefault3ProptyP => DEFAULT_3,
+																					COUNT(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60).H_FloodZone{FloodZone}));
 Report: => I_CntFloodZoneType5YProptyP := MIN(H_CntFloodZoneType5YProptyP, CAP_999);
 
 //Deduct
@@ -12629,15 +12643,15 @@ Report: => H_AvgTheftDeduct5YHO := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => R_AvgTheftDeduct5YHO := MIN(ROUND2(H_AvgTheftDeduct5YHO), CAP_99999999_99);
 
 Report: => H_AvgTheftDeduct5YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-                                  G_SetDefault2ProptyP => DEFAULT_2,
-                                  G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                        G_SetDefault4TheftDeduct5YProptyP => DEFAULT_4,
-                                    AVE(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60),TheftDeductible));
+																			G_SetDefault2ProptyP => DEFAULT_2,
+																			G_SetDefault3ProptyP => DEFAULT_3, 
+																			G_SetDefault4TheftDeduct5YProptyP => DEFAULT_4,
+																				AVE(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60),TheftDeductible));
 Report: => R_AvgTheftDeduct5YProptyP := MIN(ROUND2(H_AvgTheftDeduct5YProptyP), CAP_99999999_99);
 
 Report: => H_AvgOverallDeduct5Y := MAP(G_SetDefault1  => DEFAULT_1,
                                     G_SetDefault3 => DEFAULT_3,  
-                                                                        G_SetDefault4OverallDeduct5Y => DEFAULT_4,
+                                      G_SetDefault4OverallDeduct5Y => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60),OverallDeductible));
 Report: => R_AvgOverallDeduct5Y := MIN(ROUND2(H_AvgOverallDeduct5Y), CAP_99999999_99);
 
@@ -12650,8 +12664,8 @@ Report: => R_AvgOverallDeduct5YHO := MIN(ROUND2(H_AvgOverallDeduct5YHO), CAP_999
 
 Report: => H_AvgOverallDeduct5YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                   G_SetDefault2ProptyP => DEFAULT_2,
-                                  G_SetDefault3ProptyP => DEFAULT_3,  
-                                                                        G_SetDefault4OverallDeduct5YProptyP => DEFAULT_4,
+                                  G_SetDefault3ProptyP => DEFAULT_3,
+																	G_SetDefault4OverallDeduct5YProptyP => DEFAULT_4,
                                     AVE(Policy(G_CountablePolicy AND G_PrimaryProperty AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60),OverallDeductible));
 Report: => R_AvgOverallDeduct5YProptyP := MIN(ROUND2(H_AvgOverallDeduct5YProptyP), CAP_99999999_99);
 
@@ -12676,7 +12690,7 @@ Report: => R_AvgIndivLimitBUSP5Y := MIN(ROUND2(H_AvgIndivLimitBUSP5Y), CAP_99999
 Report: => H_AvgIndivLimitBUSP5YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                           G_SetDefault2ProptyP => DEFAULT_2,
                                           G_SetDefault3ProptyP => DEFAULT_3, 
-										  G_SetDefault4IndLimitBUSP5YProptyP => DEFAULT_4, 
+																					G_SetDefault4IndLimitBUSP5YProptyP => DEFAULT_4, 
                                     AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 60),AvgIndividualLimitBUSP));
 Report: => R_AvgIndivLimitBUSP5YProptyP := MIN(ROUND2(H_AvgIndivLimitBUSP5YProptyP), CAP_99999999_99);
 
@@ -13217,14 +13231,14 @@ Report: => R_AvgIndivLimitWTCR5YProptyP := MIN(ROUND2(H_AvgIndivLimitWTCR5YPropt
 //6 year
 //1 YEAR
 Report: => H_CntCancelledPol6Y := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                        G_SetDefault3 => DEFAULT_3, 
-                                                                        COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_MOSPolicyCancelled < 72 AND G_MOSPolicyCancelled >= 0)));
+                                      G_SetDefault3 => DEFAULT_3,
+																			COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_MOSPolicyCancelled < 72 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol6Y := MIN(H_CntCancelledPol6Y,CAP_999);     
 
 Report: => H_CntCancelledPol6YHO := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                            G_SetDefault2HO => DEFAULT_2,
-                                                                            G_SetDefault3HO => DEFAULT_3, 
-                                                                            COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_HOPolicy AND G_MOSPolicyCancelled < 72 AND G_MOSPolicyCancelled >= 0)));
+                                        G_SetDefault2HO => DEFAULT_2,
+																				G_SetDefault3HO => DEFAULT_3,
+																				COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_HOPolicy AND G_MOSPolicyCancelled < 72 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol6YHO := MIN(H_CntCancelledPol6YHO,CAP_999);     
 
 
@@ -13235,15 +13249,15 @@ Report: => H_CntCancelledPol6YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => I_CntCancelledPol6YProptyP := MIN(H_CntCancelledPol6YProptyP,CAP_999);       
 
 Report: => H_CntCancelledPol6YRiskP := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2RiskP => DEFAULT_2,
-                                                                                G_SetDefault3RiskP => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypePreferred AND G_MOSPolicyCancelled < 72 AND G_MOSPolicyCancelled >= 0)));
+                                           G_SetDefault2RiskP => DEFAULT_2,
+																					 G_SetDefault3RiskP => DEFAULT_3,
+																					 COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypePreferred AND G_MOSPolicyCancelled < 72 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol6YRiskP := MIN(H_CntCancelledPol6YRiskP,CAP_999);       
 
 Report: => H_CntCancelledPol6YRiskS := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2RiskS => DEFAULT_2,
-                                                                                G_SetDefault3RiskS => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypeStandard AND G_MOSPolicyCancelled < 72 AND G_MOSPolicyCancelled >= 0)));
+                                           G_SetDefault2RiskS => DEFAULT_2,
+																					 G_SetDefault3RiskS => DEFAULT_3, 
+																					 COUNT(Policy(G_CountablePolicy AND NOT CancellationDate:Null AND G_RiskTypeStandard AND G_MOSPolicyCancelled < 72 AND G_MOSPolicyCancelled >= 0)));
 Report: => I_CntCancelledPol6YRiskS := MIN(H_CntCancelledPol6YRiskS,CAP_999);
 
 // I_CntDerogCancellation6Y
@@ -13577,9 +13591,9 @@ Report: => H_CntProptyCancellation6YHO := MAP(G_SetDefault1  => DEFAULT_1,
 Report: => I_CntProptyCancellation6YHO := MIN(H_CntProptyCancellation6YHO,CAP_999);
 
 Report: => H_CntProptyCancellation6YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
-                                                                                G_SetDefault2ProptyP => DEFAULT_2,
-                                                                                G_SetDefault3ProptyP => DEFAULT_3, 
-                                                                                COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_PrimaryProperty AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 72)));
+                                                   G_SetDefault2ProptyP => DEFAULT_2,
+																									 G_SetDefault3ProptyP => DEFAULT_3, 
+																									 COUNT(Policy(G_CountablePolicy AND PropertyCanlletion AND G_PrimaryProperty AND G_MOSPropertyCancellation >= 0 AND G_MOSPropertyCancellation < 72)));
 Report: => I_CntProptyCancellation6YProptyP := MIN(H_CntProptyCancellation6YProptyP,CAP_999);
 
 // I_CntProptyWithFinTypeFM6Y
@@ -16165,3 +16179,561 @@ Report: => H_AvgIndivLimitWTCR7YProptyP := MAP(G_SetDefault1  => DEFAULT_1,
                                           G_SetDefault4IndLimitWTCR7YProptyP => DEFAULT_4, 
                                     AVE(Policy(G_CountablePolicy AND G_MOSSubjectEndDate >= 0 AND G_MOSSubjectEndDate < 84),AvgIndividualLimitWTCR));
 Report: => R_AvgIndivLimitWTCR7YProptyP := MIN(ROUND2(H_AvgIndivLimitWTCR7YProptyP), CAP_99999999_99);
+
+
+//Risk search attribute set 
+Policy: => InquiryHitFlag := EXISTS(PolicyProperty(InquiryHitFlag));//one policy multiple addresses
+// Report: => CntCarriername_Risk := COUNT(Policy(InquiryHitFlag){CarrierName});// this attribute was aggregated to subject and addresss
+Report: => flagsub := {Policy.InquiryHitFlag};
+// PolicyProperty: => TransactionID := Transaction.TransactionID;
+// Policy: => DateOfReport := rReport.DateOfReport;
+PolicyProperty: => G_CountablePolicy_Risk := InquiryHitFlag OR DataSource = 'RiskAddressBatch'; //Either policy saved in subject report of risk report was generated
+Policy: => G_CountablePolicy_Risk := EXISTS(PolicyProperty(G_CountablePolicy_Risk)); //Either policy saved in subject report of risk report was generated
+
+//Defaut
+//default -1, not hit 
+Report: => G_SetDefault1_Risk := COUNT(Policy(G_CountablePolicy_Risk)) = 0;
+Report: => G_SetDefault2HO_Risk := COUNT(Policy(G_CountablePolicy_Risk AND (PolicyType IN POLICY_TYPE_LIST))) = 0;
+
+//Cancelled policy count
+//Risk set can only use G_MOSPolicyInceptaion to limit the policy in certain wtime window
+Policy: => G_MOSPolicyInceptaion := MAP(DataSource = 'SubjectSearchBatch' AND NOT InceptionDate:Null =>  MONTHSBETWEEN(InceptionDate, DateOfReport),
+																				DataSource = 'RiskAddressBatch' AND InceptionDateBatch = '< 6 MONTHS'=> 5,
+																				DataSource = 'RiskAddressBatch' AND InceptionDateBatch = '> 6<12MTHS'=> 11,
+																				DataSource = 'RiskAddressBatch' AND InceptionDateBatch = '>12<18MTHS'=> 17,
+																				DataSource = 'RiskAddressBatch' AND InceptionDateBatch = '>18<24MTHS'=> 23,
+																				DataSource = 'RiskAddressBatch' AND InceptionDateBatch = '>24<30MTHS'=> 29,
+																				DataSource = 'RiskAddressBatch' AND InceptionDateBatch = '>30<36MTHS'=> 35,
+																				DataSource = 'RiskAddressBatch' AND InceptionDateBatch = '>36 MONTHS'=> 36, -9999);//map to -9999 if not covered here
+
+//Cancelled
+Policy: => CancelledPolicy := NOT CancellationDate:Null OR PolicyStatus = 'CANCELLED';//for both subject(CancellationDate and PolicyStatus) and risk (PolicyStatus)
+
+Report: => I_CntCancelledPol_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND CancelledPolicy)),CAP_999));
+
+Report: => I_CntCancelledPolWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND CancelledPolicy AND G_MOSPolicyInceptaion < 12  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntCancelledPolWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND CancelledPolicy AND G_MOSPolicyInceptaion < 24  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntCancelledPolWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND CancelledPolicy AND G_MOSPolicyInceptaion < 36  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntCancelledPolHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2, 
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND CancelledPolicy AND (PolicyType IN POLICY_TYPE_LIST))),CAP_999));
+
+Report: => I_CntCancelledPolWrittenIn1YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND CancelledPolicy AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 12  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntCancelledPolWrittenIn2YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND CancelledPolicy AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 24  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntCancelledPolWrittenIn3YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND CancelledPolicy AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 36  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+
+//Expired policy count
+Policy: => ExpiredPolicy := PolicyStatus = 'EXPIRED';//for both subject and risk
+
+Report: => I_CntExpiredPol_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND ExpiredPolicy)),CAP_999));
+
+Report: => I_CntExpiredPolWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND ExpiredPolicy AND G_MOSPolicyInceptaion < 12  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntExpiredPolWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND ExpiredPolicy AND G_MOSPolicyInceptaion < 24  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntExpiredPolWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND ExpiredPolicy AND G_MOSPolicyInceptaion < 36  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntExpiredPolHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2, 
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND ExpiredPolicy AND (PolicyType IN POLICY_TYPE_LIST))),CAP_999));
+
+Report: => I_CntExpiredPolWrittenIn1YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND ExpiredPolicy AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 12  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntExpiredPolWrittenIn2YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND ExpiredPolicy AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 24  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+Report: => I_CntExpiredPolWrittenIn3YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND ExpiredPolicy AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 36  AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+//Count CarrierName 
+Report: => I_CntDistCarrier_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,//true 0 is the case that no carriers name was reported. 
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk){CarrierName}),CAP_999));
+
+Report: => I_CntDistCarrierWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 12  AND G_MOSPolicyInceptaion >= 0){CarrierName}),CAP_999));
+
+Report: => I_CntDistCarrierWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 24  AND G_MOSPolicyInceptaion >= 0){CarrierName}),CAP_999));
+
+Report: => I_CntDistCarrierWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 36  AND G_MOSPolicyInceptaion >= 0){CarrierName}),CAP_999));
+
+Report: => I_CntDistCarrierHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																					G_SetDefault2HO_Risk => DEFAULT_2, 
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND (PolicyType IN POLICY_TYPE_LIST)){CarrierName}),CAP_999));
+
+Report: => I_CntDistCarrierWrittenIn1YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,//true 0, none policy in 1 year
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0){CarrierName}),CAP_999));
+
+Report: => I_CntDistCarrierWrittenIn2YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0){CarrierName}),CAP_999));
+
+Report: => I_CntDistCarrierWrittenIn3YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+																			MIN(COUNT(Policy(G_CountablePolicy_Risk AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0){CarrierName}),CAP_999));
+
+
+//Coverage 
+// PolicyProperty: => CoverageTypes := Coverages{CoverageType};
+Policy: => H_CovrageTypes_Risk := TOPN(PolicyProperty(G_CountablePolicy_Risk).CoverageTypes(NOT CoverageType:Null){CoverageType},1000,CoverageType);
+
+Report: => I_CntDistCOV_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,//true 0, no coverage type were reported  
+                              MIN(COUNT(Policy(G_CountablePolicy_Risk).H_CovrageTypes_Risk{CoverageType}),CAP_999)); 
+Report: => I_CntDistCOVWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                              MIN(COUNT(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0).H_CovrageTypes_Risk{CoverageType}),CAP_999)); 
+Report: => I_CntDistCOVWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                              MIN(COUNT(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0).H_CovrageTypes_Risk{CoverageType}),CAP_999)); 
+Report: => I_CntDistCOVWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                              MIN(COUNT(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0).H_CovrageTypes_Risk{CoverageType}),CAP_999)); 
+
+Report: => I_CntDistCOVHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																			G_SetDefault2HO_Risk => DEFAULT_2,
+                              MIN(COUNT(Policy(G_CountablePolicy_Risk AND (PolicyType IN POLICY_TYPE_LIST)).H_CovrageTypes_Risk{CoverageType}),CAP_999)); 
+Report: => I_CntDistCOVWrittenIn1YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+                              MIN(COUNT(Policy(G_CountablePolicy_Risk AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0).H_CovrageTypes_Risk{CoverageType}),CAP_999)); 
+Report: => I_CntDistCOVWrittenIn2YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+                              MIN(COUNT(Policy(G_CountablePolicy_Risk AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0).H_CovrageTypes_Risk{CoverageType}),CAP_999)); 
+Report: => I_CntDistCOVWrittenIn3YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																						G_SetDefault2HO_Risk => DEFAULT_2,
+                              MIN(COUNT(Policy(G_CountablePolicy_Risk AND (PolicyType IN POLICY_TYPE_LIST) AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0).H_CovrageTypes_Risk{CoverageType}),CAP_999)); 
+
+// I_CntDistPackageType_Risk
+// I_CntDistPackageTypeWrittenIn1Y_Risk
+// I_CntDistPackageTypeWrittenIn1YHO_Risk
+// I_CntDistPackageTypeWrittenIn2Y_Risk
+// I_CntDistPackageTypeWrittenIn2YHO_Risk
+// I_CntDistPackageTypeWrittenIn3Y_Risk
+// I_CntDistPackageTypeWrittenIn3YHO_Risk
+// I_CntDistPackageTypeHO_Risk
+
+PolicyProperty: => CoverageTypesDelimited_Risk := CONCAT(TOPN(CoverageTypes(NOT CoverageType:Null){CoverageType}, 1000, CoverageType), ','); 
+Policy: => H_CoverageTypesDelimited_Risk := PolicyProperty(G_CountablePolicy_Risk){CoverageTypesDelimited_Risk};
+
+Report: => G_CoveragePackages_Risk := TOPN(Policy(G_CountablePolicy_Risk).H_CoverageTypesDelimited_Risk{CoverageTypesDelimited_Risk},1000,CoverageTypesDelimited_Risk);
+Report: => G_CoveragePackages1Y_Risk := TOPN(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0).H_CoverageTypesDelimited_Risk{CoverageTypesDelimited_Risk},1000,CoverageTypesDelimited_Risk);
+Report: => G_CoveragePackages2Y_Risk := TOPN(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0).H_CoverageTypesDelimited_Risk{CoverageTypesDelimited_Risk},1000,CoverageTypesDelimited_Risk);
+Report: => G_CoveragePackages3Y_Risk := TOPN(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0).H_CoverageTypesDelimited_Risk{CoverageTypesDelimited_Risk},1000,CoverageTypesDelimited_Risk);
+
+Report: => G_CoveragePackagesHO_Risk := TOPN(Policy(G_CountablePolicy_Risk AND G_HOPolicy).H_CoverageTypesDelimited_Risk{CoverageTypesDelimited_Risk},1000,CoverageTypesDelimited_Risk);
+Report: => G_CoveragePackages1YHO_Risk := TOPN(Policy(G_CountablePolicy_Risk AND G_HOPolicy AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0).H_CoverageTypesDelimited_Risk{CoverageTypesDelimited_Risk},1000,CoverageTypesDelimited_Risk);
+Report: => G_CoveragePackages2YHO_Risk := TOPN(Policy(G_CountablePolicy_Risk AND G_HOPolicy AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0).H_CoverageTypesDelimited_Risk{CoverageTypesDelimited_Risk},1000,CoverageTypesDelimited_Risk);
+Report: => G_CoveragePackages3YHO_Risk := TOPN(Policy(G_CountablePolicy_Risk AND G_HOPolicy AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0).H_CoverageTypesDelimited_Risk{CoverageTypesDelimited_Risk},1000,CoverageTypesDelimited_Risk);
+
+
+Report: => I_CntDistPackageType_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																				MIN(COUNT(G_CoveragePackages_Risk), CAP_999));
+																				
+Report: => I_CntDistPackageTypeWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																				MIN(COUNT(G_CoveragePackages1Y_Risk), CAP_999));
+Report: => I_CntDistPackageTypeWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																				MIN(COUNT(G_CoveragePackages2Y_Risk), CAP_999));
+Report: => I_CntDistPackageTypeWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																				MIN(COUNT(G_CoveragePackages3Y_Risk), CAP_999));
+																				
+Report: => I_CntDistPackageTypeHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																							G_SetDefault2HO_Risk => DEFAULT_2,
+																				MIN(COUNT(G_CoveragePackagesHO_Risk), CAP_999));
+
+
+Report: => I_CntDistPackageTypeWrittenIn1YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																												G_SetDefault2HO_Risk => DEFAULT_2,
+																				MIN(COUNT(G_CoveragePackages1YHO_Risk), CAP_999));
+Report: => I_CntDistPackageTypeWrittenIn2YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																												G_SetDefault2HO_Risk => DEFAULT_2,
+																				MIN(COUNT(G_CoveragePackages2YHO_Risk), CAP_999));																				
+Report: => I_CntDistPackageTypeWrittenIn3YHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																												G_SetDefault2HO_Risk => DEFAULT_2,
+																				MIN(COUNT(G_CoveragePackages3YHO_Risk), CAP_999));
+																				
+// Report: => I_CntDistPackageType_Risk := MIN(H_CntDistPackageType, CAP_999);
+
+// Report: => H_CntDistPackageTypeHO := MAP(G_SetDefault1  => DEFAULT_1,
+                                  // G_SetDefault2HO => DEFAULT_2,
+                                  // G_SetDefault3HO => DEFAULT_3,
+																				// COUNT(G_CoveragePackagesHO));
+// Report: => I_CntDistPackageTypeHO := MIN(H_CntDistPackageTypeHO, CAP_999);
+
+// I_CntDistPoltype_Risk
+// I_CntDistPoltypeWrittenIn1Y_Risk
+// I_CntDistPoltypeWrittenIn2Y_Risk
+// I_CntDistPoltypeWrittenIn3Y_Risk
+Report: => I_CntDistPoltype_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,//true 0 if no policy type was reported
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk){PolicyType}),CAP_999));
+Report: => I_CntDistPoltypeWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0){PolicyType}),CAP_999));
+Report: => I_CntDistPoltypeWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0){PolicyType}),CAP_999));
+Report: => I_CntDistPoltypeWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0){PolicyType}),CAP_999));
+
+
+
+
+
+// I_CntPolOfOT_Risk
+// I_CntPolOfOTWrittenIn1Y_Risk
+// I_CntPolOfOTWrittenIn2Y_Risk
+// I_CntPolOfOTWrittenIn3Y_Risk
+Policy: => OTPolicyType := PolicyType IN ['BO','FL','HL','IM','MH','QK','RF','UM','WC','XO'];
+Report: => I_CntPolOfOT_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND OTPolicyType)),CAP_999));
+Report: => I_CntPolOfOTWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND OTPolicyType AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfOTWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND OTPolicyType AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfOTWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND OTPolicyType AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+
+
+// I_CntPolOfCO_Risk
+// I_CntPolOfCOWrittenIn1Y_Risk
+// I_CntPolOfCOWrittenIn2Y_Risk
+// I_CntPolOfCOWrittenIn3Y_Risk
+Policy: => COPolicyType := PolicyType IN ['CO'];
+Report: => I_CntPolOfCO_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND COPolicyType)),CAP_999));
+Report: => I_CntPolOfCOWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND COPolicyType AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfCOWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND COPolicyType AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfCOWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND COPolicyType AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+// I_CntPolOfFR_Risk
+// I_CntPolOfFRWrittenIn1Y_Risk
+// I_CntPolOfFRWrittenIn2Y_Risk
+// I_CntPolOfFRWrittenIn3Y_Risk
+Policy: => FRPolicyType := PolicyType IN ['FR'];
+Report: => I_CntPolOfFR_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND FRPolicyType)),CAP_999));
+Report: => I_CntPolOfFRWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND FRPolicyType AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfFRWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND FRPolicyType AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfFRWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND FRPolicyType AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+// I_CntPolOfHO_Risk
+// I_CntPolOfHOWrittenIn1Y_Risk
+// I_CntPolOfHOWrittenIn2Y_Risk
+// I_CntPolOfHOWrittenIn3Y_Risk
+Policy: => HOPolicyType := PolicyType IN ['HO'];
+Report: => I_CntPolOfHO_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND HOPolicyType)),CAP_999));
+
+Report: => I_CntPolOfHOWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND HOPolicyType AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfHOWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND HOPolicyType AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfHOWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND HOPolicyType AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+
+// I_CntPolOfTN_Risk
+// I_CntPolOfTNWrittenIn1Y_Risk
+// I_CntPolOfTNWrittenIn2Y_Risk
+// I_CntPolOfTNWrittenIn3Y_Risk
+Policy: => TNPolicyType := PolicyType IN ['TN'];
+Report: => I_CntPolOfTN_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND TNPolicyType)),CAP_999));
+Report: => I_CntPolOfTNWrittenIn1Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND TNPolicyType AND G_MOSPolicyInceptaion < 12 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfTNWrittenIn2Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND TNPolicyType AND G_MOSPolicyInceptaion < 24 AND G_MOSPolicyInceptaion >= 0)),CAP_999));
+Report: => I_CntPolOfTNWrittenIn3Y_Risk := MAP(G_SetDefault1_Risk => DEFAULT_1,
+																	MIN(COUNT(Policy(G_CountablePolicy_Risk AND TNPolicyType AND G_MOSPolicyInceptaion < 36 AND G_MOSPolicyInceptaion >= 0)),CAP_999));																	
+
+// R_AvgIndivLimitCOVA_Risk
+// Policy: => AvgIndividualLimitCOVA_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVA);// Null if no COVA or no limit for cova for matched address
+// Policy: => ExistCOVA_Risk := EXISTS(PolicyProperty(G_CountablePolicy_Risk AND ExistCOVA));// Null if no COVA or no limit for cova
+
+// Report: => G_SetDefault4IndLimitCOVA_Risk := EXISTS(Policy(G_CountablePolicy_Risk AND ExistCOVA_Risk)) AND NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT AvgIndividualLimitCOVA_Risk:Null));
+Report: => G_SetDefault4IndLimitCOVA_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT AvgIndividualLimitCOVA_Risk:Null));
+Report: => G_SetDefault4IndLimitCOVB_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT AvgIndividualLimitCOVB_Risk:Null));
+Report: => G_SetDefault4IndLimitCOVC_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT AvgIndividualLimitCOVC_Risk:Null));
+Report: => G_SetDefault4IndLimitCOVD_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT AvgIndividualLimitCOVD_Risk:Null));
+Report: => G_SetDefault4IndLimitCOVE_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT AvgIndividualLimitCOVE_Risk:Null));
+Report: => G_SetDefault4IndLimitCOVF_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT AvgIndividualLimitCOVF_Risk:Null));
+Report: => G_SetDefault4IndLimitPPRC_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT AvgIndividualLimitPPRC_Risk:Null));
+Report: => G_SetDefault4IndLimitOTHER_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT AvgIndividualLimitOTHER_Risk:Null));
+
+
+Policy: => AvgIndividualLimitCOVA_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVA);
+Report: => H_AvgIndivLimitCOVA_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVA_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk),AvgIndividualLimitCOVA_Risk));
+Report: => R_AvgIndivLimitCOVA_Risk := MIN(ROUND2(H_AvgIndivLimitCOVA_Risk), CAP_99999999_99);
+
+// R_AvgIndivLimitCOVB_Risk
+Policy: => AvgIndividualLimitCOVB_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVB);
+Report: => H_AvgIndivLimitCOVB_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVB_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk),AvgIndividualLimitCOVB_Risk));
+Report: => R_AvgIndivLimitCOVB_Risk := MIN(ROUND2(H_AvgIndivLimitCOVB_Risk), CAP_99999999_99);
+// R_AvgIndivLimitCOVC_Risk
+Policy: => AvgIndividualLimitCOVC_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVC);
+Report: => H_AvgIndivLimitCOVC_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVC_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk),AvgIndividualLimitCOVC_Risk));
+Report: => R_AvgIndivLimitCOVC_Risk := MIN(ROUND2(H_AvgIndivLimitCOVC_Risk), CAP_99999999_99);
+// R_AvgIndivLimitCOVD_Risk
+Policy: => AvgIndividualLimitCOVD_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVD);
+Report: => H_AvgIndivLimitCOVD_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVD_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk),AvgIndividualLimitCOVD_Risk));
+Report: => R_AvgIndivLimitCOVD_Risk := MIN(ROUND2(H_AvgIndivLimitCOVD_Risk), CAP_99999999_99);
+// R_AvgIndivLimitCOVE_Risk
+Policy: => AvgIndividualLimitCOVE_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVE);
+Report: => H_AvgIndivLimitCOVE_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVE_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk),AvgIndividualLimitCOVE_Risk));
+Report: => R_AvgIndivLimitCOVE_Risk := MIN(ROUND2(H_AvgIndivLimitCOVE_Risk), CAP_99999999_99);
+// R_AvgIndivLimitCOVF_Risk
+Policy: => AvgIndividualLimitCOVF_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVF);
+Report: => H_AvgIndivLimitCOVF_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVF_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk),AvgIndividualLimitCOVF_Risk));
+Report: => R_AvgIndivLimitCOVF_Risk := MIN(ROUND2(H_AvgIndivLimitCOVF_Risk), CAP_99999999_99);
+//R_AvgIndivLimitPPRC_Risk
+Policy: => AvgIndividualLimitPPRC_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitPPRC);
+Report: => H_AvgIndivLimitPPRC_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitPPRC_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk),AvgIndividualLimitPPRC_Risk));
+Report: => R_AvgIndivLimitPPRC_Risk := MIN(ROUND2(H_AvgIndivLimitPPRC_Risk), CAP_99999999_99);
+
+//R_AvgIndivLimitOTHER_Risk
+PolicyProperty: => AvgIndividualLimitOTHER := AVE(Coverages((NOT CoverageType IN ['COVA','COVB','COVC','COVD','COVE','COVF','PPRC']) AND NOT CoverageType:Null AND (IndividualLimit > 0)),IndividualLimit);
+
+Policy: => AvgIndividualLimitOTHER_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitOTHER);
+Report: => H_AvgIndivLimitOTHER_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitOTHER_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk),AvgIndividualLimitOTHER_Risk));
+Report: => R_AvgIndivLimitOTHER_Risk := MIN(ROUND2(H_AvgIndivLimitOTHER_Risk), CAP_99999999_99);
+
+
+// R_AvgOverallDeduct_Risk
+// R_AvgOverallDeductHO_Risk
+// R_AvgTheftDeduct_Risk
+// R_AvgTheftDeductHO_Risk
+Policy: => TheftDeductible_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk), TheftDeductible);
+Policy: => OverallDeductible_Risk := AVE(PolicyProperty(G_CountablePolicy_Risk), OverallDeductible);
+
+Report: => G_SetDefault4TheftDeduct_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT TheftDeductible_Risk:Null));
+Report: => G_SetDefault4OverallDeduct_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND NOT OverallDeductible_Risk:Null));
+Report: => G_SetDefault4TheftDeductHO_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND G_HOPolicy AND NOT TheftDeductible_Risk:Null));
+Report: => G_SetDefault4OverallDeductHO_Risk := NOT EXISTS(Policy(G_CountablePolicy_Risk AND G_HOPolicy AND NOT OverallDeductible_Risk:Null));
+
+Report: => H_AvgOverallDeduct_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																		G_SetDefault4OverallDeduct_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk),OverallDeductible_Risk));
+Report: => R_AvgOverallDeduct_Risk := MIN(ROUND2(H_AvgOverallDeduct_Risk), CAP_99999999_99);
+
+Report: => H_AvgOverallDeductHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1, 
+																		G_SetDefault4OverallDeductHO_Risk => DEFAULT_4,
+                                    AVE(Policy(G_CountablePolicy_Risk AND G_HOPolicy),OverallDeductible_Risk));
+Report: => R_AvgOverallDeductHO_Risk := MIN(ROUND2(H_AvgOverallDeductHO_Risk), CAP_99999999_99);
+
+
+Report: => H_AvgTheftDeduct_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																		G_SetDefault4TheftDeduct_Risk => DEFAULT_4,
+																		AVE(Policy(G_CountablePolicy_Risk),TheftDeductible_Risk));
+Report: => R_AvgTheftDeduct_Risk := MIN(ROUND2(H_AvgTheftDeduct_Risk), CAP_99999999_99);
+
+Report: => H_AvgTheftDeductHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1, 
+																	G_SetDefault4TheftDeductHO_Risk => DEFAULT_4,
+																		AVE(Policy(G_CountablePolicy_Risk AND G_HOPolicy),TheftDeductible_Risk));
+Report: => R_AvgTheftDeductHO_Risk := MIN(ROUND2(H_AvgTheftDeductHO_Risk), CAP_99999999_99);
+
+// R_MaxIndivLimitCOVA_Risk
+Policy: => MaxIndividualLimitCOVA_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVA);
+Report: => H_MaxIndivLimitCOVA_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVA_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MaxIndividualLimitCOVA_Risk));
+Report: => R_MaxIndivLimitCOVA_Risk := MIN(ROUND2(H_MaxIndivLimitCOVA_Risk), CAP_99999999_99);
+
+// R_MaxIndivLimitCOVB_Risk
+Policy: => MaxIndividualLimitCOVB_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVB);
+Report: => H_MaxIndivLimitCOVB_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVB_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MaxIndividualLimitCOVB_Risk));
+Report: => R_MaxIndivLimitCOVB_Risk := MIN(ROUND2(H_MaxIndivLimitCOVB_Risk), CAP_99999999_99);
+// R_MaxIndivLimitCOVC_Risk
+Policy: => MaxIndividualLimitCOVC_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVC);
+Report: => H_MaxIndivLimitCOVC_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVC_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MaxIndividualLimitCOVC_Risk));
+Report: => R_MaxIndivLimitCOVC_Risk := MIN(ROUND2(H_MaxIndivLimitCOVC_Risk), CAP_99999999_99);
+// R_MaxIndivLimitCOVD_Risk
+Policy: => MaxIndividualLimitCOVD_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVD);
+Report: => H_MaxIndivLimitCOVD_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVD_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MaxIndividualLimitCOVD_Risk));
+Report: => R_MaxIndivLimitCOVD_Risk := MIN(ROUND2(H_MaxIndivLimitCOVD_Risk), CAP_99999999_99);
+// R_MaxIndivLimitCOVE_Risk
+Policy: => MaxIndividualLimitCOVE_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVE);
+Report: => H_MaxIndivLimitCOVE_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVE_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MaxIndividualLimitCOVE_Risk));
+Report: => R_MaxIndivLimitCOVE_Risk := MIN(ROUND2(H_MaxIndivLimitCOVE_Risk), CAP_99999999_99);
+// R_MaxIndivLimitCOVF_Risk
+Policy: => MaxIndividualLimitCOVF_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVF);
+Report: => H_MaxIndivLimitCOVF_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVF_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MaxIndividualLimitCOVF_Risk));
+Report: => R_MaxIndivLimitCOVF_Risk := MIN(ROUND2(H_MaxIndivLimitCOVF_Risk), CAP_99999999_99);
+//R_MaxIndivLimitPPRC_Risk
+Policy: => MaxIndividualLimitPPRC_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitPPRC);
+Report: => H_MaxIndivLimitPPRC_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitPPRC_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MaxIndividualLimitPPRC_Risk));
+Report: => R_MaxIndivLimitPPRC_Risk := MIN(ROUND2(H_MaxIndivLimitPPRC_Risk), CAP_99999999_99);
+//R_MaxIndivLimitOTHER_Risk
+Policy: => MaxIndividualLimitOTHER_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitOTHER);
+Report: => H_MaxIndivLimitOTHER_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitOTHER_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MaxIndividualLimitOTHER_Risk));
+Report: => R_MaxIndivLimitOTHER_Risk := MIN(ROUND2(H_MaxIndivLimitOTHER_Risk), CAP_99999999_99);
+
+
+
+// R_MinIndivLimitCOVA_Risk
+Policy: => MinIndividualLimitCOVA_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVA);
+Report: => H_MinIndivLimitCOVA_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVA_Risk => DEFAULT_4,
+                                    MIN(Policy(G_CountablePolicy_Risk),MinIndividualLimitCOVA_Risk));
+Report: => R_MinIndivLimitCOVA_Risk := MIN(ROUND2(H_MinIndivLimitCOVA_Risk), CAP_99999999_99);
+
+// R_MinIndivLimitCOVB_Risk
+Policy: => MinIndividualLimitCOVB_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVB);
+Report: => H_MinIndivLimitCOVB_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVB_Risk => DEFAULT_4,
+                                    MIN(Policy(G_CountablePolicy_Risk),MinIndividualLimitCOVB_Risk));
+Report: => R_MinIndivLimitCOVB_Risk := MIN(ROUND2(H_MinIndivLimitCOVB_Risk), CAP_99999999_99);
+// R_MinIndivLimitCOVC_Risk
+Policy: => MinIndividualLimitCOVC_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVC);
+Report: => H_MinIndivLimitCOVC_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVC_Risk => DEFAULT_4,
+                                    MIN(Policy(G_CountablePolicy_Risk),MinIndividualLimitCOVC_Risk));
+Report: => R_MinIndivLimitCOVC_Risk := MIN(ROUND2(H_MinIndivLimitCOVC_Risk), CAP_99999999_99);
+// R_MinIndivLimitCOVD_Risk
+Policy: => MinIndividualLimitCOVD_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVD);
+Report: => H_MinIndivLimitCOVD_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVD_Risk => DEFAULT_4,
+                                    MIN(Policy(G_CountablePolicy_Risk),MinIndividualLimitCOVD_Risk));
+Report: => R_MinIndivLimitCOVD_Risk := MIN(ROUND2(H_MinIndivLimitCOVD_Risk), CAP_99999999_99);
+// R_MinIndivLimitCOVE_Risk
+Policy: => MinIndividualLimitCOVE_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVE);
+Report: => H_MinIndivLimitCOVE_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVE_Risk => DEFAULT_4,
+                                    MIN(Policy(G_CountablePolicy_Risk),MinIndividualLimitCOVE_Risk));
+Report: => R_MinIndivLimitCOVE_Risk := MIN(ROUND2(H_MinIndivLimitCOVE_Risk), CAP_99999999_99);
+// R_MinIndivLimitCOVF_Risk
+Policy: => MinIndividualLimitCOVF_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitCOVF);
+Report: => H_MinIndivLimitCOVF_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitCOVF_Risk => DEFAULT_4,
+                                    MIN(Policy(G_CountablePolicy_Risk),MinIndividualLimitCOVF_Risk));
+Report: => R_MinIndivLimitCOVF_Risk := MIN(ROUND2(H_MinIndivLimitCOVF_Risk), CAP_99999999_99);
+// R_MinIndivLimitPPRC_Risk
+Policy: => MinIndividualLimitPPRC_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitPPRC);
+Report: => H_MinIndivLimitPPRC_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitPPRC_Risk => DEFAULT_4,
+                                    MIN(Policy(G_CountablePolicy_Risk),MinIndividualLimitPPRC_Risk));
+Report: => R_MinIndivLimitPPRC_Risk := MIN(ROUND2(H_MinIndivLimitPPRC_Risk), CAP_99999999_99);
+//R_MinIndivLimitOTHER_Risk
+Policy: => MinIndividualLimitOTHER_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk),AvgIndividualLimitOTHER);
+Report: => H_MinIndivLimitOTHER_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+                                    G_SetDefault4IndLimitOTHER_Risk => DEFAULT_4,
+                                    MIN(Policy(G_CountablePolicy_Risk),MinIndividualLimitOTHER_Risk));
+Report: => R_MinIndivLimitOTHER_Risk := MIN(ROUND2(H_MinIndivLimitOTHER_Risk), CAP_99999999_99);
+
+
+
+
+// R_MaxOverallDeduct_Risk
+// R_MaxOverallDeductHO_Risk
+// R_MaxTheftDeduct_Risk
+// R_MaxTheftDeductHO_Risk
+Policy: => MaxTheftDeductible_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk), TheftDeductible);
+Policy: => MaxOverallDeductible_Risk := MAX(PolicyProperty(G_CountablePolicy_Risk), OverallDeductible);
+
+Report: => H_MaxOverallDeduct_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																		G_SetDefault4OverallDeduct_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MaxOverallDeductible_Risk));
+Report: => R_MaxOverallDeduct_Risk := MIN(ROUND2(H_MaxOverallDeduct_Risk), CAP_99999999_99);
+
+Report: => H_MaxOverallDeductHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1, 
+																		G_SetDefault4OverallDeductHO_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk AND G_HOPolicy),MaxOverallDeductible_Risk));
+Report: => R_MaxOverallDeductHO_Risk := MIN(ROUND2(H_MaxOverallDeductHO_Risk), CAP_99999999_99);
+
+
+Report: => H_MaxTheftDeduct_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																		G_SetDefault4TheftDeduct => DEFAULT_4,
+																		MAX(Policy(G_CountablePolicy_Risk),MaxTheftDeductible_Risk));
+Report: => R_MaxTheftDeduct_Risk := MIN(ROUND2(H_MaxTheftDeduct_Risk), CAP_99999999_99);
+
+Report: => H_MaxTheftDeductHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1, 
+																	G_SetDefault4TheftDeductHO_Risk => DEFAULT_4,
+																		MAX(Policy(G_CountablePolicy_Risk AND G_HOPolicy),MaxTheftDeductible_Risk));
+Report: => R_MaxTheftDeductHO_Risk := MIN(ROUND2(H_MaxTheftDeductHO_Risk), CAP_99999999_99);
+
+// R_MinOverallDeduct_Risk
+// R_MinOverallDeductHO_Risk
+// R_MinTheftDeduct_Risk
+// R_MinTheftDeductHO_Risk
+Policy: => MinTheftDeductible_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk), TheftDeductible);
+Policy: => MinOverallDeductible_Risk := MIN(PolicyProperty(G_CountablePolicy_Risk), OverallDeductible);
+
+Report: => H_MinOverallDeduct_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																		G_SetDefault4OverallDeduct_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk),MinOverallDeductible_Risk));
+Report: => R_MinOverallDeduct_Risk := MIN(ROUND2(H_MinOverallDeduct_Risk), CAP_99999999_99);
+
+Report: => H_MinOverallDeductHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1, 
+																		G_SetDefault4OverallDeductHO_Risk => DEFAULT_4,
+                                    MAX(Policy(G_CountablePolicy_Risk AND G_HOPolicy),MinOverallDeductible_Risk));
+Report: => R_MinOverallDeductHO_Risk := MIN(ROUND2(H_MinOverallDeductHO_Risk), CAP_99999999_99);
+
+Report: => H_MinTheftDeduct_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1,
+																		G_SetDefault4TheftDeduct => DEFAULT_4,
+																		MIN(Policy(G_CountablePolicy_Risk),MinTheftDeductible_Risk));
+Report: => R_MinTheftDeduct_Risk := MIN(ROUND2(H_MinTheftDeduct_Risk), CAP_99999999_99);
+
+Report: => H_MinTheftDeductHO_Risk := MAP(G_SetDefault1_Risk  => DEFAULT_1, 
+																	G_SetDefault4TheftDeductHO_Risk => DEFAULT_4,
+																		MIN(Policy(G_CountablePolicy_Risk AND G_HOPolicy),MinTheftDeductible_Risk));
+Report: => R_MinTheftDeductHO_Risk := MIN(ROUND2(H_MinTheftDeductHO_Risk), CAP_99999999_99);
+
+//audit purpose intermeditae attributes
+Report: => CountReport := COUNT(Policy{DataSource});
+Report: => SubjectPolicy := COUNT(Policy(DataSource = 'SubjectSearchBatch'));
+Report: => RiskPolicy := COUNT(Policy(DataSource = 'RiskAddressBatch'));
+PolicyHolder: => indicator := NOT EndDate:Null AND SubjectNumber > 0;
