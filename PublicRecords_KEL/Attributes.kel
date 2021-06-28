@@ -1144,6 +1144,7 @@ Address: => ResBusFlag := ONLY(BestchildAdvo, ResidentialOrBusinessIndicator);
 Address: => OnlyGMFlag := ONLY(BestchildAdvo, OnlyWayToGetMailIndicator);
 InputPII: => InputAddronfile := EXISTS(Location.DataSources);
 InputPII: => IsPostalSource :=EXISTS(Location.DataSources(Source ='VL')); 
+InputPII: => IsCurrentPostalSource :=EXISTS(CurrentAddress.DataSources(Source ='VL')); 
 
 //Input PII Address Flag  Attributes
 
@@ -3421,7 +3422,17 @@ Person: => PL_CurrAddrTypeIndx := MAP(
 			PL_CurrAddrType IN ['P','G'] => '2',
 			PL_CurrAddrType IN ['R','RD','S','SD','H','HD','UD'] => '3',
 			PL_CurrAddrType = 'M' => '4');
-
+//KS-1916
+Person: => PL_CurrAddrZipIsPOBoxFlag := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR CurrentAddrZip5 = '' => MISSING_INPUT_DATA_INT,
+			CurrAddrHelperAttribute.ZIP5:Null => NO_DATA_FOUND_INT,
+			CurrAddrHelperAttribute.ZIP5.ZipClass = 'P' => 1,
+			0);
+Person: => PL_CurrAddrIsMilitaryFlag := MAP(
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR CurrentAddrZip5 = '' => MISSING_INPUT_DATA_INT,
+			CurrAddrHelperAttribute.ZIP5:Null AND PL_CurrAddrType = '' AND NOT PII.IsCurrentPostalSource => NO_DATA_FOUND_INT,
+			PL_CurrAddrType = 'M' OR CurrAddrHelperAttribute.ZIP5.ZipClass = 'M' => 1,
+			0);
 //KS-6258
 PersonProperty: => CurrPropMatchAttribute :=
 	IsNullOrEqual(TRIMBOTH(PrimaryRange), TRIMBOTH(Subject.PII.CurrentAddrPrimRng)) AND  
@@ -3862,7 +3873,7 @@ Person: => PL_BestPhoneHomeFCRA:= MAP(
 			P_LexIDSeenFlagFCRA = '0' => MISSING_INPUT_DATA,
 			BestPhoneFCRA:Null => NO_DATA_FOUND,
 			BestPhoneFCRA);
-Person: => PL_BestPhoneHomeNonFCRA:= MAP(
+Person: => PL_BestPhoneHomeNonFCRA := MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 			BestPhoneNonFCRA:Null => NO_DATA_FOUND,
 			BestPhoneNonFCRA);
