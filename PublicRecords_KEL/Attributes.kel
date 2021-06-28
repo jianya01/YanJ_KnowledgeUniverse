@@ -11319,11 +11319,7 @@ PersonAddress: => GroupedInputAddress :=
 		TRIMALL(DEFAULT(Subject.P_InpClnAddrSecRng,''));
 PersonAddress: => AddressSimilarityMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedInputAddress) >= 0.75, 1,0);
 PersonAddress.DataSources: => TranslatedSources := ConsumerSourceGroup(Source);
-
-// Person: => AddressVerMatchSourcesAllPre := PersonAddress(InputAddressMatch OR AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource};
-
 Person: => AddressVerMatchSourcesAllPre := PersonAddress(InputAddressMatch OR AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource,
-// Person: => AddressVerMatchSourcesAllPre := PersonAddress(HeaderHitFlag AND InputAddressMatch OR AddressSimilarityMatch = 1 AND TranslatedSources != '').DataSources{TranslatedSource := Source,
 					RecordCount := Source:Weight,
 					MyDateFirstSeen := Source:DateFirstSeen,
 					MyDateLastSeen := Source:DateLastSeen};
@@ -11338,15 +11334,8 @@ Person.AddressVerMatchSources: => ValidBankruptcySources := (TranslatedSource = 
 Person.AddressVerMatchSources: => ValidLiensSources := (TranslatedSource = 'L2' AND LiensAgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT LiensAgeInDays:Null);       
 Person.AddressVerMatchSources: => OtherSources := (TranslatedSource <> 'BA' AND TranslatedSource <> 'L2'); 
 
-// Person: => AddressVerMatchSourcesSortedNonFCRA := TOPN(AddressVerMatchSources, 32, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
 Person: => AddressVerMatchSourcesSortedNonFCRA := TOPN(AddressVerMatchSources{TranslatedSource, IsBureauSource := TranslatedSource IN ['EN','EQ','TN'], DateFirstSeenCleaned, DateLastSeenCleaned, RecordCount}, 32, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
-// Person: => AddressVerMatchSourcesSortedFCRA := TOPN(AddressVerMatchSources(ValidBankruptcySources OR ValidLiensSources OR OtherSources), 21, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
 Person: => AddressVerMatchSourcesSortedFCRA := TOPN(AddressVerMatchSources(ValidBankruptcySources OR ValidLiensSources OR OtherSources){TranslatedSource, IsBureauSource := TranslatedSource IN ['EQ'], DateFirstSeenCleaned, DateLastSeenCleaned, RecordCount}, 21, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
-
-// Person: => AddressVerSourceListSortedFCRA := TOPN(PersonAddressMatchSourcesAll(ValidBankruptcySources OR ValidLiensSources OR OtherSources){TranslatedSourceCode, IsBureauSource := TranslatedSourceCode IN ['EQ'], SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 32, FirstSeenDate, TranslatedSourceCode);
-// Person: => AddressVerSourceListSorted := TOPN(PersonAddressMatchSourcesAll{TranslatedSourceCode, IsBureauSource := TranslatedSourceCode IN ['EN','EQ','TN'], SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 32, FirstSeenDate, TranslatedSourceCode);
-
-
 
 // Address Verification Sources Attributes
 
@@ -11431,81 +11420,6 @@ Person: => PL_VerAddrSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAd
 				ALL(AddressVerMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerAddrSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));
 
-
-
-
-/*
-// Address Verification Sources Attributes
-//Person: => PL_VerAddrSrcCntEvNonFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
-																BOUNDSFOLD(COUNT(AddressVerSourceListSorted), 0, 32));
-//Person: => PL_VerAddrSrcListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																 PL_VerAddrSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
-																 CONCAT(AddressVerSourceListSorted, TranslatedSourceCode, '|'));																
-//Person: => PL_VerAddrSrcEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerAddrSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
-																			 CONCAT(AddressVerSourceListSorted, SourceDateFirstSeen, '|'));
-//Person: => PL_VerAddrSrcLastDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerAddrSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
-																			 CONCAT(AddressVerSourceListSorted, SourceDateLastSeen, '|'));
-//Person: => PL_VerAddrSrcCntEvFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
-																BOUNDSFOLD(COUNT(AddressVerSourceListSortedFCRA), 0, 32));
-//Person: => PL_VerAddrSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
-																 PL_VerAddrSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
-																 CONCAT(AddressVerSourceListSortedFCRA, TranslatedSourceCode, '|'));
-//Person: => PL_VerAddrSrcEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerAddrSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
-																			 CONCAT(AddressVerSourceListSortedFCRA, SourceDateFirstSeen, '|'));
-//Person: => PL_VerAddrSrcLastDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerAddrSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
-																			 CONCAT(AddressVerSourceListSortedFCRA, SourceDateLastSeen, '|'));
-//Person: => PL_VerAddrFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																					EXISTS(AddressVerSourceListSorted) => '1','0');
-//Person: => PL_VerAddrSrcRecCntEvNonFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
-																					BOUNDSFOLD(SUM(AddressVerSourceGroupListSorted,RecordCount), 0, 9999));
-//Person: => PL_VerAddrSrcRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																					PL_VerAddrSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND,
-																					CONCAT(AddressVerSourceGroupListSorted, RecordCount, '|'));
-//Person: => PL_VerAddrSrcOldDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																	 PL_VerAddrSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND,
-																	 ALL(AddressVerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 
-																	 DATETOSTRING(MIN(AddressVerSourceListSorted, DATE(SourceDateFirstSeen)), '%Y%m%d'));
-//Person: => PL_VerAddrSrcNewDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																	 PL_VerAddrSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND,
-																	 ALL(AddressVerSourceListSorted, SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 
-																	 DATETOSTRING(MAX(AddressVerSourceListSorted, DATE(SourceDateLastSeen)), '%Y%m%d'));
-Person: => PL_VerAddrSrcOldMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT, 
-																					PL_VerAddrSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
-																					PL_VerAddrSrcOldDtEvNonFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
-																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerAddrSrcOldDtEvNonFCRA),Person.CURRENT_DATE),0,960)); 
-Person: => PL_VerAddrSrcNewMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT, 
-																					PL_VerAddrSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
-																					PL_VerAddrSrcNewDtEvNonFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
-																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerAddrSrcNewDtEvNonFCRA),Person.CURRENT_DATE),0,960)); 																					
-Person: => PL_VerAddrFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																					EXISTS(AddressVerSourceListSortedFCRA) => '1','0');
-Person: => PL_VerAddrSrcRecCntEvFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
-																					BOUNDSFOLD(SUM(AddressVerSourceGroupListSortedFCRA,RecordCount), 0, 9999));
-Person: => PL_VerAddrSrcRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																					PL_VerAddrSrcRecCntEvFCRA < 1 => NO_DATA_FOUND,
-																					CONCAT(AddressVerSourceGroupListSortedFCRA, RecordCount, '|'));
-Person: => PL_VerAddrSrcOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																	 PL_VerAddrSrcRecCntEvFCRA < 1 => NO_DATA_FOUND,
-																	 ALL(AddressVerSourceListSortedFCRA, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 
-																	 DATETOSTRING(MIN(AddressVerSourceListSortedFCRA, DATE(SourceDateFirstSeen)), '%Y%m%d'));
-Person: => PL_VerAddrSrcNewDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																	 PL_VerAddrSrcRecCntEvFCRA < 1 => NO_DATA_FOUND,
-																	 ALL(AddressVerSourceListSortedFCRA, SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 
-																	 DATETOSTRING(MAX(AddressVerSourceListSortedFCRA, DATE(SourceDateLastSeen)), '%Y%m%d'));
-Person: => PL_VerAddrSrcOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT, 
-																					PL_VerAddrSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
-																					PL_VerAddrSrcOldDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
-																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerAddrSrcOldDtEvFCRA),Person.CURRENT_DATE),0,960)); 
-Person: => PL_VerAddrSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT, 
-																					PL_VerAddrSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
-																					PL_VerAddrSrcNewDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
-																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerAddrSrcNewDtEvFCRA),Person.CURRENT_DATE),0,960));
-
-*/
 //KS6799
 Person: => PL_VerAddrSrcBureauCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
