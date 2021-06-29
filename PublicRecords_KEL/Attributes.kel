@@ -11832,7 +11832,8 @@ Person: => PL_PrevAddrSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAd
 				ALL(PreviousAddressMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));
 
-Person: => AllDOBSet := ReportedDatesOfBirth(HeaderHitFlag AND TranslatedSourceCode != ''){DateOfBirth};
+//Verification DOB
+Person: => AllDOBSet := ReportedDatesOfBirth(HeaderHitFlag AND TranslatedSources != ''){DateOfBirth};
 Person.ReportedDatesOfBirth: => AllDobCheck := ALL(AllDOBSet,SUBSTR(DATETOSTRING(DateOfBirth,'%Y%m%d'), 7, 8) IN ['00','01']);
 Person: => DOBInputMatches := EXISTS(ReportedDatesOfBirth(DATETOSTRING(ReportedDatesOfBirth.DateOfBirth,'%Y%m%d') = Person.P_InpClnDOB));
 Person: => InputDOBDistanceMatch := EXISTS(EditDistanceWithinRadius(P_InpClnDOB, DATETOSTRING(ReportedDatesOfBirth.DateOfBirth,'%Y%m%d'), 1));
@@ -11884,75 +11885,107 @@ Person: => ValidDOBLogic := (ValidDOBLogicCheck1:Null OR ValidDOBLogicCheck1)
 														OR
 														(ValidDOBLogicCheck5:Null OR ValidDOBLogicCheck5)
 														;
-Person.ReportedDatesOfBirth: => TranslatedSourceCode := ConsumerSourceGroup(Source);
-Person: => DOBVerTranslatedSources := ReportedDatesOfBirth(HeaderHitFlag AND ValidDOBLogic AND ValidDOBCheck AND TranslatedSourceCode != ''){TranslatedSourceCode};
-Person.DOBVerTranslatedSources: => AgeInDays := ABSDAYSBETWEEN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE);
-Person: => DOBMatchSourcesAll := DOBVerTranslatedSources(TranslatedSourceCode != ''){
-	TranslatedSourceCode := TranslatedSourceCode,
-	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97),
-	FirstSeenDate := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.MAX_DATE),
-	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97),
-	ValidBankruptcySources := (TranslatedSourceCode = 'BA' AND AgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT AgeInDays:Null),
-	ValidLiensSources := (TranslatedSourceCode = 'L2' AND AgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null),
-	OtherSources := (TranslatedSourceCode <> 'BA' AND TranslatedSourceCode <> 'L2')};
-Person: => DOBVerSourceListSortedFCRA := TOPN(DOBMatchSourcesAll(ValidBankruptcySources OR ValidLiensSources OR OtherSources){TranslatedSourceCode, SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 32, FirstSeenDate, TranslatedSourceCode);
-Person: => DOBVerSourceListSorted := TOPN(DOBMatchSourcesAll{TranslatedSourceCode, SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 32, FirstSeenDate, TranslatedSourceCode);
-Person.ReportedDatesOfBirth: => DOBSourceDateFirstSeen := Source:DateFirstSeen;
-Person.ReportedDatesOfBirth: => DOBSourceDateLastSeen := Source:DateLastSeen;
-Person: => PersonDOBMatchSourcesAllPre := ReportedDatesOfBirth(ValidDOBLogic AND ValidDOBCheck AND HeaderHitFlag AND TranslatedSourceCode != ''){TranslatedSourceCode, DOBSourceDateFirstSeen, DOBSourceDateLastSeen};
-Person: => PersonDOBMatchSourcesGroupAll := PersonDOBMatchSourcesAllPre(TranslatedSourceCode != ''){
-									TranslatedSourceCode,
-									DOBSourceDateFirstSeen,
-									DOBSourceDateLastSeen,
-									BankruptcyAgeInDays := ABSDAYSBETWEEN(DOBSourceDateFirstSeen, Person.CURRENT_DATE),
-									LiensAgeInDays := ABSDAYSBETWEEN(DOBSourceDateLastSeen, Person.CURRENT_DATE)}; 
-Person.PersonDOBMatchSourcesGroupAll: => ValidBankruptcySources := (TranslatedSourceCode = 'BA' AND BankruptcyAgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT BankruptcyAgeInDays:Null);       
-Person.PersonDOBMatchSourcesGroupAll: => ValidLiensSources := (TranslatedSourceCode = 'L2' AND LiensAgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT LiensAgeInDays:Null);       
-Person.PersonDOBMatchSourcesGroupAll: => OtherSources := (TranslatedSourceCode <> 'BA' AND TranslatedSourceCode <> 'L2'); 
-Person: => VerDOBSourceListFCRADataSet := PersonDOBMatchSourcesGroupAll(ValidBankruptcySources OR ValidLiensSources OR OtherSources){
-											TranslatedSourceCode,
-											DOBSourceDateFirstSeen,
-											DOBSourceDateLastSeen};
-Person: => VerDOBSourceListNonFCRADataSet := PersonDOBMatchSourcesGroupAll{
-											TranslatedSourceCode,
-											DOBSourceDateFirstSeen,
-											DOBSourceDateLastSeen};
-Person: => VerDOBSourceListAllFCRA := VerDOBSourceListFCRADataSet{
-											TranslatedSourceCode,
-											RecordCount := GROUP:Count,
-											DOBSourceDateFirstSeen := MIN(GROUP,INTEGER(IF(ISVALIDDATE(DOBSourceDateFirstSeen), DATETOSTRING(DOBSourceDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97))),
-											DOBSourceDateLastSeen := MAX(GROUP,INTEGER(IF(ISVALIDDATE(DOBSourceDateLastSeen), DATETOSTRING(DOBSourceDateLastSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97)))};
-Person: => VerDOBSourceListAllNonFCRA := VerDOBSourceListNonFCRADataSet{
-											TranslatedSourceCode,
-											RecordCount := GROUP:Count,
-											DOBSourceDateFirstSeen := MIN(GROUP,INTEGER(IF(ISVALIDDATE(DOBSourceDateFirstSeen), DATETOSTRING(DOBSourceDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97))),
-											DOBSourceDateLastSeen := MAX(GROUP,INTEGER(IF(ISVALIDDATE(DOBSourceDateLastSeen), DATETOSTRING(DOBSourceDateLastSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97)))};
-Person: => DOBVerSourceGroupListSortedFCRA := TOPN(VerDOBSourceListAllFCRA, 100, DOBSourceDateFirstSeen);
-Person: => DOBVerSourceGroupListSorted := TOPN(VerDOBSourceListAllNonFCRA, 100, DOBSourceDateFirstSeen);
+Person.ReportedDatesOfBirth: => TranslatedSources := ConsumerSourceGroup(Source);
+Person: => DOBMatchSourcesAllPre := ReportedDatesOfBirth(HeaderHitFlag AND ValidDOBLogic AND ValidDOBCheck AND TranslatedSources != ''){TranslatedSource := Source,
+					RecordCount := Source:Weight,
+					MyDateFirstSeen := Source:DateFirstSeen,
+					MyDateLastSeen := Source:DateLastSeen};
+Person: => DOBMatchSources := DOBMatchSourcesAllPre{TranslatedSource,
+					RecordCount,
+					BankruptcyAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
+					LiensAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
+					DateFirstSeenCleaned := IF(ISVALIDDATE(MyDateFirstSeen), DATETOSTRING(MyDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
+					DateLastSeenCleaned := IF(ISVALIDDATE(MyDateLastSeen), DATETOSTRING(MIN(MyDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97)};
 
+Person.DOBMatchSources: => ValidBankruptcySources := (TranslatedSource = 'BA' AND BankruptcyAgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT BankruptcyAgeInDays:Null);       
+Person.DOBMatchSources: => ValidLiensSources := (TranslatedSource = 'L2' AND LiensAgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT LiensAgeInDays:Null);       
+Person.DOBMatchSources: => OtherSources := (TranslatedSource <> 'BA' AND TranslatedSource <> 'L2'); 
 
-Person: => PL_VerDOBSrcCntEvNonFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
-																BOUNDSFOLD(COUNT(DOBVerSourceListSorted), 0, 32));
-Person: => PL_VerDOBSrcListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																 PL_VerDOBSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
-																 CONCAT(DOBVerSourceListSorted, TranslatedSourceCode, '|'));
-Person: => PL_VerDOBSrcEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerDOBSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
-																			 CONCAT(DOBVerSourceListSorted, SourceDateFirstSeen, '|'));
-Person: => PL_VerDOBSrcLastDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerDOBSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
-																			 CONCAT(DOBVerSourceListSorted, SourceDateLastSeen, '|'));
-Person: => PL_VerDOBSrcCntEvFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
-																BOUNDSFOLD(COUNT(DOBVerSourceListSortedFCRA), 0, 32));
-Person: => PL_VerDOBSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																 PL_VerDOBSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
-																 CONCAT(DOBVerSourceListSortedFCRA, TranslatedSourceCode, '|'));
-Person: => PL_VerDOBSrcEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerDOBSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
-																			 CONCAT(DOBVerSourceListSortedFCRA, SourceDateFirstSeen, '|'));
-Person: => PL_VerDOBSrcLastDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
-																			 PL_VerDOBSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
-																			 CONCAT(DOBVerSourceListSortedFCRA, SourceDateLastSeen, '|'));
+Person: => DOBMatchSourcesSortedNonFCRA := TOPN(DOBMatchSources, 32, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
+Person: => DOBMatchSourcesSortedFCRA := TOPN(DOBMatchSources(ValidBankruptcySources OR ValidLiensSources OR OtherSources), 21, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
+
+Person: => PL_VerDOBFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																					EXISTS(DOBMatchSourcesSortedNonFCRA) => '1','0');
+
+Person: => PL_VerDOBFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																					EXISTS(DOBMatchSourcesSortedFCRA) => '1','0');
+
+Person: => PL_VerDOBSrcCntEvNonFCRA  := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(DOBMatchSourcesSortedNonFCRA), 0, 32));
+				
+Person: => PL_VerDOBSrcCntEvFCRA  :=MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(DOBMatchSourcesSortedFCRA), 0, 21));
+
+Person: => PL_VerDOBSrcRecCntEvNonFCRA  := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(SUM(DOBMatchSourcesSortedNonFCRA,RecordCount), 0, 9999));
+Person: => PL_VerDOBSrcRecCntEvFCRA  := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(SUM(DOBMatchSourcesSortedFCRA,RecordCount), 0, 9999));
+
+Person: => PL_VerDOBSrcListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchSourcesSortedNonFCRA, TranslatedSource, '|'));
+Person: => PL_VerDOBSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchSourcesSortedFCRA, TranslatedSource, '|'));
+
+				
+Person: => PL_VerDOBSrcRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchSourcesSortedNonFCRA, RecordCount, '|'));
+Person: => PL_VerDOBSrcRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchSourcesSortedFCRA, RecordCount, '|'));
+
+Person: => PL_VerDOBSrcEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchSourcesSortedNonFCRA, DateFirstSeenCleaned, '|'));
+Person: => PL_VerDOBSrcEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchSourcesSortedFCRA, DateFirstSeenCleaned, '|'));
+
+Person: => PL_VerDOBSrcLastDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchSourcesSortedNonFCRA, DateLastSeenCleaned, '|'));
+Person: => PL_VerDOBSrcLastDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchSourcesSortedFCRA, DateLastSeenCleaned, '|'));
+
+Person: => PL_VerDOBSrcOldDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchSourcesSortedNonFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(DOBMatchSourcesSortedNonFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+Person: => PL_VerDOBSrcOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(DOBMatchSourcesSortedFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+
+Person: => PL_VerDOBSrcNewDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchSourcesSortedNonFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(DOBMatchSourcesSortedNonFCRA, DATE(DateLastSeenCleaned)), '%Y%m%d'));
+Person: => PL_VerDOBSrcNewDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcCntEvFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(DOBMatchSourcesSortedFCRA, DATE(DateLastSeenCleaned)), '%Y%m%d'));
+
+Person: => PL_VerDOBSrcOldMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvNonFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchSourcesSortedNonFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcOldDtEvNonFCRA), CURRENT_DATE), 0, 960));
+Person: => PL_VerDOBSrcOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcOldDtEvFCRA), CURRENT_DATE), 0, 960));
+
+Person: => PL_VerDOBSrcNewMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvNonFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchSourcesSortedNonFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcNewDtEvNonFCRA), CURRENT_DATE), 0, 960));	
+Person: => PL_VerDOBSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));
+
 
 
 
