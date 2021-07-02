@@ -1314,15 +1314,15 @@ InputPII: => PurchaseDt:=BestMostRecentPropertyEventPurchase.DtFirstSeen;
 InputPII: => ValidPropertyPurchaseDt:=IF(ISVALIDDATE(PurchaseDt),DATETOSTRING(PurchaseDt,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE);
 
 InputPII: => PI_InpAddrPurchDt:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
-			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND,
 			ValidPropertyPurchaseDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
 			ValidPropertyPurchaseDt);
 InputPII: => PI_InpAddrPurchMsnc:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND_INT,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND_INT,
 			PI_InpAddrPurchDt = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 			MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt),Property.CURRENT_DATE));
 InputPII: => PI_InpAddrPurchAmt:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
-			NOT InpAddrPropertyPurchaseRecord => NO_DATA_FOUND_INT,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND_INT,
 			ModSalePrice = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT, 
 			BOUNDSFOLD(ModSalePrice,0,9999999));
 InputPII: => PI_InpAddrMktVal:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
@@ -3260,7 +3260,7 @@ AddressProperty: =>BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsD
 AddressProperty: =>BestMostRecentPropertyEventPurchase:=ONLY(TOPN(Prop.PropertyEvent(IsDeed AND PropertyPurchaseRecord),1 ,-DtFirstSeen));
 Person: =>CurrAddrPropPurchase :=TOPN(CurrAddrHelperAttribute.AddressProperty
 		{
-			ModSalePrice:=IF(BestMostRecentPropertyEventPurchase.SalePrice:Null OR BestMostRecentPropertyEventPurchase.SalePrice='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEventPurchase.SalePrice),
+			BestMostRecentPropertyEventPurchase.SalePrice,
 			BestMostRecentPropertyEventPurchase.DtFirstSeen,
 			BestMostRecentPropertyEventPurchase},1,-DtFirstSeen);
 Person: =>CurrAddrProp :=TOPN(CurrAddrHelperAttribute.AddressProperty
@@ -3272,22 +3272,23 @@ Person: =>CurrAddrProp :=TOPN(CurrAddrHelperAttribute.AddressProperty
 			BestMostRecentPropertyEvent},1,-DtFirstSeen);			
 Person: =>CurrAddrPropertyPurchaseRecord :=EXISTS(CurrAddrPropPurchase);
 Person: =>CurrAddrPropertyRecord :=EXISTS(CurrAddrProp);
-Person: =>PropertyModSalePrice :=ONLY(CurrAddrPropPurchase,ModSalePrice);
 Person: =>PurchaseDt :=ONLY(CurrAddrPropPurchase,BestMostRecentPropertyEventPurchase.DtFirstSeen);
+Person: =>ModSalePrice := ONLY(CurrAddrPropPurchase, BestMostRecentPropertyEventPurchase.SalePrice);
+Person: =>PropertyModSalePrice := IF(ModSalePrice:Null OR ModSalePrice='',Person.NO_DATA_FOUND_97_INT,ModSalePrice);
 Person: =>ValidPropertyPurchaseDt := IF(ISVALIDDATE(PurchaseDt),DATETOSTRING(PurchaseDt,'%Y%m%d'),Person.NO_DATA_FOUND_97);
 Person: =>PropertyTaxValYr :=ONLY(CurrAddrProp,AssesdValueYear);
 Person: =>PropertyModMarketValue :=ONLY(CurrAddrProp,ModMarketValue);
 Person: =>PropertyModAssesdValue :=ONLY(CurrAddrProp,ModAssesdValue);
 Person: =>PL_CurrAddrPurchDt :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA,
-			NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND,
+			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND,
 			ValidPropertyPurchaseDt = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97,
 			ValidPropertyPurchaseDt);
 Person: =>PL_CurrAddrPurchMsnc :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
-			NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND_INT,
+			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND_INT,
 			PL_CurrAddrPurchDt  = NO_DATA_FOUND_97 =>NO_DATA_FOUND_97_INT,
 			MONTHSBETWEEN(DATE(ValidPropertyPurchaseDt),Property.CURRENT_DATE));
 Person: =>PL_CurrAddrPurchAmt :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
-			NOT CurrAddrPropertyPurchaseRecord =>NO_DATA_FOUND_INT,
+			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND_INT,
 			PropertyModSalePrice = NO_DATA_FOUND_97_INT =>NO_DATA_FOUND_97_INT, 
 			BOUNDSFOLD(PropertyModSalePrice,0,9999999));
 Person: =>PL_CurrAddrMktVal :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA_INT,
