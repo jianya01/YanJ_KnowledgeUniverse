@@ -3599,7 +3599,12 @@ Person.ReportedDatesOfBirth: => BestDOBRec := (Best = TRUE);
 Person: => BestDOB := ONLY(ReportedDatesOfBirth(BestDOBRec), DateOfBirth);
 Person: => BestDOBAge := ABSYEARSBETWEEN(BestDOB, CURRENTDATE());
 PersonSSN: => IsBestSSN := EXISTS(DataSources.Source IN ['BP', 'NEN', 'NEQ']);
-Person: => BestSSN := ONLY(PersonSSN(IsBestSSN), Social);
+Person: => BestSSNPre := ONLY(PersonSSN(IsBestSSN), STRING(Social));
+Person: => BestSSNTrim := TRIMBOTH(BestSSNPre);
+
+Person: => BestSSN := MAP(	LENGTH(BestSSNTrim)= 7 => '00' + BestSSNTrim,
+							LENGTH(BestSSNTrim)= 8 => '0' + BestSSNTrim,
+							BestSSNTrim);
 
 Person: => PL_BestNameFirst:= MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
@@ -12259,19 +12264,25 @@ Person: => PL_VerPhoneSrcCntEvFCRA := 0;
 // Person: => PL_VerPhoneSrcNewMsncEv := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnPhoneHomeFlagValue != '1' =>  MISSING_INPUT_DATA_INT,
 																 // PL_VerPhoneSrcCntEv < 1 => NO_DATA_FOUND_INT,
 																 // PL_VerPhoneSrcNewDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
-																	// BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerPhoneSrcNewDtEv),CURRENT_DATE),0,960));
-																 
+																// BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerPhoneSrcNewDtEv),CURRENT_DATE),0,960));
+
+								
+//it does't work how you think it does						
+//need to use raw here because clean is already overwritten at this point		
+
 Person: => TrimRawSSN := TRIMBOTH(P_InpSSNRaw);
 Person: => FirstFiveSSN := SUBSTR(TrimRawSSN, 1, 5);
 Person: => CleanRawSSN := IF(FirstFiveSSN = '00000' OR UPCASE(FirstFiveSSN) = 'XXXXX',SUBSTR(TrimRawSSN, 6, 9), TrimRawSSN);
+
 Person: => FourDigitBest := SUBSTR(TRIMBOTH(PL_BestSSN), 6, 9);
 Person: => SSNLength := LENGTH(CleanRawSSN);
 
 
 
+
 Person: => PL_VerSSNLookupFlag := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpSSNFlagValue = 0 => MISSING_INPUT_DATA,
 																	SSNLength > 4 => NO_DATA_FOUND,
-                                  SSNLength = 4 AND (CleanRawSSN = FourDigitBest) => '1',
+																	SSNLength = 4 AND (CleanRawSSN = FourDigitBest) => '1',
                                   '0');
 
 Person: => VerSSNSourceBureauListSortedFCRA := SSNVerSourceListSortedFCRA(TranslatedSourceCode IN Person.BUREAU_SOURCES_FCRA);
