@@ -3999,6 +3999,41 @@ Person: => PL_PrevAddrResSpanAVMRatioEv := MAP(
 		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
 		NO_DATA_FOUND_97_INT IN [DEFAULT(PL_PrevAddrSubjEmrgAVMValEv, 0), DEFAULT(PL_PrevAddrSubjLastAVMValEv,0)] => NO_DATA_FOUND_97_INT,
 		MIN(ROUND(REAL(PreviousAddressAVMValueUnCapLast) / REAL(PreviousAddressAVMValueUnCapEarliest), 2), 99.99));
+
+//KS-7347
+Person: => PreviousAddressPropertyEvents := PreviousAddrHelper.AddressProperty.Prop.PropertyEvent(IsDeed OR IsAssessment){//ID :=UID,
+									IsOwner := EXISTS(PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject.UID = Person.UID)),
+									IsOwnerOrSeller := EXISTS(PersonPropertyEvent((PartyDetails.PartyIsBuyerOrOwner OR PartyDetails.PartyIsSeller) AND Subject.UID = Person.UID)),
+									FirstNameMatch := EXISTS(PersonPropertyEvent(IsFirstNameMatch(TRIM(UPCASE(PartyDetails.FirstName)),TRIM(UPCASE(Person.FullName.FirstName))) AND Subject.UID = Person.UID)),
+									LastNameMatch := EXISTS(PersonPropertyEvent(IsLastNameMatch(TRIM(UPCASE(PartyDetails.LastName)),TRIM(UPCASE(Person.FullName.LastName))) AND Subject.UID = Person.UID)),
+									HasNames := EXISTS(PersonPropertyEvent.PartyDetails{FirstName,LastName}),
+									LatestEvent := DtFirstSeen = MAX(Prop.PropertyEvent,DtFirstSeen)};
+
+// Person: => PL_PrevAddrSubjPropMatchIndx :=  0;
+Person: => PL_PrevAddrSubjPropMatchIndx :=  MAP(PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																						NOT EXISTS(PreviousAddressPropertyEvents) => NO_DATA_FOUND_INT,
+																						EXISTS(PreviousAddressPropertyEvents(LatestEvent AND IsOwner)) => 3,
+																						EXISTS(PreviousAddressPropertyEvents(IsOwnerOrSeller)) => 2,
+																						1);
+// Person: => PL_PrevAddrNamePropMatchIndx :=  0;
+Person: => PL_PrevAddrNamePropMatchIndx :=  MAP(PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																						NOT EXISTS(PreviousAddressPropertyEvents) => NO_DATA_FOUND_INT,
+																						NOT EXISTS(PreviousAddressPropertyEvents(HasNames)) => NO_DATA_FOUND_INT,
+																						EXISTS(PreviousAddressPropertyEvents(LatestEvent AND FirstNameMatch AND LastNameMatch AND IsOwner)) => 5,
+																						EXISTS(PreviousAddressPropertyEvents(LatestEvent AND LastNameMatch AND IsOwner)) => 4,
+																						EXISTS(PreviousAddressPropertyEvents(FirstNameMatch AND LastNameMatch AND IsOwnerOrSeller)) => 3,
+																						EXISTS(PreviousAddressPropertyEvents(LastNameMatch AND IsOwnerOrSeller)) => 2,
+																						1);
+// Person: => PL_PrevAddrSubjNamePropMatchIndx :=  0;
+Person: => PL_PrevAddrSubjNamePropMatchIndx :=  MAP(PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																						PL_PrevAddrNamePropMatchIndx = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+																						PL_PrevAddrNamePropMatchIndx = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+																						PL_PrevAddrNamePropMatchIndx = 5 OR PL_PrevAddrSubjPropMatchIndx = 3 => 5,
+																						PL_PrevAddrNamePropMatchIndx = 4 => 4,
+																						PL_PrevAddrNamePropMatchIndx = 3 OR PL_PrevAddrSubjPropMatchIndx = 2 => 3,
+																						PL_PrevAddrNamePropMatchIndx = 2 => 2,
+																						1);
+
 /**************************************************************************/
 /*                                                                        */
 /*                             Address History                            */
@@ -4418,8 +4453,8 @@ Person: => PL_EduCollTierBestEv := MAP(
 /*                  EmergingID Attributes                      			      */
 /*                                                                        */
 /**************************************************************************/
-
-Person: => EmrgDate := MIN(DataSources(HeaderHitFlag), HeaderHitFlag:DateFirstSeen);
+Person.DataSources: => HeaderDateFirstSeen := HeaderHitFlag:DateFirstSeen;
+Person: => EmrgDate := MIN(DataSources(HeaderHitFlag), HeaderDateFirstSeen);
 
 Person: => PL_EmrgAge := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA_INT,
 												NOT BestDOB:Null => BOUNDSFOLD(ABSYEARSBETWEEN(EmrgDate, BestDOB), 0, 62),
