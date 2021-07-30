@@ -5768,29 +5768,47 @@ Person: => PL_AstPropBusCurrTaxValTot := MAP(P_LexIDSeenFlag = '0' => Person.MIS
 /**************************************************************************/
 
 Email: SEVEN_YEARS_IN_DAYS := 2556;
-Email: SOURCESFCRA := ['ET', 'M1', 'AW', 'SC'];
-Email: SOURCESNONFCRA := ['!I', 'ET', 'AN', 'AW', 'M1', 'DG', 'RS', 'SC', 'W@'];
+PersonEmail: SOURCESFCRA := ['ET', 'M1', 'AW', 'SC'];
+PersonEmail: SOURCESNONFCRA := ['!I', 'ET', 'AN', 'AW', 'M1', 'DG', 'RS', 'SC', 'W@'];
 
-
+Email: EMAILSOURCESFCRA := ['ET', 'M1', 'AW', 'SC'];
+Email: EMAILSOURCESNONFCRA := ['!I', 'ET', 'AN', 'AW', 'M1', 'DG', 'RS', 'SC', 'W@'];
 /**************************************************************************/
 /*                                                                        */
 /*                      Email Attributes                                  */
 /*                                                                        */
 /**************************************************************************/
 
-Email: => Emails7y := ABSDAYSBETWEEN(CURRENT_DATE_FCRA, UID:DateLastSeen) < SEVEN_YEARS_IN_DAYS;
-Person: => EmailCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(Emails7y, EXISTS(DataSources(Source IN SOURCESFCRA)))),0,999);
-Person: => EmailUnknownCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(Emails7y, EXISTS(DataSources(Source IN SOURCESFCRA)), DEFAULT(DomainType, '') = '')),0,999);
-Person: => EmailFreeCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(Emails7y, EXISTS(DataSources(Source IN SOURCESFCRA)), DomainType = 'FREE')),0,999);
-Person: => EmailISPCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(Emails7y, EXISTS(DataSources(Source IN SOURCESFCRA)), DomainType = 'ISP')),0,999);
-Person: => EmailEduCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(Emails7y, EXISTS(DataSources(Source IN SOURCESFCRA)), DomainType = 'EDU')),0,999);
-Person: => EmailCorpCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(Emails7y, EXISTS(DataSources(Source IN SOURCESFCRA)), DomainType = 'CORP')),0,999);
-Person: => EmailCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DataSources(Source IN SOURCESNONFCRA)))),0,999);
-Person: => EmailUnknownCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DataSources(Source IN SOURCESNONFCRA)), DEFAULT(DomainType, '') = '')),0,999);
-Person: => EmailFreeCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DataSources(Source IN SOURCESNONFCRA)), DomainType = 'FREE')),0,999);
-Person: => EmailISPCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DataSources(Source IN SOURCESNONFCRA)), DomainType = 'ISP')),0,999);
-Person: => EmailEduCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DataSources(Source IN SOURCESNONFCRA)), DomainType = 'EDU')),0,999);
-Person: => EmailCorpCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DataSources(Source IN SOURCESNONFCRA)), DomainType = 'CORP')),0,999);
+Email.DomainTypes: => DomainDateLastSeen := DomainType:DateLastSeen;
+Email.DomainTypes: => SeenInLast7Years := ABSDAYSBETWEEN(Email.CURRENT_DATE_FCRA, DomainDateLastSeen ) < Email.SEVEN_YEARS_IN_DAYS;
+Email.DomainTypes: => ValidNonFCRAEmails := Source IN EMAILSOURCESNONFCRA;
+Email.DomainTypes: => ValidFCRAEmails := Source IN EMAILSOURCESFCRA;
+
+PersonEmail.DataSources: => SourceDateLastSeenPre := Source:DateLastSeen;
+PersonEmail.DataSources: => Emails7y := ABSDAYSBETWEEN(Email.CURRENT_DATE_FCRA, SourceDateLastSeenPre) < Email.SEVEN_YEARS_IN_DAYS;
+PersonEmail: => SeenIn7Years := EXISTS(DataSources(Emails7y));
+PersonEmail: => ValidFCRAEmails := EXISTS(DataSources.Source IN SOURCESFCRA);
+PersonEmail: => ValidNonFCRAEmails := EXISTS(DataSources.Source IN SOURCESNONFCRA);
+
+Person: => EmailCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail(EXISTS(DataSources(Emails7y AND ValidFCRAEmails)))),0,999);
+
+
+Person: => EmailUnknownCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail(SeenIn7Years).Email(EXISTS(DomainTypes(DEFAULT(DomainType, '') = '' AND SeenInLast7Years AND ValidFCRAEmails)))),0,999);
+Person: => EmailFreeCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail(SeenIn7Years).Email(EXISTS(DomainTypes(DomainType = 'FREE' AND SeenInLast7Years AND ValidFCRAEmails)))),0,999);
+Person: => EmailISPCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail(SeenIn7Years).Email(EXISTS(DomainTypes(DomainType = 'ISP' AND SeenInLast7Years AND ValidFCRAEmails)))),0,999);
+Person: => EmailEduCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail(SeenIn7Years).Email(EXISTS(DomainTypes(DomainType = 'EDU' AND SeenInLast7Years AND ValidFCRAEmails)))),0,999);
+Person: => EmailCorpCntEvFCRA := BOUNDSFOLD(COUNT(PersonEmail(SeenIn7Years).Email(EXISTS(DomainTypes(DomainType = 'CORP' AND SeenInLast7Years AND ValidFCRAEmails)))),0,999);
+
+
+Person: => EmailCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail(EXISTS(DataSources(ValidNonFCRAEmails)))),0,999);
+
+Person: => EmailUnknownCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DomainTypes(DEFAULT(DomainType, '') = ''  AND ValidNonFCRAEmails)))),0,999);
+Person: => EmailFreeCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DomainTypes(DomainType = 'FREE' AND ValidNonFCRAEmails)))),0,999);
+Person: => EmailISPCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DomainTypes(DomainType = 'ISP'  AND ValidNonFCRAEmails)))),0,999);
+Person: => EmailEduCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DomainTypes(DomainType = 'EDU'  AND ValidNonFCRAEmails)))),0,999);
+Person: => EmailCorpCntEvNonFCRA := BOUNDSFOLD(COUNT(PersonEmail.Email(EXISTS(DomainTypes(DomainType = 'CORP'  AND ValidNonFCRAEmails)))),0,999);
+
+
 
 Person: => PL_EmailCntEvFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, EmailCntEvFCRA);
 Person: => PL_EmailFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
