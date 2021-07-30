@@ -3579,6 +3579,79 @@ Person: => PL_PrevAddrSubjResSpan := MAP(
 			P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA_INT,
 			ValidPrevAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidPrevAddrDtLastSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
             BOUNDSFOLD(MONTHSBETWEEN(DATE(ValidPrevAddrDtFirstSn), DATE(ValidPrevAddrDtLastSn)),0,960));
+//KS-3361
+Person: => PreviousAddressPropertySet := TOPN(PII.PreviousAddress.AddressProperty.Prop.AutomatedValuationModel
+                                                {
+																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
+Person: => PreviousAddressPropertySetEarliest := TOPN(PII.PreviousAddress.AddressProperty.Prop.AutomatedValuationModel
+                                                {
+																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,AVMValueDate);
+Person: => PreviousAddressOnAVM := EXISTS(PreviousAddressPropertySet);
+Person: => PreviousAddressPropertyCnt := COUNT(PreviousAddressPropertySet);
+Person: => PreviousAddressAVMValueUnCap :=ONLY(PreviousAddressPropertySet,AVMAutomatedValuation);
+
+Person: => PreviousAddressPropertyCntEarliest := COUNT(PreviousAddressPropertySetEarliest);
+Person: => PreviousAddressAVMValueUnCapEarliest :=ONLY(PreviousAddressPropertySetEarliest,AVMAutomatedValuation);
+
+Person: => PreviousAddressPropertySet7Y := TOPN(PII.PreviousAddress.AddressProperty.Prop.AutomatedValuationModel(AVMYears >= 7 AND AVMYears < 8)
+                                                {
+																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
+Person: => PreviousAddressPropertyCnt7Y := COUNT(PreviousAddressPropertySet7Y);
+Person: => PreviousAddressAVMValueUnCap7Y :=ONLY(PreviousAddressPropertySet7Y,AVMAutomatedValuation);
+
+
+Person: => PL_PrevAddrAVMValA7Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		PreviousAddressPropertyCnt7Y = 0 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PreviousAddressAVMValueUnCap7Y,1,999999999));
+		
+Person: => PL_PrevAddrSubjEmrgFlag7Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_PrevAddrSubjOldMsnc = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		PL_PrevAddrSubjOldMsnc <= 84 => 1,
+		0);
+Person: => PL_PrevAddrSubjLastFlag7Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		PL_PrevAddrSubjNewMsnc  = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		PL_PrevAddrSubjNewMsnc  <= 84 => 1,
+		0);
+Person: => PL_PrevAddrSubjEmrgAVMVal7Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		NO_DATA_FOUND_97_INT IN [DEFAULT(PL_PrevAddrSubjEmrgAVMValEv, 0), DEFAULT(PL_PrevAddrAVMValA7Y,0), PL_PrevAddrSubjEmrgFlag7Y] => NO_DATA_FOUND_97_INT,
+		PL_PrevAddrSubjEmrgFlag7Y = 1 => PL_PrevAddrSubjEmrgAVMValEv,
+		PL_PrevAddrAVMValA7Y);		
+Person: => PL_PrevAddrSubjLastAVMVal7Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		NO_DATA_FOUND_97_INT IN [DEFAULT(PL_PrevAddrSubjLastAVMValEv, 0), DEFAULT(PL_PrevAddrAVMValA7Y,0), PL_PrevAddrSubjLastFlag7Y] => NO_DATA_FOUND_97_INT,
+		PL_PrevAddrSubjLastFlag7Y = 1 => PL_PrevAddrSubjLastAVMValEv,
+		PL_PrevAddrAVMValA7Y);		
+		
+Person: => PL_PrevAddrResSpanAVMRatio7Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		NO_DATA_FOUND_97_INT IN [DEFAULT(PL_PrevAddrSubjEmrgAVMVal7Y, 0), DEFAULT(PL_PrevAddrSubjLastAVMVal7Y,0)] => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PL_PrevAddrSubjLastAVMVal7Y/PL_PrevAddrSubjEmrgAVMVal7Y,0,99.99));	
+
+Person: => PL_PrevAddrSubjEmrgAVMValEv := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		PreviousAddressPropertyCnt = 0  OR PL_PrevAddrSubjOldDt = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PreviousAddressAVMValueUnCapEarliest,1,999999999));
+		
+Person: => PL_PrevAddrSubjLastAVMValEv := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		PreviousAddressPropertyCnt = 0  OR PL_PrevAddrSubjNewDt = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PreviousAddressAVMValueUnCap,1,999999999));
+		
+Person: => PL_PrevAddrResSpanAVMRatioEv := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		NO_DATA_FOUND_97_INT IN [DEFAULT(PL_PrevAddrSubjEmrgAVMValEv, 0), DEFAULT(PL_PrevAddrSubjLastAVMValEv,0)] => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PL_PrevAddrSubjLastAVMValEv/PL_PrevAddrSubjEmrgAVMValEv,0,99.99));	
 
 /**************************************************************************/
 /*                                                                        */
