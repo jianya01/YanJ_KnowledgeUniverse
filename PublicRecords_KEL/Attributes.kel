@@ -3446,32 +3446,66 @@ Person: => PL_CurrAddrIsMilitaryFlag := MAP(
 			CurrAddrHelperAttribute.ZIP5:Null AND PL_CurrAddrType = NO_DATA_FOUND AND NOT IsCurrentPostalSource => NO_DATA_FOUND_INT,
 			PL_CurrAddrType = 'M' OR CurrAddrHelperAttribute.ZIP5.ZipClass = 'M' => 1,
 			0);
-//KS-6258
-PersonProperty: => CurrPropMatchAttribute :=
-	IsNullOrEqual(TRIMBOTH(PrimaryRange), TRIMBOTH(Subject.PII.CurrentAddrPrimRng)) AND  
-	IsNullOrEqual(TRIMBOTH(Predirectional), TRIMBOTH(Subject.PII.CurrentAddrPreDir)) AND
-	IsNullOrEqual(TRIMBOTH(PrimaryName), TRIMBOTH(Subject.PII.CurrentAddrPrimName)) AND
-	IsNullOrEqual(TRIMBOTH(Suffix), TRIMBOTH(Subject.PII.CurrentAddrSffx)) AND
-	IsNullOrEqual(TRIMBOTH(Postdirectional), TRIMBOTH(Subject.PII.CurrentAddrPostDir)) AND
-	IsNullOrEqual(TRIMBOTH(INTFORMAT(ZIP5,5,1)), TRIMBOTH(Subject.PII.CurrentAddrZip5)) AND
-	IsNullOrEqual(TRIMBOTH(SecondaryRange), TRIMBOTH(Subject.PII.CurrentAddrSecRng));
-
-Person: => CurrAddressAVM := TOPN(PersonProperty(CurrPropMatchAttribute).Prop.AutomatedValuationModel(AVMYears <= 1)
-                                {AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
-Person: => CurrAddrAVMValueUnCap := ONLY(CurrAddressAVM, AVMAutomatedValuation);
-
-Person: => GeoLink12 := PII.GeoLinkID.GeoLink;
 
 Person: => CurrAddrGeoLinkCty := TOPN(PersonAddress(CurrentPerfectAddressMatch).AddressHierarchy.GeoLinkID.AVM
 			{MedianValuation, MedianValuationDate := MedianValuation:DateFirstSeen}, 1, -MedianValuationDate);					
 					
 Person: => CurrAddrMedAVMCtyVal := ONLY(CurrAddrGeoLinkCty, MedianValuation);
+
+Person: => CurrAddressAVM1Y := TOPN(PII.CurrentAddress.AddressProperty.Prop.AutomatedValuationModel(AVMYears >= 1 AND AVMYears < 2)
+                               {AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
+Person: => CurrAddressAVM5Y := TOPN(PII.CurrentAddress.AddressProperty.Prop.AutomatedValuationModel(AVMYears >= 5 AND AVMYears < 6)
+                               {AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
+	
+Person: => CurrentAddressPropertySet := TOPN(PII.CurrentAddress.AddressProperty.Prop.AutomatedValuationModel
+	                             {AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);	
+															 
+Person: => CurrAddrAVMValueUnCap := ONLY(CurrentAddressPropertySet, AVMAutomatedValuation);															 
+															 
+Person: => CurrentAddressOnAVM := EXISTS(CurrentAddressPropertySet);
+
+Person: => CurrAddressPropertyCnt1Y := COUNT(CurrAddressAVM1Y);
+Person: => CurrAddressPropertyCnt5Y := COUNT(CurrAddressAVM5Y);
+
+Person: =>CurrAddrAVMValue1YUnCap :=ONLY(CurrAddressAVM1Y,AVMAutomatedValuation);
+Person: =>CurrAddrAVMValue5YUnCap :=ONLY(CurrAddressAVM5Y,AVMAutomatedValuation);
+
 Person: => PL_CurrAddrAVMVal := MAP(
 		P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
-		NOT EXISTS(CurrAddressAVM) => NO_DATA_FOUND_INT,
+		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
 		CurrAddrAVMValueUnCap = 0 => NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(CurrAddrAVMValueUnCap,1,999999999));
 		
+ Person: => PL_CurrAddrAVMValA1Y := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+		CurrAddressPropertyCnt1Y = 0  => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(CurrAddrAVMValue1YUnCap,0,999999999));
+				
+Person: => PL_CurrAddrAVMRatio1Y := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+		PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT OR PL_CurrAddrAVMValA1Y = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(CurrAddrAVMValueUnCap/CurrAddrAVMValue1YUnCap,2),99.99));
+				
+Person: => PL_CurrAddrAVMValA5Y := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+		CurrAddressPropertyCnt5Y = 0  => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(CurrAddrAVMValue5YUnCap,0,999999999));
+					
+Person: => PL_CurrAddrAVMRatio5Y := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+		PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT OR PL_CurrAddrAVMValA5Y = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(CurrAddrAVMValueUnCap/CurrAddrAVMValue5YUnCap,2),99.99));
+				
+Person: => PL_CurrAddrAVMConfScore := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+		PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(ONLY(CurrentAddressPropertySet,AVMConfidenceScore),0,100));
+
 Person: => PL_CurrAddrMedAVMCtyVal := MAP(
 		P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
 		CurrAddrMedAVMCtyVal:Null OR CurrAddrMedAVMCtyVal = '' => NO_DATA_FOUND_INT,
