@@ -12451,6 +12451,83 @@ Person: => PL_VerDOBSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));
 
 
+//KS-1878 Input/best PII matching
+Person: => PL_VerBestNameFirstFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestNameFirst = NO_DATA_FOUND OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+								PL_VerNameFirstSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								PL_VerNameFirstFlagFCRA = 1 AND NOT IsFirstNameMatch(TRIM(UPCASE(PL_BestNameFirst)),TRIM(UPCASE(PII.P_InpClnNameFirst))) => '0',
+                '1');
+Person: => PL_VerBestNameFirstFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestNameFirst = NO_DATA_FOUND OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+                PL_VerNameFirstSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								PL_VerNameFirstFlagNonFCRA = 1 AND NOT IsFirstNameMatch(TRIM(UPCASE(PL_BestNameFirst)),TRIM(UPCASE(PII.P_InpClnNameFirst))) => '0',
+                '1');
+Person: => PL_VerBestNameLastFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestNameLast = NO_DATA_FOUND OR P_InpClnNameLast  IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+								PL_VerNameLastSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								PL_VerNameLastFlagFCRA = 1 AND NOT IsFirstNameMatch(TRIM(UPCASE(PL_BestNameLast)),TRIM(UPCASE(PII.P_InpClnNameLast))) => '0',
+                '1');
+Person: => PL_VerBestNameLastFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestNameLast = NO_DATA_FOUND OR P_InpClnNameLast  IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+                PL_VerNameLastSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								PL_VerNameLastFlagNonFCRA = 1 AND NOT IsLastNameMatch(TRIM(UPCASE(PL_BestNameLast)),TRIM(UPCASE(PII.P_InpClnNameLast))) => '0',
+                '1');
+Person: => PL_VerBestSSNFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestSSN = NO_DATA_FOUND OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+								PL_VerSSNSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								PL_VerSSNFlagFCRA = 1 AND NOT EditDistanceWithinRadius(PL_BestSSN, PII.P_InpClnSSN, 2) => '0',
+								'1');
+Person: => PL_VerBestSSNFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestSSN = NO_DATA_FOUND OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+								PL_VerSSNSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								PL_VerSSNFlagNonFCRA = 1 AND NOT EditDistanceWithinRadius(PL_BestSSN, PII.P_InpClnSSN, 2) => '0',
+								'1');
+								
+Person: => BestDobCheck := SUBSTR(PL_BestDOB, 7, 8) IN ['00','01'];
+Person: => DOBBestMatches := PL_BestDOB = P_InpClnDOB;
+Person: => InputDOBDistanceMatchBest := EditDistanceWithinRadius(P_InpClnDOB, PL_BestDOB, 1);
+
+Person: => BestValidDOBLogicCheck1 := P_InpValDOBYearInvalidFlag = 0 AND
+																	P_InpValDOBInFutureFlag = 0 AND
+																	P_InpValDOBMonInvalidFlag = 0 AND
+																	P_InpValDOBDayInvalidFlag = 0 AND
+																	EXISTS(ReportedDatesOfBirth((MonthPaddedFlag = 0) AND (DayPaddedFlag = 0))) AND
+																	DOBBestMatches;
+Person: => BestValidDOBLogicCheck2 := P_InpValDOBYearInvalidFlag = 0 AND
+																	SUBSTR(P_InpClnDOB, 1, 6) <= SUBSTR(STRING(PII.P_InpClnArchDt), 1, 6) AND
+																	P_InpValDOBMonInvalidFlag = 0 AND
+																	(P_InpValDOBDayMissingFlag = 1 OR P_InpValDOBDayAllZeroFlag = 1) AND
+																	EXISTS(ReportedDatesOfBirth(MonthPaddedFlag = 0)) AND
+																	SUBSTR(PL_BestDOB, 1, 6) = SUBSTR(P_InpClnDOB, 1, 6);
+Person: => BestValidDOBLogicCheck3 := P_InpValDOBYearInvalidFlag = 0 AND
+																	SUBSTR(P_InpClnDOB, 1, 4) <= SUBSTR(STRING(PII.P_InpClnArchDt), 1, 4) AND
+																	(P_InpValDOBMonMissingFlag = 1 OR P_InpValDOBMonAllZeroFlag =  1) AND
+																	(P_InpValDOBDayMissingFlag = 1 OR P_InpValDOBDayAllZeroFlag = 1) AND
+																	SUBSTR(PL_BestDOB, 1, 4) = SUBSTR(P_InpClnDOB, 1, 4);
+Person: => BestValidDOBLogicCheck4 := P_InpValDOBYearMissingFlag = 0 AND
+																	P_InpValDOBMonMissingFlag = 0 AND
+																	P_InpValDOBDayMissingFlag = 0 AND
+																	EXISTS(ReportedDatesOfBirth((MonthPaddedFlag = 0) AND (DayPaddedFlag = 0))) AND
+																	InputDOBDistanceMatchBest;
+Person: => BestValidDOBLogicCheck5 := BestDobCheck AND
+																	P_InpValDOBInFutureFlag = 0 AND
+																	P_InpValDOBYearInvalidFlag = 0 AND
+																	P_InpValDOBMonInvalidFlag = 0 AND
+																	EXISTS(ReportedDatesOfBirth(MonthPaddedFlag = 0)) AND
+																	SUBSTR(PL_BestDOB, 1, 6) = SUBSTR(P_InpClnDOB, 1, 6);
+Person: => BestValidDOBLogic := (BestValidDOBLogicCheck1:Null OR BestValidDOBLogicCheck1)
+														OR
+														(BestValidDOBLogicCheck2:Null OR BestValidDOBLogicCheck2)
+														OR
+														(BestValidDOBLogicCheck3:Null OR BestValidDOBLogicCheck3)
+														OR
+														(BestValidDOBLogicCheck4:Null OR BestValidDOBLogicCheck4)
+														OR
+														(BestValidDOBLogicCheck5:Null OR BestValidDOBLogicCheck5)
+														;
+
+Person: => PL_VerBestDOBFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestDOB = NO_DATA_FOUND OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+								PL_VerDOBSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								PL_VerDOBFlagFCRA = 1 AND NOT BestValidDOBLogic => '0',
+								'1');
+Person: => PL_VerBestDOBFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestDOB = NO_DATA_FOUND OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+								PL_VerDOBSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								PL_VerDOBFlagNonFCRA = 1 AND NOT BestValidDOBLogic => '0',
+								'1');
 
 
 // Consumer Alerts FCRA current mode only
