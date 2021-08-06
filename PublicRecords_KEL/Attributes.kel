@@ -3566,6 +3566,63 @@ Person: => PL_PrevAddrIsMilitaryFlag := MAP(
 			PreviousAddrHelper.ZIP5:Null AND PL_PrevAddrType = NO_DATA_FOUND AND NOT IsPreviousPostalSource => NO_DATA_FOUND_INT,
 			PL_PrevAddrType = 'M' OR PreviousAddrHelper.ZIP5.ZipClass = 'M' => 1,
 			0);
+
+//KS-7349
+
+Person: => PreviousAddressPropertySet := PreviousAddrHelper.AddressProperty.Prop.AutomatedValuationModel{AVMValueDate, AVMYears, AVMAutomatedValuation, AVMConfidenceScore};
+
+Person: => PreviousAddressPropertySetCurr := TOPN(PreviousAddressPropertySet(AVMYears <= 1){
+				AVMAutomatedValuation,
+				AVMValueDate,
+				AVMConfidenceScore}, 1, -AVMValueDate);
+Person: => PreviousAddressPropertySet1Y := TOPN(PreviousAddressPropertySet(AVMYears > 1 AND AVMYears <= 2){
+				AVMAutomatedValuation,
+				AVMValueDate,
+				AVMConfidenceScore}, 1, -AVMValueDate);
+Person: => PreviousAddressPropertySet5Y := TOPN(PreviousAddressPropertySet(AVMYears > 5 AND AVMYears <= 6){
+				AVMAutomatedValuation,
+				AVMValueDate,
+				AVMConfidenceScore}, 1, -AVMValueDate);																								
+
+Person: => PreviousAddressOnAVM := EXISTS(PreviousAddressPropertySet);
+Person: => PreviousAddressPropertyCnt := COUNT(PreviousAddressPropertySetCurr);
+Person: => PreviousAddressPropertyCnt1Y := COUNT(PreviousAddressPropertySet1Y);
+Person: => PreviousAddressPropertyCnt5Y := COUNT(PreviousAddressPropertySet5Y);
+Person: => PreviousAddressAVMValueCurrUnCap := ONLY(PreviousAddressPropertySetCurr, AVMAutomatedValuation);
+Person: => PreviousAddressAVMValue1YUnCap := ONLY(PreviousAddressPropertySet1Y, AVMAutomatedValuation);
+Person: => PreviousAddressAVMValue5YUnCap := ONLY(PreviousAddressPropertySet5Y, AVMAutomatedValuation);
+
+Person: => PL_PrevAddrAVMVal := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		PreviousAddressPropertyCnt = 0 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PreviousAddressAVMValueCurrUnCap, 1, 999999999));
+Person: => PL_PrevAddrAVMValA1Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT, 
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		PreviousAddressPropertyCnt1Y = 0 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PreviousAddressAVMValue1YUnCap, 1, 999999999));
+Person: => PL_PrevAddrAVMRatio1Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		PL_PrevAddrAVMVal = NO_DATA_FOUND_97_INT OR PL_PrevAddrAVMValA1Y = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(PreviousAddressAVMValueCurrUnCap/PreviousAddressAVMValue1YUnCap, 2), 99.99));
+Person: => PL_PrevAddrAVMValA5Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		PreviousAddressPropertyCnt5Y = 0 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(PreviousAddressAVMValue5YUnCap, 1, 999999999));
+Person: => PL_PrevAddrAVMRatio5Y := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		PL_PrevAddrAVMVal = NO_DATA_FOUND_97_INT OR PL_PrevAddrAVMValA5Y = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(PreviousAddressAVMValueCurrUnCap/PreviousAddressAVMValue5YUnCap, 2), 99.99));
+Person: => PL_PrevAddrAVMConfScore := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		PL_PrevAddrAVMVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(ONLY(PreviousAddressPropertySetCurr, AVMConfidenceScore), 0, 100));
+
 // KS-4688: Previous Address Characteristics
 Person: => ValidPrevAddrDtFirstSn := IF(ISVALIDDATE(PreviousAddrDateFirstSeen), DATETOSTRING(PreviousAddrDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97);
 Person: => ValidPrevAddrDtLastSn := IF(ISVALIDDATE(PreviousAddrDateLastSeen), DATETOSTRING(PreviousAddrDateLastSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97);
