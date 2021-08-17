@@ -10529,11 +10529,11 @@ Person: => PL_AstPropPurchOldDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_
 				PurchaseOldDateEv);
 Person: => PL_AstPropPurchNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT, 
 				PL_AstPropPurchCntEv = 0 => NO_DATA_FOUND_INT,
-				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97)=>NO_DATA_FOUND_97,
+				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97)=>NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PurchaseNewDateEv),Property.CURRENT_DATE),0,960));
 Person: => PL_AstPropPurchOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 				PL_AstPropPurchCntEv = 0 => NO_DATA_FOUND_INT,
-				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97)=>NO_DATA_FOUND_97,
+				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97)=>NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PurchaseOldDateEv),Property.CURRENT_DATE),0,960));
 
 
@@ -12916,7 +12916,69 @@ Person: => PL_VerDOBMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB I
 								PL_VerDOBSrcCntEvFCRA < 1 => NO_DATA_FOUND,
 								ValidDOBLogicCheck4 => '1',
 								'0');
+// KS-6009		
+AircraftOwner: TWO_YEARS_IN_DAYS := 730;
+WatercraftOwner: TWO_YEARS_IN_DAYS := 730;
 
+AircraftOwner: => Seen_In_Last_Two_Years := DAYSBETWEEN(DateLastSeenCapped ,CURRENT_DATE) <= AircraftOwner.TWO_YEARS_IN_DAYS;
+Person: => PL_AstVehAirCnt2Y := MAP(
+			P_LexIDSeenFlag = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
+			PL_AstVehAirCntEv > 0 AND  ALL(AircraftOwner,AircraftMaxDate = AircraftOwner.REC_FOUND_BUT_INVALID) => AircraftOwner.REC_FOUND_BUT_INVALID_INT,			
+			BOUNDSFOLD(COUNT(AircraftOwner(Seen_In_Last_Two_Years)),0,99));
+WatercraftOwner: => Seen_In_Last_Two_Years := DAYSBETWEEN(DateLastSeenCapped ,CURRENT_DATE) <= WatercraftOwner.TWO_YEARS_IN_DAYS;
+Person: => PL_AstVehWtrCnt2Y := MAP(
+			P_LexIDSeenFlag = '0' => WatercraftOwner.MISSING_INPUT_DATA_INT,
+			PL_AstVehWtrCntEv > 0 AND  ALL(WatercraftOwner,WatercraftMaxDate = WatercraftOwner.REC_FOUND_BUT_INVALID) => WatercraftOwner.REC_FOUND_BUT_INVALID_INT,			
+			BOUNDSFOLD(COUNT(WatercraftOwner(Seen_In_Last_Two_Years)),0,99));
+Person: => PL_AstFlagEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+					        PL_AstVehAutoCntEv <= 0 AND PL_AstVehWtrCntEv <= 0 AND PL_AstVehAirCntEv <= 0 AND PL_AstPropCntEv <= 0 => 0,
+					        PL_AstVehAutoCntEv > 0 OR PL_AstVehWtrCntEv > 0 OR PL_AstVehAirCntEv > 0 OR PL_AstPropCntEv > 0 => 1);
+Person: => PL_AstFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+							PL_AstVehWtrCntEv <= 0 AND PL_AstVehAirCntEv <= 0 AND PL_AstPropCntEv <= 0 => 0,
+							PL_AstVehWtrCntEv > 0 OR PL_AstVehAirCntEv > 0 OR PL_AstPropCntEv > 0 => 1);
+Person: => PL_AstFlag2Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		                                    PL_AstVehAutoCnt2Y = 0 AND PL_AstVehWtrCnt2Y = 0 AND PL_AstVehAirCnt2Y = 0 AND PL_AstPropCurrFlag = 0 => 0,
+		                                    PL_AstVehAutoCnt2Y > 0 OR PL_AstVehWtrCnt2Y > 0 OR PL_AstVehAirCnt2Y > 0 OR PL_AstPropCurrFlag > 0 => 1,
+																				NO_DATA_FOUND_97_INT);
+Person: => PL_AstFlag2YFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+					                  PL_AstVehWtrCnt2Y = 0 AND PL_AstVehAirCnt2Y = 0 AND PL_AstPropCurrFlag = 0 => 0,
+					                  PL_AstVehWtrCnt2Y > 0 OR PL_AstVehAirCnt2Y > 0 OR PL_AstPropCurrFlag > 0 => 1,
+														NO_DATA_FOUND_97_INT);
+//Having seperated checks as FCRA has a different stop point in the testing.
+Person: => AirVehWtrVehEmrgOldMsncEv := MAP(PL_AstVehWtrEmrgOldMsncEv IN [MISSING_INPUT_DATA_INT, NO_DATA_FOUND_INT, NO_DATA_FOUND_97_INT] AND PL_AstVehAirEmrgOldMsncEv IN [MISSING_INPUT_DATA_INT, NO_DATA_FOUND_INT, NO_DATA_FOUND_97_INT] => NO_DATA_FOUND_97_INT,
+																		PL_AstVehWtrEmrgOldMsncEv >= PL_AstVehAirEmrgOldMsncEv => PL_AstVehWtrEmrgOldMsncEv,
+																		PL_AstVehWtrEmrgOldMsncEv < PL_AstVehAirEmrgOldMsncEv => PL_AstVehAirEmrgOldMsncEv);
+Person: => AirVehWtrVehPropPurchEmrgOldMsncEv := MAP(AirVehWtrVehEmrgOldMsncEv = NO_DATA_FOUND_97_INT AND PL_AstPropPurchOldMsncEv IN [MISSING_INPUT_DATA_INT, NO_DATA_FOUND_INT, NO_DATA_FOUND_97_INT] => NO_DATA_FOUND_97_INT,
+																		AirVehWtrVehEmrgOldMsncEv >= PL_AstPropPurchOldMsncEv => AirVehWtrVehEmrgOldMsncEv,
+																		AirVehWtrVehEmrgOldMsncEv < PL_AstPropPurchOldMsncEv => PL_AstPropPurchOldMsncEv);
+Person: => AirVehWtrVehPropPurchVehAutoEmrgOldMsncEv := MAP(AirVehWtrVehPropPurchEmrgOldMsncEv = NO_DATA_FOUND_97_INT AND PL_AstVehAutoEmrgOldMsncEv IN [MISSING_INPUT_DATA_INT, NO_DATA_FOUND_INT, NO_DATA_FOUND_97_INT] => NO_DATA_FOUND_97_INT,
+																		AirVehWtrVehPropPurchEmrgOldMsncEv >= PL_AstVehAutoEmrgOldMsncEv => AirVehWtrVehPropPurchEmrgOldMsncEv,
+																		AirVehWtrVehPropPurchEmrgOldMsncEv < PL_AstVehAutoEmrgOldMsncEv => PL_AstVehAutoEmrgOldMsncEv);
+Person: => AirVehWtrVehEmrgNewMsncEv := MAP(PL_AstVehWtrEmrgNewMsncEv IN [MISSING_INPUT_DATA_INT, NO_DATA_FOUND_INT, NO_DATA_FOUND_97_INT] AND PL_AstVehAirEmrgNewMsncEv IN [MISSING_INPUT_DATA_INT, NO_DATA_FOUND_INT, NO_DATA_FOUND_97_INT] => NO_DATA_FOUND_97_INT,
+																		PL_AstVehWtrEmrgNewMsncEv <= PL_AstVehAirEmrgNewMsncEv => PL_AstVehWtrEmrgNewMsncEv,
+																		PL_AstVehWtrEmrgNewMsncEv > PL_AstVehAirEmrgNewMsncEv => PL_AstVehAirEmrgNewMsncEv);
+Person: => AirVehWtrVehPropPurchEmrgNewMsncEv := MAP(AirVehWtrVehEmrgNewMsncEv = NO_DATA_FOUND_97_INT AND PL_AstPropPurchNewMsncEv IN [MISSING_INPUT_DATA_INT, NO_DATA_FOUND_INT, NO_DATA_FOUND_97_INT] => NO_DATA_FOUND_97_INT,
+																		AirVehWtrVehEmrgNewMsncEv <= PL_AstPropPurchNewMsncEv => AirVehWtrVehEmrgNewMsncEv,
+																		AirVehWtrVehEmrgNewMsncEv > PL_AstPropPurchNewMsncEv => PL_AstPropPurchNewMsncEv);
+Person: => AirVehWtrVehPropPurchVehAutoEmrgNewMsncEv := MAP(AirVehWtrVehPropPurchEmrgNewMsncEv = NO_DATA_FOUND_97_INT AND PL_AstVehAutoEmrgNewMsncEv IN [MISSING_INPUT_DATA_INT, NO_DATA_FOUND_INT, NO_DATA_FOUND_97_INT] => NO_DATA_FOUND_97_INT,
+																		AirVehWtrVehPropPurchEmrgNewMsncEv <= PL_AstVehAutoEmrgNewMsncEv => AirVehWtrVehPropPurchEmrgNewMsncEv,
+																		AirVehWtrVehPropPurchEmrgNewMsncEv > PL_AstVehAutoEmrgNewMsncEv => PL_AstVehAutoEmrgNewMsncEv);
+Person: => PL_AstPurchOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+						                PL_AstFlagEv = 0 => NO_DATA_FOUND_INT,
+						                PL_AstFlagEv = 1 AND AirVehWtrVehPropPurchVehAutoEmrgOldMsncEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+														BOUNDSFOLD(AirVehWtrVehPropPurchVehAutoEmrgOldMsncEv, 0, 960));
+Person: => PL_AstPurchOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+						                PL_AstFlagEvFCRA = 0 => NO_DATA_FOUND_INT,
+						                PL_AstFlagEvFCRA = 1 AND AirVehWtrVehPropPurchEmrgOldMsncEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+														BOUNDSFOLD(AirVehWtrVehPropPurchEmrgOldMsncEv, 0, 960));
+Person: => PL_AstPurchNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+								PL_AstFlagEv = 0 => NO_DATA_FOUND_INT,
+								PL_AstFlagEv = 1 AND AirVehWtrVehPropPurchVehAutoEmrgNewMsncEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+								BOUNDSFOLD(AirVehWtrVehPropPurchVehAutoEmrgNewMsncEv, 0, 960));
+Person: => PL_AstPurchNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+								PL_AstFlagEvFCRA = 0 => NO_DATA_FOUND_INT,
+								PL_AstFlagEvFCRA = 1 AND AirVehWtrVehPropPurchEmrgNewMsncEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+								BOUNDSFOLD(AirVehWtrVehPropPurchEmrgNewMsncEv, 0, 960));	
 /**************************************************************************/
 /*                                                                        */
 /*                           Innovis Attributes                           */
