@@ -10354,9 +10354,24 @@ Person: => AssetPropertySaleCount := COUNT(PersonProperty(PropertyIsSold){Prop})
 
 Person: =>PropertyMinDate :=STRING(MIN(PropertyDateFirstSeenSorted,DATE(DateFirstSeenClean)));
 Person: =>MonthsSince :=MONTHSBETWEEN(DATE(PropertyMinDate),Property.CURRENT_DATE);
-PersonProperty: => BestMostRecentProperty := ONLY(TOPN(Prop.AutomatedValuationModel,1,-AVMValueDate){AVMValueDate,AVMUnformattedAPN, AVMLandUseCode, AVMRecordingDate, AVMAssessedValueYear, AVMSalesPrice, AVMAssessedTotalValue, AVMMarketTotalValue, AVMTaxAssessmentValuation, AVMPriceIndexValuation, AVMHedonicValuation, AVMAutomatedValuation, AVMConfidenceScore, AVMCurrentFlag});
-Person: =>AVMList :=TOPN(PersonProperty(IsCurrentlyOwned){ModAVMValue:=IF(BestMostRecentProperty.AVMAutomatedValuation:Null OR BestMostRecentProperty.AVMAutomatedValuation='',Person.NO_DATA_FOUND_97,BestMostRecentProperty.AVMAutomatedValuation),BestMostRecentProperty.AVMValueDate,BestMostRecentProperty.AVMUnformattedAPN},999,-AVMValueDate);
 
+Property.AutomatedValuationModel: => AVMSalesDate := AVMSalesPrice:DateFirstSeen;
+
+PersonProperty: => AVMDataset := {
+	PropertyUID := Prop.UID,
+	ModAVMValueDate := IF(ISVALIDDATE(Prop.AutomatedValuationModel.AVMValueDate), DATETOSTRING(Prop.AutomatedValuationModel.AVMValueDate, '%Y%m%d'), Person.NO_DATA_FOUND_97),
+	ModAVMValue:=IF(Prop.AutomatedValuationModel.AVMAutomatedValuation:Null OR Prop.AutomatedValuationModel.AVMAutomatedValuation='',Person.NO_DATA_FOUND_97,Prop.AutomatedValuationModel.AVMAutomatedValuation),
+	ModAVMSalesDate := IF(ISVALIDDATE(Prop.AutomatedValuationModel.AVMSalesDate), DATETOSTRING(Prop.AutomatedValuationModel.AVMSalesDate, '%Y%m%d'), Person.NO_DATA_FOUND_97),
+	ModAVMSalesPrice:=IF(Prop.AutomatedValuationModel.AVMSalesPrice:Null OR Prop.AutomatedValuationModel.AVMSalesPrice='',Person.NO_DATA_FOUND_97,Prop.AutomatedValuationModel.AVMSalesPrice)};
+
+PersonProperty: => BestMostRecentProperty := TOPN(AVMDataset{PropertyUID, ModAVMValueDate, ModAVMValue},1,-ModAVMValueDate);
+Person: => AVMList := TOPN(PersonProperty(IsCurrentlyOwned).BestMostRecentProperty{PropertyUID, ModAVMValueDate, ModAVMValue},999, ModAVMValueDate, ModAVMValue);
+
+PersonProperty: => BestMostRecentPropertySales := TOPN(AVMDataset{PropertyUID, ModAVMSalesDate, ModAVMSalesPrice},1,-ModAVMSalesDate);
+Person: => AVMSalesList := TOPN(PersonProperty(PropertyIsSold).BestMostRecentPropertySales{PropertyUID, ModAVMSalesDate, ModAVMSalesPrice},999, ModAVMSalesDate, ModAVMSalesPrice);
+
+Person: => AssetPropertySaleCount1Y := COUNT(PersonProperty(PropertyIsSold AND Seen_In_One_Year){Prop});
+Person: => AssetPropertySaleCount5Y := COUNT(PersonProperty(PropertyIsSold AND Seen_In_Five_Years){Prop});
 //Property Purchase History Helpers
 PersonProperty:ONE_YEAR_IN_DAYS :=365;
 PersonProperty:FIVE_YEARS_IN_DAYS :=1826;
@@ -10432,16 +10447,16 @@ Person: => PL_AstPropCurrTaxValTot := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_
 
 Person: => PL_AstPropCurrWAVMValCnt := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
 				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,
-				BOUNDSFOLD(COUNT(PersonProperty(IsCurrentlyOwned AND NOT (BestMostRecentProperty.AVMAutomatedValuation:Null OR BestMostRecentProperty.AVMAutomatedValuation = '')){Prop}),0,999));
+				BOUNDSFOLD(COUNT(AVMList(ModAVMValue != Person.NO_DATA_FOUND_97)),0,999));
 
 Person: => PL_AstPropCurrAVMValList := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
 				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,					
-				PL_AstPropCurrCnt >0 AND PL_AstPropCurrWAVMValCnt = 0 =>NO_DATA_FOUND_97_INT,
+				PL_AstPropCurrCnt >0 AND PL_AstPropCurrWAVMValCnt = 0 => NO_DATA_FOUND_97_INT,
 				CONCAT(AVMList, ModAVMValue, '|'));
 
 Person: => PL_AstPropCurrAVMValTot := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
 				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,					
-				PL_AstPropCurrCnt >0 AND PL_AstPropCurrWAVMValCnt = 0 =>NO_DATA_FOUND_97_INT,
+				PL_AstPropCurrCnt > 0 AND PL_AstPropCurrWAVMValCnt = 0 =>NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(SUM(AVMList(ModAVMValue<> Person.NO_DATA_FOUND_97), INTEGER(ModAVMValue)), 0, 999999999));
 
 Person: => PL_AstPropCurrAVMValAvg := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
@@ -10541,7 +10556,21 @@ Person: => PL_AstPropPurchOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPU
 				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97)=>NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PurchaseOldDateEv),Property.CURRENT_DATE),0,960));
 
-
+Person: => PL_AstPropSaleCnt1Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(AssetPropertySaleCount1Y, 0, 999));		
+Person: => PL_AstPropSaleCnt5Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(AssetPropertySaleCount5Y, 0, 999));	
+Person: => PL_AstPropSaleWAVMValCntEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
+				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(AVMSalesList(ModAVMSalesPrice != Person.NO_DATA_FOUND_97)),0,999));
+Person: => PL_AstPropSaleAVMValListEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA,
+				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND,					
+				PL_AstPropSaleCntEv > 0 AND BOUNDSFOLD(COUNT(AVMSalesList(ModAVMSalesPrice != Person.NO_DATA_FOUND_97)),0,999) = 0 => NO_DATA_FOUND_97,
+				CONCAT(AVMSalesList,ModAVMSalesPrice,'|'));	
+Person: => PL_AstPropSaleAVMValTotEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
+				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,					
+				PL_AstPropSaleCntEv > 0 AND BOUNDSFOLD(COUNT(AVMSalesList(ModAVMSalesPrice != Person.NO_DATA_FOUND_97)),0,999) = 0 => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(SUM(AVMSalesList(ModAVMSalesPrice != Person.NO_DATA_FOUND_97),INTEGER(ModAVMSalesPrice)),0,999999999));
 /**************************************************************************/
 /*                                                                        */
 /*              Person Accident Helper Attributes                         */
