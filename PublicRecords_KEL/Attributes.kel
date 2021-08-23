@@ -1133,6 +1133,8 @@ InputPII: => P_InpClnIPAddr :=
 
 //Input PII Address Flag Helper Attributes
 
+Address: BADADDRESSSSOURCES := ['MED','CFG','FP3','DNM','USP'];//if we only see an address on file from this source we do NOT want to count this as verified
+
 Address: => BestchildAdvo := TOPN(ADVOSummary, 1, -ADVODateFirstSeen);
 Address: => VacantFlag := ONLY(BestchildAdvo, VacancyIndicator);
 Address: => ThrowBackFlag := ONLY(BestchildAdvo, ThrowBackIndicator);
@@ -1143,8 +1145,8 @@ Address: => SeasonalDeliveryFlag := ONLY(BestchildAdvo, SeasonalDeliveryIndicato
 Address: => DoNotDeliverFlag := ONLY(BestchildAdvo, DoNotDeliverIndicator);
 Address: => ResBusFlag := ONLY(BestchildAdvo, ResidentialOrBusinessIndicator);
 Address: => OnlyGMFlag := ONLY(BestchildAdvo, OnlyWayToGetMailIndicator);
-InputPII: => InputAddronfile := EXISTS(Location.DataSources);
-InputPII: => IsPostalSource :=EXISTS(Location.DataSources(Source ='VL'));
+InputPII: => InputAddronfile := EXISTS(Location.DataSources(NOT Source IN Address.BADADDRESSSSOURCES));
+InputPII: => IsPostalSource :=EXISTS(Location.DataSources(Source ='VL')); 
 
 //Input PII Address Flag  Attributes
 
@@ -1710,7 +1712,7 @@ InputPII: => PI_InpPhoneIsBusPhoneFlag :=  MAP(P_InpClnPhoneHomeFlagValue != 1 =
 	NOT PhoneListingTypeIsBusiness => '0',
 	PhoneListingTypeIsBusiness => '1',
 	NO_DATA_FOUND);
-	
+
 InputPII: => P_InpClnFLAPSDIETPopList := MAP(P_InpClnNameFirstFlagValue = MISSING_INPUT_DATA AND
 																							P_InpClnNameLastFlagValue = MISSING_INPUT_DATA AND
 																							P_InpClnAddrFullFlagValue = MISSING_INPUT_DATA AND
@@ -3126,7 +3128,7 @@ Person: => PersonPrevAddrLocID := AppendLocationID(PreviousAddrPrimRng,
                                                    PreviousAddrCity, 
                                                    PreviousAddrState,
                                                    PreviousAddrZip5);
-																									 
+
 
 Person: => EmergingAddrPrimRng := DEFAULT(PII.EmergingAddrPrimRng, '');
 Person: => EmergingAddrPreDir := DEFAULT(PII.EmergingAddrPreDir, '');
@@ -3498,19 +3500,19 @@ Person: => PL_CurrAddrIsMilitaryFlag := MAP(
 
 Person: => CurrAddrGeoLinkCty := TOPN(PersonAddress(CurrentPerfectAddressMatch).AddressHierarchy.GeoLinkID.AVM
 			{MedianValuation, MedianValuationDate := MedianValuation:DateFirstSeen}, 1, -MedianValuationDate);					
-					
+
 Person: => CurrAddrMedAVMCtyVal := ONLY(CurrAddrGeoLinkCty, MedianValuation);
 
 Person: => CurrAddressAVM1Y := TOPN(PII.CurrentAddress.AddressProperty.Prop.AutomatedValuationModel(AVMYears >= 1 AND AVMYears < 2)
-                               {AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
+                                {AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
 Person: => CurrAddressAVM5Y := TOPN(PII.CurrentAddress.AddressProperty.Prop.AutomatedValuationModel(AVMYears >= 5 AND AVMYears < 6)
                                {AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
-	
+
 Person: => CurrentAddressPropertySet := TOPN(PII.CurrentAddress.AddressProperty.Prop.AutomatedValuationModel
 	                             {AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);	
-															 
+
 Person: => CurrAddrAVMValueUnCap := ONLY(CurrentAddressPropertySet, AVMAutomatedValuation);															 
-															 
+					
 Person: => CurrentAddressOnAVM := EXISTS(CurrentAddressPropertySet);
 
 Person: => CurrAddressPropertyCnt1Y := COUNT(CurrAddressAVM1Y);
@@ -4026,7 +4028,7 @@ Person: => PL_BestPhoneHomeFCRA:= MAP(
 			P_LexIDSeenFlagFCRA = '0' => MISSING_INPUT_DATA,
 			BestPhoneFCRA:Null => NO_DATA_FOUND,
 			BestPhoneFCRA);
-Person: => PL_BestPhoneHomeNonFCRA := MAP(
+Person: => PL_BestPhoneHomeNonFCRA:= MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 			BestPhoneNonFCRA:Null => NO_DATA_FOUND,
 			BestPhoneNonFCRA);
@@ -10913,7 +10915,7 @@ Person: => PL_VerSrcBureauOnlyFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING
 				PL_VerSrcBureauCntEvFCRA < 1 => NO_DATA_FOUND,
 				IsBureauOnlySourceFCRA => '1', 
 				'0');
-				
+
 //KS-384
 Person: ONE_MONTH_IN_DAYS := 30;
 
@@ -12513,7 +12515,7 @@ Person: => PL_VerBestSSNFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestSSN =
 								PL_VerSSNSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
 								PL_VerSSNFlagNonFCRA = 1 AND NOT EditDistanceWithinRadius(PL_BestSSN, PII.P_InpClnSSN, 2) => '0',
 								'1');
-								
+
 Person: => BestDobCheck := SUBSTR(PL_BestDOB, 7, 8) IN ['00','01'];
 Person: => DOBBestMatches := PL_BestDOB = P_InpClnDOB;
 Person: => InputDOBDistanceMatchBest := EditDistanceWithinRadius(P_InpClnDOB, PL_BestDOB, 1);
@@ -12741,7 +12743,7 @@ Person: => PL_SSNNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT
 Person: => PL_SSNCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(PersonSSN) AND NOT EXISTS(PersonSSN{Subject:DateFirstSeen,Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
 																BOUNDSFOLD(COUNT(PersonSSN(AgeLastSeen <= 60 AND AgeLastSeen >= 0 AND EXISTS(ValidSSN.ValidSSN IN ['G','Z','R','O']) AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
-								
+
 //it does't work how you think it does						
 //need to use raw here because clean is already overwritten at this point		
 
