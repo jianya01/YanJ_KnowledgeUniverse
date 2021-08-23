@@ -1605,6 +1605,7 @@ InputPII: =>PI_InpAddrStateVoterAvailFlag := MAP(P_InpClnAddrStateFlagValue <> 1
 //KS-6125
 AddressSlim: => PII :=ONLY(InputPII);
 AddressSlim: => P_ClnAddrFullFlag := PII.P_InpClnAddrFullFlagValue;
+
 AddressSlim: => AddressSICHighRiskPre := HighRiskAddress{HighRiskSIC, DateFirstSeenMinAddressSIC := HighRiskSIC:DateFirstSeen, DateLastSeenMinAddressSIC := HighRiskSIC:DateLastSeen};
 AddressSlim: => AddressNIACSHighRiskPre := HighRiskAddress{HighRiskNAICS, DateFirstSeenMinAddressNAICS := HighRiskNAICS:DateFirstSeen, DateLastSeenMinAdressNAICS := HighRiskNAICS:DateLastSeen};
 
@@ -1619,10 +1620,11 @@ AddressSlim: => AddressNAICSList := AddressNIACSHighRiskPre{
 	AddressNAICSDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMinAddressNAICS),DATETOSTRING(DateFirstSeenMinAddressNAICS, '%Y%m%d'), NO_DATA_FOUND_97),
 	AddressNAICSDateLastSeen := IF(ISVALIDDATE(DateLastSeenMinAdressNAICS),DATETOSTRING(MIN(DateLastSeenMinAdressNAICS, CURRENT_DATE_BIP), '%Y%m%d'), NO_DATA_FOUND_97)
 	};
+
 AddressSlim: => AddressSICSortedList := TOPN(AddressSICList, 1000, AddressSICDateFirstSeen, AddressSICDateLastSeen);
 AddressSlim: => AddressNAICSSortedList := TOPN(AddressNAICSList, 1000, AddressNAICSDateFirstSeen, AddressNAICSDateLastSeen);
-AddressSlim: => AddressSICNotContains := NOT CONTAINS(CONCAT(AddressSICSortedList,HighRiskSIC,'|'), '9223');
-AddressSlim: => AddressNAICSNotContains := NOT CONTAINS(CONCAT(AddressNAICSSortedList,HighRiskNAICS,'|'), '922140');
+AddressSlim: => AddressSICContainsCorrectional := CONTAINS(CONCAT(AddressSICSortedList,HighRiskSIC,'|'), '9223');
+AddressSlim: => AddressNAICSContainsCorrectional := CONTAINS(CONCAT(AddressNAICSSortedList,HighRiskNAICS,'|'), '922140');
 AddressSlim: => SICListNotFound := NOT EXISTS(AddressSICSortedList) OR ALL(AddressSICSortedList, HighRiskSIC = '' OR HighRiskSIC:Null);
 AddressSlim: => NAICSListNotFoind := NOT EXISTS(AddressNAICSSortedList) OR ALL(AddressNAICSSortedList, HighRiskNAICS = '' OR HighRiskNAICS:Null);
 
@@ -1632,9 +1634,10 @@ AddressSlim: => PI_InpAddrSICCodeHRList := MAP(P_ClnAddrFullFlag != '1' => MISSI
 AddressSlim: => PI_InpAddrNAICSCodeHRList := MAP(P_ClnAddrFullFlag != '1' => MISSING_INPUT_DATA,
 	NAICSListNotFoind => NO_DATA_FOUND,
 	CONCAT(AddressNAICSSortedList,HighRiskNAICS,'|'));
+	
 AddressSlim: => PI_InpAddrIsHRCorrectFacFlag := MAP(P_ClnAddrFullFlag != '1' => MISSING_INPUT_DATA,
-	(AddressSICNotContains  OR AddressNAICSNotContains) OR (SICListNotFound AND NAICSListNotFoind) => '0',
-	'1');
+	(AddressSICContainsCorrectional  OR AddressNAICSContainsCorrectional) => '1',
+	'0');
 
 InputPII: => AddressZipHelperInput := ONLY(ZIP5);
 InputPII: => IsPOBoxADVO := EXISTS(Location.AddressType(AddressTypeCode = '9'));
