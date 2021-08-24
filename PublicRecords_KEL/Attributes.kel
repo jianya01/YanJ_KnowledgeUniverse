@@ -3343,6 +3343,70 @@ Person: => PL_CurrAddrUniqMailDlvryFlag := MAP(P_LexIDSeenFlag = '0' OR PL_CurrA
 		PL_CurrAddrIsDropDeliveryFlag = 0 => '0',
 		'1');
 
+//KS-7202
+
+Person: => CurrAddrAVMSetAll := CurrAddrHelperAttribute.AddressProperty.Prop.AutomatedValuationModel{
+				AVMAutomatedValuation, 
+				AVMConfidenceScore,
+				AVMSubjEmrgFlag := MAP(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97] => 0, 
+										AVMValueDate <= FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d') => 1,
+										0),
+				AVMSubjEmrgYears := IF(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97], 999, ABSYEARSBETWEEN(AVMValueDate, FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d'))),
+				AVMYears,
+				AVMValueDate};
+
+Person: => SubjCurrAVMSet := TOPN(CurrAddrAVMSetAll(AVMSubjEmrgFlag = 1 AND AVMSubjEmrgYears < 1){
+				AVMAutomatedValuation, 
+				AVMConfidenceScore,
+				AVMValueDate}, 1, -AVMValueDate);
+
+Person: => SubjCurrAvmVal := DEFAULT(ONLY(SubjCurrAVMSet, AVMAutomatedValuation), 0);
+Person: => SubjCurrAvmConfScore := DEFAULT(ONLY(SubjCurrAVMSet, AVMConfidenceScore), 0);
+
+Person: => PL_CurrAddrSubjEmrgAVMValEv := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+		NOT EXISTS(SubjCurrAVMSet) OR SubjCurrAvmVal = 0 OR PL_CurrAddrSubjOldDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SubjCurrAvmVal, 1, 999999999));
+Person: => PL_CurrAddrSubjEmrgAVMConfEv := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+		PL_CurrAddrSubjEmrgAVMValEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SubjCurrAvmConfScore, 1, 999999999));
+Person: => PL_CurrAddrResSpanAVMRatioEv := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+		PL_CurrAddrSubjEmrgAVMValEv = NO_DATA_FOUND_97_INT OR PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(PL_CurrAddrAVMVal/PL_CurrAddrSubjEmrgAVMValEv, 2), 99.99));
+
+Person: => CurrAddrMktTaxSetAll := CurrAddrHelperAttribute.AddressProperty.Prop.PropertyEvent{
+			MarketTotalValue,
+			AssessedTotalValue,
+			MktTaxSubjEmrgFlag := MAP(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97] => 0, 
+										DtFirstSeen <= FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d') => 1,
+										0),
+			MktTaxSubjEmrgYears := IF(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97], 999, ABSYEARSBETWEEN(DtFirstSeen, FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d'))),
+			DtFirstSeen};
+
+Person: => SubjCurrMktTaxSet := TOPN(CurrAddrMktTaxSetAll(MktTaxSubjEmrgFlag = 1 AND MktTaxSubjEmrgYears < 1){
+				MarketTotalValue,
+				AssessedTotalValue,
+				DtFirstSeen}, 1, -DtFirstSeen);
+
+Person: => SubjCurrMktVal := DEFAULT(ONLY(SubjCurrMktTaxSet, MarketTotalValue), 0);
+Person: => SubjCurrTaxVal := DEFAULT(ONLY(SubjCurrMktTaxSet, AssessedTotalValue), 0);
+
+Person: => PL_CurrAddrSubjEmrgMktValEv := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrAddrPropertyRecord => NO_DATA_FOUND_INT,
+		NOT EXISTS(SubjCurrMktTaxSet) OR SubjCurrMktVal = 0 OR PL_CurrAddrSubjOldDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SubjCurrMktVal, 1, 999999999));
+Person: => PL_CurrAddrSubjEmrgTaxValEv := MAP(
+		PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrAddrPropertyRecord => NO_DATA_FOUND_INT,
+		NOT EXISTS(SubjCurrMktTaxSet) OR SubjCurrTaxVal = 0 OR PL_CurrAddrSubjOldDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SubjCurrTaxVal, 1, 999999999));
+
 //Current address property
 AddressProperty: =>BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsDeed OR IsAssessment),1 ,-DtFirstSeen));
 AddressProperty: =>BestMostRecentPropertyEventPurchase:=ONLY(TOPN(Prop.PropertyEvent(IsDeed AND PropertyPurchaseRecord),1 ,-DtFirstSeen));
