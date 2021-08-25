@@ -4077,7 +4077,7 @@ Person: => PL_BestDOBAge:= MAP(
 			BestDOBAge);
 //Best Phone
 // Phone: PHONE_PLUS_RAW_SOURCES := ['IR','01','02','05','IO','PP','WO','WR','WP','GO','IQ','IB','MT','T$','AY','L9','N2'];//Not needed for now but logic might change in the future and this might be required.
-Phone.DataSources : => TranslatedSourceCode := SourceGroup(Source);
+Phone.DataSources : => TranslatedSourceCode := ConsumerSourceGroup(Source);
 Person: => BestPhoneCandidates := PersonPhone{ PhoneNumber.Phone10, //Neg means add - in the TopN to find biggest
 						SortCriteria1Neg := DEFAULT(IF(YEARSBETWEEN(MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen)),D'19000101'),
 						SortCriteria2Neg := COUNT(DataSources{TranslatedSourceCode}),
@@ -11933,9 +11933,9 @@ PersonAddress: => GroupedInputAddress :=
 PersonAddress: => AddressSimilarityMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedInputAddress) >= 0.75, 1,0);
 PersonAddress.DataSources: => TranslatedSources := ConsumerSourceGroup(Source);
 Person: => AddressVerMatchSourcesAllPre := PersonAddress(InputAddressMatch OR AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource,
-					RecordCount := Source:Weight,
-					MyDateFirstSeen := Source:DateFirstSeen,
-					MyDateLastSeen := Source:DateLastSeen};
+					RecordCount := TranslatedSource:Weight,
+					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
+					MyDateLastSeen := TranslatedSource:DateLastSeen};
 Person: => AddressVerMatchSources := AddressVerMatchSourcesAllPre{TranslatedSource,
 					RecordCount,
 					BankruptcyAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
@@ -12187,7 +12187,7 @@ PersonAddress: => CurrentPerfectAddressMatch :=
 	IsNullOrEqual(TRIMBOTH(SecondaryRange), TRIMBOTH(Subject.PII.CurrentAddrSecRng));
 	
 	
-PersonAddress.DataSources: => TranslatedSource := SourceGroup(Source);
+PersonAddress.DataSources: => TranslatedSource := ConsumerSourceGroup(Source);
 PersonAddress: => GroupedCurrentAddress := 
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrPrimRng,'')) +
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrPrimName,'')) +
@@ -12485,11 +12485,20 @@ Person: => ValidDOBLogic := (ValidDOBLogicCheck1:Null OR ValidDOBLogicCheck1)
 														(ValidDOBLogicCheck5:Null OR ValidDOBLogicCheck5)
 														;
 Person.ReportedDatesOfBirth: => TranslatedSource := ConsumerSourceGroup(Source);
-Person: => DOBMatchSourcesAllPre := ReportedDatesOfBirth(HeaderHitFlag AND ValidDOBLogic AND ValidDOBCheck AND TranslatedSource != ''){TranslatedSource}{TranslatedSource,
-					RecordCount := TranslatedSource:Weight,
+Person: => DOBMatchSourcesAllPre := ReportedDatesOfBirth(HeaderHitFlag AND ValidDOBLogic AND ValidDOBCheck AND TranslatedSource != '')
+					{TranslatedSource,
 					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
 					MyDateLastSeen := TranslatedSource:DateLastSeen};
-Person: => DOBMatchSources := DOBMatchSourcesAllPre{TranslatedSource,
+Person: => DOBMatchSourcesAllPre2 := 	DOBMatchSourcesAllPre{
+					TranslatedSource,
+					MyDateFirstSeen := MIN(GROUP,MyDateFirstSeen),
+					MyDateLastSeen := MAX(GROUP,MyDateLastSeen)
+					};
+Person: => DOBMatchSourcesAllPre3 :=DOBMatchSourcesAllPre2{TranslatedSource,
+					RecordCount := TranslatedSource:Weight,
+					MyDateFirstSeen,
+					MyDateLastSeen};
+Person: => DOBMatchSources := DOBMatchSourcesAllPre3{TranslatedSource,
 					RecordCount,
 					BankruptcyAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
 					LiensAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
@@ -12845,7 +12854,7 @@ Person: => PL_PrevAddrToInpDist := MAP(PII.P_InpClnAddrFullFlagValue != '1' OR P
 					Dist(REAL(PII.P_InpClnAddrLat), REAL(PII.P_InpClnAddrLng), REAL(PL_PrevAddrLat), REAL(PL_PrevAddrLng)));
 
 	//KS 6536
-PersonPhone.DataSources: => TranslatedSourceCode := SourceGroup(Source);
+PersonPhone.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
 PersonPhone: => TranslatedSources := DataSources(TranslatedSourceCode IN PersonPhone.GOODPHONESOURCES OR TranslatedSourceCode IN PersonPhone.OTHERSOURCES){TranslatedSourceCode};
 PersonPhone: => PhoneIsVerified := IsPhoneMatch(PhoneNumber,Subject.PII.P_InpClnPhoneHome);
 PersonPhone: GOODPHONESOURCES := ['AK', 'AM', 'AR', 'BA', 'CG', 'CY', 'D', 'DA', 'DE', 'EB', 'EL', 'EM', 'EN', 'EQ', 'FE', 'FF', 'FR', 'L2', 'MW', 'NT', 'P', 'PL', 'S1', 'SL', 'TN', 'TS', 'TU', 'U', 'V', 'VO', 'W', 'WP', 'IR', '01', '02', '05', 'IO', 'PN', 'GO', 'VW', 'DW', 'PQ', 'WR', 'WO', 'IQ', 'TM', 'T$', 'AO', 'l9', 'N2', 'GN'];
