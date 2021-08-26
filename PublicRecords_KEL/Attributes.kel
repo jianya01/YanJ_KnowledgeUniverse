@@ -3343,7 +3343,7 @@ Person: => PL_CurrAddrUniqMailDlvryFlag := MAP(P_LexIDSeenFlag = '0' OR PL_CurrA
 		PL_CurrAddrIsDropDeliveryFlag = 0 => '0',
 		'1');
 
-//KS-7202
+//Subject Emerge AVM
 
 Person: => CurrAddrAVMSetAll := CurrAddrHelperAttribute.AddressProperty.Prop.AutomatedValuationModel{
 				AVMAutomatedValuation, 
@@ -3354,6 +3354,90 @@ Person: => CurrAddrAVMSetAll := CurrAddrHelperAttribute.AddressProperty.Prop.Aut
 				AVMSubjEmrgYears := IF(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97], 999, ABSYEARSBETWEEN(AVMValueDate, FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d'))),
 				AVMYears,
 				AVMValueDate};
+
+PropertyEvent: => PropEventYears := ABSYEARSBETWEEN(DtFirstSeen, Property.CURRENT_DATE);
+
+Person: => CurrAddrMktTaxSetAll := CurrAddrHelperAttribute.AddressProperty.Prop.PropertyEvent{
+			MarketTotalValue,
+			AssessedTotalValue,
+			MktTaxSubjEmrgFlag := MAP(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97] => 0, 
+										DtFirstSeen <= FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d') => 1,
+										0),
+			MktTaxSubjEmrgYears := IF(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97], 999, ABSYEARSBETWEEN(DtFirstSeen, FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d'))),
+			PropEventYears,
+			DtFirstSeen};
+
+//KS-7302
+
+Person: => CurrAddrAVMSetA7Y := TOPN(CurrAddrAVMSetAll(AVMYears >= 7 AND AVMYears < 8){
+				AVMAutomatedValuation,
+				AVMValueDate,
+				AVMConfidenceScore}, 1, -AVMValueDate);
+
+Person: => CurrAddrAVMCntA7Y := COUNT(CurrAddrAVMSetA7Y);
+Person: => CurrAddrAVMValueA7Y := ONLY(CurrAddrAVMSetA7Y, AVMAutomatedValuation);
+
+Person: => CurrAddrMktTaxSetA7Y := TOPN(CurrAddrMktTaxSetAll(PropEventYears >= 7 AND PropEventYears < 8){
+				MarketTotalValue,
+				AssessedTotalValue,
+				PropEventYears}, 1, -PropEventYears);
+
+Person: => CurrAddrMktValA7Y := DEFAULT(ONLY(CurrAddrMktTaxSetA7Y, MarketTotalValue), 0);
+Person: => CurrAddrTaxValA7Y := DEFAULT(ONLY(CurrAddrMktTaxSetA7Y, AssessedTotalValue), 0);
+
+Person: => PL_CurrAddrSubjEmrgFlag7Y := MAP(
+	PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+	PL_CurrAddrSubjOldMsnc = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97,
+	PL_CurrAddrSubjOldMsnc > 84 => '0',
+	PL_CurrAddrSubjOldMsnc <= 84 => '1');
+
+Person: => PL_CurrAddrAVMValA7Y := MAP(
+	PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+	CurrAddrAVMCntA7Y = 0 => NO_DATA_FOUND_97_INT,
+	BOUNDSFOLD(CurrAddrAVMValueA7Y, 1, 999999999));
+
+Person: => PL_CurrAddrMktValA7Y := MAP(
+	PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT CurrAddrPropertyRecord => NO_DATA_FOUND_INT,
+	NOT EXISTS(CurrAddrMktTaxSetA7Y) OR CurrAddrMktValA7Y = 0 => NO_DATA_FOUND_97_INT,
+	BOUNDSFOLD(CurrAddrMktValA7Y, 1, 999999999));
+
+Person: => PL_CurrAddrTaxValA7Y := MAP(
+	PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT CurrAddrPropertyRecord => NO_DATA_FOUND_INT,
+	NOT EXISTS(CurrAddrMktTaxSetA7Y) OR CurrAddrTaxValA7Y = 0 => NO_DATA_FOUND_97_INT,
+	BOUNDSFOLD(CurrAddrTaxValA7Y, 1, 999999999));
+
+Person: => PL_CurrAddrSubjEmrgAVMVal7Y := MAP(
+	PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+	PL_CurrAddrSubjEmrgFlag7Y = NO_DATA_FOUND_97 OR (PL_CurrAddrSubjEmrgFlag7Y = 1 AND PL_CurrAddrSubjEmrgAVMValEv = NO_DATA_FOUND_97_INT) OR (PL_CurrAddrSubjEmrgFlag7Y = 0 AND PL_CurrAddrAVMValA7Y = NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+	PL_CurrAddrSubjEmrgFlag7Y = '1' => PL_CurrAddrSubjEmrgAVMValEv,
+	PL_CurrAddrSubjEmrgFlag7Y = '0' => PL_CurrAddrAVMValA7Y);
+
+Person: => PL_CurrAddrResSpanAVMRatio7Y := MAP(
+	PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
+	PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT OR PL_CurrAddrSubjEmrgAVMVal7Y = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+	PL_CurrAddrSubjEmrgFlag7Y = '1' => MIN(ROUND(CurrAddrAVMValueUnCap/SubjCurrAvmVal, 2), 99.99),
+	PL_CurrAddrSubjEmrgFlag7Y = '0' => MIN(ROUND(CurrAddrAVMValueUnCap/CurrAddrAVMValueA7Y, 2), 99.99));
+
+Person: => PL_CurrAddrSubjEmrgMktVal7Y := MAP(
+	PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT CurrAddrPropertyRecord => NO_DATA_FOUND_INT,
+	PL_CurrAddrSubjEmrgFlag7Y = NO_DATA_FOUND_97 OR (PL_CurrAddrSubjEmrgFlag7Y = 1 AND PL_CurrAddrSubjEmrgMktValEv = NO_DATA_FOUND_97_INT) OR (PL_CurrAddrSubjEmrgFlag7Y = 0 AND PL_CurrAddrMktValA7Y = NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+	PL_CurrAddrSubjEmrgFlag7Y = '1' => PL_CurrAddrSubjEmrgMktValEv,
+	PL_CurrAddrSubjEmrgFlag7Y = '0' => PL_CurrAddrMktValA7Y);
+
+Person: => PL_CurrAddrSubjEmrgTaxVal7Y := MAP(
+	PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT CurrAddrPropertyRecord => NO_DATA_FOUND_INT,
+	PL_CurrAddrSubjEmrgFlag7Y = NO_DATA_FOUND_97 OR (PL_CurrAddrSubjEmrgFlag7Y = 1 AND PL_CurrAddrSubjEmrgTaxValEv = NO_DATA_FOUND_97_INT) OR (PL_CurrAddrSubjEmrgFlag7Y = 0 AND PL_CurrAddrTaxValA7Y = NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+	PL_CurrAddrSubjEmrgFlag7Y = '1' => PL_CurrAddrSubjEmrgTaxValEv,
+	PL_CurrAddrSubjEmrgFlag7Y = '0' => PL_CurrAddrTaxValA7Y);
+
+//KS-7202
 
 Person: => SubjCurrAVMSet := TOPN(CurrAddrAVMSetAll(AVMSubjEmrgFlag = 1 AND AVMSubjEmrgYears < 1){
 				AVMAutomatedValuation, 
@@ -3378,15 +3462,6 @@ Person: => PL_CurrAddrResSpanAVMRatioEv := MAP(
 		NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
 		PL_CurrAddrSubjEmrgAVMValEv = NO_DATA_FOUND_97_INT OR PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
 		MIN(ROUND(PL_CurrAddrAVMVal/PL_CurrAddrSubjEmrgAVMValEv, 2), 99.99));
-
-Person: => CurrAddrMktTaxSetAll := CurrAddrHelperAttribute.AddressProperty.Prop.PropertyEvent{
-			MarketTotalValue,
-			AssessedTotalValue,
-			MktTaxSubjEmrgFlag := MAP(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97] => 0, 
-										DtFirstSeen <= FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d') => 1,
-										0),
-			MktTaxSubjEmrgYears := IF(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97], 999, ABSYEARSBETWEEN(DtFirstSeen, FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d'))),
-			DtFirstSeen};
 
 Person: => SubjCurrMktTaxSet := TOPN(CurrAddrMktTaxSetAll(MktTaxSubjEmrgFlag = 1 AND MktTaxSubjEmrgYears < 1){
 				MarketTotalValue,
