@@ -1,5 +1,4 @@
-﻿IMPORT VehicleHistoryReport_KEL.Uses;
-IMPORT KnowledgeUniverse.VehicleHistoryReport_KEL.Entities;
+﻿IMPORT KnowledgeUniverse.VehicleHistoryReport_KEL.Entities;
 
 /**** 
  * Constants section.
@@ -15,6 +14,14 @@ Vehicle: CAP_MODELED_ANNUAL_MILEAGE_1 := 13828;
 Vehicle: CAP_MODELED_ANNUAL_MILEAGE_2 := 36120;
 Vehicle: CAP_CURRENT_OWNER_ANNUAL_MILEAGE := 41873;
 
+Vehicle: METERPERMILE := 1609.344;
+
+Events: DS_EXPERIAN := 'EXPERIAN';
+Vehicle: DS_EXPERIAN := 'EXPERIAN';
+
+Events: MILESOURCE := ['EXPERIAN', 'NISSAN'];
+
+
 /****
  * Helpder Attributes.
  */
@@ -24,16 +31,27 @@ Vehicle: => SearchYear := YEAR(SearchDate);
 Vehicle: => SearchMonth := MONTH(SearchDate);
 
 
-
 /**** 
  * Begin of Intermediate Attributes.
  */
 
 // CURRENT_OWNER_START_DATE
 Vehicle: => LastOwnerSequenceNumber := MAX(Owners(NOT SequenceNumber:Null AND StartDate <= rVehicle.SearchDate), SequenceNumber);
-Vehicle: => MostRecentOwnerStartDate := ONLY(Owners(SequenceNumber = rVehicle.LastOwnerSequenceNumber), StartDate);
+Vehicle: => AutoCheckOwnerStartDate := ONLY(Owners(SequenceNumber = rVehicle.LastOwnerSequenceNumber), StartDate);
 Vehicle: => MostRecentTitleDate := MAX(Events(ExperianType = 100), EventDate);
-Vehicle: => CurrentOwnerStartDate := IF(LastOwnerSequenceNumber:Null, MostRecentTitleDate, MostRecentOwnerStartDate);
+
+// If clients orders CC only, we use the OwnerFirstSeenDate as CurrentOwnerStartDate. If OwnerFirstSeenDate is Null, logic will be handled inside of attribute logic
+Vehicle: => CurrentOwnerStartDate := MAP(EXISTS(Events(DataSource = DS_EXPERIAN)) AND LastOwnerSequenceNumber:Null => MostRecentTitleDate,
+										 EXISTS(Events(DataSource = DS_EXPERIAN)) => AutoCheckOwnerStartDate,
+										 OwnerFirstSeenDate);
+
+
+// Converted odometer reading from kilometers to miles for GM. The unit from GM is meters.
+Events: => OdometerInMiles := IF(DataSource IN MILESOURCE, Odometer, ROUND(Odometer / rVehicle.METERPERMILE));
+Events: => NonZeroOdoReadings := Odometer > 0 AND EventDate <= rVehicle.SearchDate;
+
+Events: => NonZeroACOdoReadings := NonZeroOdoReadings AND DataSource = DS_EXPERIAN;
+Events: => NonZeroOEMOdoReadings := NonZeroOdoReadings AND DataSource != DS_EXPERIAN;
 
 
 // FIRST_OWNER_START_DATE
@@ -45,11 +63,11 @@ Vehicle: => OldestTitleDate := MIN(Events(ExperianType = 100), EventDate);
 
 
 // DATE_OF_FIRST_MILEAGE
-Vehicle: => DateOfFirstMileage := MIN(Events((NOT Odometer:Null) AND DataSource = 'EXPERIAN' AND EventDate <= rVehicle.SearchDate), EventDate);
+Vehicle: => DateOfFirstMileage := MIN(Events(NonZeroACOdoReadings), EventDate);
 
 
 // DATE_OF_LAST_MILEAGE
-Vehicle: => DateOfLastMileage := MAX(Events((NOT Odometer:Null) AND DataSource = 'EXPERIAN' AND EventDate <= rVehicle.SearchDate), EventDate);
+Vehicle: => DateOfLastMileage := MAX(Events(NonZeroACOdoReadings), EventDate);
 
 
 // VIND_YEAR_WINDOW_START
@@ -66,14 +84,15 @@ Vehicle: => ValidOTD := (OldestTitleDate >= VinYearWindowStart) AND (OldestTitle
 Vehicle: => ValidDOFM := (DateOfFirstMileage >= VinYearWindowStart) AND (DateOfLastMileage <= VinYearWindowEnd);
 
 Vehicle: => TotalAgeInYears := MAP(ValidFOSD => MAX(((SearchYear - YEAR(FirstOwnerStartDate)) * MONTHS_IN_YEAR + (SearchMonth - MONTH(FirstOwnerStartDate))) / MONTHS_IN_YEAR, 1 / MONTHS_IN_YEAR),
-							ValidOTD => MAX(((SearchYear - YEAR(OldestTitleDate)) * MONTHS_IN_YEAR + (SearchMonth - MONTH(OldestTitleDate))) / MONTHS_IN_YEAR, 1 / MONTHS_IN_YEAR),
-							ValidDOFM => MAX(((SearchYear - YEAR(DateOfFirstMileage)) * MONTHS_IN_YEAR + (SearchMonth - MONTH(DateOfFirstMileage))) / MONTHS_IN_YEAR, 1 / MONTHS_IN_YEAR),
-							YearMake:Null OR YearMake < 1900 => LVL1_DEFAULT,
-							MAX(((SearchYear - YearMake) * MONTHS_IN_YEAR + (SearchMonth - 1)) / MONTHS_IN_YEAR, 1 / MONTHS_IN_YEAR));
+									ValidOTD => MAX(((SearchYear - YEAR(OldestTitleDate)) * MONTHS_IN_YEAR + (SearchMonth - MONTH(OldestTitleDate))) / MONTHS_IN_YEAR, 1 / MONTHS_IN_YEAR),
+									ValidDOFM => MAX(((SearchYear - YEAR(DateOfFirstMileage)) * MONTHS_IN_YEAR + (SearchMonth - MONTH(DateOfFirstMileage))) / MONTHS_IN_YEAR, 1 / MONTHS_IN_YEAR),
+									YearMake:Null OR YearMake < 1900 => LVL1_DEFAULT,
+									MAX(((SearchYear - YearMake) * MONTHS_IN_YEAR + (SearchMonth - 1)) / MONTHS_IN_YEAR, 1 / MONTHS_IN_YEAR));
 
 
 // ESTIMATED_ANNUAL_MILES
 Vehicle: => EstimatedAnnualMiles := EstimatedAverageMiles / TotalAgeInYears;
+
 /**** 
  * End of Intermediate Attributes.
  */
@@ -84,39 +103,43 @@ Vehicle: => EstimatedAnnualMiles := EstimatedAverageMiles / TotalAgeInYears;
  * Begin of Final Attributes.
  */
 // OEM_SOURCE
-Vehicle: => OEMSource := IF(EXISTS(Events(DataSource != 'EXPERIAN')), ONLY(Events(DataSource != 'EXPERIAN'), DataSource), 'EXPERIAN');
+Vehicle: => OEMSource := MAP(EXISTS(Events(DataSource != DS_EXPERIAN)) AND EXISTS(Events(DataSource = DS_EXPERIAN)) => TRIMBOTH(ONLY(Events(DataSource != DS_EXPERIAN), DataSource)) + '&EXP',
+							 EXISTS(Events(DataSource != DS_EXPERIAN)) => TRIMBOTH(ONLY(Events(DataSource != DS_EXPERIAN), DataSource)),
+							DS_EXPERIAN);
+
 
 // OEM_SUB_SOURCE
-Vehicle: => OEMSubSource := IF(EXISTS(Events(DataSubSource != 'EXPERIAN')), ONLY(Events(DataSubSource != 'EXPERIAN'), DataSubSource), 'EXPERIAN');
+Vehicle: => OEMSubSource := IF(EXISTS(Events(DataSubSource != DS_EXPERIAN)), TRIMBOTH(ONLY(Events(DataSubSource != DS_EXPERIAN), DataSubSource)), DS_EXPERIAN);
+
+
+// MileageSource
+Vehicle: => MileageSource := ONLY(Events, MileageSource);
+
 
 //  Modeled Annual Mileage
 Vehicle: => ModeledAnnualMileageTmp := ROUND(EstimatedAnnualMiles);
 Vehicle: => ModeledAnnualMileage := MAP(TotalAgeInYears = LVL1_DEFAULT => LVL1_DEFAULT,
-																				ModeledAnnualMileageTmp:Null => LVL1_DEFAULT,
-																				((NOT OldestTitleDate:Null) AND (DAYSBETWEEN(OldestTitleDate, SearchDate) <= DAYS_IN_MONTH) OR (NOT FirstOwnerStartDate:Null) AND (DAYSBETWEEN(FirstOwnerStartDate, SearchDate) <= DAYS_IN_MONTH)) AND (ModeledAnnualMileageTmp < 599 * MONTHS_IN_YEAR) => CAP_MODELED_ANNUAL_MILEAGE_1,
-																				YEAR(OldestTitleDate):Null AND INTEGER(SearchYear) < YearMake => CAP_MODELED_ANNUAL_MILEAGE_1,
-																				ModeledAnnualMileageTmp > CAP_MODELED_ANNUAL_MILEAGE_2 => CAP_MODELED_ANNUAL_MILEAGE_2,
-																				ModeledAnnualMileageTmp);
-
+										ModeledAnnualMileageTmp:Null => LVL1_DEFAULT,
+										((NOT OldestTitleDate:Null) AND (DAYSBETWEEN(OldestTitleDate, SearchDate) <= DAYS_IN_MONTH) OR (NOT FirstOwnerStartDate:Null) AND (DAYSBETWEEN(FirstOwnerStartDate, SearchDate) <= DAYS_IN_MONTH)) AND (ModeledAnnualMileageTmp < 599 * MONTHS_IN_YEAR) => CAP_MODELED_ANNUAL_MILEAGE_1,
+										YEAR(OldestTitleDate):Null AND INTEGER(SearchYear) < YearMake => CAP_MODELED_ANNUAL_MILEAGE_1,
+										ModeledAnnualMileageTmp > CAP_MODELED_ANNUAL_MILEAGE_2 => CAP_MODELED_ANNUAL_MILEAGE_2,
+										ModeledAnnualMileageTmp);
 
 // ODOMETER_DATE
-Vehicle: => LastMileageDateConnectedCar := MAX(Events((NOT Odometer:Null) AND DataSource != 'EXPERIAN' AND EventDate <= rVehicle.SearchDate), EventDate);
+Vehicle: => LastMileageDateConnectedCar := MAX(Events(NonZeroOEMOdoReadings), EventDate);
 Vehicle: => OdometerDate := MAP(DateOfLastMileage:Null AND LastMileageDateConnectedCar:Null => LVL1_DEFAULT,
-																DateOfLastMileage:Null AND (NOT LastMileageDateConnectedCar:Null) => INTEGER(LastMileageDateConnectedCar),
-																LastMileageDateConnectedCar:Null AND (NOT DateOfLastMileage:Null) => INTEGER(DateOfLastMileage),
-																(INTEGER(LastMileageDateConnectedCar) > INTEGER(DateOfLastMileage)) OR (DAYSBETWEEN(LastMileageDateConnectedCar, DateOfLastMileage) <= 30) => INTEGER(LastMileageDateConnectedCar),
-																INTEGER(DateOfLastMileage));
+								DateOfLastMileage:Null AND (NOT LastMileageDateConnectedCar:Null) => INTEGER(LastMileageDateConnectedCar),
+								LastMileageDateConnectedCar:Null AND (NOT DateOfLastMileage:Null) => INTEGER(DateOfLastMileage),
+								(INTEGER(LastMileageDateConnectedCar) > INTEGER(DateOfLastMileage)) OR (DAYSBETWEEN(LastMileageDateConnectedCar, DateOfLastMileage) <= 30) => INTEGER(LastMileageDateConnectedCar),
+								INTEGER(DateOfLastMileage));
 
 // LAST_ODOMETER_READING
-Vehicle: => LastOdometerReading := IF(OdometerDate = LVL1_DEFAULT, LVL1_DEFAULT, MAX(Events((NOT Odometer:Null) AND EventDate = DATE(rVehicle.OdometerDate)), Odometer));
-
+Vehicle: => LastOdometerReading := IF(OdometerDate = LVL1_DEFAULT, LVL1_DEFAULT, MAX(Events(NonZeroOdoReadings AND EventDate = DATE(rVehicle.OdometerDate)), OdometerInMiles));
 
 // CURRENT_OWNER_ANNUALIZED_MILEAGE1
-Events: => validCOAM1Records := IF(rVehicle.CurrentOwnerStartDate:Null, 
-																	 DAYSBETWEEN(EventDate, rVehicle.SearchDate) <= DAYS_IN_1_YEAR AND DAYSBETWEEN(EventDate, rVehicle.SearchDate) >= 0
-																	 AND DataSource != 'EXPERIAN' AND (NOT Odometer:Null),
-																	 DAYSBETWEEN(EventDate, rVehicle.SearchDate) <= DAYS_IN_3_YEAR AND DAYSBETWEEN(EventDate, rVehicle.SearchDate) >= 0
-																	 AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 AND (NOT Odometer:Null));
+Events: => validCOAM1Records := MAP(rVehicle.CurrentOwnerStartDate:Null => DAYSBETWEEN(EventDate, rVehicle.SearchDate) <= DAYS_IN_1_YEAR AND NonZeroOEMOdoReadings,
+								   DataSource IN MILESOURCE => DAYSBETWEEN(EventDate, rVehicle.SearchDate) <= DAYS_IN_3_YEAR AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 AND NonZeroOdoReadings,
+								   DAYSBETWEEN(EventDate, rVehicle.SearchDate) <= DAYS_IN_3_YEAR AND NonZeroOdoReadings);
 
 Vehicle: => cntValidCOAM1EventDate := COUNT(Events(validCOAM1Records));
 Vehicle: => minValidCOAM1EventDate := MIN(Events(validCOAM1Records), EventDate);
@@ -124,18 +147,18 @@ Vehicle: => maxValidCOAM1EventDate := MAX(Events(validCOAM1Records), EventDate);
 
 Events: => dateLapse1 := DAYSBETWEEN(rVehicle.minValidCOAM1EventDate, EventDate);
 
-Vehicle: => CurrentOwnerAnnualMileage1TmpH1 := Events(validCOAM1Records){UID, dateLapse1, Odometer};
-Vehicle: => CurrentOwnerAnnualMileage1Tmp := ROUND(Stats.Slope(CurrentOwnerAnnualMileage1TmpH1, dateLapse1, Odometer) * 365);
+Vehicle: => CurrentOwnerAnnualMileage1TmpH1 := Events(validCOAM1Records){UID, dateLapse1, OdometerInMiles};
+Vehicle: => CurrentOwnerAnnualMileage1Tmp := ROUND(Stats.Slope(CurrentOwnerAnnualMileage1TmpH1, dateLapse1, OdometerInMiles) * 365);
 Vehicle: => CurrentOwnerAnnualMileage := MAP(cntValidCOAM1EventDate <2 OR (DAYSBETWEEN(minValidCOAM1EventDate, maxValidCOAM1EventDate) < 100) => LVL1_DEFAULT,
-																							CurrentOwnerAnnualMileage1Tmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
-																							CurrentOwnerAnnualMileage1Tmp <= 0 => LVL1_DEFAULT,
-																							CurrentOwnerAnnualMileage1Tmp);
+											CurrentOwnerAnnualMileage1Tmp <= 0 => LVL1_DEFAULT,
+											CurrentOwnerAnnualMileage1Tmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
+											CurrentOwnerAnnualMileage1Tmp);
 
 // CURRENT_OWNER_ANNUALIZED_MILEAGE2
-Events: => validCOAM2Records := DAYSBETWEEN(EventDate, rVehicle.SearchDate) >= 0 AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 AND (NOT Odometer:Null);
+Events: => validCOAM2Records := IF(DataSource IN MILESOURCE, DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 AND NonZeroOdoReadings, NonZeroOdoReadings);
 
-// Added per request from Prod by only return COAM2 when there has one odo reading in the past 3 years and all rest do readings are older than 3 years.
-Events: => odoReadingIn3Yr := DAYSBETWEEN(EventDate, rVehicle.SearchDate) <= DAYS_IN_3_YEAR AND EventDate <= rVehicle.SearchDate AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 AND Odometer > 0;
+// Added per request from Prod by only return COAM2 when there is only one odo reading in the past 3 years (or Daysbetween(min ododate in the past 3 years, max ododate in the past 3 years) < 100 ) and all rest do readings are older than 3 years.
+Events: => odoReadingIn3Yr := IF(DataSource IN MILESOURCE, DAYSBETWEEN(EventDate, rVehicle.SearchDate) <= DAYS_IN_3_YEAR AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 AND NonZeroOdoReadings, DAYSBETWEEN(EventDate, rVehicle.SearchDate) <= DAYS_IN_3_YEAR AND NonZeroOdoReadings);
 Vehicle: => cntOdoReadingIn3Yr := COUNT(Events(odoReadingIn3Yr));
 
 
@@ -145,20 +168,19 @@ Vehicle: => maxValidCOAM2EventDate := MAX(Events(validCOAM2Records), EventDate);
 
 Events: => dateLapse2 := DAYSBETWEEN(rVehicle.minValidCOAM2EventDate, EventDate);
 
-Vehicle: => CurrentOwnerAnnualMileage2TmpH2 := Events(validCOAM2Records){UID, dateLapse2, Odometer};
-Vehicle: => CurrentOwnerAnnualMileage2Tmp := ROUND(Stats.Slope(CurrentOwnerAnnualMileage2TmpH2, dateLapse2, Odometer) * 365);
+Vehicle: => CurrentOwnerAnnualMileage2TmpH2 := Events(validCOAM2Records){UID, dateLapse2, OdometerInMiles};
+Vehicle: => CurrentOwnerAnnualMileage2Tmp := ROUND(Stats.Slope(CurrentOwnerAnnualMileage2TmpH2, dateLapse2, OdometerInMiles) * 365);
 Vehicle: => CurrentOwnerAnnualMileage2 := MAP(CurrentOwnerAnnualMileage != LVL1_DEFAULT => CurrentOwnerAnnualMileage,
-																							CurrentOwnerStartDate:Null AND CurrentOwnerAnnualMileage = LVL1_DEFAULT => LVL1_DEFAULT,
-																							cntValidCOAM2EventDate < 2 OR (DAYSBETWEEN(minValidCOAM2EventDate, maxValidCOAM2EventDate) < 100) => LVL1_DEFAULT,
-																							cntOdoReadingIn3Yr < 1 => LVL1_DEFAULT,
-																							CurrentOwnerAnnualMileage2Tmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
-																							CurrentOwnerAnnualMileage2Tmp <= 0 => LVL1_DEFAULT,
-																							CurrentOwnerAnnualMileage2Tmp);
+												CurrentOwnerStartDate:Null AND CurrentOwnerAnnualMileage = LVL1_DEFAULT => LVL1_DEFAULT,
+												cntValidCOAM2EventDate < 2 OR (DAYSBETWEEN(minValidCOAM2EventDate, maxValidCOAM2EventDate) < 100) => LVL1_DEFAULT,
+												cntOdoReadingIn3Yr < 1 => LVL1_DEFAULT,
+												CurrentOwnerAnnualMileage2Tmp <= 0 => LVL1_DEFAULT,
+												CurrentOwnerAnnualMileage2Tmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
+												CurrentOwnerAnnualMileage2Tmp);
 
 
 // CURRENT_OWNER_ANNUALIZED_MILEAGE3
-Events: => validCOAM3Records := DAYSBETWEEN(EventDate, rVehicle.SearchDate) > DAYS_IN_3_YEAR AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 
-																	 AND (NOT Odometer:Null) AND DataSource = 'EXPERIAN';
+Events: => validCOAM3Records := DAYSBETWEEN(EventDate, rVehicle.SearchDate) > DAYS_IN_3_YEAR AND DAYSBETWEEN(rVehicle.CurrentOwnerStartDate, EventDate) >= 0 AND NonZeroACOdoReadings;	
 
 Vehicle: => cntValidCOAM3EventDate := COUNT(Events(validCOAM3Records));
 Vehicle: => minValidCOAM3EventDate := MIN(Events(validCOAM3Records), EventDate);
@@ -166,32 +188,32 @@ Vehicle: => maxValidCOAM3EventDate := MAX(Events(validCOAM3Records), EventDate);
 
 Events: => dateLapse3 := DAYSBETWEEN(rVehicle.minValidCOAM3EventDate, EventDate);
 
-Vehicle: => CurrentOwnerAnnualMileage3TmpH3 := Events(validCOAM3Records){UID, dateLapse3, Odometer};
-Vehicle: => CurrentOwnerAnnualMileage3Tmp := ROUND(Stats.Slope(CurrentOwnerAnnualMileage3TmpH3, dateLapse3, Odometer) * 365);
+Vehicle: => CurrentOwnerAnnualMileage3TmpH3 := Events(validCOAM3Records){UID, dateLapse3, OdometerInMiles};
+Vehicle: => CurrentOwnerAnnualMileage3Tmp := ROUND(Stats.Slope(CurrentOwnerAnnualMileage3TmpH3, dateLapse3, OdometerInMiles) * 365);
 Vehicle: => CurrentOwnerAnnualMileage3 := MAP(CurrentOwnerAnnualMileage != LVL1_DEFAULT => CurrentOwnerAnnualMileage,
-																							CurrentOwnerAnnualMileage2 != LVL1_DEFAULT => CurrentOwnerAnnualMileage2,
-																							CurrentOwnerStartDate:Null AND CurrentOwnerAnnualMileage = LVL1_DEFAULT => LVL1_DEFAULT,
-																							cntValidCOAM3EventDate < 2 OR (DAYSBETWEEN(minValidCOAM3EventDate, maxValidCOAM3EventDate) < 100) => LVL1_DEFAULT,
-																							CurrentOwnerAnnualMileage3Tmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
-																							CurrentOwnerAnnualMileage3Tmp <= 0 => LVL1_DEFAULT,
-																							CurrentOwnerAnnualMileage3Tmp);
+												CurrentOwnerAnnualMileage2 != LVL1_DEFAULT => CurrentOwnerAnnualMileage2,
+												CurrentOwnerStartDate:Null AND CurrentOwnerAnnualMileage = LVL1_DEFAULT => LVL1_DEFAULT,
+												cntValidCOAM3EventDate < 2 OR (DAYSBETWEEN(minValidCOAM3EventDate, maxValidCOAM3EventDate) < 100) => LVL1_DEFAULT,
+												CurrentOwnerAnnualMileage3Tmp <= 0 => LVL1_DEFAULT,
+												CurrentOwnerAnnualMileage3Tmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => CAP_CURRENT_OWNER_ANNUAL_MILEAGE,
+												CurrentOwnerAnnualMileage3Tmp);
 
 // ESTIMATED_ANNUALIZED_MILES_BLENDED
 Vehicle: => blankPeriodMiles := DAYSBETWEEN(DATE(OdometerDate), SearchDate) / DAYS_IN_1_YEAR * EstimatedAnnualMiles;
 Vehicle: => estimatedTotalMilesBlended := blankPeriodMiles + LastOdometerReading;
 Vehicle: => estimatedAnnualizedMilesBlendedTmp := ROUND(estimatedTotalMilesBlended / TotalAgeInYears);
 Vehicle: => BlendedAnnualMileage := MAP(estimatedAnnualizedMilesBlendedTmp:Null => LVL1_DEFAULT,
-																									 TotalAgeInYears = LVL1_DEFAULT => LVL1_DEFAULT,
-																									 estimatedAnnualizedMilesBlendedTmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => LVL1_DEFAULT,
-																									 estimatedAnnualizedMilesBlendedTmp);
+										 TotalAgeInYears = LVL1_DEFAULT => LVL1_DEFAULT,
+										 estimatedAnnualizedMilesBlendedTmp > CAP_CURRENT_OWNER_ANNUAL_MILEAGE => LVL1_DEFAULT,
+										 estimatedAnnualizedMilesBlendedTmp);
 
 
 // CONNECTED_CAR_INDICATOR
 Vehicle: => ConnectedCarIndicator := IF((NOT LastMileageDateConnectedCar:Null) AND (DateOfLastMileage:Null OR
-																			INTEGER(LastMileageDateConnectedCar) > INTEGER(DateOfLastMileage) OR
-																			DAYSBETWEEN(LastMileageDateConnectedCar, DateOfLastMileage) <= 30 OR
-																			EXISTS(Events(validCOAM1Records AND DataSource != 'EXPERIAN')) AND cntValidCOAM1EventDate >= 2 AND DAYSBETWEEN(minValidCOAM1EventDate, maxValidCOAM1EventDate) >= 100 OR
-																			EXISTS(Events(validCOAM2Records AND DataSource != 'EXPERIAN')) AND cntValidCOAM2EventDate >= 2 AND DAYSBETWEEN(minValidCOAM2EventDate, maxValidCOAM2EventDate) >= 100), 1, 0);
+										INTEGER(LastMileageDateConnectedCar) > INTEGER(DateOfLastMileage) OR
+										DAYSBETWEEN(LastMileageDateConnectedCar, DateOfLastMileage) <= 30 OR
+										EXISTS(Events(validCOAM1Records AND DataSource != DS_EXPERIAN)) AND cntValidCOAM1EventDate >= 2 AND DAYSBETWEEN(minValidCOAM1EventDate, maxValidCOAM1EventDate) >= 100 OR
+										EXISTS(Events(validCOAM2Records AND DataSource != DS_EXPERIAN)) AND cntValidCOAM2EventDate >= 2 AND DAYSBETWEEN(minValidCOAM2EventDate, maxValidCOAM2EventDate) >= 100), 1, 0);
 
 /****
  * End of Final Attributes
