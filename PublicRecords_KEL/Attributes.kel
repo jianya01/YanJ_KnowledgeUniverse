@@ -3888,12 +3888,26 @@ Person: => PL_PrevAddrSubjResSpan := MAP(
 			ValidPrevAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidPrevAddrDtLastSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
             BOUNDSFOLD(MONTHSBETWEEN(DATE(ValidPrevAddrDtFirstSn), DATE(ValidPrevAddrDtLastSn)),0,960));
 //KS-3361
-Person: => PreviousAddressPropertySet := TOPN(PII.PreviousAddress.AddressProperty.Prop.AutomatedValuationModel
-                                                {
-																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
-Person: => PreviousAddressPropertySetEarliest := TOPN(PII.PreviousAddress.AddressProperty.Prop.AutomatedValuationModel
-                                                {
-																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,AVMValueDate);
+Person: => PrevAddrAVMSetAll := PII.PreviousAddress.AddressProperty.Prop.AutomatedValuationModel{AVMAutomatedValuation,
+																AVMConfidenceScore,
+																AVMSubjEmrgFlag := MAP(Person.PL_PrevAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97] => 0,
+																										AVMValueDate <= FROMSTRINGTODATE(Person.PL_PrevAddrSubjOldDt, '%Y%m%d') => 1,
+																										0),
+																AVMSubjEmrgYears := IF(Person.PL_PrevAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97],
+																										999,
+																										ABSYEARSBETWEEN(AVMValueDate, FROMSTRINGTODATE(Person.PL_PrevAddrSubjOldDt, '%Y%m%d'))),
+																AVMYears,
+																AVMValueDate};
+
+Person: => PreviousAddressPropertySet := TOPN(PrevAddrAVMSetAll{
+																				AVMAutomatedValuation, 
+																				AVMConfidenceScore,
+																				AVMValueDate}, 1, -AVMValueDate);
+
+Person: => PreviousAddressPropertySetEarliest := TOPN(PrevAddrAVMSetAll(AVMSubjEmrgFlag = 1 AND AVMSubjEmrgYears < 1){
+															AVMAutomatedValuation, 
+															AVMConfidenceScore,
+															AVMValueDate}, 1, AVMValueDate);
 Person: => PreviousAddressOnAVM := EXISTS(PreviousAddressPropertySet);
 Person: => PreviousAddressPropertyCnt := COUNT(PreviousAddressPropertySet);
 Person: => PreviousAddressAVMValueUnCap :=ONLY(PreviousAddressPropertySet,AVMAutomatedValuation);
@@ -3901,7 +3915,7 @@ Person: => PreviousAddressAVMValueUnCap :=ONLY(PreviousAddressPropertySet,AVMAut
 Person: => PreviousAddressPropertyCntEarliest := COUNT(PreviousAddressPropertySetEarliest);
 Person: => PreviousAddressAVMValueUnCapEarliest :=ONLY(PreviousAddressPropertySetEarliest,AVMAutomatedValuation);
 
-Person: => PreviousAddressPropertySet7Y := TOPN(PII.PreviousAddress.AddressProperty.Prop.AutomatedValuationModel(AVMYears >= 7 AND AVMYears < 8)
+Person: => PreviousAddressPropertySet7Y := TOPN(PrevAddrAVMSetAll(AVMYears >= 7 AND AVMYears < 8)
                                                 {
 																							  AVMAutomatedValuation ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);
 Person: => PreviousAddressPropertyCnt7Y := COUNT(PreviousAddressPropertySet7Y);
