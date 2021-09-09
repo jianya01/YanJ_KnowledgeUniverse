@@ -4152,7 +4152,7 @@ Person: => PL_BestDOBAge:= MAP(
 			BestDOBAge);
 //Best Phone
 // Phone: PHONE_PLUS_RAW_SOURCES := ['IR','01','02','05','IO','PP','WO','WR','WP','GO','IQ','IB','MT','T$','AY','L9','N2'];//Not needed for now but logic might change in the future and this might be required.
-Phone.DataSources : => TranslatedSourceCode := SourceGroup(Source);
+Phone.DataSources : => TranslatedSourceCode := ConsumerSourceGroup(Source);
 Person: => BestPhoneCandidates := PersonPhone{ PhoneNumber.Phone10, //Neg means add - in the TopN to find biggest
 						SortCriteria1Neg := DEFAULT(IF(YEARSBETWEEN(MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen)),D'19000101'),
 						SortCriteria2Neg := COUNT(DataSources{TranslatedSourceCode}),
@@ -12330,9 +12330,9 @@ PersonAddress: => GroupedInputAddress :=
 PersonAddress: => AddressSimilarityMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedInputAddress) >= 0.75, 1,0);
 PersonAddress.DataSources: => TranslatedSources := ConsumerSourceGroup(Source);
 Person: => AddressVerMatchSourcesAllPre := PersonAddress(InputAddressMatch OR AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource,
-					RecordCount := Source:Weight,
-					MyDateFirstSeen := Source:DateFirstSeen,
-					MyDateLastSeen := Source:DateLastSeen};
+					RecordCount := TranslatedSource:Weight,
+					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
+					MyDateLastSeen := TranslatedSource:DateLastSeen};
 Person: => AddressVerMatchSources := AddressVerMatchSourcesAllPre{TranslatedSource,
 					RecordCount,
 					BankruptcyAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
@@ -12584,7 +12584,7 @@ PersonAddress: => CurrentPerfectAddressMatch :=
 	IsNullOrEqual(TRIMBOTH(SecondaryRange), TRIMBOTH(Subject.PII.CurrentAddrSecRng));
 	
 	
-PersonAddress.DataSources: => TranslatedSource := SourceGroup(Source);
+PersonAddress.DataSources: => TranslatedSource := ConsumerSourceGroup(Source);
 PersonAddress: => GroupedCurrentAddress := 
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrPrimRng,'')) +
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrPrimName,'')) +
@@ -12829,7 +12829,7 @@ Person: => PL_PrevAddrSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAd
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_PrevAddrSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));
 
 //Verification DOB
-Person: => AllDOBSet := ReportedDatesOfBirth(HeaderHitFlag AND TranslatedSources != ''){DateOfBirth};
+Person: => AllDOBSet := ReportedDatesOfBirth(HeaderHitFlag AND TranslatedSource != ''){DateOfBirth};
 Person.ReportedDatesOfBirth: => AllDobCheck := ALL(AllDOBSet,SUBSTR(DATETOSTRING(DateOfBirth,'%Y%m%d'), 7, 8) IN ['00','01']);
 Person: => DOBInputMatches := EXISTS(ReportedDatesOfBirth(DATETOSTRING(ReportedDatesOfBirth.DateOfBirth,'%Y%m%d') = Person.P_InpClnDOB));
 Person: => InputDOBDistanceMatch := EXISTS(EditDistanceWithinRadius(P_InpClnDOB, DATETOSTRING(ReportedDatesOfBirth.DateOfBirth,'%Y%m%d'), 1));
@@ -12881,12 +12881,21 @@ Person: => ValidDOBLogic := (ValidDOBLogicCheck1:Null OR ValidDOBLogicCheck1)
 														OR
 														(ValidDOBLogicCheck5:Null OR ValidDOBLogicCheck5)
 														;
-Person.ReportedDatesOfBirth: => TranslatedSources := ConsumerSourceGroup(Source);
-Person: => DOBMatchSourcesAllPre := ReportedDatesOfBirth(HeaderHitFlag AND ValidDOBLogic AND ValidDOBCheck AND TranslatedSources != ''){TranslatedSource := Source,
-					RecordCount := Source:Weight,
-					MyDateFirstSeen := Source:DateFirstSeen,
-					MyDateLastSeen := Source:DateLastSeen};
-Person: => DOBMatchSources := DOBMatchSourcesAllPre{TranslatedSource,
+Person.ReportedDatesOfBirth: => TranslatedSource := ConsumerSourceGroup(Source);
+Person: => DOBMatchSourcesAllPre := ReportedDatesOfBirth(HeaderHitFlag AND ValidDOBLogic AND ValidDOBCheck AND TranslatedSource != '')
+					{TranslatedSource,
+					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
+					MyDateLastSeen := TranslatedSource:DateLastSeen};
+Person: => DOBMatchSourcesAllPre2 := 	DOBMatchSourcesAllPre{
+					TranslatedSource,
+					MyDateFirstSeen := MIN(GROUP,MyDateFirstSeen),
+					MyDateLastSeen := MAX(GROUP,MyDateLastSeen)
+					};
+Person: => DOBMatchSourcesAllPre3 :=DOBMatchSourcesAllPre2{TranslatedSource,
+					RecordCount := TranslatedSource:Weight,
+					MyDateFirstSeen,
+					MyDateLastSeen};
+Person: => DOBMatchSources := DOBMatchSourcesAllPre3{TranslatedSource,
 					RecordCount,
 					BankruptcyAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
 					LiensAgeInDays := ABSDAYSBETWEEN(MyDateLastSeen, Person.CURRENT_DATE),
@@ -12896,7 +12905,8 @@ Person: => DOBMatchSources := DOBMatchSourcesAllPre{TranslatedSource,
 Person.DOBMatchSources: => ValidBankruptcySources := (TranslatedSource = 'BA' AND BankruptcyAgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT BankruptcyAgeInDays:Null);       
 Person.DOBMatchSources: => ValidLiensSources := (TranslatedSource = 'L2' AND LiensAgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT LiensAgeInDays:Null);       
 Person.DOBMatchSources: => OtherSources := (TranslatedSource <> 'BA' AND TranslatedSource <> 'L2'); 
-
+Person.DOBMatchSources: => IsBureauSourceNonFCRA := TranslatedSource IN BUREAU_SOURCES;
+Person.DOBMatchSources: => IsBureauSourceFCRA := TranslatedSource IN BUREAU_SOURCES_FCRA;
 Person: => DOBMatchSourcesSortedNonFCRA := TOPN(DOBMatchSources, 32, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
 Person: => DOBMatchSourcesSortedFCRA := TOPN(DOBMatchSources(ValidBankruptcySources OR ValidLiensSources OR OtherSources), 21, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
 
@@ -12981,6 +12991,99 @@ Person: => PL_VerDOBSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB
 				PL_VerDOBSrcCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
 				ALL(DOBMatchSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));
+
+//DOB bureau verification
+//KS-6803
+Person: => DOBMatchBureauSourcesSortedNonFCRA := TOPN(DOBMatchSources(IsBureauSourceNonFCRA), 3, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
+Person: => DOBMatchBureauSourcesSortedFCRA := TOPN(DOBMatchSources(IsBureauSourceFCRA), 1, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
+
+
+Person: => PL_VerDOBSrcBureauCntEvNonFCRA  := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(DOBMatchBureauSourcesSortedNonFCRA), 0, 3));
+				
+Person: => PL_VerDOBSrcBureauCntEvFCRA  :=MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(DOBMatchBureauSourcesSortedFCRA), 0, 1));
+
+Person: => PL_VerDOBSrcBureauRecCntEvNonFCRA  := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(SUM(DOBMatchBureauSourcesSortedNonFCRA,RecordCount), 0, 9999));
+Person: => PL_VerDOBSrcBureauRecCntEvFCRA  := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(SUM(DOBMatchBureauSourcesSortedFCRA,RecordCount), 0, 9999));
+
+Person: => PL_VerDOBSrcBureauListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchBureauSourcesSortedNonFCRA, TranslatedSource, '|'));
+Person: => PL_VerDOBSrcBureauListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchBureauSourcesSortedFCRA, TranslatedSource, '|'));
+
+Person: => PL_VerDOBSrcBureauRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchBureauSourcesSortedNonFCRA, RecordCount, '|'));
+Person: => PL_VerDOBSrcBureauRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchBureauSourcesSortedFCRA, RecordCount, '|'));
+
+Person: => PL_VerDOBSrcBureauEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchBureauSourcesSortedNonFCRA, DateFirstSeenCleaned, '|'));
+Person: => PL_VerDOBSrcBureauEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchBureauSourcesSortedFCRA, DateFirstSeenCleaned, '|'));
+
+Person: => PL_VerDOBSrcBureauLastDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchBureauSourcesSortedNonFCRA, DateLastSeenCleaned, '|'));
+Person: => PL_VerDOBSrcBureauLastDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchBureauSourcesSortedFCRA, DateLastSeenCleaned, '|'));
+
+Person: => PL_VerDOBSrcBureauOldDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchBureauSourcesSortedNonFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(DOBMatchBureauSourcesSortedNonFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+Person: => PL_VerDOBSrcBureauOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchBureauSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(DOBMatchBureauSourcesSortedFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+
+Person: => PL_VerDOBSrcBureauNewDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchBureauSourcesSortedNonFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(DOBMatchBureauSourcesSortedNonFCRA, DATE(DateLastSeenCleaned)), '%Y%m%d'));
+Person: => PL_VerDOBSrcBureauNewDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_VerDOBSrcBureauCntEvFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchBureauSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MAX(DOBMatchBureauSourcesSortedFCRA, DATE(DateLastSeenCleaned)), '%Y%m%d'));
+
+Person: => PL_VerDOBSrcBureauOldMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcBureauCntEvNonFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchBureauSourcesSortedNonFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcBureauOldDtEvNonFCRA), CURRENT_DATE), 0, 960));
+Person: => PL_VerDOBSrcBureauOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcBureauCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchBureauSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcBureauOldDtEvFCRA), CURRENT_DATE), 0, 960));
+
+Person: => PL_VerDOBSrcBureauNewMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcBureauCntEvNonFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchBureauSourcesSortedNonFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcBureauNewDtEvNonFCRA), CURRENT_DATE), 0, 960));	
+Person: => PL_VerDOBSrcBureauNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcBureauCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchBureauSourcesSortedFCRA, DateLastSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerDOBSrcBureauNewDtEvFCRA), CURRENT_DATE), 0, 960));
+
+Person: => PL_VerDOBSrcBureauOnlyFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																					COUNT(DOBMatchBureauSourcesSortedNonFCRA) = COUNT(DOBMatchSourcesSortedNonFCRA) => '1','0');
+
+Person: => PL_VerDOBSrcBureauOnlyFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																					COUNT(DOBMatchBureauSourcesSortedFCRA) = COUNT(DOBMatchSourcesSortedFCRA) => '1','0');
+
+
 
 
 //KS-1878 Input/best PII matching
@@ -13148,7 +13251,7 @@ Person: => PL_PrevAddrToInpDist := MAP(PII.P_InpClnAddrFullFlagValue != '1' OR P
 					Dist(REAL(PII.P_InpClnAddrLat), REAL(PII.P_InpClnAddrLng), REAL(PL_PrevAddrLat), REAL(PL_PrevAddrLng)));
 
 	//KS 6536
-PersonPhone.DataSources: => TranslatedSourceCode := SourceGroup(Source);
+PersonPhone.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
 PersonPhone: => TranslatedSources := DataSources(TranslatedSourceCode IN PersonPhone.GOODPHONESOURCES OR TranslatedSourceCode IN PersonPhone.OTHERSOURCES){TranslatedSourceCode};
 PersonPhone: => PhoneIsVerified := IsPhoneMatch(PhoneNumber,Subject.PII.P_InpClnPhoneHome);
 PersonPhone: GOODPHONESOURCES := ['AK', 'AM', 'AR', 'BA', 'CG', 'CY', 'D', 'DA', 'DE', 'EB', 'EL', 'EM', 'EN', 'EQ', 'FE', 'FF', 'FR', 'L2', 'MW', 'NT', 'P', 'PL', 'S1', 'SL', 'TN', 'TS', 'TU', 'U', 'V', 'VO', 'W', 'WP', 'IR', '01', '02', '05', 'IO', 'PN', 'GO', 'VW', 'DW', 'PQ', 'WR', 'WO', 'IQ', 'TM', 'T$', 'AO', 'l9', 'N2', 'GN'];
