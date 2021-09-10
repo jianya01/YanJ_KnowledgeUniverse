@@ -14079,17 +14079,16 @@ Person: => PL_TradeSatToTotRatio2Y := MAP(P_LexIDSeenFlagFCRA = '0' => MISSING_I
 						PL_TradeBureauFlag < 1 OR PL_TradeCntEv < 1 => NO_DATA_FOUND_INT,
 						InnovisData.in_TradeSatToTotRatio2Y < 0 OR InnovisData.in_TradeSatToTotRatio2Y:Null => NO_DATA_FOUND_97_INT, InnovisData.in_TradeSatToTotRatio2Y);
 
-
 // KS-6807
-Person: => PI_InpAddrStateVoterAvailFlag := PII.PI_InpAddrStateVoterAvailFlag;
-Person: => AddressVerVoterSourceList := PersonAddress.TranslatedSources(TranslatedSource = 'VO'){
-					 TranslatedSource := TranslatedSource,
-					 SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSource:DateFirstSeen), DATETOSTRING(TranslatedSource:DateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
-					 SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSource:DateLastSeen), DATETOSTRING(MIN(TranslatedSource:DateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97)};
-
-Person: => AddressVerVoterSourceListSorted := TOPN(AddressVerVoterSourceList, 1000, SourceDateFirstSeen = Address.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSource);
+Person: => P_InpAddrStateVoterAvailFlag := PII.PI_InpAddrStateVoterAvailFlag;
+Person: => VoterTranslatedSources := PersonAddress.DataSources(TranslatedSources = 'VO'){TranslatedSources};
+Person: => AddressVerVoterSourceList := VoterTranslatedSources{
+					 TranslatedSource := TranslatedSources,
+					 SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSources:DateFirstSeen), DATETOSTRING(TranslatedSources:DateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
+					 SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSources:DateLastSeen), DATETOSTRING(MIN(TranslatedSources:DateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97)};
+Person: => AddressVerVoterSourceListSorted := TOPN(AddressVerVoterSourceList, 1, SourceDateFirstSeen = Address.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSource);
 Person: => PL_VerSrcVoterFlagEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-								PI_InpAddrStateVoterAvailFlag < 1 => NO_DATA_FOUND,
+								P_InpAddrStateVoterAvailFlag < 1 => NO_DATA_FOUND,
 								EXISTS(AddressVerVoterSourceList) => '1', '0');
 Person: => PL_VerSrcVoterOldDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 								PL_VerSrcVoterFlagEv < '1' => NO_DATA_FOUND,
@@ -14101,9 +14100,9 @@ Person: => PL_VerSrcVoterOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 								BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerSrcVoterOldDtEv),CURRENT_DATE),0,960));
 Person: => PL_VerAddrSrcVoterFlagEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
-								PL_VerAddrFlagNonFCRA = '1' AND PL_VerSrcVoterFlagEv = '0' => '0',
+								PL_VerAddrFlagNonFCRA = '1' AND PL_VerSrcVoterFlagEv < '1' => '0',
 								PL_VerAddrFlagNonFCRA = '1' AND PL_VerSrcVoterFlagEv = '1' => '1');
 Person: => PL_VerAddrSrcVoterFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND,
-								PL_VerAddrFlagFCRA = '1' AND PL_VerSrcVoterFlagEv = '0' => '0',
+								PL_VerAddrFlagFCRA = '1' AND PL_VerSrcVoterFlagEv < '1' => '0',
 								PL_VerAddrFlagFCRA = '1' AND PL_VerSrcVoterFlagEv = '1' => '1');
