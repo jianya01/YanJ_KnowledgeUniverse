@@ -14106,3 +14106,33 @@ Person: => PL_VerAddrSrcVoterFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpCln
 								PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND,
 								PL_VerAddrFlagFCRA = '1' AND PL_VerSrcVoterFlagEv < '1' => '0',
 								PL_VerAddrFlagFCRA = '1' AND PL_VerSrcVoterFlagEv = '1' => '1');
+								
+Person: => ContactBus := EXISTS(SelePerson);
+SelePerson: => DtFirstSeen := IF(ISVALIDDATE(Contact:DateFirstSeen), DATETOSTRING(MIN(Contact:DateFirstSeen, SelePerson.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97);
+SelePerson: => DtLastSeen := IF(ISVALIDDATE(Contact:DateLastSeen), DATETOSTRING(MIN(Contact:DateLastSeen, SelePerson.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97);
+
+Person: => PL_BusHdrSeenFlagEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+		NOT ContactBus => '0',
+		ContactBus => '1');
+Person: => PL_BusHdrOldDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+		PL_BusHdrSeenFlagEv = '0' => NO_DATA_FOUND,
+		PL_BusHdrSeenFlagEv = '1' AND ALL(SelePerson, DtFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+		DATETOSTRING(MIN(SelePerson(DtFirstSeen != Person.NO_DATA_FOUND_97), DATE(DtFirstSeen)), '%Y%m%d'));
+Person: => PL_BusHdrNewDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+		PL_BusHdrSeenFlagEv = '0' => NO_DATA_FOUND,
+		PL_BusHdrSeenFlagEv = '1' AND ALL(SelePerson, DtLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+		DATETOSTRING(MAX(SelePerson, DATE(DtLastSeen)), '%Y%m%d'));
+Person: => PL_BusHdrOldMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_BusHdrSeenFlagEv = '0' => NO_DATA_FOUND_INT,
+		PL_BusHdrOldDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_BusHdrOldDtEv), SelePerson.CURRENT_DATE), 0, 960));
+Person: => PL_BusHdrNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_BusHdrSeenFlagEv = '0' => NO_DATA_FOUND_INT,
+		PL_BusHdrNewDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_BusHdrNewDtEv), SelePerson.CURRENT_DATE), 0, 960));
+		
+Person: => PL_DrgLnJSeverityIndx7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_DrgJudgSmClaimCnt7Y > 0 => 4,
+		PL_DrgJudgCivCrtCnt7Y > 0 => 3,
+		PL_DrgLienTaxCnt7Y > 0 => 2,
+		PL_DrgLnJCnt7Y > 0 => 1, 0);
