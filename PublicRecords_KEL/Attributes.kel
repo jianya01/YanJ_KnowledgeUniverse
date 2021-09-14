@@ -10844,6 +10844,7 @@ PersonProperty:FIVE_YEARS_IN_DAYS :=1826;
 PropertyEvent: DOCUMENT_TYPE_CODE:=['G','T','WD','DE','GD','SW','TD','X','BS','SD','CP','LW','SV','CH','OT','PA','PR','JT','ID','EX','LD','CS','RD','CD','FD','LT','CM','AD','AG','LH','D','PD','LC','AS','RC','CO','DG','MD','DC','RA'];
 PropertyEvent: => PropertyPurchaseRecord := DocumentTypeCode IN DOCUMENT_TYPE_CODE OR SalePrice>0;
 PersonProperty: => PropertyIsPurchased := IsEverOwned AND EXISTS(Prop.PropertyEvent(PropertyPurchaseRecord AND IsDeed).PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject));//{LNFaresID,DtFirstSeen};
+PersonProperty: => PropertyPurchasePrice := ONLY(Prop.PropertyEvent(PropertyPurchaseRecord AND IsDeed AND EXISTS(PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject))), SalePrice);    
 PersonProperty: => PropertyPurchaseDateFirstSeen := MIN(Prop.PropertyEvent(PropertyPurchaseRecord AND IsDeed AND EXISTS(PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject))), DtFirstSeen);    
 PersonProperty: => PropertyPurchaseDateLastSeenCapped := MAX(Prop.PropertyEvent(PropertyPurchaseRecord AND IsDeed AND EXISTS(PersonPropertyEvent(PartyDetails.PartyIsBuyerOrOwner AND Subject = PersonProperty.Subject))), DtLastSeen); 
 PersonProperty: => PropertyPurchaseDateLastSeen :=MIN(PropertyPurchaseDateLastSeenCapped,Property.CURRENT_DATE); 
@@ -10853,7 +10854,10 @@ PersonProperty: =>Seen_In_Five_Years :=AgeInDays<=PersonProperty.FIVE_YEARS_IN_D
 Person: =>Purchase1YCount :=COUNT(PersonProperty(PropertyIsPurchased AND Seen_In_One_Year){Prop});
 Person: =>Purchase5YCount :=COUNT(PersonProperty(PropertyIsPurchased AND Seen_In_Five_Years){Prop});
 Person: =>PurchaseCountEver :=COUNT(PersonProperty(PropertyIsPurchased){Prop});
-Person: => PurchaseDateListSorted :=TOPN(PersonProperty(PropertyIsPurchased){PropertyPurchaseDateFirstSeen:=IF(ISVALIDDATE(PropertyPurchaseDateFirstSeen),DATETOSTRING(PropertyPurchaseDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),Prop},999,PropertyPurchaseDateFirstSeen);
+Person: => PurchaseDateListSorted := TOPN(PersonProperty(PropertyIsPurchased){PropertyPurchaseDateFirstSeen:=IF(ISVALIDDATE(PropertyPurchaseDateFirstSeen),DATETOSTRING(PropertyPurchaseDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),PropertyPurchasePrice := IF(PropertyPurchasePrice = '' OR PropertyPurchasePrice:Null, Person.NO_DATA_FOUND_97, PropertyPurchasePrice),Prop},999,PropertyPurchaseDateFirstSeen, PropertyPurchasePrice);
+Person: => PurchasePriceNewAmountSorted := TOPN(PurchaseDateListSorted(PropertyPurchasePrice != Person.NO_DATA_FOUND_97),1 , -PropertyPurchaseDateFirstSeen, -PropertyPurchasePrice);
+Person: => PurchasePriceNewAmount := ONLY(PurchasePriceNewAmountSorted, PropertyPurchasePrice);
+Person: => PurchasePriceList := CONCAT(PurchaseDateListSorted,PropertyPurchasePrice,'|');
 Person: =>DateList :=CONCAT(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen,'|');
 Person: =>PurchaseOldDateEv :=IsBlank(STRING(MIN(PurchaseDateListSorted,DATE(PropertyPurchaseDateFirstSeen))),Person.NO_DATA_FOUND_97);
 Person: =>PurchaseNewDateEv :=IsBlank(STRING(MAX(PurchaseDateListSorted,DATE(PropertyPurchaseDateFirstSeen))),Person.NO_DATA_FOUND_97);
@@ -10934,6 +10938,26 @@ Person: => PL_AstPropCurrTaxValTot := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_
 				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,					
 				PL_AstPropCurrCnt >0 AND PL_AstPropCurrWTaxValCnt = 0 =>NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(SUM(PropCurrTaxValList(ModAssesdValue<> Person.NO_DATA_FOUND_97), INTEGER(ModAssesdValue)), 0, 999999999));
+
+Person: => PL_AstPropCurrTaxValAvg := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
+				PL_AstPropCurrCnt < 1 =>	NO_DATA_FOUND_INT,
+				PL_AstPropCurrCnt > 0 AND PL_AstPropCurrWTaxValCnt = 0 => NO_DATA_FOUND_97_INT,				
+				BOUNDSFOLD(PL_AstPropCurrTaxValTot / PL_AstPropCurrWTaxValCnt, 0, 999999999));
+
+Person: => PL_AstPropPurchAmtListEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA,
+				PL_AstPropPurchCntEv < 1 => NO_DATA_FOUND,
+				NOT EXISTS(PurchaseDateListSorted) => NO_DATA_FOUND_97,
+				PurchasePriceList);
+				
+Person: => PL_AstPropPurchNewAmtEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
+				PL_AstPropPurchCntEv < 1 => NO_DATA_FOUND_INT,				
+				ALL(PurchaseDateListSorted, PropertyPurchasePrice = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(INTEGER(PurchasePriceNewAmount), 0, 999999999));
+
+Person: => PL_AstPropPurchTotEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
+				PL_AstPropPurchCntEv < 1 => NO_DATA_FOUND_INT,	
+				PL_AstPropPurchCntEv > 0 AND ALL(PurchaseDateListSorted, PropertyPurchasePrice = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(SUM(PurchaseDateListSorted(PropertyPurchasePrice <> Person.NO_DATA_FOUND_97), INTEGER(PropertyPurchasePrice)), 0, 999999999));
 
 Person: => PL_AstPropCurrWAVMValCnt := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
 				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,
