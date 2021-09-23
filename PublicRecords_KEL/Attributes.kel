@@ -4054,6 +4054,34 @@ Person: => PL_AddrMaxMonCnt := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_I
 		ALL(UniqueAddresses, NOT ISVALIDDATE(HierarchyDateFirstSeen) OR NOT ISVALIDDATE(HierarchyDateLastSeen)) => NO_DATA_FOUND_97_INT,
 		MAX(UniqueAddresses, BOUNDSFOLD(MONTHSBETWEEN(HierarchyDateFirstSeen, HierarchyDateLastSeen),0,960)));
 
+Person: => PrevAddrMktTaxSetAll := PreviousAddrHelper.AddressProperty.Prop.PropertyEvent{
+			MarketTotalValue,
+			AssessedTotalValue,
+			MktTaxSubjEmrgFlag := MAP(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97] => 0, 
+										DtFirstSeen <= FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d') => 1,
+										0),
+			MktTaxSubjEmrgYears := IF(Person.PL_CurrAddrSubjOldDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97], 999, ABSYEARSBETWEEN(DtFirstSeen, FROMSTRINGTODATE(Person.PL_CurrAddrSubjOldDt, '%Y%m%d'))),
+			PropEventYears,
+			DtFirstSeen};
+Person: => SubjPrevMktTaxSet := TOPN(PrevAddrMktTaxSetAll(MktTaxSubjEmrgFlag = 1){
+				MarketTotalValue,
+				AssessedTotalValue,
+				DtFirstSeen}, 1, -DtFirstSeen);
+Person: => SubjPrevTaxVal := DEFAULT(ONLY(SubjPrevMktTaxSet, AssessedTotalValue), 0);
+Person: =>PrevAddrProp :=TOPN(PreviousAddrHelper.AddressProperty
+		{
+			ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.MarketTotalValue),
+			ModAssesdValue:=IF(BestMostRecentPropertyEvent.AssessedTotalValue:Null OR BestMostRecentPropertyEvent.AssessedTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.AssessedTotalValue),
+			AssesdValueYear :=IF(ISVALIDDATE(BestMostRecentPropertyEvent.AssessedValueYear),DATETOSTRING(BestMostRecentPropertyEvent.AssessedValueYear,'%Y%m%d'),Person.NO_DATA_FOUND_97),
+			BestMostRecentPropertyEvent.DtFirstSeen,
+			BestMostRecentPropertyEvent},1,-DtFirstSeen);			
+Person: => PrevAddrPropertyRecord :=EXISTS(PrevAddrProp);
+
+Person: => PL_AddrLastMoveTaxRatio := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT CurrAddrPropertyRecord OR NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+		PL_CurrAddrSubjOldDt = NO_DATA_FOUND_97 OR NOT EXISTS(SubjCurrMktTaxSet) OR SubjCurrTaxVal = 0 OR NOT EXISTS(SubjPrevMktTaxSet) OR SubjPrevTaxVal = 0 => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(PL_CurrAddrSubjEmrgTaxValEv / BOUNDSFOLD(SubjPrevTaxVal, 1, 999999999), 2), 99.99));
+
 /**************************************************************************/
 /*                                                                        */
 /*                                Best PII                                */
