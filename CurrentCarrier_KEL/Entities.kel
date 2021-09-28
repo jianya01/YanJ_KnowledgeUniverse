@@ -2,16 +2,22 @@
 ERA reportedby BEFORE(DateFirstSeen=NULL(MIN));
 ERA reportedbetween BETWEEN(DateFirstSeen=NULL(MIN), DateLastSeen=NULL(MAX));
 
+// CrossProductReport := ENTITY(FLAT(UID(TransactionID),
+        // STRING TransactionID),
+    // MODEL(UID, TransactionID));
+
 Report := ENTITY(FLAT(UID(TransactionID),
+		// CrossProductReport rCrossProductReport = UID(TransactionID),
 		DATE DateOfReport,
 		STRING TransactionID,
 		STRING DataSource),
     MODEL(UID,
+		// rCrossProductReport,
 		DateOfReport,
 		TransactionID,
-		DataSources{DataSource}));
+		DataSource));
 
-Policy := ENTITY(FLAT(UID(TransactionID, InsuranceType, Ambest, PolicyNumber, DataSource),
+Policy := ENTITY(FLAT(UID(TransactionID, InsuranceType, Ambest, PolicyNumber),
 		Report rReport = UID(TransactionID), 
 		STRING TransactionID,
 		INTEGER Ambest,
@@ -73,8 +79,9 @@ Policy := ENTITY(FLAT(UID(TransactionID, InsuranceType, Ambest, PolicyNumber, Da
 			AgentStreetName, AgentCity, AgentState, AgentZip5, 
 			AgentZip4,AgentPhoneNumber, AgentAreaCode}));
 
-Property := ENTITY(FLAT(UID(TransactionID, HouseNumber, StreetName, SecondaryRange, State, Zip5, DataSource),
+Property := ENTITY(FLAT(UID(TransactionID, HouseNumber, StreetName, SecondaryRange, State, Zip5),
 		STRING TransactionID,
+		STRING DataSource,
 		STRING HouseNumber,
 		STRING StreetName,
 		INTEGER SecondaryRange, 
@@ -84,11 +91,11 @@ Property := ENTITY(FLAT(UID(TransactionID, HouseNumber, StreetName, SecondaryRan
 		INTEGER Zip4,
 		STRING PropertyLegalDescription,  
 		STRING SuppressIndicator),
-	MODEL(UID, TransactionID, HouseNumber, StreetName, SecondaryRange, City, State, Zip5, Zip4,
+	MODEL(UID, TransactionID, DataSource,HouseNumber, StreetName, SecondaryRange, City, State, Zip5, Zip4,
 		PropertyLegalDescription, 
 		SuppressIndicator)); 
 
-Vehicle := ENTITY(FLAT(UID(TransactionID, VIN, DataSource), 
+Vehicle := ENTITY(FLAT(UID(TransactionID, VIN), 
 		STRING TransactionID,
 		STRING VIN,
 		STRING CoverageDateUseFlag,
@@ -106,14 +113,15 @@ Vehicle := ENTITY(FLAT(UID(TransactionID, VIN, DataSource),
 		DATE PolicyBeginDate,
 		DATE PolicyEndDate,
 		DATE PolicyCanDate,
+		STRING DataSource,
 		DATE PolicyStatusEndDate),		 
-	MODEL(UID, TransactionID, VIN,
+	MODEL(UID, TransactionID, DataSource,VIN,
 		CoverageDateUseFlag, VehicleMake, VehicleModel,
 		VehicleModelYear, LicensePlate, LiabilityIndicator, LeaseIndicator, 
 		UseVehicle, VehicleTermDate, SuppressIndicator, GroupId, 
 		PolicyInceptionDate, PolicyBeginDate, PolicyEndDate, PolicyCanDate, PolicyStatusEndDate));
 
-Holder := ENTITY(FLAT(UID(LexID, TransactionID, InsuranceType, Ambest, PolicyNumber, LastName, FirstName, MiddleName, NameSuffix, DateOfBirth, PrimRange, Predir, PrimName, AddressSuffix, PostDir, UnitDesig, SecondaryRange, City, Zip5, DataSource),
+Holder := ENTITY(FLAT(UID(LexID, TransactionID, InsuranceType, Ambest, PolicyNumber, LastName, FirstName, MiddleName, NameSuffix, DateOfBirth, PrimRange, Predir, PrimName, AddressSuffix, PostDir, UnitDesig, SecondaryRange, City, Zip5),
 		DATE OrigDate,
 		STRING Gender,
 		DATE DateOfBirth,
@@ -140,8 +148,9 @@ Holder := ENTITY(FLAT(UID(LexID, TransactionID, InsuranceType, Ambest, PolicyNum
 		INTEGER Zip4,
 		DATE DateOfDeath,
 		INTEGER Score,
+		STRING DataSource,
 		STRING InquiryState),
-	MODEL(UID, OrigDate, Gender, DateOfBirth,
+	MODEL(UID, OrigDate, DataSource,Gender, DateOfBirth,
 		SSN, FraudAlertIndicator, DateOfDeath, InquiryState,
 		FirstName, MiddleName, LastName, NameSuffix,
 		PrimRange, Predir, PrimName, SecondaryRange, AddressSuffix, PostDir, UnitDesig, City, State, Zip4, Zip5,
@@ -151,8 +160,9 @@ Holder := ENTITY(FLAT(UID(LexID, TransactionID, InsuranceType, Ambest, PolicyNum
 		));
 
 PolicyProperty := ASSOCIATION(FLAT(
-		Policy Transaction = UID(TransactionID, InsuranceType, Ambest, PolicyNumber, DataSource), 
-		Property Location = UID(TransactionID, HouseNumber, StreetName, SecondaryRange, State, Zip5, DataSource),
+		Policy Transaction = UID(TransactionID, InsuranceType, Ambest, PolicyNumber), 
+		Property Location = UID(TransactionID, HouseNumber, StreetName, SecondaryRange, State, Zip5),
+		STRING TransactionID,		
 		DATE CoverageStartDate,
 		DATE CoverageEndDate,
 		DATE PropertyCancellationDate,
@@ -177,16 +187,18 @@ PolicyProperty := ASSOCIATION(FLAT(
 		INTEGER FinanceZip4,
 		STRING BusinessUseIndicator,
 		REAL PremiumDueAmount=NULL(),
+		STRING DataSource,
 		BOOLEAN InquiryHitFlag),
-	MODEL(Transaction, Location,
+	MODEL(Transaction, TransactionID,DataSource,Location,
 		Coverages{CoverageType, IndividualLimit, OccurrenceLimit, CombinedSingleLimit, CoverageStartDate, CoverageEndDate,PropertyNumber,
 		PropertyCancellationDate, OverallDeductible, TheftDeductible,FloodZone,PropertyType,BusinessUseIndicator, InquiryHitFlag},
 		FinanceInfo{LoanNumber, FinanceType, FinanceCompanyName, FinanceHouseNumber, FinanceStreetName, FinanceSecondaryRange, FinanceCityName, FinanceState, FinanceZip5, FinanceZip4,PremiumDueAmount},
 		InquiryHitFlag));
 	
 PolicyHolder := ASSOCIATION(FLAT(
-		Policy Transaction = UID(TransactionID, InsuranceType, Ambest, PolicyNumber, DataSource), 
-		Holder Holder = UID(LexID, TransactionID, InsuranceType, Ambest, PolicyNumber, LastName, FirstName, MiddleName, NameSuffix, DateOfBirth, PrimRange, Predir, PrimName, AddressSuffix, PostDir, UnitDesig, SecondaryRange, City, Zip5, DataSource), 
+		Policy Transaction = UID(TransactionID, InsuranceType, Ambest, PolicyNumber), 
+		Holder Holder = UID(LexID, TransactionID, InsuranceType, Ambest, PolicyNumber, LastName, FirstName, MiddleName, NameSuffix, DateOfBirth, PrimRange, Predir, PrimName, AddressSuffix, PostDir, UnitDesig, SecondaryRange, City, Zip5), 
+		STRING TransactionID,			
 		INTEGER SubjectNumber,
 		STRING Relation,
 		DATE HolderCancelDate,
@@ -198,17 +210,19 @@ PolicyHolder := ASSOCIATION(FLAT(
 		STRING LastCancelDate,
 		STRING InputFlag,
 		DATE LoadDate,
+		STRING DataSource,
 		DATE StartDate, 
 		DATE EndDate),
-	MODEL(Transaction, Holder,
+	MODEL(Transaction, TransactionID,DataSource,Holder,
 		SubjectNumber, Relation, HolderCancelDate, ChangeEffectDate, StartDate, EndDate,
 		Lapses{LapseStartDate, LapseCounter, LapseLastCancelDate, LastCancelDate, InputFlag, CountLapseIndicator, LoadDate}
 		));
 	
 VehiclePolicy := ASSOCIATION(FLAT(
-		Policy Transaction = UID(TransactionID, InsuranceType, Ambest, PolicyNumber, DataSource), 
-		Vehicle Auto = UID(VIN, TransactionID, DataSource),
+		Policy Transaction = UID(TransactionID, InsuranceType, Ambest, PolicyNumber), 
+		Vehicle Auto = UID(VIN, TransactionID),
 		DATE CoverageStartDate,
+		STRING DataSource,
 		DATE CoverageEndDate,
 		DATE VehicleCancellationDate,
 		STRING CancelReason,
@@ -233,7 +247,7 @@ VehiclePolicy := ASSOCIATION(FLAT(
 		INTEGER FinanceZip4,
 		REAL PremiumDueAmount=NULL(),
 		STRING BusinessUseIndicator),
-	MODEL(Transaction, Auto,
+	MODEL(Transaction, DataSource,Auto,
 		VehicleCancellationDate, CancelReason, NotificationDate, FirstLoadDate, CoDeduct, CpDeduct, RegistrationState,
 		Coverages{CoverageType, IndividualLimit, OccurrenceLimit, CombinedSingleLimit, CoverageStartDate, CoverageEndDate,BusinessUseIndicator},
 		FinanceInfo{LoanNumber, FinanceType, FinanceCompanyName, FinanceHouseNumber, FinanceStreetName, FinanceSecondaryRange, FinanceCityName, FinanceState, FinanceZip5, FinanceZip4,PremiumDueAmount}
