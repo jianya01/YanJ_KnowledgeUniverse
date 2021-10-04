@@ -4427,20 +4427,22 @@ PersonAddress: => DLSAge := DEFAULT(DAYSBETWEEN(Location:DateLastSeen,Person.CUR
 PersonAddress: => DLSAgeUnderYear := DLSAge <= 365;
 PersonAddress: => ChosenLatitude := ONLY(AddressHierarchy,REAL(Latitude));
 PersonAddress: => ChosenLongitude := ONLY(AddressHierarchy,REAL(Longitude));
-Person: => InputAddressLatitude := ONLY(PII.Location.AddressComponents,Latitude);
-Person: => InputAddressLongitude := ONLY(PII.Location.AddressComponents,Longitude);
-InputPII: => CurrentAddressDLS := CurrentAddress:DateLastSeen;
-Person: => CurrentAddressDLS := PII.CurrentAddressDLS;
-InputPII: => CurrentAddressDFS := CurrentAddress:DateFirstSeen;
-Person: => CurrentAddressDFS := PII.CurrentAddressDFS;
+Person: => InputAddressLatitude := DEFAULT(REAL(PII.P_InpClnAddrLat), DEFAULT(ONLY(PII.Location.PersonAddress.AddressHierarchy,REAL(Latitude)),0.0));
+Person: => InputAddressLongitude := DEFAULT(REAL(PII.P_InpClnAddrLng), DEFAULT(ONLY(PII.Location.PersonAddress.AddressHierarchy,REAL(Longitude)),0.0));
+Person: => CurrentAddressDLS := ONLY(PersonAddress(CurrentPerfectAddressMatch OR CuurentLevenshteinMatch),Location:DateLastSeen);
+Person: => CurrentAddressDFS := ONLY(PersonAddress(CurrentPerfectAddressMatch OR CuurentLevenshteinMatch),Location:DateFirstSeen);
+
 Person: => DistancesToFamily := FirstDegreeRelative.Relative.PersonAddress{
 																LexID := Subject.UID,
 																ID := Location.UID,
 																AddrDFS := Location:DateFirstSeen,
-																AddrDLS := Location:DateLastSeen,
+																AddrDLS := Location:DateLastSeen, 
 																Distance := Dist(ChosenLatitude,ChosenLongitude,Subject.InputAddressLatitude,Subject.InputAddressLongitude),
+																// Distance := 3963.3453 * ACOS ( ( (1 + COS(0.01745 * (ChosenLongitude - Person.InputAddressLongitude) ) ) * COS(0.01745 * (ChosenLatitude - Person.InputAddressLatitude)) - (1 - COS(0.01745 * (ChosenLongitude - Person.InputAddressLongitude))) * COS(0.01745 * (ChosenLatitude + Person.InputAddressLatitude))) / 2),//Code is copied here rather than using the ecl function. Testing only																	
+																DistanceValid := NOT ChosenLongitude:Null AND NOT ChosenLatitude:Null AND  NOT Person.InputAddressLatitude = 0.0 AND NOT Person.InputAddressLongitude = 0.0,
 																DLSAge,
 																DLSAgeUnderYear};
+																
 Person: => PL_RaAMmbrCnt := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA_INT,
 														BOUNDSFOLD(COUNT(FirstDegreeRelative.Relative),0,999));
 Person: => PL_RaAMmbrSubjBureauOnlyCnt := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA_INT,
@@ -4450,65 +4452,65 @@ Person: => PL_RaAMmbrBureauOnlyCntEv := MAP(P_LexIDSeenFlag = '0' => Person.MISS
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														BOUNDSFOLD(COUNT(FirstDegreeRelative.Relative(IsBureauOnlySource)),0,999));
 // Person: => PL_RaAMmbrInpAddrCnt1Y := 0;
-Person: => PL_RaAMmbrInpAddrCnt1Y := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpClnAddrFullFlagValue != '1' => Person.MISSING_INPUT_DATA_INT,
+Person: => PL_RaAMmbrInpAddrCnt1Y := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR PII.Location:Null => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(COUNT(FirstDegreeRelative.Relative(EXISTS(PersonAddress(Location = Subject.PII.Location AND DLSAgeUnderYear)))),0,999));
+														BOUNDSFOLD(COUNT(FirstDegreeRelative.Relative(EXISTS(PersonAddress(Location = Person.PII.Location AND DLSAgeUnderYear)))),0,999));
 
 // Person: => PL_RaAMmbrCurrAddrCnt1Y :=0;
 Person: => PL_RaAMmbrCurrAddrCnt1Y := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(COUNT(FirstDegreeRelative.Relative(EXISTS(PersonAddress(Location = Subject.PII.CurrentAddress AND DLSAgeUnderYear)))),0,999));
+														BOUNDSFOLD(COUNT(FirstDegreeRelative.Relative(EXISTS(PersonAddress(Location = Person.PII.CurrentAddress AND DLSAgeUnderYear)))),0,999));
 
 // Person: => PL_RaAMmbrCurrAddrWSubjCnt1Y := 0;
 Person: => PL_RaAMmbrCurrAddrWSubjCnt1Y := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND AddrDFS <= Person.CurrentAddressDLS AND AddrDLS >= Person.CurrentAddressDFS)),0,999));
+														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND AddrDFS <= Person.CurrentAddressDLS AND AddrDLS >= Person.CurrentAddressDFS){LexID}),0,100));
 
 // Person: => PL_RaAInpAddrCloseDist := DistancesToFamily;
 // Person: => PL_RaAInpAddrCloseDist := 0;
-Person: => PL_RaAInpAddrCloseDist := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
+Person: => PL_RaAInpAddrCloseDist := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(MIN(DistancesToFamily(DLSAgeUnderYear),Distance),0,999));
+														BOUNDSFOLD(MIN(DistancesToFamily(DLSAgeUnderYear AND DistanceValid),Distance),0,999));
 
 // Person: => PL_RaAInpAddrCloseNZDist := 0;
-Person: => PL_RaAInpAddrCloseNZDist := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
+Person: => PL_RaAInpAddrCloseNZDist := MAP(P_LexIDSeenFlag = '0'  OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
-														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(MIN(DistancesToFamily(DLSAgeUnderYear AND Distance > 0),Distance),0,999));
+														NOT EXISTS(DistancesToFamily(DLSAgeUnderYear AND Distance > 0 AND DistanceValid)) => Person.NO_DATA_FOUND_97_INT,
+														BOUNDSFOLD(MIN(DistancesToFamily(DLSAgeUnderYear AND Distance > 0 AND DistanceValid),Distance),1,999));
 
 // Person: => PL_RaAMmbrInpAddr25MiCnt1Y := 0;
-Person: => PL_RaAMmbrInpAddr25MiCnt1Y := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
+Person: => PL_RaAMmbrInpAddr25MiCnt1Y := MAP(P_LexIDSeenFlag = '0'  OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND Distance < 25){LexID}),0,100));
+														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND Distance < 25 AND DistanceValid){LexID}),0,100));
 
 // Person: => PL_RaAMmbrInpAddr100MiCnt1Y := 0;
-Person: => PL_RaAMmbrInpAddr100MiCnt1Y := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
+Person: => PL_RaAMmbrInpAddr100MiCnt1Y := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND Distance < 100){LexID}),0,100));
+														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND Distance < 100 AND DistanceValid){LexID}),0,100));
 
 // Person: => PL_RaAMmbrInpAddr500MiCnt1Y := 0;
-Person: => PL_RaAMmbrInpAddr500MiCnt1Y := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
+Person: => PL_RaAMmbrInpAddr500MiCnt1Y := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND Distance < 500){LexID}),0,100));
+														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND Distance < 500 AND DistanceValid){LexID}),0,100));
 
 // Person: => PL_RaAMmbrInpAddr500pMiCnt1Y := 0;
-Person: => PL_RaAMmbrInpAddr500pMiCnt1Y := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
+Person: => PL_RaAMmbrInpAddr500pMiCnt1Y := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND Distance > 500){LexID}),0,100));
+														BOUNDSFOLD(COUNT(DistancesToFamily(DLSAgeUnderYear AND Distance > 500 AND DistanceValid){LexID}),0,100));
 
 // Person: => PL_RaAMmbrInpAddrDistAvg1Y := 0;
-Person: => PL_RaAMmbrInpAddrDistAvg1Y := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
+Person: => PL_RaAMmbrInpAddrDistAvg1Y := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => Person.MISSING_INPUT_DATA_INT,
 														PL_RaAMmbrCnt = 0 => Person.NO_DATA_FOUND_INT,
 														NOT EXISTS(FirstDegreeRelative.Relative.PersonAddress{Location}) AND EXISTS(FirstDegreeRelative) => Person.NO_DATA_FOUND_97_INT,
-														BOUNDSFOLD(AVE(DistancesToFamily(DLSAgeUnderYear),Distance),0,100));
+														BOUNDSFOLD(AVE(DistancesToFamily(DLSAgeUnderYear AND DistanceValid),Distance),0,100));
 
 /**************************************************************************/
 /*                                                                        */
