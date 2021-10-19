@@ -149,7 +149,7 @@ FUNCTION: SlimBusinessName(STRING BusinessName) <= RegexReplace(
 	'', 
 	TRUE);
 
-FUNCTION: LevenshteinSimilarity(STRING field1, STRING field2) <= EditDistance(field1, field2)/MAX(LENGTH(field1), LENGTH(field2));
+FUNCTION: LevenshteinSimilarity(STRING field1, STRING field2) <= (1 - EditDistance(field1, field2)/MAX(LENGTH(field1), LENGTH(field2)));
 
 FUNCTION: IsNullOrEqual(Field1, Field2) <= Field1 = Field2 OR (Field1:Null AND Field2:Null);
 
@@ -241,8 +241,8 @@ FUNCTION: IsLastNameMatch(STRING LastName1, STRING LastName2) <=
 		LENGTH(LastName1) < 5 AND LENGTH(LastName2) < 5 AND LevenshteinSimilarity(LastName1, LastName2) > 0.5 => TRUE,
 		FALSE);
 FUNCTION: IsNameMiskeyMatch(STRING Name1, STRING Name2) <=
-		MAP((LENGTH(Name1) > 4 OR LENGTH(Name2) > 4) AND LevenshteinSimilarity(Name1, Name2) > 0.6 => TRUE,
-		LENGTH(Name1) < 5 AND LENGTH(Name2) < 5 AND LevenshteinSimilarity(Name1, Name2) > 0.5 => TRUE,
+		MAP((LENGTH(Name1) > 4 OR LENGTH(Name2) > 4) AND LevenshteinSimilarity(Name1, Name2) > 0.6 AND LevenshteinSimilarity(Name1, Name2) < 1 => TRUE,
+		LENGTH(Name1) < 5 AND LENGTH(Name2) < 5 AND LevenshteinSimilarity(Name1, Name2) > 0.5 AND LevenshteinSimilarity(Name1, Name2) < 1 => TRUE,
 		FALSE);
 //These functions are for inferred performance attributes. If the datefirstseen is within the time frame the data can be used for those attributes.	
 //Unfortunately for now you have to pass in CURRENTDATE() into the second parameter as CURRENTDATE() within a function creates broken ECL. There is no timeline for a fix as this workaround exists.	
@@ -4436,8 +4436,8 @@ Person: => PL_EmrgAge := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA_
 // PersonAddress: => ChosenLongitude := ONLY(AddressHierarchy,REAL(Longitude));
 // Person: => InputAddressLatitude := DEFAULT(REAL(PII.P_InpClnAddrLat), DEFAULT(ONLY(PII.Location.PersonAddress.AddressHierarchy,REAL(Latitude)),0.0));
 // Person: => InputAddressLongitude := DEFAULT(REAL(PII.P_InpClnAddrLng), DEFAULT(ONLY(PII.Location.PersonAddress.AddressHierarchy,REAL(Longitude)),0.0));
-// Person: => CurrentAddressDLS := ONLY(PersonAddress(CurrentPerfectAddressMatch OR CuurentLevenshteinMatch),Location:DateLastSeen);
-// Person: => CurrentAddressDFS := ONLY(PersonAddress(CurrentPerfectAddressMatch OR CuurentLevenshteinMatch),Location:DateFirstSeen);
+// Person: => CurrentAddressDLS := ONLY(PersonAddress(CurrentPerfectAddressMatch OR CurentLevenshteinMatch),Location:DateLastSeen);
+// Person: => CurrentAddressDFS := ONLY(PersonAddress(CurrentPerfectAddressMatch OR CurentLevenshteinMatch),Location:DateFirstSeen);
 
 // Person: => DistancesToFamily := FirstDegreeRelative.Relative.PersonAddress{
 																// LexID := Subject.UID,
@@ -6926,6 +6926,7 @@ Person: => P_InpClnAddrPrimName := PII.InputPrimaryNameCleanValue;
 Person: => P_InpClnAddrSecRng := PII.InputSecondaryRangeCleanValue;
 Person: => P_InpClnAddrPreDir := PII.InputPreDirectionCleanValue;
 Person: => P_InpClnAddrSffx := PII.InputAddressSuffixCleanValue;
+Person: => P_InpClnAddrPostDir := PII.InputPostDirectionCleanValue;
 
 // These don't have special values assigned yet. Use them for checking if inputs are verified against our data.
 Person: => P_InpClnNameFirstRaw := PII.P_InpClnNameFirst;
@@ -6939,7 +6940,7 @@ Person: => P_InpClnAddrPrimNameRaw := PII.P_InpClnAddrPrimName;
 Person: => P_InpClnAddrSecRngRaw := PII.P_InpClnAddrSecRng;
 Person: => P_InpClnAddrPreDirRaw := PII.P_InpClnAddrPreDir;
 Person: => P_InpClnAddrSffxRaw := PII.P_InpClnAddrSffx;
-Person: => P_InpClnAddrPostDir := PII.InputCityPostCleanValue;
+Person: => P_InpClnAddrPostDirRaw := PII.P_InpClnAddrPostDir;
 Person: => P_InpClnAddrFull := PII.InputFullAddressCleanValue;
 Person: => P_InpSSNRaw := PII.P_InpSSN;
 
@@ -12503,13 +12504,14 @@ Person: => PL_VerSSNTypeFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MIS
 
 // Address Verification Sources Helper Attributes
 PersonAddress: => InputAddressMatch := ( 
-		Subject.P_InpClnAddrPrimRng = TRIMBOTH(PrimaryRange) AND
-		Subject.P_InpClnAddrPrimName = TRIMBOTH(PrimaryName) AND
-		Subject.P_InpClnAddrPreDir = TRIMBOTH(Predirectional) AND
-		Subject.P_InpClnAddrPostDir = TRIMBOTH(Postdirectional) AND
-		Subject.P_InpClnAddrSffx = TRIMBOTH(Suffix) AND
-		Subject.P_InpClnAddrZip5 = TRIMBOTH(INTFORMAT(ZIP5,5,1)) AND
-		(Subject.P_InpClnAddrSecRng = TRIMBOTH(SecondaryRange) OR ((Subject.P_InpClnAddrSecRng = '' OR Subject.P_InpClnAddrSecRng:Null) AND SecondaryRange != '') OR (Subject.P_InpClnAddrSecRng != '' AND (SecondaryRange = '' OR SecondaryRange:Null))));
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPrimRngRaw,'')) = TRIMALL(DEFAULT(PrimaryRange,'')) AND
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPrimNameRaw,'')) = TRIMALL(DEFAULT(PrimaryName,'')) AND
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPreDirRaw,'')) = TRIMALL(DEFAULT(Predirectional,'')) AND
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPostDirRaw,'')) = TRIMALL(DEFAULT(Postdirectional,'')) AND 
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrSffxRaw,'')) = TRIMALL(DEFAULT(Suffix,'')) AND
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrZip5Raw,'')) = TRIMALL(DEFAULT(INTFORMAT(ZIP5,5,1),'')) AND
+		(TRIMALL(DEFAULT(Subject.P_InpClnAddrSecRngRaw,'')) = TRIMALL(DEFAULT(SecondaryRange,'')) OR ((Subject.P_InpClnAddrSecRngRaw = '' OR Subject.P_InpClnAddrSecRngRaw:Null) AND SecondaryRange != '') OR (Subject.P_InpClnAddrSecRngRaw != '' AND (SecondaryRange = '' OR SecondaryRange:Null))));
+
 PersonAddress: => GroupedAddress := 
 		TRIMALL(DEFAULT(PrimaryRange,'')) +
 		TRIMALL(DEFAULT(PrimaryName,'')) +
@@ -12518,15 +12520,17 @@ PersonAddress: => GroupedAddress :=
 		TRIMALL(DEFAULT(Suffix,'')) +
 		TRIMALL(DEFAULT(INTFORMAT(ZIP5,5,1),'')) +
 		TRIMALL(DEFAULT(SecondaryRange,''));
+
 PersonAddress: => GroupedInputAddress := 
-		TRIMALL(DEFAULT(Subject.P_InpClnAddrPrimRng,'')) +
-		TRIMALL(DEFAULT(Subject.P_InpClnAddrPrimName,'')) +
-		TRIMALL(DEFAULT(Subject.P_InpClnAddrPreDir,'')) +
-		TRIMALL(DEFAULT(Subject.P_InpClnAddrPostDir,'')) +
-		TRIMALL(DEFAULT(Subject.P_InpClnAddrSffx,'')) +
-		TRIMALL(DEFAULT(Subject.P_InpClnAddrZip5,'')) +
-		TRIMALL(DEFAULT(Subject.P_InpClnAddrSecRng,''));
-PersonAddress: => AddressSimilarityMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedInputAddress) >= 0.75, 1,0);
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPrimRngRaw,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPrimNameRaw,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPreDirRaw,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrPostDirRaw,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrSffxRaw,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrZip5Raw,'')) +
+		TRIMALL(DEFAULT(Subject.P_InpClnAddrSecRngRaw,''));
+		
+PersonAddress: => AddressSimilarityMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedInputAddress) >= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedInputAddress) < 1 , 1,0);  //Add logic here
 PersonAddress.DataSources: => TranslatedSources := ConsumerSourceGroup(Source);
 Person: => AddressVerMatchSourcesAllPre := PersonAddress(InputAddressMatch OR AddressSimilarityMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource,
 					RecordCount := TranslatedSource:Weight,
@@ -12793,8 +12797,8 @@ PersonAddress: => GroupedCurrentAddress :=
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrZip5,'')) +
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrSecRng,''));
 
-PersonAddress: => CuurentLevenshteinMatch := LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress)>= 0.75;
-Person: => CurrentAddressMatchSourcesPre := PersonAddress(CurrentPerfectAddressMatch OR CuurentLevenshteinMatch).TranslatedSources{TranslatedSource,
+PersonAddress: => CurentLevenshteinMatch := LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress)>= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress) < 1;
+Person: => CurrentAddressMatchSourcesPre := PersonAddress(CurrentPerfectAddressMatch OR CurentLevenshteinMatch).TranslatedSources{TranslatedSource,
 					RecordCount := TranslatedSource:Weight,
 					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
 					MyDateLastSeen := TranslatedSource:DateLastSeen};
@@ -13742,11 +13746,11 @@ Person: => PL_VerNameLastMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpCln
 								
 Person: => PL_VerAddrMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
-							  PersonAddress(CuurentLevenshteinMatch) => '1',
+							  PersonAddress(AddressSimilarityMatch = 1) => '1',
 								'0');
 Person: => PL_VerAddrMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND,
-							  PersonAddress(CuurentLevenshteinMatch) => '1',
+							  PersonAddress(AddressSimilarityMatch = 1) => '1',
 								'0');
 
 Person: => PL_VerSSNMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
