@@ -9572,71 +9572,89 @@ BusinessSele: => OtherFilingCount := COUNT(SeleUCC(IsDebtor).Filing(NOT Terminat
 /*                                                                        */
 /**************************************************************************/	
 
+BusinessSele: => DebtorFileCountFlag := InitialFilingCount != 0 AND InitialDebtorFilingCount = 0 AND InitialCreditorFilingCount = 0;
 
 BusinessSele: => BE_UCCCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(InitialFilingCount, 0, 99999));	
 BusinessSele: => BE_UCCDebtorCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCCntEv = 0 => SeleUCC.NO_DATA_FOUND_INT,
-				BE_UCCCntEv != 0 AND InitialDebtorFilingCount = 0 AND InitialCreditorFilingCount = 0 => NO_DATA_FOUND_97_INT,
+				InitialFilingCount = 0 => SeleUCC.NO_DATA_FOUND_INT,
+				DebtorFileCountFlag => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(InitialDebtorFilingCount, 0, 99999));
+
+
+BusinessSele: => UCCNotFound := InitialFilingCount = 0 OR InitialDebtorFilingCount = 0 OR DebtorFileCountFlag;
+BusinessSele: => UCCDebtorOldDate := IsBlank(STRING(MIN(SeleUCC(IsDebtor).Filing(BestUCCChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),BestUCCChildRecord.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97);
+
+
 BusinessSele: => BE_UCCDebtorOldDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT]  => SeleUCC.NO_DATA_FOUND,
-				IsBlank(STRING(MIN(SeleUCC(IsDebtor).Filing(BestUCCChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),BestUCCChildRecord.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97));
+				UCCNotFound => SeleUCC.NO_DATA_FOUND,
+				UCCDebtorOldDate);
+
 BusinessSele: => BE_UCCDebtorOldMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
-				BE_UCCDebtorOldDtEv = SeleUCC.NO_DATA_FOUND_97 => SeleUCC.NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_UCCDebtorOldDtEv), BusinessSele.UCCCURRENT_DATE), 0, 960));
+				UCCNotFound => SeleUCC.NO_DATA_FOUND_INT,
+				UCCDebtorOldDate = SeleUCC.NO_DATA_FOUND_97 => SeleUCC.NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(UCCDebtorOldDate), BusinessSele.UCCCURRENT_DATE), 0, 960));
+
+BusinessSele: => UCCDebtorNewDate := IsBlank(STRING(MAX(SeleUCC(IsDebtor).Filing(BestUCCChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),BestUCCChildRecord.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97);
+
 BusinessSele: => BE_UCCDebtorNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT]  => SeleUCC.NO_DATA_FOUND,
-				IsBlank(STRING(MAX(SeleUCC(IsDebtor).Filing(BestUCCChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),BestUCCChildRecord.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97));
+				UCCNotFound  => SeleUCC.NO_DATA_FOUND,
+				UCCDebtorNewDate);
 BusinessSele: => BE_UCCDebtorNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
-				BE_UCCDebtorNewDtEv = SeleUCC.NO_DATA_FOUND_97 => SeleUCC.NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_UCCDebtorNewDtEv), BusinessSele.UCCCURRENT_DATE), 0, 960));
+				UCCNotFound => SeleUCC.NO_DATA_FOUND_INT,
+				UCCDebtorNewDate = SeleUCC.NO_DATA_FOUND_97 => SeleUCC.NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(UCCDebtorNewDate), BusinessSele.UCCCURRENT_DATE), 0, 960));
 BusinessSele: => BE_UCCActvCnt := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCCntEv = 0 => SeleUCC.NO_DATA_FOUND_INT,
+				InitialFilingCount = 0 => SeleUCC.NO_DATA_FOUND_INT,
 				BOUNDSFOLD(ActiveFilingCount, 0, 99999));
 BusinessSele: => BE_UCCDebtorActvCnt := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
+				UCCNotFound => SeleUCC.NO_DATA_FOUND_INT,
 				BOUNDSFOLD(ActiveDebtorFilingCount, 0, 99999));
 BusinessSele: => BE_UCCDebtorTermCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
+				UCCNotFound => SeleUCC.NO_DATA_FOUND_INT,
 				BOUNDSFOLD(TerminatedFilingCount, 0, 99999));
 BusinessSele: => BE_UCCDebtorOtherCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
+				UCCNotFound => SeleUCC.NO_DATA_FOUND_INT,
 				BOUNDSFOLD(OtherFilingCount, 0, 99999));
 BusinessSele: => BE_UCCDebtorActvPct := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
+				UCCNotFound => SeleUCC.NO_DATA_FOUND_INT,
 				(ActiveDebtorFilingCount / InitialDebtorFilingCount)*100);
 BusinessSele: => BE_UCCDebtorTermPctEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
+				UCCNotFound => SeleUCC.NO_DATA_FOUND_INT,
 				(TerminatedFilingCount / InitialDebtorFilingCount)*100);
 BusinessSele: => BE_UCCDebtorOtherPctEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCDebtorCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT, SeleUCC.NO_DATA_FOUND_97_INT] => SeleUCC.NO_DATA_FOUND_INT,
+				UCCNotFound => SeleUCC.NO_DATA_FOUND_INT,
 				(OtherFilingCount / InitialDebtorFilingCount)*100);
+
+BusinessSele: => UCCDebtorTermCntNoData := UCCNotFound OR TerminatedFilingCount = 0;
+
+BusinessSele: => UCCDebtorTermNewDt := IsBlank(STRING(MAX(SeleUCC(IsDebtor).Filing(TerminatedFiling AND BestUCCChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),BestUCCChildRecord.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97);
 BusinessSele: => BE_UCCDebtorTermNewDtEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA,
-				BE_UCCDebtorTermCntEv  IN [0, SeleUCC.NO_DATA_FOUND_INT]  => SeleUCC.NO_DATA_FOUND,
-				IsBlank(STRING(MAX(SeleUCC(IsDebtor).Filing(TerminatedFiling AND BestUCCChildRecord.MaxFilingDate < BusinessSele.UCCCURRENT_DATE),BestUCCChildRecord.MaxFilingDate)),SeleUCC.NO_DATA_FOUND_97));
+				UCCDebtorTermCntNoData  => SeleUCC.NO_DATA_FOUND,
+				UCCDebtorTermNewDt);
 BusinessSele: => BE_UCCDebtorTermNewMsncEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCDebtorTermCntEv IN [0, SeleUCC.NO_DATA_FOUND_INT] => SeleUCC.NO_DATA_FOUND_INT,
-				BE_UCCDebtorTermNewDtEv = SeleUCC.NO_DATA_FOUND_97 => SeleUCC.NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(BE_UCCDebtorTermNewDtEv), BusinessSele.UCCCURRENT_DATE), 0, 960));
+				UCCDebtorTermCntNoData => SeleUCC.NO_DATA_FOUND_INT,
+				UCCDebtorTermNewDt = SeleUCC.NO_DATA_FOUND_97 => SeleUCC.NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(UCCDebtorTermNewDt), BusinessSele.UCCCURRENT_DATE), 0, 960));
 BusinessSele: => BE_UCCCreditorCntEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA_INT,
-				BE_UCCCntEv = 0 => SeleUCC.NO_DATA_FOUND_INT,
-				BE_UCCCntEv != 0 AND InitialDebtorFilingCount = 0 AND InitialCreditorFilingCount = 0 => NO_DATA_FOUND_97_INT,
+				InitialFilingCount = 0 => SeleUCC.NO_DATA_FOUND_INT,
+				DebtorFileCountFlag => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(InitialCreditorFilingCount, 0, 99999));
+				
 BusinessSele: => BE_UCCRoleIndxEv := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA,
-				BE_UCCCntEv = 0 => SeleUCC.NO_DATA_FOUND,
+				InitialFilingCount = 0 => SeleUCC.NO_DATA_FOUND,
 				InitialDebtorFilingCount = 0 AND InitialCreditorFilingCount = 0 => NO_DATA_FOUND_97_INT,
-				MAP(InitialDebtorFilingCount > 0 AND InitialCreditorFilingCount > 0 => '3',
-					InitialDebtorFilingCount > 0 AND InitialCreditorFilingCount = 0 => '2',
-					InitialDebtorFilingCount = 0 AND InitialCreditorFilingCount > 0 => '1'));
+				InitialDebtorFilingCount > 0 AND InitialCreditorFilingCount > 0 => '3',
+				InitialDebtorFilingCount > 0 AND InitialCreditorFilingCount = 0 => '2',
+				InitialDebtorFilingCount = 0 AND InitialCreditorFilingCount > 0 => '1');
+
+
 BusinessSele: => BE_UCCActvRoleIndx := MAP(B_LexIDLegalSeenFlag = '0' OR  SeleID = SeleUCC.MISSING_INPUT_DATA_INT => SeleUCC.MISSING_INPUT_DATA,
-				BE_UCCActvCnt IN [0, SeleUCC.NO_DATA_FOUND_INT] => SeleUCC.NO_DATA_FOUND,
+				InitialFilingCount = 0 OR ActiveFilingCount = 0 => SeleUCC.NO_DATA_FOUND,
 				ActiveDebtorFilingCount = 0 AND ActiveCreditorFilingCount = 0 => SeleUCC.NO_DATA_FOUND_97,
-				MAP(ActiveDebtorFilingCount > 0 AND ActiveCreditorFilingCount > 0 => '3',
-					ActiveDebtorFilingCount > 0 AND ActiveCreditorFilingCount = 0 => '2',
-					ActiveDebtorFilingCount = 0 AND ActiveCreditorFilingCount > 0 => '1'));
+				ActiveDebtorFilingCount > 0 AND ActiveCreditorFilingCount > 0 => '3',
+				ActiveDebtorFilingCount > 0 AND ActiveCreditorFilingCount = 0 => '2',
+				ActiveDebtorFilingCount = 0 AND ActiveCreditorFilingCount > 0 => '1');
 
 
 /**************************************************************************/
