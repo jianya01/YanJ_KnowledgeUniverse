@@ -6371,10 +6371,10 @@ ProfessionalLicense: => MaxIssueDate := MAX(LicenseDates, IF(OriginalDateOfIssua
 ProfessionalLicense: => ValidProfessionalLicense := LicenseNumber <> '' AND (MaxIssueDate < BUILD_DATE OR MaxIssueDate:Null) ;
 ProfessionalLicense: => MaxExpireDate := MAX(LicenseDates, DateOfExpiration);
 ProfessionalLicense: => IsActive := MaxExpireDate > BUILD_DATE;
+ProfessionalLicense: => IsExpired := MaxExpireDate < BUILD_DATE;
 
 
-
-Person: => ProfessionalLicenseDates := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 100, MaxIssueDate, -MaxExpireDate);
+Person: => ProfessionalLicenseDates := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, IsActive, IsExpired,  MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 100, MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseIssueExpDate := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseIssueDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxIssueDate);
 Person: => ActiveProfessionalLicenseExpDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxExpireDate);
@@ -6384,6 +6384,8 @@ Person: => ActiveProfessionalLicenseOccupation := ONLY(ActiveProfessionalLicense
 Person: => ActiveProfessionalLicenseCategory := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseCategory, ProfessionalLicense.REC_FOUND_BUT_INVALID));
 Person: => ActiveProfessionalLicenseSource :=ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Source, ProfessionalLicense.REC_FOUND_BUT_INVALID));
 
+Person: => ActiveLicenseCount := COUNT(ProfessionalLicenseDates(IsActive));
+Person: => ActiveLicenseFlag := IF(ActiveLicenseCount > 0, TRUE, FALSE);
 
 /**************************************************************************/
 /*                                                                        */
@@ -6395,11 +6397,12 @@ Person: => PL_ProfLicFlagEv := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
 			ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense) => '1',
 			'0');
-Person: => PL_ProfLicActvCntEv := MAP(
+Person: => PL_ProfLicActvCnt := MAP( 
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA_INT,	 
 			PL_ProfLicFlagEv = '0' =>	ProfessionalLicense.NO_DATA_FOUND_PROF_INT,
-			ALL(ProfessionalLicenseDates, MaxExpireDate = ProfessionalLicense.REC_FOUND_BUT_INVALID) OR ALL(ProfessionalLicenseDates, MaxExpireDate < STRING(Person.BUILD_DATE)) => 0,
-			BOUNDSFOLD(COUNT(ProfessionalLicenseDates(MaxExpireDate > STRING(Person.BUILD_DATE))), 1, 99));
+			ActiveLicenseFlag => BOUNDSFOLD(ActiveLicenseCount, 1, 99),
+			0);
+
 Person: => PL_ProfLicCntEv := IF(P_LexIDSeenFlag = '0', ProfessionalLicense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense)),0,99));
 Person: => PL_ProfLicIssueDtListEv := CONCAT(ProfessionalLicenseDates{ProfLicUID, MaxIssueDate}, MaxIssueDate, '|');
 Person: => PL_ProfLicExpDtListEv := CONCAT(ProfessionalLicenseDates{ProfLicUID, MaxExpireDate}, MaxExpireDate, '|');
@@ -6408,7 +6411,7 @@ Person: => PL_ProfLicIndxByLicListEv := CONCAT(PL_ProfLicIndxByLicListEvPre, Lic
 Person: => PL_ProfLicActvFlag := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,	
 			NOT(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense)) => ProfessionalLicense.NO_DATA_FOUND_PROF,			
-			ActiveProfessionalLicenseExpDt > STRING(BUILD_DATE) => '1',
+			ActiveLicenseFlag => '1',
 			'0');
 Person: => PL_ProfLicActvNewIssueDt := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,
@@ -12047,8 +12050,7 @@ Person: => PL_VerSrcOtherRecCntListEv := MAP(P_LexIDSeenFlag = '0' => MISSING_IN
 																	CONCAT(VerOtherSourceGroupListSorted, RecordCount, '|'));
 																	
 // KS-7038
-Person: => P_LexID := PII.P_LexID;
-Person: => PL_VerSrcIndxEvFCRA := MAP(P_LexID = Person.MISSING_INPUT_DATA OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+Person: => PL_VerSrcIndxEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 								PL_VerSrcBureauCntEvFCRA > 0 AND PL_VerSrcCredCntEvFCRA > 0 AND PL_VerSrcOtherCntEvFCRA > 0 => '7',
 								PL_VerSrcBureauCntEvFCRA = 0 AND PL_VerSrcCredCntEvFCRA > 0 AND PL_VerSrcOtherCntEvFCRA > 0 => '6',
 								PL_VerSrcBureauCntEvFCRA > 0 AND PL_VerSrcCredCntEvFCRA > 0 AND PL_VerSrcOtherCntEvFCRA = 0 => '5',
@@ -12057,7 +12059,7 @@ Person: => PL_VerSrcIndxEvFCRA := MAP(P_LexID = Person.MISSING_INPUT_DATA OR P_L
 								PL_VerSrcBureauCntEvFCRA = 0 AND PL_VerSrcCredCntEvFCRA = 0 AND PL_VerSrcOtherCntEvFCRA > 0 => '2',
 								PL_VerSrcBureauCntEvFCRA > 0 AND PL_VerSrcCredCntEvFCRA = 0 AND PL_VerSrcOtherCntEvFCRA = 0 => '1');
 								
-Person: => PL_VerSrcIndxEv := MAP(P_LexID = Person.MISSING_INPUT_DATA OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+Person: => PL_VerSrcIndxEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 								PL_VerSrcBureauCntEvNonFCRA > 0 AND PL_VerSrcCredCntEvNonFCRA > 0 AND PL_VerSrcOtherCntEv > 0 => '7',
 								PL_VerSrcBureauCntEvNonFCRA = 0 AND PL_VerSrcCredCntEvNonFCRA > 0 AND PL_VerSrcOtherCntEv > 0 => '6',
 								PL_VerSrcBureauCntEvNonFCRA > 0 AND PL_VerSrcCredCntEvNonFCRA > 0 AND PL_VerSrcOtherCntEv = 0 => '5',
