@@ -3034,7 +3034,8 @@ Person: => AddressHierarchySet := TOPN(PersonAddress.AddressHierarchy
 																		DLSourceCount,
 																		VoterSourceCount,
 																		BureauSourceCount,
-																		InsuranceSourceCount
+																		InsuranceSourceCount,
+																		IsBest
                                      }, 9999, AddressRank, AddressRankBest, -SortField);
 
 
@@ -3159,6 +3160,7 @@ Person: => EmergingAddrSffx := DEFAULT(PII.EmergingAddrSffx, '');
 Person: => EmergingAddrSecRng := DEFAULT(PII.EmergingAddrSecRng, '');
 Person: => EmergingAddrState := DEFAULT(PII.EmergingAddrState, '');
 Person: => EmergingAddrZip5 := DEFAULT(PII.EmergingAddrZip5, '');
+Person: => EmergingAddrFull := DEFAULT(PII.EmergingAddrFull, '');
 
 Person: => CurrAddrHelperAttribute := PII.CurrentAddress;
 Person: => OnlyCurrAddressHelperFlag := ONLY(CurrAddrHelperAttribute{
@@ -3222,6 +3224,41 @@ Person: =>OnlyPreviousAddressHelperFlag := ONLY(PreviousAddrHelper{
 
 Person: => IsPreviousPostalSource :=EXISTS(PII.PreviousAddress.DataSources(Source ='VL'));
 
+Person: => EmergingAddrHelper := PII.EmergingAddress;
+
+Person: =>OnlyEmergingAddressHelperFlag := ONLY(EmergingAddrHelper{
+		VacantFlagNull := VacantFlag ='' OR VacantFlag:Null,
+		VacantFlagY := VacantFlag = 'Y',
+		VacantFlagN := VacantFlag = 'N',
+		ThrowBackNull := ThrowBackFlag ='' OR ThrowBackFlag:Null,
+		ThrowBackFlagY := ThrowBackFlag ='Y',
+		ThrowBackFlagN := ThrowBackFlag ='N',
+		SeasonalDeliveryFlagNull := SeasonalDeliveryFlag ='' OR SeasonalDeliveryFlag:Null,
+		SeasonalDeliveryFlagN := SeasonalDeliveryFlag ='N',
+		SeasonalDeliveryFlagY := SeasonalDeliveryFlag ='Y',
+		SeasonalDeliveryFlagE := SeasonalDeliveryFlag ='E',
+		DoNotDeliverFlagNull := DoNotDeliverFlag ='' OR DoNotDeliverFlag:Null,
+		DoNotDeliverFlagY := DoNotDeliverFlag ='Y',
+		DoNotDeliverFlagN := DoNotDeliverFlag ='N',
+		CollegeFlagNull := CollegeFlag ='' OR CollegeFlag:Null,
+		CollegeFlagY := CollegeFlag ='Y',
+		CollegeFlagN := CollegeFlag ='N',
+		DropIndicatorFlagNull := DropIndicatorFlag ='' OR DropIndicatorFlag:Null,
+		DropIndicatorFlagC := DropIndicatorFlag ='C',
+		DropIndicatorFlagN := DropIndicatorFlag ='N',
+		DropIndicatorFlagY := DropIndicatorFlag ='Y',		
+		StyleFlagNull := StyleFlag ='' OR StyleFlag:Null,
+		StyleFlagS := StyleFlag ='S',
+		ResBusFlagNull := ResBusFlag ='' OR ResBusFlag:Null,
+		ResBusFlagAC := ResBusFlag IN ['A','C'],
+		ResBusFlagBD := ResBusFlag IN ['B','D'],
+		OnlyGMFlagY := OnlyGMFlag = 'Y',
+		OnlyGMFlagN := OnlyGMFlag = 'N'
+		});
+		
+Person: => IsEmergingPostalSource :=EXISTS(PII.EmergingAddress.DataSources(Source ='VL'));		
+		
+		
 /**************************************************************************/
 /*                                                                        */
 /*                  Person Attributes                                     */
@@ -4456,6 +4493,165 @@ Person: => PL_EmrgAge := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA_
 												NOT BestDOB:Null => BOUNDSFOLD(ABSYEARSBETWEEN(EmrgDate, BestDOB), 0, 62),
 												NOT PII.P_InpClnDOB:Null => BOUNDSFOLD(ABSYEARSBETWEEN(EmrgDate, PII.P_InpClnDOB), 0, 62),
 												Person.NO_DATA_FOUND_INT);
+												
+AddressSlim: => EmergingPerfectAddressMatch := 
+	IsNullOrEqual(TRIMBOTH(PrimaryRange), TRIMBOTH(PII.EmergingAddrPrimRng)) AND  
+	IsNullOrEqual(TRIMBOTH(Predirectional), TRIMBOTH(PII.EmergingAddrPreDir)) AND
+	IsNullOrEqual(TRIMBOTH(PrimaryName), TRIMBOTH(PII.EmergingAddrPrimName)) AND
+	IsNullOrEqual(TRIMBOTH(Suffix), TRIMBOTH(PII.EmergingAddrSffx)) AND
+	IsNullOrEqual(TRIMBOTH(Postdirectional), TRIMBOTH(PII.EmergingPostdirectional)) AND
+	IsNullOrEqual(TRIMBOTH(INTFORMAT(ZIP5,5,1)), TRIMBOTH(PII.EmergingAddrZip5));
+	
+PersonAddress: => EmergingPerfectAddressMatch := 
+	IsNullOrEqual(TRIMBOTH(PrimaryRange), TRIMBOTH(Subject.PII.EmergingAddrPrimRng)) AND  
+	IsNullOrEqual(TRIMBOTH(Predirectional), TRIMBOTH(Subject.PII.EmergingAddrPreDir)) AND
+	IsNullOrEqual(TRIMBOTH(PrimaryName), TRIMBOTH(Subject.PII.EmergingAddrPrimName)) AND
+	IsNullOrEqual(TRIMBOTH(Suffix), TRIMBOTH(Subject.PII.EmergingAddrSffx)) AND
+	IsNullOrEqual(TRIMBOTH(Postdirectional), TRIMBOTH(Subject.PII.EmergingPostdirectional)) AND
+	IsNullOrEqual(TRIMBOTH(INTFORMAT(ZIP5,5,1)), TRIMBOTH(Subject.PII.EmergingAddrZip5)) AND
+	IsNullOrEqual(TRIMBOTH(SecondaryRange), TRIMBOTH(Subject.PII.EmergingAddrSecRng));	
+	
+Person: => EmergingAddressSource := PersonAddress(EmergingPerfectAddressMatch).DataSources{Source};
+
+Person: => EmergingAddressSourceIsMTCSA := ONLY(EmergingAddressSource, Source);
+
+AddressSlim: EmergingPerfectAddressMatch => EmergingAddressSICHighRiskPre := HighRiskAddress{HighRiskSIC, DateFirstSeenAddressSIC := HighRiskSIC:DateFirstSeen, DateLastSeenAddressSIC := HighRiskSIC:DateLastSeen};
+AddressSlim: EmergingPerfectAddressMatch => EmergingAddressNIACSHighRiskPre := HighRiskAddress{HighRiskNAICS, DateFirstSeenAddressNAICS := HighRiskNAICS:DateFirstSeen, DateLastSeenAdressNAICS := HighRiskNAICS:DateLastSeen};												
+												
+AddressSlim: => EmergingAddressSICList := EmergingAddressSICHighRiskPre{
+	HighRiskSIC,
+	AddressSICDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenAddressSIC),DATETOSTRING(DateFirstSeenAddressSIC, '%Y%m%d'), NO_DATA_FOUND_97),
+	AddressSICDateLastSeen := IF(ISVALIDDATE(DateLastSeenAddressSIC),DATETOSTRING(MIN(DateLastSeenAddressSIC, CURRENT_DATE_BIP), '%Y%m%d'), NO_DATA_FOUND_97)
+	};
+
+AddressSlim: => EmergingAddressNAICSList := EmergingAddressNIACSHighRiskPre{
+	HighRiskNAICS,
+	AddressNAICSDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenAddressNAICS),DATETOSTRING(DateFirstSeenAddressNAICS, '%Y%m%d'), NO_DATA_FOUND_97),
+	AddressNAICSDateLastSeen := IF(ISVALIDDATE(DateLastSeenAdressNAICS),DATETOSTRING(MIN(DateLastSeenAdressNAICS, CURRENT_DATE_BIP), '%Y%m%d'), NO_DATA_FOUND_97)
+	};
+
+AddressSlim: => EmergingAddressSICSortedList := TOPN(EmergingAddressSICList, 1000, AddressSICDateFirstSeen, AddressSICDateLastSeen);
+AddressSlim: => EmergingAddressNAICSSortedList := TOPN(EmergingAddressNAICSList, 1000, AddressNAICSDateFirstSeen, AddressNAICSDateLastSeen);
+
+AddressSlim: => EmergingAddressSIC := CONCAT(EmergingAddressSICSortedList,HighRiskSIC,'|');
+AddressSlim: => EmergingAddressNAICS := CONCAT(EmergingAddressNAICSSortedList,HighRiskNAICS,'|');
+
+AddressSlim: => EmergingAddressSICContainsCorrectional := CONTAINS(EmergingAddressSIC, '9223');
+AddressSlim: => EmergingAddressNAICSContainsCorrectional := CONTAINS(EmergingAddressNAICS, '922140');
+
+AddressSlim: => EmergingAddressSICContainsHRUSPSSA := CONTAINS(EmergingAddressSIC, '4311');
+AddressSlim: => EmergingAddressNAICSContainsHRUSPSSA := CONTAINS(EmergingAddressNAICS, '491110');
+
+AddressSlim: => EmergingAddressNAICSContainsHRCMRA := CONTAINS(EmergingAddressNAICS, '561431');
+
+AddressSlim: => EmergingAddressSICContainsHRHospGame := EXISTS(EmergingAddressSICSortedList(HighRiskSIC IN [2451, 6515, 7011, 7021, 7032, 7033, 7993]));
+AddressSlim: => EmergingAddressNAICSContainsHRHospGame := EXISTS(EmergingAddressNAICSSortedList(HighRiskNAICS IN [713210, 713290, 721110, 721120, 721191, 721199, 721211, 721214, 721310]));
+
+AddressSlim: => EmergingAddressSICContainsHRShelterCare := EXISTS(EmergingAddressSICSortedList(HighRiskSIC IN [8051, 8052, 8059, 8062, 8063, 8069, 8082, 8322, 8361]));
+AddressSlim: => EmergingAddressNAICSContainsHRShelterCare := EXISTS(EmergingAddressNAICSSortedList(HighRiskNAICS IN [621610, 622110, 622210, 622310, 623110, 623210, 623210, 623220, 623311, 623312, 623990, 624110, 624120, 624190, 624210, 624221, 624229, 624230]));
+
+AddressSlim: => EmergingAddressSICContainsHRCashBus := EXISTS(EmergingAddressSICSortedList(HighRiskSIC IN [4119, 4121, 4729, 4789, 5194, 5541, 5812, 5993]));
+AddressSlim: => EmergingAddressNAICSContainsHRCashBus := EXISTS(EmergingAddressNAICSSortedList(HighRiskNAICS IN [445310, 446110, 447110, 447190, 453991, 485310, 485320, 487210, 722110, 722211, 722212, 722213, 722410, 811191]));
+
+AddressSlim: => EmergingAddressSICContainsHRFinanceBus := EXISTS(EmergingAddressSICSortedList(HighRiskSIC IN [4812, 4813, 4899, 44822, 5271, 5511, 5521, 5571, 5599, 6019, 6021, 6022, 6029, 6061, 6062, 6081, 6082, 6099, 6111, 6141, 6153, 6159, 6162, 6163, 6515, 6712, 7291, 7322, 7323]));
+AddressSlim: => EmergingAddressNAICSContainsHRFinanceBus := EXISTS(EmergingAddressNAICSSortedList(HighRiskNAICS IN [423110, 423140, 425120, 441110, 441120, 441221, 441320, 453930, 517110, 517211, 517212, 517310, 517410, 517910, 522110, 522130, 522190, 522210, 522220, 522291, 522292, 522298, 522310, 522390, 541199, 541213, 541214, 561440, 561450]));
+
+AddressSlim: => EmergingAddressSICContainsHRVirtOffice := EXISTS(EmergingAddressSICSortedList(HighRiskSIC IN [7361, 7363, 8741, 8744]));
+AddressSlim: => EmergingAddressNAICSContainsHRVirtOffice := EXISTS(EmergingAddressNAICSSortedList(HighRiskNAICS IN [561110, 561210, 561310, 561421]));
+
+AddressSlim: => EmergingAddressSICContainsHRShipStore := EXISTS(EmergingAddressSICSortedList(HighRiskSIC IN [4212, 4213, 4214, 4215, 221, 4222, 4225, 4226, 4412, 4424, 4432, 4449, 4499, 4513, 4731, 4783, 7331]));
+AddressSlim: => EmergingAddressNAICSContainsHRShipStore := EXISTS(EmergingAddressNAICSSortedList(HighRiskNAICS IN [481112, 481212, 481219, 483111, 483113, 483211, 484110, 484121, 484122, 484220, 484230, 488510, 488991, 492110, 492210, 493110, 493120, 493130, 493190, 531130, 541860]));
+
+AddressSlim: => EmergingAddressSICContainsHROther := EXISTS(EmergingAddressSICSortedList(HighRiskSIC IN [6553, 7261, 8231]));
+AddressSlim: => EmergingAddressNAICSContainsHROther := EXISTS(EmergingAddressNAICSSortedList(HighRiskNAICS IN [519120, 812210, 812220]));
+
+AddressSlim: => EmergingSICListNotFound := NOT EXISTS(EmergingAddressSICSortedList) OR ALL(EmergingAddressSICSortedList, HighRiskSIC = '' OR HighRiskSIC:Null);
+AddressSlim: => EmergingNAICSListNotFoind := NOT EXISTS(EmergingAddressNAICSSortedList) OR ALL(EmergingAddressNAICSSortedList, HighRiskNAICS = '' OR HighRiskNAICS:Null);				
+
+AddressSlim: => PL_EmrgAddrSICCodeHRList := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingSICListNotFound => NO_DATA_FOUND,
+												CONCAT(EmergingAddressSICSortedList,HighRiskSIC,'|'));
+AddressSlim: => PL_EmrgAddrNAICSCodeHRList := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingNAICSListNotFoind => NO_DATA_FOUND,
+												CONCAT(EmergingAddressNAICSSortedList,HighRiskNAICS,'|'));
+
+AddressSlim: => PL_EmrgAddrHRType := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												PL_EmrgAddrIsHRCMRAFlag != '1' AND PII.Subject.PL_EmrgAddrIsVacantFlag != '1' AND PL_EmrgAddrSICCodeHRList = NO_DATA_FOUND AND PL_EmrgAddrNAICSCodeHRList = NO_DATA_FOUND => NO_DATA_FOUND,
+												PL_EmrgAddrIsHRCorrectFacFlag = '1' => 'P - Correctional Facilities',
+												PII.Subject.PL_EmrgAddrIsHRUSPSSAFlag = '1' => 'V - USPSSA',
+												PL_EmrgAddrIsHRCMRAFlag = '1' => 'V - CMRA',
+												PII.Subject.PL_EmrgAddrIsVacantFlag = '1' => 'P - Vacant',
+												PL_EmrgAddrIsHRHospGameFlag = '1' => 'P - Hospitality and Gaming',
+												PL_EmrgAddrIsHRShelterCareFlag = '1' => 'P - Shelters and Care Facilities',
+												PL_EmrgAddrIsHRCashBusFlag = '1' => 'P - Cash Business',
+												PL_EmrgAddrIsHRFinanceBusFlag = '1' => 'P - Finance Business',
+												PL_EmrgAddrIsHRVirtOfficeFlag = '1' => 'V - Virtual Office',
+												PL_EmrgAddrIsHRShipStoreFlag = '1' => 'V - Shipping and Storage',
+												PL_EmrgAddrIsHROtherFlag  = '1' => 'P - Other High Risk');
+												
+AddressSlim: => PL_EmrgAddrIsHRCorrectFacFlag := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingAddressSICContainsCorrectional OR EmergingAddressNAICSContainsCorrectional => '1',
+												'0');
+AddressSlim: => PL_EmrgAddrIsHRHospGameFlag := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingAddressSICContainsHRHospGame OR EmergingAddressNAICSContainsHRHospGame => '1',
+												'0');
+AddressSlim: => PL_EmrgAddrIsHRShelterCareFlag := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingAddressSICContainsHRShelterCare OR EmergingAddressNAICSContainsHRShelterCare => '1',
+												'0');
+AddressSlim: => PL_EmrgAddrIsHRCashBusFlag := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingAddressSICContainsHRCashBus OR EmergingAddressNAICSContainsHRCashBus => '1',
+												'0');
+AddressSlim: => PL_EmrgAddrIsHRFinanceBusFlag := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingAddressSICContainsHRFinanceBus OR EmergingAddressNAICSContainsHRFinanceBus => '1',
+												'0');
+AddressSlim: => PL_EmrgAddrIsHRVirtOfficeFlag := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingAddressSICContainsHRVirtOffice OR EmergingAddressNAICSContainsHRVirtOffice => '1',
+												'0');
+AddressSlim: => PL_EmrgAddrIsHRShipStoreFlag := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingAddressSICContainsHRShipStore OR EmergingAddressNAICSContainsHRShipStore => '1',
+												'0');
+AddressSlim: => PL_EmrgAddrIsHROtherFlag := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingAddressSICContainsHROther OR EmergingAddressNAICSContainsHROther => '1',
+												'0');
+AddressSlim: => PL_EmrgAddrIsHRCMRAFlag := MAP(PII.Subject.PL_EmrgAddrFull IN [NO_DATA_FOUND, ''] OR PII.Subject.P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												EmergingAddressNAICSContainsHRCMRA OR (PII.Subject.PL_EmrgAddrIsCMRAFlag = '1' AND PII.Subject.PL_EmrgAddrIsBusinessFlag = '1') OR (PII.Subject.PL_EmrgAddrZipIsPOBoxFlag = '1' AND PII.Subject.PL_EmrgAddrOWGMFlag = '1') => '1',
+												'0');																
+
+Person: => PL_EmrgAddrIsHRUSPSSAFlag := MAP(PL_EmrgAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+												EmergingAddressSourceIsMTCSA != 'PBS' AND (NOT PII.SlimLocation.EmergingAddressSICContainsHRUSPSSA OR NOT PII.SlimLocation.EmergingAddressNAICSContainsHRUSPSSA) => '0',//NOT EmergingAddressSourceIsMTCSA.SourcePBS AND 
+												'1');
+Person: => PL_EmrgAddrFull := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+												IsNotEnoughToClean(EmergingAddrFull) => NO_DATA_FOUND,
+												EmergingAddrFull);
+Person: => PL_EmrgAddrOWGMFlag := MAP(PL_EmrgAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+												NOT IsEmergingPostalSource => NO_DATA_FOUND,
+												OnlyEmergingAddressHelperFlag.OnlyGMFlagN => '0',
+												OnlyEmergingAddressHelperFlag.OnlyGMFlagY => '1',
+												NO_DATA_FOUND_97);
+Person: => PL_EmrgAddrZipIsPOBoxFlag := MAP(
+												PL_EmrgAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR EmergingAddrZip5 = '' => MISSING_INPUT_DATA,
+												EmergingAddrHelper.ZIP5:Null => NO_DATA_FOUND,
+												EmergingAddrHelper.ZIP5.ZipClass = 'P' => '1',
+												'0');
+Person: => PL_EmrgAddrIsBusinessFlag := MAP(PL_EmrgAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+												NOT IsEmergingPostalSource => NO_DATA_FOUND,
+												OnlyEmergingAddressHelperFlag.ResBusFlagAC => '0',
+												OnlyEmergingAddressHelperFlag.ResBusFlagBD => '1',
+												NO_DATA_FOUND_97);
+Person: => PL_EmrgAddrIsCMRAFlag := MAP(PL_EmrgAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+												NOT IsEmergingPostalSource => NO_DATA_FOUND,
+												OnlyEmergingAddressHelperFlag.DropIndicatorFlagC => '1',
+												OnlyEmergingAddressHelperFlag.DropIndicatorFlagY OR OnlyEmergingAddressHelperFlag.DropIndicatorFlagN => '0',
+												NO_DATA_FOUND_97);
+Person: => PL_EmrgAddrIsVacantFlag := MAP(PL_EmrgAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+												NOT IsEmergingPostalSource => NO_DATA_FOUND,
+												OnlyEmergingAddressHelperFlag.VacantFlagY => '1',
+												OnlyEmergingAddressHelperFlag.VacantFlagN => '0',
+												NO_DATA_FOUND_97);
+								
+
+											
+												
 /**************************************************************************/
 /*                                                                        */
 /*                  Person Associate Attributes                           */
