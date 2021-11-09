@@ -11740,6 +11740,75 @@ Person: => PL_VerSrcRecCntEvFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA
 																	BOUNDSFOLD(SUM(VerSourceGroupListSortedFCRA, RecordCount), 1, 9999));
 Person: => PL_VerSrcRecCntListEvFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA,
 																	CONCAT(VerSourceGroupListSortedFCRA, RecordCount, '|'));
+//Non Derog
+// KS-5760
+Person: FCRA_NON_DEROG_VALID_SOURCES := ['AM', 'AR', 'CG', 'DA', 'EB', 'E1', 'E2', 'E3', 'EQ', 'P', 'PL', 'SL', 'VO', 'W'];
+Person: NON_FCRA_NON_DEROG_VALID_SOURCES := ['AM', 'AR', 'CG', 'D', 'DA', 'EB', 'E1', 'E2', 'E3', 'EN', 'EQ', 'FE', 'FF', 'P', 'PL', 'S1', 'SL', 'TN', 'U', 'V', 'VO', 'W'];
+Person: => NonDerogSourceListFCRADataSet := DataSources(TranslatedSourceCode IN FCRA_NON_DEROG_VALID_SOURCES){TranslatedSourceCode};
+Person: => NonDerogSourceListNonFCRADataSet := DataSources(TranslatedSourceCode IN NON_FCRA_NON_DEROG_VALID_SOURCES){TranslatedSourceCode};
+Person: => NonDerogSourceListAllFCRAPre := NonDerogSourceListFCRADataSet{
+											TranslatedSourceCode,
+											SourceDateFirstSeen := TranslatedSourceCode:DateFirstSeen,
+											SourceDateLastSeen := TranslatedSourceCode:DateLastSeen};
+Person: => NonDerogSourceListAllNonFCRAPre := NonDerogSourceListNonFCRADataSet{
+											TranslatedSourceCode,
+											SourceDateFirstSeen := TranslatedSourceCode:DateFirstSeen,
+											SourceDateLastSeen := TranslatedSourceCode:DateLastSeen};
+Person: => NonDerogSourceListAllFCRA := NonDerogSourceListAllFCRAPre{
+											TranslatedSourceCode,
+											AgeInDays := DAYSBETWEEN(SourceDateLastSeen,Person.CURRENT_DATE),
+											SrcFirstSeenDate := DEFAULT(DATETOSTRING(SourceDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
+											SrcLastSeenDate := IF(ISVALIDDATE(SourceDateLastSeen), DATETOSTRING(MIN(SourceDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)}; 
+Person: => NonDerogSourceListAllNonFCRA := NonDerogSourceListAllNonFCRAPre{
+											TranslatedSourceCode,
+											AgeInDays := DAYSBETWEEN(SourceDateLastSeen,Person.CURRENT_DATE),
+											SrcFirstSeenDate := DEFAULT(DATETOSTRING(SourceDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
+											SrcLastSeenDate := IF(ISVALIDDATE(SourceDateLastSeen), DATETOSTRING(MIN(SourceDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)}; 
+Person: => NonDerogSourceGroupListSortedFCRA := TOPN(NonDerogSourceListAllFCRA, 14, SrcFirstSeenDate = Person.NO_DATA_FOUND_97, SrcFirstSeenDate, TranslatedSourceCode);
+Person: => NonDerogSourceGroupListSorted := TOPN(NonDerogSourceListAllNonFCRA, 22, SrcFirstSeenDate = Person.NO_DATA_FOUND_97, SrcFirstSeenDate, TranslatedSourceCode);
+
+
+Person: => PL_SrcNonDrgCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(NonDerogSourceGroupListSorted{TranslatedSourceCode}), 0, 22));
+Person: => PL_SrcNonDrgCntEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(NonDerogSourceGroupListSortedFCRA{TranslatedSourceCode}), 0, 14));
+
+Person: => PL_SrcNonDrgCnt1YNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(NonDerogSourceGroupListSorted(AgeInDays < Person.ONE_YEAR_IN_DAYS){TranslatedSourceCode}), 0, 22));
+Person: => PL_SrcNonDrgCnt1YFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																BOUNDSFOLD(COUNT(NonDerogSourceGroupListSortedFCRA(AgeInDays < Person.ONE_YEAR_IN_DAYS){TranslatedSourceCode}), 0, 14));
+																
+Person: => PL_SrcNonDrgListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA, 
+																 PL_SrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(NonDerogSourceGroupListSorted, TranslatedSourceCode, '|'));
+Person: => PL_SrcNonDrgListEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA, 
+																 PL_SrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(NonDerogSourceGroupListSortedFCRA, TranslatedSourceCode, '|'));
+
+Person: => PL_SrcNonDrgEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																 PL_SrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(NonDerogSourceGroupListSorted, SrcFirstSeenDate, '|'));
+Person: => PL_SrcNonDrgEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																 PL_SrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(NonDerogSourceGroupListSortedFCRA, SrcFirstSeenDate, '|'));
+
+Person: => PL_SrcNonDrgOldDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																 PL_SrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 ALL(NonDerogSourceGroupListSorted, SrcFirstSeenDate = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 	
+																 DATETOSTRING(MIN(NonDerogSourceGroupListSorted, DATE(SrcFirstSeenDate)), '%Y%m%d'));
+Person: => PL_SrcNonDrgOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																 PL_SrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+																 ALL(NonDerogSourceGroupListSortedFCRA, SrcFirstSeenDate = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 	
+																 DATETOSTRING(MIN(NonDerogSourceGroupListSortedFCRA, DATE(SrcFirstSeenDate)), '%Y%m%d'));
+
+Person: => PL_SrcNonDrgOldMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																  PL_SrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+																	PL_SrcNonDrgOldDtEvNonFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+																	BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrcNonDrgOldDtEvNonFCRA),Person.CURRENT_DATE),0,960));
+Person: => PL_SrcNonDrgOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																  PL_SrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+																	PL_SrcNonDrgOldDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+																	BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrcNonDrgOldDtEvFCRA),Person.CURRENT_DATE),0,960));
 
 //Bureau verification
 
