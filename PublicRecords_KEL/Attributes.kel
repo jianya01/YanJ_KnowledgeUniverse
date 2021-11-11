@@ -11649,6 +11649,20 @@ Person: => VerSourceListAllNonFCRA := VerSourceListNonFCRADataSet{
 Person: => VerSourceGroupListSortedFCRA := TOPN(VerSourceListAllFCRA, 100, SrcFirstSeenDate);
 Person: => VerSourceGroupListSorted := TOPN(VerSourceListAllNonFCRA, 100, SrcFirstSeenDate);
 
+Person.DataSources: => NonFCRASourceListCheck := MAP(ConsumerSourceGroup(Source) = 'P ' => Source,
+			ConsumerSourceGroup(Source) = 'L2' => Source,
+			ConsumerSourceGroup(Source));
+Person: => TranslatedSourcesOnly := DataSources(HeaderHitFlag AND NonFCRASourceListCheck != ''){NonFCRASourceListCheck};
+Person.TranslatedSourcesOnly: => AgeInDays := ABSDAYSBETWEEN(NonFCRASourceListCheck:DateLastSeen, Person.CURRENT_DATE);														
+														
+Person: => NonFCRASourceListOnlyPre := TranslatedSourcesOnly(NonFCRASourceListCheck != ''){
+				NonFCRASourceListCheck,
+				ValidBankruptcySources := (NonFCRASourceListCheck = 'BA' AND AgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT AgeInDays:Null),
+				ValidLiensSources := (NonFCRASourceListCheck = 'L2' AND AgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null),
+				OtherSources := (NonFCRASourceListCheck <> 'BA' AND NonFCRASourceListCheck <> 'L2')};
+
+Person: => NonFCRASourceListOnly := TOPN(NonFCRASourceListOnlyPre{NonFCRASourceListCheck}, 99, NonFCRASourceListCheck);
+Person: => FCRASourceListOnly := TOPN(NonFCRASourceListOnlyPre(ValidBankruptcySources OR ValidLiensSources OR OtherSources){NonFCRASourceListCheck}, 99, NonFCRASourceListCheck);
 
 Person: => PL_VerSrcCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																 NOT EXISTS(VerSourceListSorted) => MISSING_INPUT_DATA_INT,
@@ -11668,7 +11682,7 @@ Person: => PL_VerSrcNewDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 																	 ALL(VerSourceListSorted, SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 
 																	 VerSrcNewDtEvNonFCRA);
 Person: => P_LexIDRstdOnlyFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-																	 EXISTS(VerSourceListSorted(NOT TranslatedSourceCode IN ['CY','D','EN','FR','LI','NT','P*','TN','TS','TU','V'])) => '0', 
+																	 EXISTS(NonFCRASourceListOnly(NOT NonFCRASourceListCheck IN ['CY', 'D ', 'EN', 'FE', 'FF', 'FR', 'NT', 'TN', 'V', 'EL', 'U ', 'S1', 'FA', 'FP', 'LI'])) => '0', 
 																	 '1');
 Person: => PL_VerSrcOldMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																	 ALL(VerSourceListSorted, SourceDateFirstSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
@@ -11713,7 +11727,7 @@ Person: => PL_VerSrcNewDtEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DA
 																	 ALL(VerSourceListSortedFCRA, SourceDateLastSeen = NO_DATA_FOUND_97) => NO_DATA_FOUND_97, 
 																	 DATETOSTRING(MAX(VerSourceListSortedFCRA, DATE(SourceDateLastSeen)), '%Y%m%d'));
 Person: => P_LexIDRstdOnlyFlagFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-																	 EXISTS(VerSourceListSortedFCRA(NOT TranslatedSourceCode IN ['CY','D','EN','FR','LI','NT','P*','TN','TS','TU','V'])) => '0', 
+																	 EXISTS(FCRASourceListOnly(NOT NonFCRASourceListCheck IN ['CY', 'D ', 'EN', 'FE', 'FF', 'FR', 'NT', 'TN', 'V', 'EL', 'U ', 'S1', 'FA', 'FP', 'LI'])) => '0', 
 																	 '1');
 Person: => PL_VerSrcOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																	PL_VerSrcOldDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
