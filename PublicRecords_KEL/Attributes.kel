@@ -171,6 +171,16 @@ FUNCTION: IsPhoneMatch(STRING PhoneOnFile, STRING InputPhone) <=
 			LENGTH(PhoneOnFile) = 10 AND LENGTH(InputPhone) = 7 => IsPhone7Match(SUBSTR(PhoneOnFile, 4, 10), InputPhone),
 			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 10 => IsPhone10Match(SUBSTR(InputPhone, 1, 3) + PhoneOnFile, InputPhone),
 			FALSE);
+// Seven digit phones are considered a match if the Levenshtein distance between the two phone numbers is less than or equal to 1.
+FUNCTION: IsPhone7MatchMiskey(STRING Phone1, STRING Phone2) <= EditDistance(Phone1, Phone2) = 1;
+// Ten digit phones are considered a match if the last seven digits of the phone number are an exact match or if the Levenshtein distance between the two phone10s is less than or equal to 2.
+FUNCTION: IsPhone10MatchMiskey(STRING Phone1, STRING Phone2) <= EditDistance(Phone1, Phone2) = 1 OR EditDistance(Phone1, Phone2) = 2;			
+FUNCTION: IsPhoneMatchMiskey(STRING PhoneOnFile, STRING InputPhone) <= 
+	MAP(LENGTH(PhoneOnFile) = 10 AND LENGTH(InputPhone) = 10 => IsPhone10MatchMiskey(PhoneOnFile, InputPhone),
+			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 7 => IsPhone7MatchMiskey(PhoneOnFile, InputPhone),	
+			LENGTH(PhoneOnFile) = 10 AND LENGTH(InputPhone) = 7 => IsPhone7MatchMiskey(SUBSTR(PhoneOnFile, 4, 10), InputPhone),
+			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 10 => IsPhone10MatchMiskey(SUBSTR(InputPhone, 1, 3) + PhoneOnFile, InputPhone),
+			FALSE);	
 FUNCTION: FnIPValidate(STRING field1) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_IPValidate(field1)) FROM PublicRecords_KEL RETURNS STRING;	
 FUNCTION: IsFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;
 FUNCTION: IsNonFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsNonFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
@@ -14263,49 +14273,92 @@ Person.FullName: => VerifiedMiskeyFirstName := IsNameMiskeyMatch(FirstName, Pers
 
 Person.FullName: => VerifiedMiskeyLastName := IsNameMiskeyMatch(LastName, Person.P_InpClnNameLast);
 
+PersonSSN: => MiskeySSNMatch := IF(EditDistance(Social, Subject.P_InpClnSSN) = 1 OR EditDistance(Social, Subject.P_InpClnSSN) = 2, '1', '0');
+
+
+PersonPhone: => MiskeyPhoneMatch := IsPhoneMatchMiskey(PhoneNumber, Subject.P_InpClnPhoneHome);
+
+
+Person: => InputDOBDistanceMatchMiskey := EXISTS(EditDistance(P_InpClnDOB, DATETOSTRING(ReportedDatesOfBirth.DateOfBirth,'%Y%m%d')) = 1);
+
+Person: => ValidDOBLogicCheck4Miskey := P_InpValDOBYearMissingFlag = 0 AND
+																	P_InpValDOBMonMissingFlag = 0 AND
+																	P_InpValDOBDayMissingFlag = 0 AND
+																	EXISTS(ReportedDatesOfBirth((MonthPaddedFlag = 0) AND (DayPaddedFlag = 0))) AND
+																	InputDOBDistanceMatchMiskey;
+
+PersonAddress: => MiskeyAddressSimilarityMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedInputAddress) >= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedInputAddress) < 1, 1,0);
+
+Person.FullName: => InputFirstNameMatch := FirstName = Person.P_InpClnNameFirst;
+Person.FullName: => InputLastNameMatch := LastName = Person.P_InpClnNameLast;
+PersonSSN: => InputSSNDirectMatch := Social = Subject.P_InpClnSSN;
+Person.ReportedDatesOfBirth: => InputDOBDirectMatch := DATETOSTRING(DateOfBirth,'%Y%m%d') = Person.P_InpClnDOB;
+PersonPhone: => InputPhoneDirectMatch := PhoneNumber = Subject.P_InpClnPhoneHome;
+
 Person: => PL_VerNameFirstMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 								PL_VerNameFirstSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								EXISTS(FullName(InputFirstNameMatch)) => '0',
 								FullName(VerifiedMiskeyFirstName) => '1',
 								'0');
 Person: => PL_VerNameFirstMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 								PL_VerNameFirstSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								EXISTS(FullName(InputFirstNameMatch)) => '0',
 								FullName(VerifiedMiskeyFirstName) => '1',
 								'0');
 								
 Person: => PL_VerNameLastMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 								PL_VerNameLastSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
+								EXISTS(FullName(InputLastNameMatch)) => '0',
 								FullName(VerifiedMiskeyLastName) => '1',
 								'0');
 Person: => PL_VerNameLastMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 								PL_VerNameLastSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								EXISTS(FullName(InputLastNameMatch)) => '0',
 								FullName(VerifiedMiskeyLastName) => '1',
 								'0');
 								
 Person: => PL_VerAddrMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
-							  PersonAddress(AddressSimilarityMatch = 1) => '1',
+							  EXISTS(PersonAddress(InputAddressMatch)) => '0',
+							  PersonAddress(MiskeyAddressSimilarityMatch = 1) => '1',
 								'0');
 Person: => PL_VerAddrMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND,
-							  PersonAddress(AddressSimilarityMatch = 1) => '1',
+								EXISTS(PersonAddress(InputAddressMatch)) => '0',
+							  PersonAddress(MiskeyAddressSimilarityMatch = 1) => '1',
 								'0');
 
 Person: => PL_VerSSNMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 								PL_VerSSNSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
-								PersonSSN(InputSSNMatch) => '1',
+								EXISTS(PersonSSN(InputSSNDirectMatch)) => '0',
+								PersonSSN(MiskeySSNMatch = '1') => '1',
 								'0');
 Person: => PL_VerSSNMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 								PL_VerSSNSrcCntEvFCRA < 1 => NO_DATA_FOUND,
-								PersonSSN(InputSSNMatch) => '1',
+								EXISTS(PersonSSN(InputSSNDirectMatch)) => '0',
+								PersonSSN(MiskeySSNMatch = '1') => '1',
 								'0');
 
 Person: => PL_VerDOBMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 								PL_VerDOBSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
-								ValidDOBLogicCheck4 => '1',
+								EXISTS(ReportedDatesOfBirth(InputDOBDirectMatch)) => '0',
+								ValidDOBLogicCheck4Miskey => '1',
 								'0');
 Person: => PL_VerDOBMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 								PL_VerDOBSrcCntEvFCRA < 1 => NO_DATA_FOUND,
-								ValidDOBLogicCheck4 => '1',
+								EXISTS(ReportedDatesOfBirth(InputDOBDirectMatch)) => '0',
+								ValidDOBLogicCheck4Miskey => '1',
+								'0');
+
+Person: => PL_VerPhoneMiskeyFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerPhoneSrcCntEv < 1 => NO_DATA_FOUND,
+								EXISTS(PersonPhone(InputPhoneDirectMatch)) => '0',
+								PersonPhone(MiskeyPhoneMatch) => '1',
+								'0');
+Person: => PL_VerPhoneMiskeyFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+								PL_VerPhoneSrcCntEvFCRA < 1 => NO_DATA_FOUND,
+								EXISTS(PersonPhone(InputPhoneDirectMatch)) => '0',
+								PersonPhone(MiskeyPhoneMatch) => '1',
 								'0');
 
 /**************************************************************************/
