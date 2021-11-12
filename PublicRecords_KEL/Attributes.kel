@@ -1,7 +1,7 @@
 ﻿﻿IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities; 
 IMPORT PublicRecords_KEL.Uses;
 
-IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
+IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary; 
 
 
 
@@ -14930,6 +14930,109 @@ Person: => PL_DrgLnJSeverityIndx7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 		PL_DrgLienTaxCnt7Y > 0 => 2,
 		PL_DrgLnJCnt7Y > 0 => 1, 0);
 
+		
+PropertyEvent: => PropEventLSYears := ABSYEARSBETWEEN(DtLastSeen, Property.CURRENT_DATE);
+
+Person: => PrevAddrMktTaxSetA7Y := TOPN(PrevAddrMktTaxSetAll(PropEventYears >= 7 AND PropEventYears < 8){
+				MarketTotalValue,
+				AssessedTotalValue,
+				PropEventYears}, 1, -PropEventYears);
+
+Person: => PrevAddrMktValA7Y := DEFAULT(ONLY(PrevAddrMktTaxSetA7Y, MarketTotalValue), 0);
+Person: => PrevAddrTaxValA7Y := DEFAULT(ONLY(PrevAddrMktTaxSetA7Y, AssessedTotalValue), 0);
+
+Person: => SubjPrevMktVal := DEFAULT(ONLY(SubjPrevMktTaxSet, MarketTotalValue), 0);
+
+Person: => PrevAddrMktTaxSetLastAll := PII.PreviousAddress.AddressProperty.Prop.PropertyEvent{
+			MarketTotalValue,
+			AssessedTotalValue,
+			MktTaxSubjLastFlag := MAP(Person.PL_PrevAddrSubjNewDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97] => 0, 
+										DtLastSeen <= FROMSTRINGTODATE(Person.PL_PrevAddrSubjNewDt, '%Y%m%d') => 1,
+										0),
+			MktTaxSubjLastYears := IF(Person.PL_PrevAddrSubjNewDt IN [Person.MISSING_INPUT_DATA, Person.NO_DATA_FOUND_97], 999, ABSYEARSBETWEEN(DtFirstSeen, FROMSTRINGTODATE(Person.PL_PrevAddrSubjNewDt, '%Y%m%d'))),
+			PropEventLSYears,
+			DtLastSeen};
+			
+Person: => PrevAddrMktTaxSetLast7Y := TOPN(PrevAddrMktTaxSetLastAll(PropEventLSYears >= 7 AND PropEventLSYears < 8){
+				MarketTotalValue,
+				AssessedTotalValue,
+				PropEventLSYears}, 1, -PropEventLSYears);
+
+Person: => PrevAddrMktValLast7Y := DEFAULT(ONLY(PrevAddrMktTaxSetLast7Y, MarketTotalValue), 0);
+Person: => PrevAddrTaxValLast7Y := DEFAULT(ONLY(PrevAddrMktTaxSetLast7Y, AssessedTotalValue), 0);
+
+Person: => SubjPrevMktTaxLastSet := TOPN(PrevAddrMktTaxSetLastAll(MktTaxSubjLastFlag = 1 AND MktTaxSubjLastYears < 1){
+				MarketTotalValue,
+				AssessedTotalValue,
+				DtLastSeen}, 1, -DtLastSeen);
+
+Person: => SubjPrevMktValLast := DEFAULT(ONLY(SubjPrevMktTaxLastSet, MarketTotalValue), 0);
+Person: => SubjPrevTaxValLast := DEFAULT(ONLY(SubjPrevMktTaxLastSet, AssessedTotalValue), 0); 
+
+Person: => PL_PrevAddrMktValA7Y := MAP(
+	PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+	NOT EXISTS(PrevAddrMktTaxSetA7Y) OR PrevAddrMktValA7Y = 0 => NO_DATA_FOUND_97_INT,
+	BOUNDSFOLD(PrevAddrMktValA7Y, 1, 999999999));
+
+Person: => PL_PrevAddrTaxValA7Y := MAP(
+	PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+	NOT EXISTS(PrevAddrMktTaxSetA7Y) OR PrevAddrTaxValA7Y = 0 => NO_DATA_FOUND_97_INT,
+	BOUNDSFOLD(PrevAddrTaxValA7Y, 1, 999999999));
+	
+Person: => PL_PrevAddrSubjEmrgMktValEv := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+		NOT EXISTS(SubjPrevMktTaxSet) OR SubjPrevMktVal = 0 OR PL_PrevAddrSubjOldDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SubjPrevMktVal, 1, 999999999));
+
+Person: => PL_PrevAddrSubjEmrgTaxValEv := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+		NOT EXISTS(SubjPrevMktTaxSet) OR SubjPrevTaxVal = 0 OR PL_PrevAddrSubjOldDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SubjPrevTaxVal, 1, 999999999));
+	
+Person: => PL_PrevAddrSubjEmrgMktVal7Y := MAP(
+	PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+	PL_PrevAddrSubjEmrgFlag7Y = NO_DATA_FOUND_97_INT OR (PL_PrevAddrSubjEmrgFlag7Y = 1 AND PL_PrevAddrSubjEmrgMktValEv = NO_DATA_FOUND_97_INT) OR (PL_PrevAddrSubjEmrgFlag7Y = 0 AND PL_PrevAddrMktValA7Y = NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+	PL_PrevAddrSubjEmrgFlag7Y = 1 => PL_PrevAddrSubjEmrgMktValEv,
+	PL_PrevAddrSubjEmrgFlag7Y = 0 => PL_PrevAddrMktValA7Y);
+
+Person: => PL_PrevAddrSubjEmrgTaxVal7Y := MAP(
+	PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+	PL_PrevAddrSubjEmrgFlag7Y = NO_DATA_FOUND_97_INT OR (PL_PrevAddrSubjEmrgFlag7Y = 1 AND PL_PrevAddrSubjEmrgTaxValEv = NO_DATA_FOUND_97_INT) OR (PL_PrevAddrSubjEmrgFlag7Y = 0 AND PL_PrevAddrTaxValA7Y = NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+	PL_PrevAddrSubjEmrgFlag7Y = 1 => PL_PrevAddrSubjEmrgTaxValEv,
+	PL_PrevAddrSubjEmrgFlag7Y = 0 => PL_PrevAddrTaxValA7Y);
+	
+Person: => PL_PrevAddrSubjLastMktValEv := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+		NOT EXISTS(SubjPrevMktTaxLastSet) OR SubjPrevMktValLast = 0 OR PL_PrevAddrSubjNewDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SubjPrevMktValLast, 1, 999999999));
+Person: => PL_PrevAddrSubjLastTaxValEv := MAP(
+		PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+		NOT EXISTS(SubjPrevMktTaxLastSet) OR SubjPrevTaxValLast = 0 OR PL_PrevAddrSubjNewDt = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(SubjPrevTaxValLast, 1, 999999999));
+	
+Person: => PL_PrevAddrSubjLastMktVal7Y := MAP(
+	PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+	PL_PrevAddrSubjLastFlag7Y = NO_DATA_FOUND_97_INT OR (PL_PrevAddrSubjLastFlag7Y = 1 AND PL_PrevAddrSubjLastMktValEv = NO_DATA_FOUND_97_INT) OR (PL_PrevAddrSubjLastFlag7Y = 0 AND PL_PrevAddrMktValA7Y = NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+	PL_PrevAddrSubjLastFlag7Y = 1 => PL_PrevAddrSubjLastMktValEv,
+	PL_PrevAddrSubjLastFlag7Y = 0 => PL_PrevAddrMktValA7Y);
+
+Person: => PL_PrevAddrSubjLastTaxVal7Y := MAP(
+	PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+	NOT PrevAddrPropertyRecord => NO_DATA_FOUND_INT,
+	PL_PrevAddrSubjLastFlag7Y = NO_DATA_FOUND_97_INT OR (PL_PrevAddrSubjLastFlag7Y = 1 AND PL_PrevAddrSubjLastTaxValEv = NO_DATA_FOUND_97_INT) OR (PL_PrevAddrSubjLastFlag7Y = 0 AND PL_PrevAddrTaxValA7Y = NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+	PL_PrevAddrSubjLastFlag7Y = 1 => PL_PrevAddrSubjLastTaxValEv,
+	PL_PrevAddrSubjLastFlag7Y = 0 => PL_PrevAddrTaxValA7Y);
+
+
 //NLR Key helper attributes
 Person: => EverAppearsOnNLR := EXISTS(AppearsOnNLR(AppearsOnNLR = TRUE));
 Person: => EQOnNLREver := EXISTS(EQdidNLR(EQdidNLR = TRUE));
@@ -14939,3 +15042,4 @@ PersonSSN: => EverAppearsOnNLR := EXISTS(AppearsOnNLR(AppearsOnNLR = TRUE));
 PersonSSN: => EQOnNLREver := EXISTS(EQssnNLR(EQssnNLR = TRUE));
 PersonSSN: => ENOnNLREver := EXISTS(ENssnNLR(ENssnNLR = TRUE));
 PersonSSN: => TNOnNLREver := EXISTS(TNssnNLR(TNssnNLR = TRUE));
+
