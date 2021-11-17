@@ -1437,7 +1437,7 @@ InputPII: => PI_InpAddrFamilyOwnedFlag := MAP(PI_InpAddrOnFileFlagEv != 1 => MIS
 
 InputPII: => AddressRecords := Location.DataSources(HeaderHitFlag)
   {HeaderHitFlag,
-	AddressDateFirstSeen := IF(ISVALIDDATE(HeaderHitFlag:DateFirstSeen), DATETOSTRING(HeaderHitFlag:DateFirstSeen, '%Y%m01'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE),
+	AddressDateFirstSeen := IF(ISVALIDDATE(HeaderHitFlag:DateFirstSeen), DATETOSTRING(MIN(HeaderHitFlag:DateFirstSeen, Person.CURRENT_DATE), '%Y%m01'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE),
 	AddressDateLastSeen :=  IF(ISVALIDDATE(HeaderHitFlag:DateLastSeen), DATETOSTRING(MIN(HeaderHitFlag:DateLastSeen, Person.CURRENT_DATE), '%Y%m01'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)};
 
 InputPII: => InpAddressDateFirstSeen := ONLY(AddressRecords, AddressDateFirstSeen);
@@ -1506,13 +1506,23 @@ InputPII: => PI_InpAddrBusCnt := MAP(P_InpClnAddrFullFlagValue IN [MISSING_INPUT
 
 //KS-7239
 
-InputPII: => PI_InpClnAddrTypeIndx := MAP(
+InputPII: => PI_InpAddrType := MAP(
 		InputFullAddressCleanValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		InputAddressTypeCleanValue = NO_DATA_FOUND => NO_DATA_FOUND,
-		InputAddressTypeCleanValue = 'F' => '1',
-		InputAddressTypeCleanValue IN ['P','G'] => '2',
-		InputAddressTypeCleanValue IN ['R','RD','S','SD','H','HD','UD'] => '3',
-		InputAddressTypeCleanValue = 'M' => '4');
+		InputAddressTypeCleanValue IN ['F', 'FD'] => 'F',
+		InputAddressTypeCleanValue IN ['G', 'GD'] => 'G',
+		InputAddressTypeCleanValue IN ['H', 'HD'] => 'H',
+		InputAddressTypeCleanValue = 'P' => 'P',
+		InputAddressTypeCleanValue IN ['R', 'RD'] => 'R',
+		InputAddressTypeCleanValue IN ['S', 'SD'] => 'S',
+		InputAddressTypeCleanValue IN ['M', 'UD'] => 'U');
+		
+InputPII: => PI_InpAddrTypeIndx := MAP(
+		InputFullAddressCleanValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PI_InpAddrType = NO_DATA_FOUND => NO_DATA_FOUND,
+		PI_InpAddrType = 'F' => '0',
+		PI_InpAddrType IN ['P', 'G'] => '1',
+		PI_InpAddrType IN ['R', 'S', 'H', 'U'] => '2');
 
 /**************************************************************************/
 /*                                                                        */
@@ -4426,18 +4436,18 @@ Person: => EduCollSrcNewRecOldMsnc := MONTHSBETWEEN(DATE(EduCollSrcNewRecOldDt),
 Person: => PL_EduCollSrcNewRecOldMsncEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
 		NOT PersonEducation.Edu(CollRecFlag) => PersonEducation.NO_DATA_FOUND,
-		BOUNDSFOLD(EduCollSrcNewRecOldMsnc,0,999)); 
+		BOUNDSFOLD(EduCollSrcNewRecOldMsnc, 0, 960)); 
 		
 Person: => PL_EduCollSrcNewRecNewMsncEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
 		NOT PersonEducation.Edu(CollRecFlag) => PersonEducation.NO_DATA_FOUND,
-		BOUNDSFOLD(MONTHSBETWEEN(DATE(EduCollSrcNewRecNewDt),Person.BUILD_DATE),0,999)); 
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(EduCollSrcNewRecNewDt), Person.BUILD_DATE), 0, 960)); 
 
 Person: => PL_EduCollRecSpanEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
 		NOT PersonEducation.Edu(CollRecFlag) => PersonEducation.NO_DATA_FOUND,
 		BOUNDSFOLD(MONTHSBETWEEN(MIN(EduCollRecVerSourceList(SourceDateFirstSeen<>Person.NO_DATA_FOUND_97), DATE(SourceDateFirstSeen)),
-														 MAX(EduCollRecVerSourceList(SourceDateLastSeen<>Person.NO_DATA_FOUND_97), DATE(SourceDateLastSeen))),0,999)); 
+														 MAX(EduCollRecVerSourceList(SourceDateLastSeen<>Person.NO_DATA_FOUND_97), DATE(SourceDateLastSeen))), 0, 960)); 
 
 Person: => PL_EduCollRecNewLevelEv := MAP(
 		P_LexIDSeenFlag = '0' => PersonEducation.MISSING_INPUT_DATA,
@@ -4805,8 +4815,8 @@ Person: => AstVehAutoEmrgOldDt := DATETOSTRING(MIN(PersonVehicle(VehicleMinDate 
 
 Person: => PL_AstVehAutoCntEv := IF(P_LexIDSeenFlag = '0', PersonVehicle.MISSING_INPUT_DATA_INT,
 			BOUNDSFOLD(VehicleCount, 0, 999));
-Person: => PL_AstVehAutoEmrgDtListEv := TOPN(PersonVehicle{Automobile, VehicleFirstSeenDate := (VehicleMinDate)},999,-VehicleFirstSeenDate);
-Person: => PL_AstVehAutoLastDtListEv := TOPN(PersonVehicle{Automobile,VehicleLastSeenDate := (VehicleMaxDate)},999,-VehicleLastSeenDate);
+Person: => PL_AstVehAutoEmrgDtListEv := TOPN(PersonVehicle{Automobile, VehicleFirstSeenDate := VehicleMinDate}, 999, VehicleFirstSeenDate = PersonVehicle.REC_FOUND_BUT_INVALID, VehicleFirstSeenDate);
+Person: => PL_AstVehAutoLastDtListEv := TOPN(PersonVehicle{Automobile,VehicleLastSeenDate := VehicleMaxDate}, 999, VehicleLastSeenDate = PersonVehicle.REC_FOUND_BUT_INVALID, VehicleLastSeenDate);
 Person: => PL_AstVehAutoCnt10Y := MAP(
 			P_LexIDSeenFlag = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,									
 			BOUNDSFOLD(COUNT(PersonVehicle(Seen_In_Last_Ten_Years)),0,999));
@@ -4827,12 +4837,12 @@ Person: => PL_AstVehAutoEmrgNewMsncEv := MAP(
 			P_LexIDSeenFlag = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
 			VehicleCount = 0 => PersonVehicle.NO_DATA_FOUND_INT,
 			VehicleCountNoMinDate => PersonVehicle.REC_FOUND_BUT_INVALID_INT,	
-			BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehAutoEmrgNewDt),VehicleBuildCurrentDate),0,999)); 
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehAutoEmrgNewDt), VehicleBuildCurrentDate), 0, 960)); 
 Person: => PL_AstVehAutoEmrgOldMsncEv := MAP( 
 			P_LexIDSeenFlag = '0' => PersonVehicle.MISSING_INPUT_DATA_INT,
 			VehicleCount = 0 => PersonVehicle.NO_DATA_FOUND_INT,
 			VehicleCountNoMinDate => PersonVehicle.REC_FOUND_BUT_INVALID_INT,	
-			BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehAutoEmrgOldDt),VehicleBuildCurrentDate),0,999));	
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehAutoEmrgOldDt), VehicleBuildCurrentDate), 0, 960));	
 
 
 
@@ -4862,7 +4872,7 @@ Person: => AstVehAirNewDtEv := DATETOSTRING(MAX(AircraftOwner(AircraftMaxDate !=
 
 Person: => PL_AstVehAirCntEv:= IF(P_LexIDSeenFlag = '0', AircraftOwner.MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(AstVehAirCnt, 0, 99));
-Person: => PL_AstVehAirEmrgDtListEvPre := TOPN(AircraftOwner{Plane, AircraftFirstSeenDate := (AircraftMinDate)},999,AircraftFirstSeenDate);
+Person: => PL_AstVehAirEmrgDtListEvPre := TOPN(AircraftOwner{Plane, AircraftFirstSeenDate := AircraftMinDate}, 999, AircraftFirstSeenDate = AircraftOwner.REC_FOUND_BUT_INVALID, AircraftFirstSeenDate);
 Person: => PL_AstVehAirEmrgDtListEv := CONCAT(PL_AstVehAirEmrgDtListEvPre, AircraftFirstSeenDate, '|');
 
 Person: => PL_AstVehAirCnt2Y := MAP(
@@ -4889,12 +4899,12 @@ Person: => PL_AstVehAirEmrgNewMsncEv := MAP(
 				P_LexIDSeenFlag = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
 				AstVehAirCnt = 0 => AircraftOwner.NO_DATA_FOUND_INT,
 				AstVehAirCntNoMinDate => AircraftOwner.REC_FOUND_BUT_INVALID_INT,	
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehAirEmrgNewDt ),AircraftBuildCurrentDate),0,999)); 
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehAirEmrgNewDt ), AircraftBuildCurrentDate), 0, 960)); 
 Person: => PL_AstVehAirEmrgOldMsncEv := MAP(
 				P_LexIDSeenFlag = '0' => AircraftOwner.MISSING_INPUT_DATA_INT,
 				AstVehAirCnt = 0 => AircraftOwner.NO_DATA_FOUND_INT,
 				AstVehAirCntNoMinDate => AircraftOwner.REC_FOUND_BUT_INVALID_INT,	
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehAirEmrgOldDt),AircraftBuildCurrentDate),0,999));
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehAirEmrgOldDt), AircraftBuildCurrentDate), 0, 960));
 
 
 /**************************************************************************/
@@ -4924,7 +4934,7 @@ Person: => AstVehWtrNewDtEv := DATETOSTRING(MAX(WatercraftOwner(WatercraftMaxDat
 
 Person: => PL_AstVehWtrCntEv:= IF(P_LexIDSeenFlag = '0', WatercraftOwner.MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(AstVehWtrCnt, 0, 99));
-Person:	=>	PL_AstVehWtrEmrgDtListEvPre := TOPN(WatercraftOwner{WCraft,WatercraftFirstSeenDate := (WatercraftMinDate)},999,WatercraftFirstSeenDate);
+Person:	=>	PL_AstVehWtrEmrgDtListEvPre := TOPN(WatercraftOwner{WCraft,WatercraftFirstSeenDate := WatercraftMinDate}, 999, WatercraftFirstSeenDate = WatercraftOwner.REC_FOUND_BUT_INVALID, WatercraftFirstSeenDate);
 Person:	=>	PL_AstVehWtrEmrgDtListEv := CONCAT(PL_AstVehWtrEmrgDtListEvPre, WatercraftFirstSeenDate, '|');
 
 Person: => PL_AstVehWtrCnt2Y := MAP(
@@ -4950,12 +4960,12 @@ Person:	=>	PL_AstVehWtrEmrgNewMsncEv := MAP(
 				P_LexIDSeenFlag = '0' => WatercraftOwner.MISSING_INPUT_DATA_INT,
 				AstVehWtrCnt = 0 => WatercraftOwner.NO_DATA_FOUND_INT,
 				AstVehWtrCntNoMinDate => WatercraftOwner.REC_FOUND_BUT_INVALID_INT,	
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehWtrEmrgNewDt),WatercraftBuildCurrentDate),0,999));
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehWtrEmrgNewDt), WatercraftBuildCurrentDate), 0, 960));
 Person:	=>	PL_AstVehWtrEmrgOldMsncEv:= MAP(
 				P_LexIDSeenFlag = '0' => WatercraftOwner.MISSING_INPUT_DATA_INT,
 				AstVehWtrCnt = 0 => WatercraftOwner.NO_DATA_FOUND_INT,
 				AstVehWtrCntNoMinDate => WatercraftOwner.REC_FOUND_BUT_INVALID_INT,	
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehWtrEmrgOldDt),WatercraftBuildCurrentDate),0,999));
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(AstVehWtrEmrgOldDt), WatercraftBuildCurrentDate), 0, 960));
 
 
 Person: =>  PL_AstVehWtrAirCnt2Y := MAP(
@@ -6581,7 +6591,7 @@ ProfessionalLicense: => IsActive := MaxExpireDate > BUILD_DATE;
 ProfessionalLicense: => IsExpired := MaxExpireDate < BUILD_DATE;
 
 
-Person: => ProfessionalLicenseDates := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, IsActive, IsExpired,  MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 100, MaxIssueDate, -MaxExpireDate);
+Person: => ProfessionalLicenseDates := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID, IsActive, IsExpired,  MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 100, MaxIssueDate = ProfessionalLicense.REC_FOUND_BUT_INVALID, MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseIssueExpDate := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseIssueDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxIssueDate);
 Person: => ActiveProfessionalLicenseExpDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxExpireDate);
@@ -11253,8 +11263,8 @@ PersonProperty: =>Seen_In_Five_Years :=AgeInDays<=PersonProperty.FIVE_YEARS_IN_D
 Person: =>Purchase1YCount :=COUNT(PersonProperty(PropertyIsPurchased AND Seen_In_One_Year){Prop});
 Person: =>Purchase5YCount :=COUNT(PersonProperty(PropertyIsPurchased AND Seen_In_Five_Years){Prop});
 Person: =>PurchaseCountEver :=COUNT(PersonProperty(PropertyIsPurchased){Prop});
-Person: => PurchaseDateListSorted := TOPN(PersonProperty(PropertyIsPurchased){PropertyPurchaseDateFirstSeen:=IF(ISVALIDDATE(PropertyPurchaseDateFirstSeen),DATETOSTRING(PropertyPurchaseDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),PropertyPurchasePrice := IF(PropertyPurchasePrice = '' OR PropertyPurchasePrice:Null, Person.NO_DATA_FOUND_97, PropertyPurchasePrice),Prop},999,PropertyPurchaseDateFirstSeen, PropertyPurchasePrice);
-Person: => PurchasePriceNewAmountSorted := TOPN(PurchaseDateListSorted(PropertyPurchasePrice != Person.NO_DATA_FOUND_97),1 , -PropertyPurchaseDateFirstSeen, -PropertyPurchasePrice);
+Person: => PurchaseDateListSorted := TOPN(PersonProperty(PropertyIsPurchased){PropertyPurchaseDateFirstSeen:=IF(ISVALIDDATE(PropertyPurchaseDateFirstSeen),DATETOSTRING(PropertyPurchaseDateFirstSeen,'%Y%m%d'),Person.NO_DATA_FOUND_97),PropertyPurchasePrice := IF(PropertyPurchasePrice = '' OR PropertyPurchasePrice:Null, Person.NO_DATA_FOUND_97, PropertyPurchasePrice), Prop}, 999, PropertyPurchaseDateFirstSeen = Person.NO_DATA_FOUND_97, PropertyPurchaseDateFirstSeen, PropertyPurchasePrice);
+Person: => PurchasePriceNewAmountSorted := TOPN(PurchaseDateListSorted, 1 , -PropertyPurchaseDateFirstSeen, -PropertyPurchasePrice);
 Person: => PurchasePriceNewAmount := ONLY(PurchasePriceNewAmountSorted, PropertyPurchasePrice);
 Person: => PurchasePriceList := CONCAT(PurchaseDateListSorted,PropertyPurchasePrice,'|');
 Person: =>DateList :=CONCAT(PurchaseDateListSorted,PropertyPurchaseDateFirstSeen,'|');
@@ -11350,7 +11360,7 @@ Person: => PL_AstPropPurchAmtListEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT
 				
 Person: => PL_AstPropPurchNewAmtEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
 				PL_AstPropPurchCntEv < 1 => NO_DATA_FOUND_INT,				
-				ALL(PurchaseDateListSorted, PropertyPurchasePrice = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				PurchasePriceNewAmount = Person.NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(INTEGER(PurchasePriceNewAmount), 0, 999999999));
 
 Person: => PL_AstPropPurchTotEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
@@ -11543,7 +11553,7 @@ Person: => PL_AccNewDtEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_
 Person: => PL_AccNewMsncEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
 																	AccentCountCap = 0 => PersonAccident.NO_DATA_FOUND,
 																	AccNoDates => PersonAccident.NO_DATA_FOUND_97,
-																	BOUNDSFOLD(MONTHSBETWEEN(DATE(AccNewDt),PersonAccident.CURRENT_DATE),0,999));
+																	BOUNDSFOLD(MONTHSBETWEEN(DATE(AccNewDt), PersonAccident.CURRENT_DATE), 0, 960));
 
 Person: => PL_AccDmgAmtListEv := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_INPUT_DATA,
 																		 AccentCountCap = 0 => PersonAccident.NO_DATA_FOUND,
