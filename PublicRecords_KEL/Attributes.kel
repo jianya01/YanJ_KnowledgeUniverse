@@ -4379,6 +4379,16 @@ Person: => NewestColTier2 := ONLY(EduCollRecVerSourceNewListFiltered, INTEGER(Ti
 
 Person: => ColTierAvail := EXISTS(EduCollRecVerSourceListSorted(Tier IN ['1', '2', '3', '4', '5', '6']));
 Person: => ColTier2Avail := EXISTS(EduCollRecVerSourceListSorted(Tier2 IN ['1', '2', '3', '4', '5', '6']));
+
+Person: EDUCATION_LAND_USE_CODES := ['0118', '0119', '0656', '0664', '0680', '1111', '9103', '9203', '9204'];
+Person: => CollegeAddressesCountByUseCode := IF(EXISTS(PII.Location.AddressProperty.Prop{PropertyEvent(StandardizedLandUseCode IN Person.EDUCATION_LAND_USE_CODES)}),1,0) + 
+																						 IF(EXISTS(PII.CurrentAddress.AddressProperty.Prop{PropertyEvent(StandardizedLandUseCode IN Person.EDUCATION_LAND_USE_CODES)}),1,0) +
+																						 IF(EXISTS(PII.PreviousAddress.AddressProperty.Prop{PropertyEvent(StandardizedLandUseCode IN Person.EDUCATION_LAND_USE_CODES)}),1,0);
+PersonAddress: => IsAddressHistoryAddress := EXISTS(AddressHierarchy(AddressRank > 0));
+PersonAddress: => IsCollegeAddressHistoryAddress := IsAddressHistoryAddress AND (Location.CollegeFlag = 'Y' OR Location.SeasonalDeliveryFlag = 'E');
+Person: => HasCollegeAddressOnADVO := EXISTS(PersonAddress(IsCollegeAddressHistoryAddress));
+
+
 /**************************************************************************/
 /*                                                                        */
 /*                  Education Attributes                             */
@@ -4502,6 +4512,11 @@ Person: => PL_EduCollTierBestEv := MAP(
 		ColTier2Avail => MIN(EduCollRecVerSourceListSorted(Tier2 IN ['1', '2', '3', '4', '5', '6']), INTEGER(Tier2)),
 		ColTierAvail => MIN(EduCollRecVerSourceListSorted(Tier IN ['1', '2', '3', '4', '5', '6']), INTEGER(Tier)),
 		NO_DATA_FOUND_97);
+		
+Person: => PL_AddrCollegeFlag := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA_INT,
+																 PL_AddrHistOnFileFlag = 0 => NO_DATA_FOUND_INT,
+																 CollegeAddressesCountByUseCode > 0 OR HasCollegeAddressOnADVO => 1,
+																 0);
 /**************************************************************************/
 /*                                                                        */
 /*                  EmergingID Attributes                      			      */
