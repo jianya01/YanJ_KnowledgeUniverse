@@ -13899,6 +13899,97 @@ Person: => PL_VerDOBSrcBureauOnlyFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_In
 																					
 
 
+//DOB credentialed
+//KS7481
+Person: => DOBMatchCredentialedSourcesSortedNonFCRA := TOPN(DOBMatchSources(TranslatedSource IN CREDENTIALED_SOURCES), 99, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, TranslatedSource);
+Person: => DOBMatchCredentialedSourcesSortedFCRA := TOPN(DOBMatchSources(TranslatedSource IN CREDENTIALED_SOURCES_FCRA AND (TranslatedSource != 'BA' OR ValidBankruptcySources) AND (TranslatedSource != 'L2' OR ValidLiensSources)), 99, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, TranslatedSource);
+
+
+Person: => PL_InpDOBSrcCredCntEvNonFCRA  := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(DOBMatchCredentialedSourcesSortedNonFCRA), 0, 99));			
+Person: => PL_InpDOBSrcCredCntEvFCRA  := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(DOBMatchCredentialedSourcesSortedFCRA), 0, 99));
+
+
+Person: => PL_InpDOBSrcCredListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchCredentialedSourcesSortedNonFCRA, TranslatedSource, '|'));
+Person: => PL_InpDOBSrcCredListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchCredentialedSourcesSortedFCRA, TranslatedSource, '|'));
+
+
+Person: => PL_InpDOBSrcCredEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcCredListEvNonFCRA < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchCredentialedSourcesSortedNonFCRA, DateFirstSeenCleaned, '|'));
+Person: => PL_InpDOBSrcCredEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchCredentialedSourcesSortedFCRA, DateFirstSeenCleaned, '|'));
+
+Person: => PL_InpDOBSrcCredOldDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchCredentialedSourcesSortedNonFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(DOBMatchCredentialedSourcesSortedNonFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+Person: => PL_InpDOBSrcCredOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchCredentialedSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(DOBMatchCredentialedSourcesSortedFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+
+Person: => PL_InpDOBSrcCredOldMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_InpDOBSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchCredentialedSourcesSortedNonFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpDOBSrcCredOldDtEvNonFCRA), CURRENT_DATE), 0, 960));
+Person: => PL_InpDOBSrcCredOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_InpDOBSrcCredCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchCredentialedSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpDOBSrcCredOldDtEvFCRA), CURRENT_DATE), 0, 960));
+//DOB nonderog
+Person: => DOBMatchNonDerogSourcesSortedNonFCRA := TOPN(DOBMatchSources(TranslatedSource IN NON_FCRA_NON_DEROG_VALID_SOURCES), 99, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
+Person: => DOBMatchNonDerogSourcesSortedFCRA := TOPN(DOBMatchSources(TranslatedSource IN FCRA_NON_DEROG_VALID_SOURCES), 99, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97, DateFirstSeenCleaned, -DateLastSeenCleaned, TranslatedSource);
+
+
+Person: => PL_InpDOBSrcNonDrgCntEvNonFCRA  := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(DOBMatchNonDerogSourcesSortedNonFCRA), 0, 99));			
+Person: => PL_InpDOBSrcNonDrgCntEvFCRA  :=MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_VerDOBSrcCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+				BOUNDSFOLD(COUNT(DOBMatchNonDerogSourcesSortedFCRA), 0, 99));
+
+
+Person: => PL_InpDOBSrcNonDrgListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcNonDrgCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchNonDerogSourcesSortedNonFCRA, TranslatedSource, '|'));
+Person: => PL_InpDOBSrcNonDrgListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcNonDrgCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchNonDerogSourcesSortedFCRA, TranslatedSource, '|'));
+
+
+Person: => PL_InpDOBSrcNonDrgEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcNonDrgCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchNonDerogSourcesSortedNonFCRA, DateFirstSeenCleaned, '|'));
+Person: => PL_InpDOBSrcNonDrgEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcNonDrgCntEvFCRA  < 1 => NO_DATA_FOUND,
+				CONCAT(DOBMatchNonDerogSourcesSortedFCRA, DateFirstSeenCleaned, '|'));
+
+Person: => PL_InpDOBSrcNonDrgOldDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcNonDrgCntEvNonFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchNonDerogSourcesSortedNonFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(DOBMatchNonDerogSourcesSortedNonFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+Person: => PL_InpDOBSrcNonDrgOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA,
+				PL_InpDOBSrcNonDrgCntEvFCRA  < 1 => NO_DATA_FOUND,
+				ALL(DOBMatchNonDerogSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+				DATETOSTRING(MIN(DOBMatchNonDerogSourcesSortedFCRA, DATE(DateFirstSeenCleaned)), '%Y%m%d'));
+
+Person: => PL_InpDOBSrcNonDrgOldMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_InpDOBSrcNonDrgCntEvNonFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchNonDerogSourcesSortedNonFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpDOBSrcNonDrgOldDtEvNonFCRA), CURRENT_DATE), 0, 960));
+Person: => PL_InpDOBSrcNonDrgOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
+				PL_InpDOBSrcNonDrgCntEvFCRA  < 1 => NO_DATA_FOUND_INT,
+				ALL(DOBMatchNonDerogSourcesSortedFCRA, DateFirstSeenCleaned = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpDOBSrcNonDrgOldDtEvFCRA), CURRENT_DATE), 0, 960));
 
 //KS-1878 Input/best PII matching
 Person: => PL_VerBestNameFirstFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestNameFirst = NO_DATA_FOUND OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
