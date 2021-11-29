@@ -1632,6 +1632,9 @@ InputPII: =>PI_InpSSNIsDeceasedFlag := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_
 InputPII: =>PI_InpSSNDeceasedDt := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 PI_InpSSNIsDeceasedFlag = 0 => NO_DATA_FOUND_INT,
 																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
+InputPII: => PI_InpSSNDeceasedMsnc := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																			 PI_InpSSNDeceasedDt = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,																				
+																			 BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(STRING(PI_InpSSNDeceasedDt), '%Y%m%d'), Person.CURRENT_DATE),0,960));																				
 //KS-6266
 InputPII: =>PI_InpAddrStateDLAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 fnInDriversState(P_InpClnAddrState) => 1,
@@ -4295,7 +4298,10 @@ Person: => PL_BestSSNDeceasedDt := MAP(
             PL_BestSSN = MISSING_INPUT_DATA OR PL_BestSSN = NO_DATA_FOUND => MISSING_INPUT_DATA,
             PL_BestSSNIsDeceasedFlag = '0' => NO_DATA_FOUND,
             ONLY(TOPN(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt), '%Y%m%d')), 1, -DateOfDeath), STRING(DateOfDeath)));
-
+Person: => PL_BestSSNDeceasedMsnc := MAP(
+            PL_BestSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+						PL_BestSSNDeceasedDt = NO_DATA_FOUND => NO_DATA_FOUND_INT,
+						BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(PL_BestSSNDeceasedDt, '%Y%m%d'), CURRENT_DATE),0,960)); 
 Person: => PL_BestDOB:= MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 			BestDOB:Null => NO_DATA_FOUND,
