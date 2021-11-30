@@ -3003,6 +3003,7 @@ Person: INVALIDADDRESSRANK := [0, 91, 92, 93, 94, 95, 96, 97, 98, 99];
 Person: BUSADDRESSTYPE := 'BUS';
 Person: => AddressHierarchySet := TOPN(PersonAddress.AddressHierarchy
                                     {
+																		Location,
                                     AddressRank,
 																		AddressRankBest,
 																		AddressType,
@@ -3061,49 +3062,54 @@ Person: => AddressHierarchySet := TOPN(PersonAddress.AddressHierarchy
 
 
 
-// Person: => Occupied := ONLY(TOPN(AddressHierarchySet(HierarchyDateFirstSeen < CURRENTDATE() AND HierarchyDateLastSeen > CURRENTDATE()), 1,
-													// UtilitySourceCount = SourceCount,
-													// NOT (HierarchyDateFirstSeen = MAX(Person.AddressHierarchySet,HierarchyDateFirstSeen) AND HierarchyDateLastSeen = MAX(Person.AddressHierarchySet,HierarchyDateLastSeen)),
-													// -(InsuranceSourceCount + PropertySourceCount + VehicleSourceCount + VoterSourceCount + DLSourceCount),
-													// -(SourceCount - BureauSourceCount),
-													// -(SourceCount),
-													// BureauSourceCount <= 1
-													// ));
-// Person: => OccupiedAll := AddressHierarchySet(HierarchyDateFirstSeen < CURRENTDATE() AND HierarchyDateLastSeen > CURRENTDATE(), 
-													// ((Person.Occupied.UtilitySourceCount = Person.Occupied.SourceCount AND UtilitySourceCount = SourceCount) OR (Person.Occupied.UtilitySourceCount != Person.Occupied.SourceCount AND UtilitySourceCount != SourceCount)),
-													// Person.Occupied.HierarchyDateFirstSeen = HierarchyDateFirstSeen AND Person.Occupied.HierarchyDateLastSeen = HierarchyDateLastSeen,
-													// Person.Occupied.InsuranceSourceCount + Person.Occupied.PropertySourceCount + Person.Occupied.VehicleSourceCount + Person.Occupied.VoterSourceCount + Person.Occupied.DLSourceCount = InsuranceSourceCount + PropertySourceCount + VehicleSourceCount + VoterSourceCount + DLSourceCount,
-													// Person.Occupied.SourceCount - Person.Occupied.BureauSourceCount = SourceCount - BureauSourceCount,
-													// Person.Occupied.SourceCount = SourceCount,
-													// ((Person.Occupied.BureauSourceCount <= 1 AND BureauSourceCount <= 1) OR (Person.Occupied.BureauSourceCount <= 1 AND BureauSourceCount <= 1))
-													// );
-// Person: => OccupiedAddresses := PersonAddress(
-	// IsNullOrEqual(TRIMBOTH(Subject.OccupiedAll.PrimaryRange),TRIMBOTH(Location.PrimaryRange)) AND
-	// IsNullOrEqual(TRIMBOTH(Subject.OccupiedAll.Predirectional), TRIMBOTH(Location.Predirectional)) AND
-	// IsNullOrEqual(TRIMBOTH(Subject.OccupiedAll.PrimaryName), TRIMBOTH(Location.PrimaryName)) AND
-	// IsNullOrEqual(TRIMBOTH(Subject.OccupiedAll.Suffix), TRIMBOTH(Location.Suffix)) AND
-	// IsNullOrEqual(TRIMBOTH(Subject.OccupiedAll.Postdirectional), TRIMBOTH(Location.Postdirectional)) AND
-	// IsNullOrEqual(TRIMBOTH(Subject.OccupiedAll.ZIP5), TRIMBOTH(INTFORMAT(Location.ZIP5,5,1))) AND
-	// IsNullOrEqual(TRIMBOTH(Subject.OccupiedAll.SecondaryRange), TRIMBOTH(Location.SecondaryRange))
-	// ){Location};
-// Person: => OccupiedAddress := ONLY(OccupiedAddresses.Location);//Takes the top result.
+Person.AddressHierarchySet: => SortCriteria1 := UtilitySourceCount = SourceCount;
+Person.AddressHierarchySet: => SortCriteria2 := NOT (HierarchyDateFirstSeen = MAX(Person.AddressHierarchySet,HierarchyDateFirstSeen) AND HierarchyDateLastSeen = MAX(Person.AddressHierarchySet,HierarchyDateLastSeen));
+Person.AddressHierarchySet: => SortCriteria3 := -(InsuranceSourceCount + PropertySourceCount + VehicleSourceCount + VoterSourceCount + DLSourceCount);
+Person.AddressHierarchySet: => SortCriteria4 := -(SourceCount - BureauSourceCount);
+Person.AddressHierarchySet: => SortCriteria5 := -(SourceCount);
+Person.AddressHierarchySet: => SortCriteria6 := BureauSourceCount <= 1;
 
-// InputPII: => PI_InpAddrOccupancyIndx :=  MAP(Subject.P_LexIDSeenFlag = 0 OR P_InpClnAddrFullFlagValue != 1 => MISSING_INPUT_DATA_INT,
-																					// PI_InpAddrIsPOBoxFlag != 1 AND Subject.OccupiedAddress:Null => 0,
-																					// PI_InpAddrIsPOBoxFlag != 1 AND Subject.OccupiedAddress = Location => 1,
-																					// PI_InpAddrIsPOBoxFlag != 1 AND Location IN Subject.OccupiedAddresses => 2,
-																					// PI_InpAddrIsPOBoxFlag != 1 AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 3,
-																					// PI_InpAddrIsPOBoxFlag != 1 => 4,
-																					// PI_InpAddrIsPOBoxFlag = 1 AND EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 5,
-																					// PI_InpAddrIsPOBoxFlag = 1  AND EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND NOT EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 6,
-																					// PI_InpAddrIsPOBoxFlag = 1  AND NOT EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 7,
-																					// PI_InpAddrIsPOBoxFlag = 1  AND NOT EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 6,
-																					// PI_InpAddrIsPOBoxFlag = 1 => 8);
-	// Person: => PL_CurrAddrOccupancyIndx :=  MAP(P_LexIDSeenFlag = 0 => MISSING_INPUT_DATA_INT,
-																					// OccupiedAddress:Null => 0,
-																					// OccupiedAddress = CurrAddrHelperAttribute => 1,
-																					// CurrAddrHelperAttribute IN OccupiedAddresses => 2,
-																					// 3);																				
+Person: => Occupied := ONLY(TOPN(AddressHierarchySet(HierarchyDateFirstSeen < CURRENTDATE() AND HierarchyDateLastSeen > CURRENTDATE()), 1,
+													SortCriteria1, 
+													SortCriteria2,
+													SortCriteria3,
+													SortCriteria4,
+													SortCriteria5,
+													SortCriteria6,
+													PrimaryRange/*Only here to make determinate*/){Location, SortCriteria1, SortCriteria2, SortCriteria3, SortCriteria4, SortCriteria5, SortCriteria6 });
+													
+Person: => OccupiedAll := AddressHierarchySet(HierarchyDateFirstSeen < CURRENTDATE() AND HierarchyDateLastSeen > CURRENTDATE(), 
+													SortCriteria1 = Occupied.SortCriteria1,
+													SortCriteria2 = Occupied.SortCriteria2,
+													SortCriteria3 = Occupied.SortCriteria3,
+													SortCriteria4 = Occupied.SortCriteria4,
+													SortCriteria5 = Occupied.SortCriteria5,
+													SortCriteria6 = Occupied.SortCriteria6
+													);
+Person: => OccupiedAddresses := Person.OccupiedAll{Location};
+Person: => OccupiedAddress := Occupied.Location;
+
+InputPII: => PI_InpAddrOccupancyIndx :=  MAP(Subject.P_LexIDSeenFlag = '0' OR P_InpClnAddrFullFlagValue != '1' => MISSING_INPUT_DATA_INT,
+																					PI_InpAddrIsPOBoxFlag != '1' AND Subject.OccupiedAddress:Null => 0,
+																					PI_InpAddrIsPOBoxFlag != '1' AND Subject.OccupiedAddress = Location => 1,
+																					PI_InpAddrIsPOBoxFlag != '1' AND Location IN Subject.OccupiedAddresses => 2,
+																					PI_InpAddrIsPOBoxFlag != '1' AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 3,
+																					PI_InpAddrIsPOBoxFlag != '1' => 4,
+																					PI_InpAddrIsPOBoxFlag = '1' AND EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 5,
+																					PI_InpAddrIsPOBoxFlag = '1' AND EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND NOT EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 6,
+																					PI_InpAddrIsPOBoxFlag = '1' AND NOT EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 7,
+																					PI_InpAddrIsPOBoxFlag = '1' => 8);
+
+Person: => PL_CurrAddrOccupancyIndx :=  MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																					OccupiedAddress:Null => 0,
+																					OccupiedAddress = CurrAddrHelperAttribute => 1,
+																					CurrAddrHelperAttribute IN OccupiedAddresses => 2,
+																					3);
+//KS-7225
+InputPII: => PI_InpAddrOwnNotOccFlag :=  MAP(Subject.P_LexIDSeenFlag = '0' OR P_InpClnAddrFullFlagValue != '1' OR PI_InpAddrOnFileFlagEv IN [MISSING_INPUT_DATA_INT, 0]  => MISSING_INPUT_DATA_INT,
+																					Location:Null OR Prop:Null => NO_DATA_FOUND_INT,
+																					PI_InpAddrSubjOwnedFlag = 1 AND PI_InpAddrOccupancyIndx = 3 => 1,
+																					0);
 // Current and previous address values are pre-calculated in MiniAttributes and returned through the Mini query. Then they are mapped back in through the InputPII ENTITY.
 // This enhances performance so that, say, for current address property attributes, we only fetch property records tied to the current address instead of fetching property records for all PersonAddress addresses.
 Person: => CurrentAddrPrimRng := DEFAULT(PII.CurrentAddrPrimRng, '');
