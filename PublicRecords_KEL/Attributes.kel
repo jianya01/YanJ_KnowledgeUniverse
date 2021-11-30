@@ -14459,6 +14459,95 @@ Person: => PL_VerBestPhoneHomeFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnP
 																		PL_VerPhoneSrcCntEvFCRA < 1 => NO_DATA_FOUND,
 																		PL_VerPhoneFlag = '1' AND PII.P_InpClnPhoneHome != PL_BestPhoneHomeFCRA => '0',
 																		PII.P_InpClnPhoneHome = PL_BestPhoneHomeFCRA => '1');
+//KS-7482
+Person: => PhoneHeaderOnlyTranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode := TranslatedSourceCode,
+	RecordCount := TranslatedSourceCode:Weight,//To be used later
+	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), Phone.NO_DATA_FOUND_97),
+	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Phone.CURRENT_DATE), '%Y%m%d'), Phone.NO_DATA_FOUND_97)};
+
+Person: => PhoneCredSourceListSortedFCRA := TOPN(PhoneHeaderOnlyTranslatedSources(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES_FCRA),	99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+Person: => PhoneCredSourceListSortedNonFCRA := TOPN(PhoneHeaderOnlyTranslatedSources(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES), 99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+
+Person: => PL_InpPhoneSrcCredCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																PL_VerPhoneSrcCntEv = 0 => NO_DATA_FOUND_INT,
+																BOUNDSFOLD(COUNT(PhoneCredSourceListSortedNonFCRA), 0, 99));
+Person: => PL_InpPhoneSrcCredCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																PL_VerPhoneSrcCntEvFCRA = 0 => NO_DATA_FOUND_INT,
+																BOUNDSFOLD(COUNT(PhoneCredSourceListSortedFCRA), 0, 99));
+
+Person: => PL_InpPhoneSrcCredListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+																 PL_InpPhoneSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneCredSourceListSortedNonFCRA, TranslatedSourceCode, '|'));
+Person: => PL_InpPhoneSrcCredListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+																 PL_InpPhoneSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneCredSourceListSortedFCRA, TranslatedSourceCode, '|'));
+
+Person: => PL_InpPhoneSrcCredEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_InpPhoneSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneCredSourceListSortedNonFCRA, SourceDateFirstSeen, '|'));
+Person: => PL_InpPhoneSrcCredEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_InpPhoneSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneCredSourceListSortedFCRA, SourceDateFirstSeen, '|'));
+
+Person: => PL_InpPhoneSrcCredOldDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_InpPhoneSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 PL_InpPhoneSrcCredCntEvNonFCRA > 0 AND ALL(PhoneCredSourceListSortedNonFCRA,SourceDateFirstSeen = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+																 DATETOSTRING(MIN(PhoneCredSourceListSortedNonFCRA(SourceDateFirstSeen != Person.NO_DATA_FOUND_97),DATE(SourceDateFirstSeen)),'%Y%m%d' ));
+Person: => PL_InpPhoneSrcCredOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_InpPhoneSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+																 PL_InpPhoneSrcCredCntEvFCRA > 0 AND ALL(PhoneCredSourceListSortedFCRA,SourceDateFirstSeen = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+																 DATETOSTRING(MIN(PhoneCredSourceListSortedFCRA(SourceDateFirstSeen != Person.NO_DATA_FOUND_97),DATE(SourceDateFirstSeen)),'%Y%m%d' ));
+
+Person: => PL_InpPhoneSrcCredOldMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA_INT,
+																 PL_InpPhoneSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+																 PL_InpPhoneSrcCredOldDtEvNonFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+																 BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpPhoneSrcCredOldDtEvNonFCRA),CURRENT_DATE),0,960));
+Person: => PL_InpPhoneSrcCredOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA_INT,
+																 PL_InpPhoneSrcCredCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+																 PL_InpPhoneSrcCredOldDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+																 BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpPhoneSrcCredOldDtEvFCRA),CURRENT_DATE),0,960));
+//NonDerog
+Person: => PhoneNonDrgSourceListSortedFCRA := TOPN(PhoneHeaderOnlyTranslatedSources(TranslatedSourceCode IN Person.FCRA_NON_DEROG_VALID_SOURCES), 99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+Person: => PhoneNonDrgSourceListSortedNonFCRA := TOPN(PhoneHeaderOnlyTranslatedSources(TranslatedSourceCode IN Person.NON_FCRA_NON_DEROG_VALID_SOURCES), 99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+
+Person: => PL_InpPhoneSrcNonDrgCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																PL_VerPhoneSrcCntEvFCRA = 0 => NO_DATA_FOUND_INT,
+																BOUNDSFOLD(COUNT(PhoneNonDrgSourceListSortedNonFCRA), 0, 99));
+Person: => PL_InpPhoneSrcNonDrgCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																PL_VerPhoneSrcCntEvFCRA = 0 => NO_DATA_FOUND_INT,
+																BOUNDSFOLD(COUNT(PhoneNonDrgSourceListSortedFCRA), 0, 99));
+
+Person: => PL_InpPhoneSrcNonDrgListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+																 PL_InpPhoneSrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneNonDrgSourceListSortedNonFCRA, TranslatedSourceCode, '|'));
+Person: => PL_InpPhoneSrcNonDrgListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA, 
+																 PL_InpPhoneSrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneNonDrgSourceListSortedFCRA, TranslatedSourceCode, '|'));
+
+Person: => PL_InpPhoneSrcNonDrgEmrgDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_InpPhoneSrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneNonDrgSourceListSortedNonFCRA, SourceDateFirstSeen, '|'));
+Person: => PL_InpPhoneSrcNonDrgEmrgDtListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_InpPhoneSrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+																 CONCAT(PhoneNonDrgSourceListSortedFCRA, SourceDateFirstSeen, '|'));
+
+Person: => PL_InpPhoneSrcNonDrgOldDtEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_InpPhoneSrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+																 PL_InpPhoneSrcNonDrgCntEvNonFCRA > 0 AND ALL(PhoneNonDrgSourceListSortedNonFCRA,SourceDateFirstSeen = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+																 DATETOSTRING(MIN(PhoneNonDrgSourceListSortedNonFCRA(SourceDateFirstSeen != Person.NO_DATA_FOUND_97),DATE(SourceDateFirstSeen)),'%Y%m%d' ));
+Person: => PL_InpPhoneSrcNonDrgOldDtEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA,
+																 PL_InpPhoneSrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+																 PL_InpPhoneSrcNonDrgCntEvFCRA > 0 AND ALL(PhoneNonDrgSourceListSortedFCRA,SourceDateFirstSeen = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+																 DATETOSTRING(MIN(PhoneNonDrgSourceListSortedFCRA(SourceDateFirstSeen != Person.NO_DATA_FOUND_97),DATE(SourceDateFirstSeen)),'%Y%m%d' ));
+
+Person: => PL_InpPhoneSrcNonDrgOldMsncEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA_INT,
+																 PL_InpPhoneSrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+																 PL_InpPhoneSrcNonDrgOldDtEvNonFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+																 BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpPhoneSrcNonDrgOldDtEvNonFCRA),CURRENT_DATE),0,960));
+Person: => PL_InpPhoneSrcNonDrgOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] =>  MISSING_INPUT_DATA_INT,
+																 PL_InpPhoneSrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+																 PL_InpPhoneSrcNonDrgOldDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
+																 BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpPhoneSrcNonDrgOldDtEvFCRA),CURRENT_DATE),0,960));
 
 // KS-2702
 PersonPhone: => AgeFirstSeen := MONTHSBETWEEN(Subject:DateFirstSeen,Person.CURRENT_DATE);
