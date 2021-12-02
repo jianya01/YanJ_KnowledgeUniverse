@@ -3322,10 +3322,35 @@ Person: => P_LexIDCategory := MAP(
 			LexIDSegment = LEXIDCATEGORYCORE => '10 CORE',
 			LexIDSegment:Null => NO_DATA_FOUND);
 
+Person: => PI_InpSSNDeceasedDt := PII.PI_InpSSNDeceasedDt;
+Person: => PI_InpSSNIsDeceasedFlag := PII.PI_InpSSNIsDeceasedFlag;
+Person: => P_InpClnArchDt := PII.P_InpClnArchDt;
+Person: => P_LexIDDeceasedDtIsValid := IF(ISVALIDDATE(FROMSTRINGTODATE(STRING(P_LexIDDeceasedDt), '%Y%m%d')), P_LexIDDeceasedDt, P_InpClnArchDt);
+Person: => PI_InpSSNDeceasedDtIsValid := IF(ISVALIDDATE(FROMSTRINGTODATE(STRING(PI_InpSSNDeceasedDt), '%Y%m%d')), PI_InpSSNDeceasedDt, P_InpClnArchDt);
+Person: => PL_BestSSNDeceasedDtIsValid := IF(ISVALIDDATE(FROMSTRINGTODATE(PL_BestSSNDeceasedDt, '%Y%m%d')), INTEGER(PL_BestSSNDeceasedDt), P_InpClnArchDt);
+Person: => EarliestDeceasedDate := MAP(P_LexIDDeceasedDtIsValid <= PI_InpSSNDeceasedDtIsValid AND P_LexIDDeceasedDtIsValid <= PL_BestSSNDeceasedDtIsValid => STRING(P_LexIDDeceasedDtIsValid),
+													PI_InpSSNDeceasedDtIsValid <= P_LexIDDeceasedDtIsValid AND PI_InpSSNDeceasedDtIsValid <= PL_BestSSNDeceasedDtIsValid => STRING(PI_InpSSNDeceasedDtIsValid),
+													PL_BestSSNDeceasedDtIsValid <= P_LexIDDeceasedDtIsValid AND PL_BestSSNDeceasedDtIsValid <= PI_InpSSNDeceasedDtIsValid => STRING(PL_BestSSNDeceasedDtIsValid));
+Person: => P_LexIDDeceasedDtList := TOPN(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath);
+
 Person: => P_LexIDIsDeceasedFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 													NOT EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d'))) => '0',
 													'1');
-
+Person: => P_LexIDDeceasedDt := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+													P_LexIDIsDeceasedFlag = '0' => NO_DATA_FOUND_INT,
+													ONLY(P_LexIDDeceasedDtList, INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
+Person: => P_LexIDDeceasedMsnc := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+													P_LexIDDeceasedDt = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+													BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(STRING(P_LexIDDeceasedDt), '%Y%m%d'), CURRENT_DATE),0,960)); 	
+Person: => P_SubjIsDeceasedFlag := MAP(P_LexIDIsDeceasedFlag = MISSING_INPUT_DATA AND PI_InpSSNIsDeceasedFlag = MISSING_INPUT_DATA_INT AND PL_BestSSNIsDeceasedFlag = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+													P_LexIDIsDeceasedFlag = '1' OR PI_InpSSNIsDeceasedFlag = 1 OR PL_BestSSNIsDeceasedFlag = '1' => '1',
+													'0');	
+Person: => P_SubjDeceasedDt := MAP(P_LexIDIsDeceasedFlag = MISSING_INPUT_DATA AND PI_InpSSNIsDeceasedFlag = MISSING_INPUT_DATA_INT AND PL_BestSSNIsDeceasedFlag = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+													P_SubjIsDeceasedFlag = '0' => NO_DATA_FOUND,
+													EarliestDeceasedDate);														
+Person: => P_SubjDeceasedMsnc := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+													P_SubjDeceasedDt = NO_DATA_FOUND => NO_DATA_FOUND_INT,
+													BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(P_SubjDeceasedDt, '%Y%m%d'), CURRENT_DATE),0,960)); 
 /**************************************************************************/
 /*                                                                        */
 /*                     Current Address Characteristics                    */
