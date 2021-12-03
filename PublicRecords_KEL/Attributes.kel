@@ -3645,6 +3645,54 @@ Person: => PL_CurrAddrSubjOwnedTaxValYr := MAP(PL_CurrAddrFull IN [MISSING_INPUT
 		PropertyTaxValYr = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
 			YEAR(DATE(PropertyTaxValYr)));
 
+//KS-7000
+
+Person: => MailingDataSet := TOPN(CurrAddrHelperAttribute.AddressProperty.BestMostRecentPropertyEvent
+	{
+		PropertyDateFirstSeen := DtFirstSeen,
+		MailingFullStreetAddress := MailingFullStreetAddress,
+		MailingUnitNumber := MailingUnitNumber,
+		MailingCityStateZip := MailingCityStateZip
+	}, 1, -PropertyDateFirstSeen); 
+
+Person: => MailStreetAddr := ONLY(MailingDataSet, MailingFullStreetAddress);
+Person: => MailUnitNum := ONLY(MailingDataSet, MailingUnitNumber);
+Person: => MailCityStZip := ONLY(MailingDataSet, MailingCityStateZip);
+Person: => GetMailZip := Filter(MailCityStZip, '0123456789');
+Person: => GetMailZip5 := SUBSTR(GetMailZip, 1, 5);
+
+Person: => CurrentAddrStreetConcat := 
+				IF(IsNotEnoughToClean(CurrentAddrPrimRng), '', TRIMBOTH(CurrentAddrPrimRng) + ' ') +
+				IF(IsNotEnoughToClean(CurrentAddrPreDir), '', TRIMBOTH(CurrentAddrPreDir) + ' ') +
+				IF(IsNotEnoughToClean(CurrentAddrPrimName), '', TRIMBOTH(CurrentAddrPrimName) + ' ') +
+				IF(IsNotEnoughToClean(CurrentAddrSffx), '', TRIMBOTH(CurrentAddrSffx) + ' ') +
+				IF(IsNotEnoughToClean(CurrentAddrPostDir), '', TRIMBOTH(CurrentAddrPostDir));
+Person: => GroupedMailAddr := 
+				TRIMALL(DEFAULT(MailStreetAddr,'') + 
+				DEFAULT(MailUnitNum,'') + 
+				DEFAULT(GetMailZip5,''));
+Person: => GroupedCurrentAddrLev := 
+				TRIMALL(CurrentAddrPrimRng + 
+				CurrentAddrPreDir + 
+				CurrentAddrPrimName +
+				CurrentAddrSffx +
+				CurrentAddrPostDir +
+				CurrentAddrSecRng +
+				CurrentAddrZip5);
+
+Person: => MailMatchCurrentAddr := TRIMBOTH(MailStreetAddr) = TRIMBOTH(CurrentAddrStreetConcat) AND 
+									TRIMBOTH(GetMailZip5) = TRIMBOTH(CurrentAddrZip5) AND
+									(TRIMBOTH(MailUnitNum) = TRIMBOTH(CurrentAddrSecRng) OR 
+										((MailUnitNum = '' OR MailUnitNum:Null) AND CurrentAddrSecRng != '') OR (MailUnitNum != '' AND CurrentAddrSecRng = '' ));
+Person: => MailLevCurrentAddr := IF(LevenshteinSimilarity(GroupedMailAddr, GroupedCurrentAddrLev) >= 0.75, 1, 0);
+Person: => MailMatchCurrentAddrFlag := IF(MailMatchCurrentAddr,1,0);
+
+Person: => PL_CurrAddrMailMatchFlag := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+				NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
+				GroupedMailAddr = '' => NO_DATA_FOUND_97,
+				MailMatchCurrentAddrFlag = 1 OR MailLevCurrentAddr = 1 => '1',
+				'0');
+
 //KS-3406		
 Person: => NameDataSet := TOPN(CurrAddrHelperAttribute.AddressProperty
     {
