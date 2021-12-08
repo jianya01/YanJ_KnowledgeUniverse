@@ -7038,7 +7038,11 @@ Person: => PL_EmailSrcBusNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT
 /*                      Inquiry Helper Attributes                         */
 /*                                                                        */
 /**************************************************************************/
-
+PersonInquiry: ONE_MONTH_IN_DAYS := 30; 
+PersonInquiry: THREE_MONTHS_IN_DAYS := 90;
+PersonInquiry: SIX_MONTHS_IN_DAYS := 180;
+PersonInquiry: ONE_YEAR_IN_DAYS := 365;
+PersonInquiry: TWO_YEARS_IN_DAYS := 730;
 PersonInquiry: FIVE_YEARS_IN_DAYS := 1826; 
 Inquiry: METHOD :=['BATCH','MONITORING'];
 Inquiry: COLLECTION_INDUSTRY := ['COLLECTIONS','COLLECTION','COLLECTION LAW FIRM','DEBT BUYER','FIRST PARTY', 'THIRD PARTY'];
@@ -7080,6 +7084,10 @@ Inquiry: => IsNonFcraOk := IsNonFcraInquiry(UPCASE(TRIM(InquiryFunctionDescripti
 Inquiry: => IsFcraOk := IsFcraInquiry(UPCASE(TRIM(InquiryFunctionDescription)));
 Inquiry: => IsProductCodeOk := IsValidInquiryProductCode(InquiryProductCode);
 
+Inquiry: => InquiryFCRAPurpose := ONLY(Permissions, FCRAPurpose);
+Inquiry: => InquiryHHID := ONLY(SearchInfo, ClientIdentifierHHID);
+Inquiry: => InquirySegmentID := ONLY(SearchInfo, ClientIdentifierSegmentID);
+
 PersonInquiry: => GatherInquiries := Transaction{
 																						TransactionID,
 																						Method := InquiryMethod,
@@ -7093,7 +7101,35 @@ PersonInquiry: => GatherInquiries := Transaction{
 																						IsCollection,
 																						IsBatchMonitoringMethod,
 																						IsProductCodeOk,
+																						InquiryFCRAPurpose,
+																						InquiryHHID,
+																						InquirySegmentID,
 																						AgeinDays};
+
+PersonInquiry.GatherInquiries: => Seen_In_One_Month := AgeinDays <= ONE_MONTH_IN_DAYS;
+PersonInquiry.GatherInquiries: => Seen_In_Three_Months := AgeinDays <= THREE_MONTHS_IN_DAYS;
+PersonInquiry.GatherInquiries: => Seen_In_Six_Months := AgeinDays <= SIX_MONTHS_IN_DAYS;
+PersonInquiry.GatherInquiries: => Seen_In_One_Year := AgeinDays <= ONE_YEAR_IN_DAYS;
+PersonInquiry.GatherInquiries: => Seen_In_Two_Years := AgeinDays <= TWO_YEARS_IN_DAYS;
+
+PersonInquiry.GatherInquiries: => PurposeIsFCRA := InquiryFCRAPurpose IN [0, 100, 101, 106, 110, 113, 115];
+PersonInquiry.GatherInquiries: => ExcludedHHIDs := IF(InquiryHHID IN [7066, 23573, 81162], '0', '1');
+PersonInquiry.GatherInquiries: => ExcludedSegments := IF(InquirySegmentID IN [4, 87, 22], '0', '1');
+PersonInquiry.GatherInquiries: => PurposeIsFCRAColl := InquiryFCRAPurpose IN [0, 100, 101, 106, 110, 113, 115] OR (InquiryFCRAPurpose = 164 AND IsCollection) ; //Used for attributes beginning with PL_InqColl or PL_SrchColl
+//This will not be the check for all FCRA Inquiry attributes
+PersonInquiry.GatherInquiries: => ValidInquiriesFCRA := IsFcraOk AND
+		UPCASE(TRIM(Industry)) != '' AND
+		ExcludeFunctionDescription AND //Bank Batch
+		PurposeIsFCRA AND
+		ExcludedHHIDs = '1' AND 
+		ExcludedSegments = '1' AND
+		IsProductCodeOk AND
+		NOT IsBatchMonitoringMethod;
+Person: => Inquiries1MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Month AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => Inquiries3MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Three_Months AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => Inquiries6MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Six_Months AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => Inquiries1YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Year AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => Inquiries2YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 
 PersonInquiry.GatherInquiries: =>ExcludeFunctionDescription :=UPCASE(TRIM(FunctionDescription)) != 'BANKO BATCH';
 PersonInquiry.GatherInquiries: =>ValidCollection:=IsNonFcraOk AND IsBatchMonitoringMethod AND ExcludeFunctionDescription AND IsCollection;
@@ -7333,7 +7369,30 @@ Person: => VelocityInquirySSNsPerCurrAddrNonFCRA := VelocityInquiriesPerCurrAddr
 /*                      Inquiry Attributes                                */
 /*                                                                        */
 /**************************************************************************/
-
+//FCRA Inquiry
+Person: => PL_InqCnt1M :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(Inquiries1MListSorted),0,999));
+Person: => PL_InqCnt3M :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(Inquiries3MListSorted),0,999));	
+Person: => PL_InqCnt6M :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(Inquiries6MListSorted),0,999));		
+Person: => PL_InqCnt1Y :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(Inquiries1YListSorted),0,999));			
+Person: => PL_InqCnt2Y :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(Inquiries2YListSorted),0,999));	
+		
+Person: => PL_InqDtList2Y := MAP(P_LexIDSeenFlag = '0'=> Inquiry.MISSING_INPUT_DATA,
+		PL_InqCnt2Y < 1  => Inquiry.NO_DATA_FOUND_INQ, 
+		CONCAT(Inquiries2YListSorted, InqDate, '|'));		
+Person: =>PL_InqNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(Inquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
+  	DATETOSTRING(MAX(Inquiries2YListSorted, DATE(InqDate)), '%Y%m%d'));		
+Person: => PL_InqNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(Inquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqNewDt2Y), CURRENT_DATE_INQ),0,60));	
+//
 Person: => PL_SrchCollCnt5Y :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT(Inquiries5YListSorted ),0,999));
 Person: => PL_SrchCollDtList5Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
