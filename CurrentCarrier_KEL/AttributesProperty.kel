@@ -203,12 +203,12 @@ PolicyProperty: C_GRACETIME := 10;//lapse
 // Report: => FirstPolicyPeriodEndDate := ONLY(TOPN(Policy, 1, -SubjectEndDatePolicy, -SubjectBeginDatePolicy)); 
 
 // Policy: => G_ValidPolicy := EXISTS(Subject) AND InsuranceType = 'PP' AND (SubjectEndDatePolicy > InceptionDate);//Intermediate
-Policy: => G_ValidPolicy := EXISTS(Subject) AND (SubjectEndDatePolicy > InceptionDate) AND DataSource = 'SubjectSearchBatch';//Batch
+// Policy: => G_ValidPolicy := EXISTS(Subject) AND (SubjectEndDatePolicy > InceptionDate) AND DataSource = 'SubjectSearchBatch';//Batch
 
-// Policy: => G_ValidPolicy := EXISTS(Subject) AND 
-													// (InsuranceType = 'PP' OR (InsuranceType:Null AND NOT DataSource:Null)) AND // For Intermediate the InsuranceType == ‘PP, but for Batch InsuranceType isn’t populated, but DataSource is
-													// (SubjectEndDatePolicy > InceptionDate) AND 
-													// DataSource != 'RiskAddressBatch';
+//20211129, G_ValidPolicy for both intermediate and batch data
+Policy: => G_ValidPolicy := EXISTS(Subject) AND 
+													(InsuranceType = 'PP' OR (InsuranceType = '' AND DataSource = 'SubjectSearchBatch')) AND // For Intermediate the InsuranceType == ‘PP, but for Batch InsuranceType isn’t populated, but DataSource is
+													(SubjectEndDatePolicy > InceptionDate);
 
 
 Policy: => G_Current := CheckCP1 OR CheckCP2;
@@ -282,7 +282,10 @@ Report: => G_SetDefault3ProptyP := NOT EXISTS(Policy(G_ValidPolicy AND G_PolicyT
 
 //drop all future policy when counting
 // Policy: => G_CountablePolicy := G_ValidPolicy AND (G_PolicyTenure >= 0);//intermediate
-Policy: => G_CountablePolicy := EXISTS(Subject) AND (SubjectEndDatePolicy > InceptionDate) AND (G_PolicyTenure >= 0) AND DataSource = 'SubjectSearchBatch';//batch data
+// Policy: => G_CountablePolicy := EXISTS(Subject) AND (SubjectEndDatePolicy > InceptionDate) AND (G_PolicyTenure >= 0) AND DataSource = 'SubjectSearchBatch';//batch data
+
+//20211129, G_CountablePolicy for both intermediate and batch data
+Policy: => G_CountablePolicy := G_ValidPolicy AND (G_PolicyTenure >= 0);
 
 //****************************Attribute Pack 2****************************/
 Report: => H_CntDistAmbestNumber := MAP(G_SetDefault1  => DEFAULT_1,
