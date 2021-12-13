@@ -1344,8 +1344,8 @@ InputPII: => PI_InpAddrMedAVMCtyVal := MAP(
 		BOUNDSFOLD(InputAddrMedAVMCtyVal, 1, 999999999));
 InputPII: =>PI_InpAddrMedAVMCtyRatio := MAP(
 		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-		NOT InputAddressOnAVM OR InputAddrMedAVMCtyVal:Null OR InputAddrMedAVMCtyVal = '' => NO_DATA_FOUND_INT,
-		InputAddressPropertyCnt = 0 OR InputAddrMedAVMCtyVal = 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		PI_InpAddrAVMVal = NO_DATA_FOUND_INT OR PI_InpAddrMedAVMCtyVal = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrMedAVMCtyVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 		MIN(ROUND(AVMValueUnCap / InputAddrMedAVMCtyVal,2), 99.99));
 //KS-4390
 
@@ -13408,8 +13408,8 @@ PersonAddress: => GroupedCurrentAddress :=
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrZip5,'')) +
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrSecRng,''));
 
-PersonAddress: => CurrentLevenshteinMatch := LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress)>= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress) < 1;
-Person: => CurrentAddressMatchSourcesPre := PersonAddress(CurrentPerfectAddressMatch OR CurrentLevenshteinMatch).TranslatedSources{TranslatedSource,
+PersonAddress: => CurrentLevenshteinMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress)>= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress) < 1, 1, 0);
+Person: => CurrentAddressMatchSourcesPre := PersonAddress(CurrentPerfectAddressMatch OR CurrentLevenshteinMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource,
 					RecordCount := TranslatedSource:Weight,
 					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
 					MyDateLastSeen := TranslatedSource:DateLastSeen};
@@ -13535,9 +13535,9 @@ PersonAddress: => GroupedPreviousAddress :=
 		TRIMALL(DEFAULT(Subject.PII.PreviousAddrZip5,'')) +
 		TRIMALL(DEFAULT(Subject.PII.PreviousAddrSecRng,''));
 
-PersonAddress: => PreviousLevenshteinMatch := LevenshteinSimilarity(GroupedAddress, GroupedPreviousAddress)>= 0.75;
+PersonAddress: => PreviousLevenshteinMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedPreviousAddress)>= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedPreviousAddress) < 1, 1, 0);
 PersonAddress: =>TranslatedSources := DataSources{TranslatedSource};
-Person: => PreviousAddressMatchSourcesPre := PersonAddress(PreviousPerfectAddressMatch OR PreviousLevenshteinMatch).TranslatedSources{TranslatedSource,
+Person: => PreviousAddressMatchSourcesPre := PersonAddress(PreviousPerfectAddressMatch OR PreviousLevenshteinMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource,
 					RecordCount := TranslatedSource:Weight,
 					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
 					MyDateLastSeen := TranslatedSource:DateLastSeen};
@@ -15720,6 +15720,7 @@ Person: => PL_BusHdrNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_BusHdrNewDtEv), SelePerson.CURRENT_DATE), 0, 960));
 		
 Person: => PL_DrgLnJSeverityIndx7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_DrgLTDCnt7Y > 0 => 5,
 		PL_DrgJudgSmClaimCnt7Y > 0 => 4,
 		PL_DrgJudgCivCrtCnt7Y > 0 => 3,
 		PL_DrgLienTaxCnt7Y > 0 => 2,
