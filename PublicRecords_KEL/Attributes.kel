@@ -3143,7 +3143,7 @@ Person: => OccupiedAddress := Occupied.Location;
 InputPII: => PI_InpAddrOccupancyIndx :=  MAP(Subject.P_LexIDSeenFlag = '0' OR P_InpClnAddrFullFlagValue != '1' => MISSING_INPUT_DATA_INT,
 																					PI_InpAddrIsPOBoxFlag != '1' AND Subject.OccupiedAddress:Null => 0,
 																					PI_InpAddrIsPOBoxFlag != '1' AND Subject.OccupiedAddress = Location => 1,
-																					PI_InpAddrIsPOBoxFlag != '1' AND Location IN Subject.OccupiedAddresses => 2,
+																					PI_InpAddrIsPOBoxFlag != '1' AND Location IN Subject.OccupiedAddresses{Location} => 2,
 																					PI_InpAddrIsPOBoxFlag != '1' AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 3,
 																					PI_InpAddrIsPOBoxFlag != '1' => 4,
 																					PI_InpAddrIsPOBoxFlag = '1' AND EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 5,
@@ -3154,7 +3154,7 @@ InputPII: => PI_InpAddrOccupancyIndx :=  MAP(Subject.P_LexIDSeenFlag = '0' OR P_
 Person: => PL_CurrAddrOccupancyIndx :=  MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																					OccupiedAddress:Null => 0,
 																					OccupiedAddress = CurrAddrHelperAttribute => 1,
-																					CurrAddrHelperAttribute IN OccupiedAddresses => 2,
+																					CurrAddrHelperAttribute IN OccupiedAddresses{Location} => 2,
 																					3);
 //KS-7225
 InputPII: => PI_InpAddrOwnNotOccFlag :=  MAP(Subject.P_LexIDSeenFlag = '0' OR P_InpClnAddrFullFlagValue != '1' OR PI_InpAddrOnFileFlagEv IN [MISSING_INPUT_DATA_INT, 0]  => MISSING_INPUT_DATA_INT,
@@ -7315,6 +7315,20 @@ Person: =>InquiriesOther2YDtList:= CONCAT(InquiriesOther2YListSorted,InqDate,'|'
 Person: =>InquiryOther2YNewDate :=IsBlank(STRING(MAX(InquiriesOther2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiryOther2YOldDate :=IsBlank(STRING(MIN(InquiriesOther2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 
+
+// Person: =>InquiriesUtilities2YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND IsUtility AND ValidInquiriesFCRA AND NOT IsCollection){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID}{TransactionID,InqDate := DEFAULT(STRING(MIN(GROUP(InqDate != Inquiry.REC_FOUND_BUT_INVALID),INTEGER(InqDate))),Inquiry.REC_FOUND_BUT_INVALID)},999,InqDate);
+
+Person: =>InquiriesUtilities2YList := PersonInquiry.GatherInquiries(Seen_In_Two_Years AND IsUtility AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID,InqDate := MIN(GROUP,InqDate)};
+Person: =>InquiriesUtilities2YListSorted := TOPN(InquiriesUtilities2YList{TransactionID,InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID)},999,InqDate);
+
+// Person: =>InquiriesUtilities2YListSorted := TOPN(PersonInquiry.GatherInquiries{TransactionID,InqDate},999,InqDate);
+
+// Person: =>InquiriesUtilities2YListSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND IsUtility AND ValidInquiriesFCRA AND NOT IsCollection){InqDate:=IF(ISVALIDDATE(MIN(GROUP,InqDate)),DATETOSTRING(MIN(GROUP,InqDate),'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+
+Person: =>InquiriesUtilities2YDtList:= CONCAT(InquiriesUtilities2YListSorted,InqDate,'|');
+Person: =>InquiryUtilities2YNewDate :=IsBlank(STRING(MAX(InquiriesUtilities2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+Person: =>InquiryUtilities2YOldDate :=IsBlank(STRING(MIN(InquiriesUtilities2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+
 Inquiry: => IsValidVelocityInquiryNonFCRA := AgeinDays <= 365 AND 
 																						NOT IsCollection AND 
 																						NOT IsBatchMonitoringMethod AND
@@ -7882,6 +7896,7 @@ Person: =>PL_SrchQuizProvOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISS
 		PL_SrchQuizProvCnt5Y  < 1  => Inquiry.NO_DATA_FOUND_INQ_INT,
 		ALL(InquiriesQuizProvider5YListSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryQuizProvider5YOldDate),CURRENT_DATE_INQ),0,60));
+//KS-7560
 
 //KS-7554
 
@@ -7951,6 +7966,39 @@ Person: =>PL_InqOtherNewMsnc2Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_
 		PL_InqOtherCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
 		ALL(InquiriesOther2YListSorted,InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryOther2YNewDate), CURRENT_DATE_INQ),0,24));
+
+Person: => PL_InqUtilCnt1M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.ONE_MONTH_IN_DAYS AND IsUtility AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqUtilCnt3M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.THREE_MONTHS_IN_DAYS AND IsUtility AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqUtilCnt6M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.SIX_MONTHS_IN_DAYS AND IsUtility AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqUtilCnt1Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.ONE_YEAR_IN_DAYS AND IsUtility AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqUtilCnt2Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.TWO_YEARS_IN_DAYS AND IsUtility AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqUtilDtList2Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
+		PL_InqUtilCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		InquiriesUtilities2YDtList);
+
+Person: => PL_InqUtilNewDt2Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
+		PL_InqUtilCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		InquiriesUtilities2YDtList);
+
+Person: =>PL_InqUtilNewMsnc2Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqUtilCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(InquiriesUtilities2YListSorted,InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryUtilities2YNewDate), CURRENT_DATE_INQ),0,24));
 
 //KS-6136 Retail search
 
