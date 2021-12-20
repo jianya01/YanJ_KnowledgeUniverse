@@ -1631,7 +1631,7 @@ InputPII: =>PI_InpDOBAge := MAP(P_InpClnDOBFlagValue <>1 => MISSING_INPUT_DATA_I
 																BOUNDSFOLD(YEARSBETWEEN(P_InpClnDOB,FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')),0,120));
 
 InputPII: =>PI_InpSSNIsDeceasedFlag := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')){DateOfDeath}) => 0,
+																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')){DateOfDeath}) => 0,
 																						 1);
 InputPII: =>PI_InpSSNDeceasedDt := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 PI_InpSSNIsDeceasedFlag = 0 => NO_DATA_FOUND_INT,
@@ -3343,7 +3343,7 @@ Person: => EarliestDeceasedDate := MAP(P_LexIDDeceasedDtIsValid <= PI_InpSSNDece
 Person: => P_LexIDDeceasedDtList := TOPN(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')),1,-DateOfDeath);
 
 Person: => P_LexIDIsDeceasedFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-													NOT EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d'))) => '0',
+													NOT EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d'))) => '0',
 													'1');
 Person: => P_LexIDDeceasedDt := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 													P_LexIDIsDeceasedFlag = '0' => NO_DATA_FOUND_INT,
@@ -4381,7 +4381,7 @@ Person: => PL_BestSSNIsDeceasedFlag := MAP(
 Person: => PL_BestSSNDeceasedDt := MAP(
             PL_BestSSN = MISSING_INPUT_DATA OR PL_BestSSN = NO_DATA_FOUND => MISSING_INPUT_DATA,
             PL_BestSSNIsDeceasedFlag = '0' => NO_DATA_FOUND,
-            ONLY(TOPN(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt), '%Y%m%d')), 1, -DateOfDeath), STRING(DateOfDeath)));
+            ONLY(TOPN(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(CURRENTDATE()), '%Y%m%d')), 1, -DateOfDeath), STRING(DateOfDeath)));
 Person: => PL_BestSSNDeceasedMsnc := MAP(
             PL_BestSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 						PL_BestSSNDeceasedDt = NO_DATA_FOUND => NO_DATA_FOUND_INT,
@@ -8228,7 +8228,7 @@ InputPII: => PI_SrchSSNPerInpAddrCnt1Y := MAP( P_InpClnAddrFullFlagValue IN [MIS
 			SrchSSNPerInpAddrCnt1Y);
 			
 //KS-6160
-InputPII: => GoodInquiriesLastYearForPhone := InputCleanPhone.PhoneInquiry.Transaction(IsValidVelocityInquiryNonFCRA).PersonInfo(PersonalPhoneNumber = P_InpClnPhoneHomeRaw){TransactionID,LexID := ONLY(TOPN(GROUP(NOT LexID:Null), 1, -LexID), LexID)};	
+InputPII: => GoodInquiriesLastYearForPhone := InputCleanPhone.PhoneInquiry.Transaction(IsValidVelocityInquiryNonFCRA).PersonInfo(PersonalPhoneNumber = InputPII.P_InpClnPhoneHome){TransactionID,LexID := ONLY(TOPN(GROUP(NOT LexID:Null), 1, -LexID), LexID)};	
 InputPII: => PI_SrchPerInpPhoneCnt1Y := IF(P_InpClnPhoneHomeFlagValue <> 1 , MISSING_INPUT_DATA_INT,	BOUNDSFOLD(COUNT(GoodInquiriesLastYearForPhone{TransactionID}),0,999));
 
 InputPII: => PI_SrchLexIDPerInpPhoneCnt1Y := MAP(P_InpClnPhoneHomeFlagValue <> 1 => MISSING_INPUT_DATA_INT,
@@ -15279,28 +15279,28 @@ Person: => PL_SrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INP
 																								PL_VerSrcBureauCntEvNonFCRA = 0 => 0,
 																								PL_VerSrcBureauCntEvNonFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_InpSSNSrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_LexID = MISSING_INPUT_DATA OR P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
+Person: => PL_InpSSNSrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
 																								PL_VerSSNSrcBureauCntEvNonFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerSSNSrcBureauCntEvNonFCRA = 0 => 0,
 																								PL_VerSSNSrcBureauCntEvNonFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
 //FCRA
-Person: => PL_InpAddrSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_LexID = MISSING_INPUT_DATA OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+Person: => PL_InpAddrSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																								PL_VerAddrSrcBureauCntEvFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerAddrSrcBureauCntEvFCRA = 0 => 0,
 																								PL_VerAddrSrcBureauCntEvFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_InpDOBSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_LexID = MISSING_INPUT_DATA OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+Person: => PL_InpDOBSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																								PL_VerDOBSrcBureauCntEvFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerDOBSrcBureauCntEvFCRA = 0 => 0,
 																								PL_VerDOBSrcBureauCntEvFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_SrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_LexID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+Person: => PL_SrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0'  => MISSING_INPUT_DATA_INT,
 																								PL_VerSrcBureauCntEvFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerSrcBureauCntEvFCRA = 0 => 0,
 																								PL_VerSrcBureauCntEvFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_InpSSNSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_LexID = MISSING_INPUT_DATA OR P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
+Person: => PL_InpSSNSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
 																								PL_VerSSNSrcBureauCntEvFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerSSNSrcBureauCntEvFCRA = 0 => 0,
 																								PL_VerSSNSrcBureauCntEvFCRA > 0 => 1,
