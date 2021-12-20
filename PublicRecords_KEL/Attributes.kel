@@ -1344,8 +1344,8 @@ InputPII: => PI_InpAddrMedAVMCtyVal := MAP(
 		BOUNDSFOLD(InputAddrMedAVMCtyVal, 1, 999999999));
 InputPII: =>PI_InpAddrMedAVMCtyRatio := MAP(
 		P_InpClnAddrFullFlagValue <> '1' => MISSING_INPUT_DATA_INT,
-		NOT InputAddressOnAVM OR InputAddrMedAVMCtyVal:Null OR InputAddrMedAVMCtyVal = '' => NO_DATA_FOUND_INT,
-		InputAddressPropertyCnt = 0 OR InputAddrMedAVMCtyVal = 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		PI_InpAddrAVMVal = NO_DATA_FOUND_INT OR PI_InpAddrMedAVMCtyVal = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+		PI_InpAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PI_InpAddrMedAVMCtyVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 		MIN(ROUND(AVMValueUnCap / InputAddrMedAVMCtyVal,2), 99.99));
 //KS-4390
 
@@ -1421,14 +1421,18 @@ InputPII: => PI_InpAddrSubjOwnedTaxValYr := MAP(P_LexID = MISSING_INPUT_DATA_INT
 //KS-3397
 
 InputPII: => PI_InpAddrNamePropMatchIndx := MAP(PI_InpAddrOnFileFlagEv != 1 => MISSING_INPUT_DATA_INT,
-                                                Location:Null OR Prop:Null => NO_DATA_FOUND_INT,
+                                                P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+                                                P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+                                                NOT EXISTS(BestMostRecentPropertyEvent) => NO_DATA_FOUND_INT,
                                                 NOT EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND (FirstName != '' OR LastName != '')){FirstName, LastName}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
                                                 EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 3,
                                                 EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 2,
                                                 EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))))) => 1,
                                                 0);
 InputPII: => PI_InpAddrFamilyOwnedFlag := MAP(PI_InpAddrOnFileFlagEv != 1 => MISSING_INPUT_DATA_INT,
-																								Location:Null OR Prop:Null => NO_DATA_FOUND_INT,
+                                                P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+                                                P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+                                                NOT EXISTS(BestMostRecentPropertyEvent) => NO_DATA_FOUND_INT,
 																								PI_InpAddrNamePropMatchIndx = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 																								PI_InpAddrNamePropMatchIndx IN [0,1,3] => 0,
 																								PI_InpAddrNamePropMatchIndx = 2 => 1);
@@ -3739,7 +3743,7 @@ Person: => matchIndex := NameDataSet(PartyIsBuyerOrOwner){
         MatchFirstName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst)))};  
 		
 Person: => PL_CurrAddrNamePropMatchIndx := MAP(
-			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND,''] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND,''] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND]  OR P_InpClnNameFirst:Null OR P_InpClnNameLast:Null=> MISSING_INPUT_DATA,
 			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
 			NOT EXISTS(matchIndex(NameMatch)) => NO_DATA_FOUND_97,
       EXISTS(matchIndex(MatchFirstLastName)) => '3',
@@ -3747,7 +3751,7 @@ Person: => PL_CurrAddrNamePropMatchIndx := MAP(
       EXISTS(matchIndex(MatchFirstName)) => '1',
       '0');				
 Person: => PL_CurrAddrFamilyOwnedFlag := MAP(
-			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,			
+			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND,''] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND,''] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst:Null OR P_InpClnNameLast:Null => MISSING_INPUT_DATA,			
 			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
 			PL_CurrAddrNamePropMatchIndx = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
 			PL_CurrAddrNamePropMatchIndx IN ['0','1','3'] => 0,
@@ -4174,7 +4178,9 @@ Person: => PL_PrevAddrResSpanAVMRatioEv := MAP(
 /*                             Address History                            */
 /*                                                                        */
 /**************************************************************************/
-
+Person: ONE_DAY_IN_DAYS := 1;
+Person: ONE_WEEK_IN_DAYS := 7;
+Person: ONE_MONTH_IN_DAYS := 30;
 Person: THREE_MONTHS_IN_DAYS := 90;
 Person: SIX_MONTHS_IN_DAYS := 180;
 Person: FIFTEEN_YEARS_IN_DAYS := 5478;
@@ -4392,7 +4398,7 @@ Person: => PL_BestDOBAge:= MAP(
 //Best Phone
 // Phone: PHONE_PLUS_RAW_SOURCES := ['IR','01','02','05','IO','PP','WO','WR','WP','GO','IQ','IB','MT','T$','AY','L9','N2'];//Not needed for now but logic might change in the future and this might be required.
 Phone.DataSources : => TranslatedSourceCode := ConsumerSourceGroup(Source);
-Person: => BestPhoneCandidates := PersonPhone{ PhoneNumber.Phone10, //Neg means add - in the TopN to find biggest
+Person: => BestPhoneCandidates := PersonPhone(BestPersonPhoneHitFlag){PhoneNumber.Phone10, //Neg means add - in the TopN to find biggest
 						SortCriteria1Neg := DEFAULT(IF(YEARSBETWEEN(MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen)),D'19000101'),
 						SortCriteria2Neg := COUNT(DataSources{TranslatedSourceCode}),
 						SortCriteria3ANeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen), Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen)),D'19000101'),//Phones Plus
@@ -4413,12 +4419,6 @@ Person: => PL_BestPhoneHomeNonFCRA:= MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 			BestPhoneNonFCRA:Null => NO_DATA_FOUND,
 			BestPhoneNonFCRA);
-			
-//the above doesn't work on roxie- the below is to prove the best phone fdc works.
-//remove the below when the above is fixed	
-PersonPhone.DataSources: => TEMPSOURCES	:= ['GN', 'GO', 'EN','EQ','TN','UT','IQ', 'TM','AO'];
-PersonPhone: => MyPhoneSource := EXISTS(DataSources(Source IN TEMPSOURCES));
-Person: => PL_BestPhoneHome := ONLY(TOPN(PersonPhone(MyPhoneSource),1,-PhoneNumber),PhoneNumber);
 
 
 /**************************************************************************/
@@ -7044,7 +7044,7 @@ PersonInquiry: THREE_MONTHS_IN_DAYS := 90;
 PersonInquiry: SIX_MONTHS_IN_DAYS := 180;
 PersonInquiry: ONE_YEAR_IN_DAYS := 365;
 PersonInquiry: TWO_YEARS_IN_DAYS := 730;
-PersonInquiry: FIVE_YEARS_IN_DAYS := 1826; 
+PersonInquiry: FIVE_YEARS_IN_DAYS := 1826;
 Inquiry: METHOD :=['BATCH','MONITORING'];
 Inquiry: COLLECTION_INDUSTRY := ['COLLECTIONS','COLLECTION','COLLECTION LAW FIRM','DEBT BUYER','FIRST PARTY', 'THIRD PARTY'];
 Inquiry: COLLECTION_VERTICAL :=['COLLECTIONS', 'RECEIVABLES MANAGEMENT', '1PC','3PC'];
@@ -7054,7 +7054,7 @@ Inquiry: AUTO_INDUSTRY := ['AUTO', 'AUTO - CAPTIVE'];
 Inquiry: MORTGAGE_INDUSTRY := ['MORTGAGE/REAL ESTATE'];
 //special dedups
 Inquiry: HIGH_RISK_CREDIT_INDUSTRY := ['CARDS - SUBPRIME', 'MSB', 'REFUND ANTICIPATION LOAN', 'RENT TO OWN', 'PAYDAY LOANS', 'PAY DAY LOANS', 'TITLE LOANS', 'PAY DAY', 'PAYDAY'];
-Inquiry: BANKING_INDUSTRY := ['BANKING', 'CARDS', 'CREDIT DECISIONING', 'CREDIT MONITORING', 'CREDIT UNION', 'FINANCE COMPANY', 'FS SERVICES PROVIDER', 'INVESTMENTS/SECURITIES', 'COMMERCIAL LENDING'];
+Inquiry: BANKING_INDUSTRY := ['BANKING', 'CREDIT UNION', 'DDA'];
 Inquiry: COMMUNICATIONS_INDUSTRY := ['COMMUNICATIONS'];
 Inquiry: PREPAID_CARD_INDUSTRY := ['PREPAID CARDS'];
 Inquiry: RETAIL_INDUSTRY := ['RETAIL'];
@@ -7065,8 +7065,11 @@ Inquiry: STUDENT_LOAN_INDUSTRY := ['STUDENT LOANS'];
 Inquiry: CHARGEBACK_FUNCTIONS := ['CHARGEBACK DEFENDER', 'CHARGEBACK DEFENDER SCORE ATTRIBUTES', 'RISKWISE CHARGEBACK DEFENDER (SCORE ONLY CD02)', 'RISKWISE CHARGEBACK DEFENDER W/ RC JOINT APP (FDSL)', 
 							'RISKWISE CHARGEBACK DEFENDER W/ RC SINGLE APP (FDS7)', 'RISKWISE CUSTOM CANADIAN CHARGEBACK DEFENDER', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (CB61)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND03)', 
 							'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND05)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER (ND11)', 'RISKWISE CUSTOM CHARGEBACK DEFENDER W/ IP DOMAIN (ND10)'];
-// Inquiry: OTHER := NOT IN [COLLECTION_INDUSTRY OR AUTO_INDUSTRY OR BANKING_INDUSTRY OR MORTGAGE_INDUSTRY OR HIGH_RISK_CREDIT_INDUSTRY OR RETAIL_INDUSTRY OR COMMUNICATIONS_INDUSTRY OR RETAIL_PAYMENTS_INDUSTRY OR PREPAID_CARD_INDUSTRY OR UTILITIES_INDUSTRY OR QUIZ_PROVIDER_INDUSTRY OR STUDENT_LOAN_INDUSTRY];
-
+Inquiry: OTHER := ['CREDIT DECISIONING', 'CREDIT MONITORING', 'COMMUNICATIONS', 'COLLEGE/UNIVERSITY', 'CONSULTING', 'CREDIT BUREAU', 'DIRECT TO CONSUMER', 'INVESTIGATIONS', 'LAW FIRM', 'LEASING', 'LEGAL',
+							'LEISURE', 'LOGISTICS', 'MANUFACTURING', 'MARKETING', 'NEWS / PUBLICATIONS / TV', 'OTHER', 'PAYMENT PROCESSING', 'PROPERTY MANAGEMENT', 'TAX SERVICES', 'TENANT SCREENING', 'TOBACCO', 'TOBBACO',
+							'UNASSIGNED', 'BUY NOW PAY LATER FINANCING', 'BUY NOW PAY LATER LENDING', 'PREPAID CARDS', 'STUDENT LOANS', 'QUIZ PROVIDER'];
+Inquiry: COMMERCIAL_LENDING := ['COMMERCIAL LENDING'];
+Inquiry: CREDIT_CARD := ['CARDS'];							
 // Inquiry Velocity helper attributes
 Inquiry: => AgeinDays := ABSDAYSBETWEEN(TimeStampToDate(TransactionID:DateFirstSeen), CURRENT_DATE);
 
@@ -7116,7 +7119,6 @@ PersonInquiry.GatherInquiries: => Seen_In_Two_Years := AgeinDays <= TWO_YEARS_IN
 PersonInquiry.GatherInquiries: => PurposeIsFCRA := InquiryFCRAPurpose IN [0, 100, 101, 106, 110, 113, 115];
 PersonInquiry.GatherInquiries: => ExcludedHHIDs := IF(InquiryHHID IN [7066, 23573, 81162], '0', '1');
 PersonInquiry.GatherInquiries: => ExcludedSegments := IF(InquirySegmentID IN [4, 87, 22], '0', '1');
-PersonInquiry.GatherInquiries: => PurposeIsFCRAColl := InquiryFCRAPurpose IN [0, 100, 101, 106, 110, 113, 115] OR (InquiryFCRAPurpose = 164 AND IsCollection) ; //Used for attributes beginning with PL_InqColl or PL_SrchColl
 //This will not be the check for all FCRA Inquiry attributes
 PersonInquiry.GatherInquiries: => ValidInquiriesFCRA := IsFcraOk AND
 		UPCASE(TRIM(Industry)) != '' AND
@@ -7126,11 +7128,44 @@ PersonInquiry.GatherInquiries: => ValidInquiriesFCRA := IsFcraOk AND
 		ExcludedSegments = '1' AND
 		IsProductCodeOk AND
 		NOT IsBatchMonitoringMethod;
+		
 Person: => Inquiries1MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Month AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 Person: => Inquiries3MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Three_Months AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 Person: => Inquiries6MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Six_Months AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 Person: => Inquiries1YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Year AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 Person: => Inquiries2YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND ValidInquiriesFCRA){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+
+PersonInquiry.GatherInquiries: => IsCommercialLending := UPCASE(TRIM(Industry)) IN Inquiry.COMMERCIAL_LENDING;
+Person: => CommercialLendingInquiries1MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Month AND ValidInquiriesFCRA AND NOT IsCollection AND IsCommercialLending){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => CommercialLendingInquiries3MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Three_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsCommercialLending){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => CommercialLendingInquiries6MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Six_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsCommercialLending){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => CommercialLendingInquiries1YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Year AND ValidInquiriesFCRA AND NOT IsCollection AND IsCommercialLending){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => CommercialLendingInquiries2YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND ValidInquiriesFCRA AND NOT IsCollection AND IsCommercialLending){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+
+PersonInquiry.GatherInquiries: => IsCreditCard := UPCASE(TRIM(Industry)) IN Inquiry.CREDIT_CARD;
+Person: => CreditCardInquiries1MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Month AND ValidInquiriesFCRA AND NOT IsCollection AND IsCreditCard){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => CreditCardInquiries3MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Three_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsCreditCard){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => CreditCardInquiries6MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Six_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsCreditCard){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => CreditCardInquiries1YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Year AND ValidInquiriesFCRA AND NOT IsCollection AND IsCreditCard){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => CreditCardInquiries2YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND ValidInquiriesFCRA AND NOT IsCollection AND IsCreditCard){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+
+Person: => MortgageInquiries1MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Month AND ValidInquiriesFCRA AND NOT IsCollection AND IsMortgage){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => MortgageInquiries3MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Three_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsMortgage){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => MortgageInquiries6MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Six_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsMortgage){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => MortgageInquiries1YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Year AND ValidInquiriesFCRA AND NOT IsCollection AND IsMortgage){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => MortgageInquiries2YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND ValidInquiriesFCRA AND NOT IsCollection AND IsMortgage){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+
+Person: => RetailInquiries1MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Month AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetail){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => RetailInquiries3MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Three_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetail){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => RetailInquiries6MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Six_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetail){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => RetailInquiries1YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Year AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetail){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => RetailInquiries2YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetail){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+	
+Person: => RetailPaymentInquiries1MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Month AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetailPayment){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => RetailPaymentInquiries3MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Three_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetailPayment){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => RetailPaymentInquiries6MListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Six_Months AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetailPayment){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => RetailPaymentInquiries1YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_One_Year AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetailPayment){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: => RetailPaymentInquiries2YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetailPayment){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 
 PersonInquiry.GatherInquiries: =>ExcludeFunctionDescription :=UPCASE(TRIM(FunctionDescription)) != 'BANKO BATCH';
 PersonInquiry.GatherInquiries: =>ValidCollection:=IsNonFcraOk AND IsBatchMonitoringMethod AND ExcludeFunctionDescription AND IsCollection;
@@ -7218,12 +7253,22 @@ Person: =>InquiriesQuizProvider5YDtList:= CONCAT(InquiriesQuizProvider5YListSort
 Person: =>InquiryQuizProvider5YNewDate :=IsBlank(STRING(MAX(InquiriesQuizProvider5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiryQuizProvider5YOldDate :=IsBlank(STRING(MIN(InquiriesQuizProvider5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 
-PersonInquiry.GatherInquiries: =>IsOther := NOT (IsBanking OR IsAutoSrch OR IsRetail OR IsMortgage OR IsUtility OR IsPrepaidCard OR IsCommunications OR IsStudentLoan OR IsRetailPayment OR IsQuizProvider);
+PersonInquiry.GatherInquiries: => IsOther := UPCASE(TRIM(Industry)) IN Inquiry.OTHER;
 PersonInquiry.GatherInquiries: =>ValidOther:=ValidInquiries AND IsOther;
 Person: =>InquiriesOther5YListSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidOther){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 Person: =>InquiriesOther5YDtList:= CONCAT(InquiriesOther5YListSorted,InqDate,'|');
 Person: =>InquiryOther5YNewDate :=IsBlank(STRING(MAX(InquiriesOther5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiryOther5YOldDate :=IsBlank(STRING(MIN(InquiriesOther5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+
+Person: =>InquiriesBanking2YListSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND IsBanking AND ValidInquiriesFCRA AND NOT IsCollection){InqDate:=IF(ISVALIDDATE(MIN(GROUP,InqDate)),DATETOSTRING(MIN(GROUP,InqDate),'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: =>InquiriesBanking2YDtList:= CONCAT(InquiriesBanking2YListSorted,InqDate,'|');
+Person: =>InquiryBanking2YNewDate :=IsBlank(STRING(MAX(InquiriesBanking2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+Person: =>InquiryBanking2YOldDate :=IsBlank(STRING(MIN(InquiriesBanking2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+
+Person: =>InquiriesOther2YListSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND IsOther AND ValidInquiriesFCRA AND NOT IsCollection){InqDate:=IF(ISVALIDDATE(MIN(GROUP,InqDate)),DATETOSTRING(MIN(GROUP,InqDate),'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: =>InquiriesOther2YDtList:= CONCAT(InquiriesOther2YListSorted,InqDate,'|');
+Person: =>InquiryOther2YNewDate :=IsBlank(STRING(MAX(InquiriesOther2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
+Person: =>InquiryOther2YOldDate :=IsBlank(STRING(MIN(InquiriesOther2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 
 Inquiry: => IsValidVelocityInquiryNonFCRA := AgeinDays <= 365 AND 
 																						NOT IsCollection AND 
@@ -7240,9 +7285,11 @@ Inquiry: => IsValidVelocityInquiryFCRA := AgeinDays <= 365 AND
 																						IsFcraOk;
 
 Inquiry.PersonInfo: => TransactionID := Inquiry.TransactionID;
+Inquiry.PersonInfo: => InquiryAgeinDays := ABSDAYSBETWEEN(TimeStampToDate(Inquiry.TransactionID:DateFirstSeen), CURRENT_DATE);
 
 Person: => VelocityInquiriesPerLexIDNonFCRA := PersonInquiry.Transaction(IsValidVelocityInquiryNonFCRA).PersonInfo(LexID = Person.UID){
 										TransactionID,
+										InquiryAgeinDays,
 										SSN := ONLY(TOPN(GROUP(NOT SSN:Null), 1, -SSN), SSN),
 										ZIP5 := ONLY(TOPN(GROUP(NOT ZIP5:Null), 1, -ZIP5), ZIP5),
 										LastName := ONLY(TOPN(GROUP(NOT LastName:Null), 1, -LastName), LastName),
@@ -7393,7 +7440,153 @@ Person: =>PL_InqNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DA
 Person: => PL_InqNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
 		ALL(Inquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqNewDt2Y), CURRENT_DATE_INQ),0,60));	
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqNewDt2Y), CURRENT_DATE_INQ),0,24));	
+		
+//Commercail Lending
+Person: => PL_InqBusLendCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CommercialLendingInquiries1MListSorted),0,999));
+Person: => PL_InqBusLendCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CommercialLendingInquiries3MListSorted),0,999));
+Person: => PL_InqBusLendCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CommercialLendingInquiries6MListSorted),0,999));	
+Person: => PL_InqBusLendCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CommercialLendingInquiries1YListSorted),0,999));		
+Person: => PL_InqBusLendCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CommercialLendingInquiries2YListSorted),0,999));
+		
+Person: => PL_InqBusLendDtList2Y := MAP(P_LexIDSeenFlag = '0'=> Inquiry.MISSING_INPUT_DATA,
+		PL_InqBusLendCnt2Y < 1  => Inquiry.NO_DATA_FOUND_INQ, 
+		CONCAT(CommercialLendingInquiries2YListSorted, InqDate, '|'));		
+Person: =>PL_InqBusLendNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
+		PL_InqBusLendCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(CommercialLendingInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
+  	DATETOSTRING(MAX(CommercialLendingInquiries2YListSorted, DATE(InqDate)), '%Y%m%d'));		
+Person: => PL_InqBusLendNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqBusLendCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(CommercialLendingInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqBusLendNewDt2Y), CURRENT_DATE_INQ),0,24));	
+		
+//Credit Card
+Person: => PL_InqCardCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CreditCardInquiries1MListSorted),0,999));
+Person: => PL_InqCardCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CreditCardInquiries3MListSorted),0,999));
+Person: => PL_InqCardCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CreditCardInquiries6MListSorted),0,999));	
+Person: => PL_InqCardCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CreditCardInquiries1YListSorted),0,999));		
+Person: => PL_InqCardCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(CreditCardInquiries2YListSorted),0,999));
+		
+Person: => PL_InqCardDtList2Y := MAP(P_LexIDSeenFlag = '0'=> Inquiry.MISSING_INPUT_DATA,
+		PL_InqCardCnt2Y < 1  => Inquiry.NO_DATA_FOUND_INQ, 
+		CONCAT(CreditCardInquiries2YListSorted, InqDate, '|'));		
+Person: =>PL_InqCardNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
+		PL_InqCardCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(CreditCardInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
+  	DATETOSTRING(MAX(CreditCardInquiries2YListSorted, DATE(InqDate)), '%Y%m%d'));		
+Person: => PL_InqCardNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCardCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(CreditCardInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqCardNewDt2Y), CURRENT_DATE_INQ),0,24));			
+
+//Mortgage
+Person: => PL_InqMtgeCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(MortgageInquiries1MListSorted),0,999));
+Person: => PL_InqMtgeCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(MortgageInquiries3MListSorted),0,999));
+Person: => PL_InqMtgeCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(MortgageInquiries6MListSorted),0,999));	
+Person: => PL_InqMtgeCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(MortgageInquiries1YListSorted),0,999));		
+Person: => PL_InqMtgeCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(MortgageInquiries2YListSorted),0,999));
+		
+Person: => PL_InqMtgeDtList2Y := MAP(P_LexIDSeenFlag = '0'=> Inquiry.MISSING_INPUT_DATA,
+		PL_InqMtgeCnt2Y < 1  => Inquiry.NO_DATA_FOUND_INQ, 
+		CONCAT(MortgageInquiries2YListSorted, InqDate, '|'));		
+Person: =>PL_InqMtgeNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
+		PL_InqMtgeCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(MortgageInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
+  	DATETOSTRING(MAX(MortgageInquiries2YListSorted, DATE(InqDate)), '%Y%m%d'));		
+Person: => PL_InqMtgeNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqMtgeCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(MortgageInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqMtgeNewDt2Y), CURRENT_DATE_INQ),0,24));		
+
+//Retail
+Person: => PL_InqRetailCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailInquiries1MListSorted),0,999));
+Person: => PL_InqRetailCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailInquiries3MListSorted),0,999));
+Person: => PL_InqRetailCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailInquiries6MListSorted),0,999));	
+Person: => PL_InqRetailCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailInquiries1YListSorted),0,999));		
+Person: => PL_InqRetailCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailInquiries2YListSorted),0,999));
+		
+Person: => PL_InqRetailDtList2Y := MAP(P_LexIDSeenFlag = '0'=> Inquiry.MISSING_INPUT_DATA,
+		PL_InqRetailCnt2Y < 1  => Inquiry.NO_DATA_FOUND_INQ, 
+		CONCAT(RetailInquiries2YListSorted, InqDate, '|'));		
+Person: =>PL_InqRetailNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
+		PL_InqRetailCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(RetailInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
+  	DATETOSTRING(MAX(RetailInquiries2YListSorted, DATE(InqDate)), '%Y%m%d'));		
+Person: => PL_InqRetailNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqRetailCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(RetailInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqRetailNewDt2Y), CURRENT_DATE_INQ),0,24));	
+
+//Retail Payment
+Person: => PL_InqRetailPymtCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailPaymentInquiries1MListSorted),0,999));
+Person: => PL_InqRetailPymtCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailPaymentInquiries3MListSorted),0,999));
+Person: => PL_InqRetailPymtCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailPaymentInquiries6MListSorted),0,999));	
+Person: => PL_InqRetailPymtCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailPaymentInquiries1YListSorted),0,999));		
+Person: => PL_InqRetailPymtCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(RetailPaymentInquiries2YListSorted),0,999));
+		
+Person: => PL_InqRetailPymtDtList2Y := MAP(P_LexIDSeenFlag = '0'=> Inquiry.MISSING_INPUT_DATA,
+		PL_InqRetailPymtCnt2Y < 1  => Inquiry.NO_DATA_FOUND_INQ, 
+		CONCAT(RetailPaymentInquiries2YListSorted, InqDate, '|'));		
+Person: => PL_InqRetailPymtNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
+		PL_InqRetailPymtCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		ALL(RetailPaymentInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
+  	DATETOSTRING(MAX(RetailPaymentInquiries2YListSorted, DATE(InqDate)), '%Y%m%d'));		
+Person: => PL_InqRetailPymtNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqRetailPymtCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(RetailPaymentInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqRetailPymtNewDt2Y), CURRENT_DATE_INQ),0,24));			
+		
 //
 Person: => PL_SrchCollCnt5Y :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT(Inquiries5YListSorted ),0,999));
@@ -7646,6 +7839,75 @@ Person: =>PL_SrchQuizProvOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISS
 		ALL(InquiriesQuizProvider5YListSorted,InqDate= Inquiry.REC_FOUND_BUT_INVALID)=>Inquiry.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryQuizProvider5YOldDate),CURRENT_DATE_INQ),0,60));
 
+//KS-7554
+
+Person: => PL_InqBankCnt1M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.ONE_MONTH_IN_DAYS AND IsBanking AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqBankCnt3M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.THREE_MONTHS_IN_DAYS AND IsBanking AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqBankCnt6M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.SIX_MONTHS_IN_DAYS AND IsBanking AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqBankCnt1Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.ONE_YEAR_IN_DAYS AND IsBanking AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqBankCnt2Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.TWO_YEARS_IN_DAYS AND IsBanking AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqBankDtList2Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
+		PL_InqBankCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		InquiriesBanking2YDtList);
+
+Person: => PL_InqBankNewDt2Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
+		PL_InqBankCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		InquiryBanking2YNewDate);
+
+Person: =>PL_InqBankNewMsnc2Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqBankCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(InquiriesBanking2YListSorted,InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryBanking2YNewDate), CURRENT_DATE_INQ),0,24));
+// KS-7561
+
+Person: => PL_InqOtherCnt1M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.ONE_MONTH_IN_DAYS AND IsOther AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqOtherCnt3M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.THREE_MONTHS_IN_DAYS AND IsOther AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqOtherCnt6M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.SIX_MONTHS_IN_DAYS AND IsOther AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqOtherCnt1Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.ONE_YEAR_IN_DAYS AND IsOther AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqOtherCnt2Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		BOUNDSFOLD(COUNT(PersonInquiry.GatherInquiries(AgeinDays < Person.TWO_YEARS_IN_DAYS AND IsOther AND ValidInquiriesFCRA AND NOT IsCollection){TransactionID}),0,999));
+
+Person: => PL_InqOtherDtList2Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
+		PL_InqOtherCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		InquiriesOther2YDtList);
+
+Person: => PL_InqOtherNewDt2Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
+		PL_InqOtherCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
+		InquiryOther2YNewDate);
+
+Person: =>PL_InqOtherNewMsnc2Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
+		PL_InqOtherCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
+		ALL(InquiriesOther2YListSorted,InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryOther2YNewDate), CURRENT_DATE_INQ),0,24));
+
 //KS-6136 Retail search
 
 Person: => RetailInquiries5Yrs := TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidRetail){TransactionID, MyDateFirstSeen := InqDate},999,ISVALIDDATE(MyDateFirstSeen),MyDateFirstSeen);																					
@@ -7733,32 +7995,177 @@ Person: =>PL_SrchOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPU
 /*                                                                        */
 /**************************************************************************/
 // NonFCRA
+
+//START KS-959g BRANCH ****
+//KS-959 - Extend PL_SrchPerLexIDCnt1Y		
+Person: => VelocityInquiriesPerLexIDNonFCRA1Day := VelocityInquiriesPerLexIDNonFCRA(InquiryAgeinDays <= ONE_DAY_IN_DAYS);
+Person: => VelocityInquiriesPerLexIDNonFCRA1Week := VelocityInquiriesPerLexIDNonFCRA(InquiryAgeinDays <= ONE_WEEK_IN_DAYS);
+Person: => VelocityInquiriesPerLexIDNonFCRA1Month := VelocityInquiriesPerLexIDNonFCRA(InquiryAgeinDays <= ONE_MONTH_IN_DAYS);
+Person: => VelocityInquiriesPerLexIDNonFCRA3Months := VelocityInquiriesPerLexIDNonFCRA(InquiryAgeinDays <= THREE_MONTHS_IN_DAYS);
+Person: => VelocityInquiriesPerLexIDNonFCRA6Months := VelocityInquiriesPerLexIDNonFCRA(InquiryAgeinDays <= SIX_MONTHS_IN_DAYS);
+
+Person: => PL_SrchPerLexIDCnt1D := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, 
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Day),0,999));
+Person: => PL_SrchPerLexIDCnt1W := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, 
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Week),0,999));
+Person: => PL_SrchPerLexIDCnt1M := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, 
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Month),0,999));
+Person: => PL_SrchPerLexIDCnt3M := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, 
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA3Months),0,999));
+Person: => PL_SrchPerLexIDCnt6M := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT, 
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA6Months),0,999));
 Person: => PL_SrchPerLexIDCnt1Y := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,	
 		BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA),0,999));
-		
+
+//END KS-959
+
+//KS-960 - Extend PL_SrchSSNPerLexIDCnt1Y
+Person: => PL_SrchSSNPerLexIDCnt1D := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1D < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Day(NOT SSN:Null){SSN}),0,999));
+Person: => PL_SrchSSNPerLexIDCnt1W := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1W < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Week(NOT SSN:Null){SSN}),0,999));
+Person: => PL_SrchSSNPerLexIDCnt1M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Month(NOT SSN:Null){SSN}),0,999));
+Person: => PL_SrchSSNPerLexIDCnt3M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt3M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA3Months(NOT SSN:Null){SSN}),0,999));
+Person: => PL_SrchSSNPerLexIDCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt6M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA6Months(NOT SSN:Null){SSN}),0,999));
 Person: => PL_SrchSSNPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
-		BOUNDSFOLD(COUNT(VelocityInquirySSNsPerLexIDNonFCRA),0,999));
+			PL_SrchPerLexIDCnt1Y < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquirySSNsPerLexIDNonFCRA(NOT SSN:Null)),0,999));
+//KS-960 END
 
+
+//KS-961 - Extend PL_SrchAddrPerLexIDCnt1Y	
+Person: => PL_SrchAddrPerLexIDCnt1D := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1D < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Day(NOT PrimaryName:Null AND NOT ZIP5:Null){PrimaryRange,PrimaryName,ZIP5}),0,999));
+Person: => PL_SrchAddrPerLexIDCnt1W := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1W < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Week(NOT PrimaryName:Null AND NOT ZIP5:Null){PrimaryRange,PrimaryName,ZIP5}),0,999));
+Person: => PL_SrchAddrPerLexIDCnt1M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Month(NOT PrimaryName:Null AND NOT ZIP5:Null){PrimaryRange,PrimaryName,ZIP5}),0,999));
+Person: => PL_SrchAddrPerLexIDCnt3M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt3M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA3Months(NOT PrimaryName:Null AND NOT ZIP5:Null){PrimaryRange,PrimaryName,ZIP5}),0,999));
+Person: => PL_SrchAddrPerLexIDCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt6M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA6Months(NOT PrimaryName:Null AND NOT ZIP5:Null){PrimaryRange,PrimaryName,ZIP5}),0,999));
 Person: => PL_SrchAddrPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
-		BOUNDSFOLD(COUNT(VelocityInquiryAddrsPerLexIDNonFCRA),0,999));
-		
-Person: => PL_SrchLNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
-		BOUNDSFOLD(COUNT(VelocityInquiryLastNamesPerLexIDNonFCRA), 0, 999));
-		
-Person: => PL_SrchFNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
-		BOUNDSFOLD(COUNT(VelocityInquiryFirstNamesPerLexIDNonFCRA), 0, 999));
-		
-Person: => PL_SrchPhonePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
-		BOUNDSFOLD(COUNT(VelocityInquiryPhonesPerLexIDNonFCRA), 0, 999));
+			PL_SrchPerLexIDCnt1Y < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiryAddrsPerLexIDNonFCRA(NOT PrimaryName:Null AND NOT ZIP5:Null)),0,999));
+//KS-961 END
 
+//KS-962 - Extend PL_SrchLNamePerLexIDCnt1Y			
+Person: => PL_SrchLNamePerLexIDCnt1D := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1D < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Day(NOT LastName:Null){LastName}),0,999));
+Person: => PL_SrchLNamePerLexIDCnt1W := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1W < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Week(NOT LastName:Null){LastName}),0,999));
+Person: => PL_SrchLNamePerLexIDCnt1M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Month(NOT LastName:Null){LastName}),0,999));
+Person: => PL_SrchLNamePerLexIDCnt3M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt3M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA3Months(NOT LastName:Null){LastName}),0,999));
+Person: => PL_SrchLNamePerLexIDCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt6M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA6Months(NOT LastName:Null){LastName}),0,999));
+Person: => PL_SrchLNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1Y < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiryLastNamesPerLexIDNonFCRA(NOT LastName:Null)), 0, 999));
+//KS-962 END
+
+//KS-963 - Extend PL_SrchFNamePerLexIDCnt1Y			
+Person: => PL_SrchFNamePerLexIDCnt1D := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1D < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Day(NOT FirstName:Null){FirstName}),0,999));
+Person: => PL_SrchFNamePerLexIDCnt1W := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1W < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Week(NOT FirstName:Null){FirstName}),0,999));
+Person: => PL_SrchFNamePerLexIDCnt1M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Month(NOT FirstName:Null){FirstName}),0,999));
+Person: => PL_SrchFNamePerLexIDCnt3M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt3M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA3Months(NOT FirstName:Null){FirstName}),0,999));
+Person: => PL_SrchFNamePerLexIDCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt6M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA6Months(NOT FirstName:Null){FirstName}),0,999));
+Person: => PL_SrchFNamePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1Y < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiryFirstNamesPerLexIDNonFCRA(NOT FirstName:Null)), 0, 999));
+//KS-963 END
+
+//KS-964 - Extend PL_SrchPhonePerLexIDCnt1Y			
+Person: => PL_SrchPhonePerLexIDCnt1D := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1D < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Day(NOT PersonalPhoneNumber:Null){PersonalPhoneNumber}),0,999));
+Person: => PL_SrchPhonePerLexIDCnt1W := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1W < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Week(NOT PersonalPhoneNumber:Null){PersonalPhoneNumber}),0,999));
+Person: => PL_SrchPhonePerLexIDCnt1M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Month(NOT PersonalPhoneNumber:Null){PersonalPhoneNumber}),0,999));
+Person: => PL_SrchPhonePerLexIDCnt3M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt3M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA3Months(NOT PersonalPhoneNumber:Null){PersonalPhoneNumber}),0,999));
+Person: => PL_SrchPhonePerLexIDCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt6M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA6Months(NOT PersonalPhoneNumber:Null){PersonalPhoneNumber}),0,999));
+Person: => PL_SrchPhonePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1Y < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiryPhonesPerLexIDNonFCRA(NOT PersonalPhoneNumber:Null)), 0, 999));
+//KS-964 END
+
+//KS-965 - Extend PL_SrchDOBPerLexIDCnt1Y	
+Person: => PL_SrchDOBPerLexIDCnt1D := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1D < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Day(NOT DateOfBirth:Null){DateOfBirth}),0,999));
+Person: => PL_SrchDOBPerLexIDCnt1W := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1W < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Week(NOT DateOfBirth:Null){DateOfBirth}),0,999));
+Person: => PL_SrchDOBPerLexIDCnt1M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Month(NOT DateOfBirth:Null){DateOfBirth}),0,999));
+Person: => PL_SrchDOBPerLexIDCnt3M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt3M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA3Months(NOT DateOfBirth:Null){DateOfBirth}),0,999));
+Person: => PL_SrchDOBPerLexIDCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt6M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA6Months(NOT DateOfBirth:Null){DateOfBirth}),0,999));
 Person: => PL_SrchDOBPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-		PL_SrchPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
-		BOUNDSFOLD(COUNT(VelocityInquiryDOBsPerLexIDNonFCRA), 0, 999));
+			PL_SrchPerLexIDCnt1Y < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiryDOBsPerLexIDNonFCRA(NOT DateOfBirth:Null)), 0, 999));
+//END KS-965
+
+//KS-977
+Person: => PL_SrchEmailPerLexIDCnt1D := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1D < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Day(NOT EmailAddress:Null){EmailAddress}),0,999));
+Person: => PL_SrchEmailPerLexIDCnt1W := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1W < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Week(NOT EmailAddress:Null){EmailAddress}),0,999));
+Person: => PL_SrchEmailPerLexIDCnt1M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt1M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA1Month(NOT EmailAddress:Null){EmailAddress}),0,999));
+Person: => PL_SrchEmailPerLexIDCnt3M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt3M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA3Months(NOT EmailAddress:Null){EmailAddress}),0,999));
+Person: => PL_SrchEmailPerLexIDCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+			PL_SrchPerLexIDCnt6M < 1 => NO_DATA_FOUND_INT,
+			BOUNDSFOLD(COUNT(VelocityInquiriesPerLexIDNonFCRA6Months(NOT EmailAddress:Null){EmailAddress}),0,999));
+ 
+//END KS-977
+
+//END KS-959g BRANCH ****
 		
 Person: => PL_SrchPerCurrAddrCnt1Y := IF(P_LexIDSeenFlag = '0' OR CurrAddrNoClean , MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(COUNT(VelocityInquiriesPerCurrAddrNonFCRA),0,999));
@@ -11538,8 +11945,7 @@ Person: => PL_AstPropCurrWAVMValCnt := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT
 				BOUNDSFOLD(COUNT(AVMList(ModAVMValue != Person.NO_DATA_FOUND_97)),0,999));
 
 Person: => PL_AstPropCurrAVMValList := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
-				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,					
-				PL_AstPropCurrCnt >0 AND PL_AstPropCurrWAVMValCnt = 0 => NO_DATA_FOUND_97_INT,
+				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,
 				CONCAT(AVMList, DEFAULT(ModAVMValue,Person.NO_DATA_FOUND_97), '|'));
 
 Person: => PL_AstPropCurrAVMValTot := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
@@ -11652,8 +12058,7 @@ Person: => PL_AstPropSaleWAVMValCntEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INP
 				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
 				BOUNDSFOLD(COUNT(AVMSalesList(ModAVMSalesPrice != Person.NO_DATA_FOUND_97)),0,999));
 Person: => PL_AstPropSaleAVMValListEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA,
-				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND,					
-				PL_AstPropSaleCntEv > 0 AND BOUNDSFOLD(COUNT(AVMSalesList(ModAVMSalesPrice != Person.NO_DATA_FOUND_97)),0,999) = 0 => NO_DATA_FOUND_97,
+				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND,
 				CONCAT(AVMSalesList,DEFAULT(ModAVMSalesPrice,Person.NO_DATA_FOUND_97),'|'));	
 Person: => PL_AstPropSaleAVMValTotEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
 				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,					
@@ -12135,8 +12540,6 @@ Person: => PL_VerSrcBureauOnlyFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING
 				'0');
 
 //KS-384
-Person: ONE_MONTH_IN_DAYS := 30;
-
 Person.VerSourceListSorted: => Seen_In_One_Month := AgeInDays <= Person.ONE_MONTH_IN_DAYS;
 
 Person: => SubjBureauSeenInOneMonth := BOUNDSFOLD(COUNT(FirstDegreeRelative.Relative(IsBureauOnlySource AND VerSourceListSorted.Seen_In_One_Month)), 0, 999);
@@ -13410,8 +13813,8 @@ PersonAddress: => GroupedCurrentAddress :=
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrZip5,'')) +
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrSecRng,''));
 
-PersonAddress: => CurrentLevenshteinMatch := LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress)>= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress) < 1;
-Person: => CurrentAddressMatchSourcesPre := PersonAddress(CurrentPerfectAddressMatch OR CurrentLevenshteinMatch).TranslatedSources{TranslatedSource,
+PersonAddress: => CurrentLevenshteinMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress)>= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress) < 1, 1, 0);
+Person: => CurrentAddressMatchSourcesPre := PersonAddress(CurrentPerfectAddressMatch OR CurrentLevenshteinMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource,
 					RecordCount := TranslatedSource:Weight,
 					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
 					MyDateLastSeen := TranslatedSource:DateLastSeen};
@@ -13537,9 +13940,9 @@ PersonAddress: => GroupedPreviousAddress :=
 		TRIMALL(DEFAULT(Subject.PII.PreviousAddrZip5,'')) +
 		TRIMALL(DEFAULT(Subject.PII.PreviousAddrSecRng,''));
 
-PersonAddress: => PreviousLevenshteinMatch := LevenshteinSimilarity(GroupedAddress, GroupedPreviousAddress)>= 0.75;
+PersonAddress: => PreviousLevenshteinMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedPreviousAddress)>= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedPreviousAddress) < 1, 1, 0);
 PersonAddress: =>TranslatedSources := DataSources{TranslatedSource};
-Person: => PreviousAddressMatchSourcesPre := PersonAddress(PreviousPerfectAddressMatch OR PreviousLevenshteinMatch).TranslatedSources{TranslatedSource,
+Person: => PreviousAddressMatchSourcesPre := PersonAddress(PreviousPerfectAddressMatch OR PreviousLevenshteinMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource,
 					RecordCount := TranslatedSource:Weight,
 					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
 					MyDateLastSeen := TranslatedSource:DateLastSeen};
@@ -15728,6 +16131,7 @@ Person: => PL_BusHdrNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_BusHdrNewDtEv), SelePerson.CURRENT_DATE), 0, 960));
 		
 Person: => PL_DrgLnJSeverityIndx7Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_DrgLTDCnt7Y > 0 => 5,
 		PL_DrgJudgSmClaimCnt7Y > 0 => 4,
 		PL_DrgJudgCivCrtCnt7Y > 0 => 3,
 		PL_DrgLienTaxCnt7Y > 0 => 2,
@@ -16013,3 +16417,75 @@ Person: => PL_InpAddrSrcNonDrgOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_In
 				PL_InpAddrSrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND_INT,
 				PL_InpAddrSrcNonDrgOldDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpAddrSrcNonDrgOldDtEvFCRA), CURRENT_DATE), 0, 960));
+				
+Person: => PL_VerNameFirstSrcBureauOnlyIdntIndxNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerNameFirstSrcBureauCntEvNonFCRA < 1 => NO_DATA_FOUND,
+		PL_VerNameFirstSrcBureauOnlyFlagEvNonFCRA = '0' => '0',
+		PL_VerNameFirstSrcBureauOnlyFlagEvNonFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvNonFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvNonFCRA = NO_DATA_FOUND) => '1',
+		PL_VerNameFirstSrcBureauOnlyFlagEvNonFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvNonFCRA = '1' => '2');
+
+Person: => PL_VerNameFirstSrcBureauOnlyIdntIndxFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerNameFirstSrcBureauCntEvFCRA < 1 => NO_DATA_FOUND,
+		PL_VerNameFirstSrcBureauOnlyFlagEvFCRA = '0' => '0',
+		PL_VerNameFirstSrcBureauOnlyFlagEvFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvFCRA = NO_DATA_FOUND) => '1',
+		PL_VerNameFirstSrcBureauOnlyFlagEvFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvFCRA = '1' => '2');
+		
+Person: => PL_VerNameLastSrcBureauOnlyIdntIndxNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerNameLastSrcBureauCntEvNonFCRA < 1 => NO_DATA_FOUND,
+		PL_VerNameLastSrcBureauOnlyFlagEvNonFCRA = '0' => '0',
+		PL_VerNameLastSrcBureauOnlyFlagEvNonFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvNonFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvNonFCRA = NO_DATA_FOUND) => '1',
+		PL_VerNameLastSrcBureauOnlyFlagEvNonFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvNonFCRA = '1' => '2');
+
+Person: => PL_VerNameLastSrcBureauOnlyIdntIndxFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerNameLastSrcBureauCntEvFCRA < 1 => NO_DATA_FOUND,
+		PL_VerNameLastSrcBureauOnlyFlagEvFCRA = '0' => '0',
+		PL_VerNameLastSrcBureauOnlyFlagEvFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvFCRA = NO_DATA_FOUND) => '1',
+		PL_VerNameLastSrcBureauOnlyFlagEvFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvFCRA = '1' => '2');
+		
+Person: => PL_VerAddrSrcBureauOnlyIdntIndxNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerAddrSrcBureauCntEvNonFCRA < 1 => NO_DATA_FOUND,
+		PL_VerAddrSrcBureauOnlyFlagEvNonFCRA = '0' => '0',
+		PL_VerAddrSrcBureauOnlyFlagEvNonFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvNonFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvNonFCRA = NO_DATA_FOUND) => '1',
+		PL_VerAddrSrcBureauOnlyFlagEvNonFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvNonFCRA = '1' => '2');
+
+Person: => PL_VerAddrSrcBureauOnlyIdntIndxFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerAddrSrcBureauCntEvFCRA < 1 => NO_DATA_FOUND,
+		PL_VerAddrSrcBureauOnlyFlagEvFCRA = '0' => '0',
+		PL_VerAddrSrcBureauOnlyFlagEvFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvFCRA = NO_DATA_FOUND) => '1',
+		PL_VerAddrSrcBureauOnlyFlagEvFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvFCRA = '1' => '2');
+		
+Person: => PL_VerSSNSrcBureauOnlyIdntIndxNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerSSNSrcBureauCntEvNonFCRA < 1 => NO_DATA_FOUND,
+		PL_VerSSNSrcBureauOnlyFlagEvNonFCRA = '0' => '0',
+		PL_VerSSNSrcBureauOnlyFlagEvNonFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvNonFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvNonFCRA = NO_DATA_FOUND) => '1',
+		PL_VerSSNSrcBureauOnlyFlagEvNonFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvNonFCRA = '1' => '2');
+
+Person: => PL_VerSSNSrcBureauOnlyIdntIndxFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerSSNSrcBureauCntEvFCRA < 1 => NO_DATA_FOUND,
+		PL_VerSSNSrcBureauOnlyFlagEvFCRA = '0' => '0',
+		PL_VerSSNSrcBureauOnlyFlagEvFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvFCRA = NO_DATA_FOUND) => '1',
+		PL_VerSSNSrcBureauOnlyFlagEvFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvFCRA = '1' => '2');
+		
+Person: => PL_VerDOBSrcBureauOnlyIdntIndxNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerDOBSrcBureauCntEvNonFCRA < 1 => NO_DATA_FOUND,
+		PL_VerDOBSrcBureauOnlyFlagEvNonFCRA = '0' => '0',
+		PL_VerDOBSrcBureauOnlyFlagEvNonFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvNonFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvNonFCRA = NO_DATA_FOUND) => '1',
+		PL_VerDOBSrcBureauOnlyFlagEvNonFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvNonFCRA = '1' => '2');
+
+Person: => PL_VerDOBSrcBureauOnlyIdntIndxFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerDOBSrcBureauCntEvFCRA < 1 => NO_DATA_FOUND,
+		PL_VerDOBSrcBureauOnlyFlagEvFCRA = '0' => '0',
+		PL_VerDOBSrcBureauOnlyFlagEvFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvFCRA = NO_DATA_FOUND) => '1',
+		PL_VerDOBSrcBureauOnlyFlagEvFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvFCRA = '1' => '2');
+		
+Person: => PL_VerPhoneSrcBureauOnlyIdntIndxNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerPhoneSrcBureauCntEvNonFCRA < 1 => NO_DATA_FOUND,
+		PL_VerPhoneSrcBureauOnlyFlagEvNonFCRA = '0' => '0',
+		PL_VerPhoneSrcBureauOnlyFlagEvNonFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvNonFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvNonFCRA = NO_DATA_FOUND) => '1',
+		PL_VerPhoneSrcBureauOnlyFlagEvNonFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvNonFCRA = '1' => '2');
+
+Person: => PL_VerPhoneSrcBureauOnlyIdntIndxFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		PL_VerPhoneSrcBureauCntEvFCRA < 1 => NO_DATA_FOUND,
+		PL_VerPhoneSrcBureauOnlyFlagEvFCRA = '0' => '0',
+		PL_VerPhoneSrcBureauOnlyFlagEvFCRA = '1' AND (PL_VerSrcBureauOnlyFlagEvFCRA = '0' OR PL_VerSrcBureauOnlyFlagEvFCRA = NO_DATA_FOUND) => '1',
+		PL_VerPhoneSrcBureauOnlyFlagEvFCRA = '1' AND PL_VerSrcBureauOnlyFlagEvFCRA = '1' => '2');
