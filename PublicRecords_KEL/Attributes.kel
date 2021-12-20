@@ -1612,13 +1612,13 @@ InputPII: => PI_CFPBRaceIsMultiRaceProb := MAP(P_InpClnNameLastFlagValue != '1' 
 		ROUND((PI_CFPBRaceJointMultiRaceProb/PI_CFPBRaceJointTotalProb)*100,2));
 InputPII: => PI_CFPBRaceProbType := MAP(P_InpClnNameLastFlagValue != '1' OR P_InpClnAddrGeoFlagValue != '1' => MISSING_INPUT_DATA,
 		NOT IsSensus => NO_DATA_FOUND,
-		IsSensus AND PI_CFPBRaceIsWhiteProb < 80 AND PI_CFPBRaceIsBlackProb < 80 AND PI_CFPBRaceIsHispanicProb < 80 AND PI_CFPBRaceIsAIANProb < 80 AND PI_CFPBRaceIsAsianPIProb < 80 AND PI_CFPBRaceIsMultiRaceProb < 80 => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+		IsSensus AND PI_CFPBRaceIsWhiteProb < 80 AND PI_CFPBRaceIsBlackProb < 80 AND PI_CFPBRaceIsHispanicProb < 80 AND PI_CFPBRaceIsAIANProb < 80 AND PI_CFPBRaceIsAsianPIProb < 80 AND PI_CFPBRaceIsMultiRaceProb < 80 => InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE,
 		MAP(PI_CFPBRaceIsWhiteProb >= 80.00 =>'WHITE',
 		PI_CFPBRaceIsBlackProb >= 80.00 =>'BLACK',
 		PI_CFPBRaceIsHispanicProb >= 80.00 =>'HISPANIC',
 		PI_CFPBRaceIsAIANProb >= 80.00 =>'AMERICAN INDIAN OR ALASKA NATIVE',
 		PI_CFPBRaceIsAsianPIProb >= 80.00 =>'ASIAN OR PACIFIC ISLANDER', 
-		PI_CFPBRaceIsMultiRaceProb >= 80.00 =>'MULTIRACIAL',RECS_AVAIL_BUT_CANNOT_CALCULATE));
+		PI_CFPBRaceIsMultiRaceProb >= 80.00 =>'MULTIRACIAL',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE));
 
 /**************************************************************************/
 /*                                                                        */
@@ -1631,11 +1631,11 @@ InputPII: =>PI_InpDOBAge := MAP(P_InpClnDOBFlagValue <>1 => MISSING_INPUT_DATA_I
 																BOUNDSFOLD(YEARSBETWEEN(P_InpClnDOB,FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')),0,120));
 
 InputPII: =>PI_InpSSNIsDeceasedFlag := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')){DateOfDeath}) => 0,
+																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')){DateOfDeath}) => 0,
 																						 1);
 InputPII: =>PI_InpSSNDeceasedDt := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 PI_InpSSNIsDeceasedFlag = 0 => NO_DATA_FOUND_INT,
-																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
+																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
 InputPII: => PI_InpSSNDeceasedMsnc := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 PI_InpSSNDeceasedDt = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,																				
 																			 BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(STRING(PI_InpSSNDeceasedDt), '%Y%m%d'), Person.CURRENT_DATE),0,960));																				
@@ -1720,15 +1720,15 @@ InputPII: => PhoneListingTypeIsBusiness := EXISTS(InputCleanPhone.ListingTypes(L
 		
 InputPII: => PhoneSICList := PhoneSICHighRiskPre{
 	HighRiskSIC,
-	PhoneSICDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMinSICPhone),DATETOSTRING(DateFirstSeenMinSICPhone, '%Y%m%d'), RECS_AVAIL_BUT_CANNOT_CALCULATE),
-	PhoneSICDateLastSeen := IF(ISVALIDDATE(DateLastSeenMinSICPhone),DATETOSTRING(MIN(DateLastSeenMinSICPhone, CURRENT_DATE_BIP), '%Y%m%d'), RECS_AVAIL_BUT_CANNOT_CALCULATE)
+	PhoneSICDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMinSICPhone),DATETOSTRING(DateFirstSeenMinSICPhone, '%Y%m%d'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE),
+	PhoneSICDateLastSeen := IF(ISVALIDDATE(DateLastSeenMinSICPhone),DATETOSTRING(MIN(DateLastSeenMinSICPhone, CURRENT_DATE_BIP), '%Y%m%d'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)
 	
 	};
 
 InputPII: => PhoneNAICSList := PhoneNAICSHighRiskPre{
 	HighRiskNAICS,
-	PhoneNAICSDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMinNAICSPhone),DATETOSTRING(DateFirstSeenMinNAICSPhone, '%Y%m%d'), RECS_AVAIL_BUT_CANNOT_CALCULATE),
-	PhoneNAICSDateLastSeen := IF(ISVALIDDATE(DateLastSeenMinNAICSPhone),DATETOSTRING(MIN(DateLastSeenMinNAICSPhone, CURRENT_DATE_BIP), '%Y%m%d'), RECS_AVAIL_BUT_CANNOT_CALCULATE)
+	PhoneNAICSDateFirstSeen := IF(ISVALIDDATE(DateFirstSeenMinNAICSPhone),DATETOSTRING(DateFirstSeenMinNAICSPhone, '%Y%m%d'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE),
+	PhoneNAICSDateLastSeen := IF(ISVALIDDATE(DateLastSeenMinNAICSPhone),DATETOSTRING(MIN(DateLastSeenMinNAICSPhone, CURRENT_DATE_BIP), '%Y%m%d'), InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)
 
 	};		
 	
@@ -3102,9 +3102,9 @@ InputPII: => PI_InpAddrOccupancyIndx :=  MAP(Subject.P_LexIDSeenFlag = '0' OR P_
 																					PI_InpAddrIsPOBoxFlag != '1' AND Location IN Subject.OccupiedAddresses => 2,
 																					PI_InpAddrIsPOBoxFlag != '1' AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 3,
 																					PI_InpAddrIsPOBoxFlag != '1' => 4,
-																					PI_InpAddrIsPOBoxFlag = '1' AND EXISTS(Subject.PersonAddress(Location = Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 5,
-																					PI_InpAddrIsPOBoxFlag = '1' AND EXISTS(Subject.PersonAddress(Location = Location)) AND NOT EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 6,
-																					PI_InpAddrIsPOBoxFlag = '1' AND NOT EXISTS(Subject.PersonAddress(Location = Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 7,
+																					PI_InpAddrIsPOBoxFlag = '1' AND EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 5,
+																					PI_InpAddrIsPOBoxFlag = '1' AND EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND NOT EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 6,
+																					PI_InpAddrIsPOBoxFlag = '1' AND NOT EXISTS(Subject.PersonAddress(Location = InputPII.Location)) AND EXISTS(Subject.PersonAddress(Location = Subject.OccupiedAddress)) => 7,
 																					PI_InpAddrIsPOBoxFlag = '1' => 8);
 
 Person: => PL_CurrAddrOccupancyIndx :=  MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
@@ -3343,7 +3343,7 @@ Person: => EarliestDeceasedDate := MAP(P_LexIDDeceasedDtIsValid <= PI_InpSSNDece
 Person: => P_LexIDDeceasedDtList := TOPN(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')),1,-DateOfDeath);
 
 Person: => P_LexIDIsDeceasedFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-													NOT EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d'))) => '0',
+													NOT EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d'))) => '0',
 													'1');
 Person: => P_LexIDDeceasedDt := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 													P_LexIDIsDeceasedFlag = '0' => NO_DATA_FOUND_INT,
@@ -4376,12 +4376,12 @@ Person: => PL_BestSSN:= MAP(
 			BestSSN);
 Person: => PL_BestSSNIsDeceasedFlag := MAP(
             PL_BestSSN = MISSING_INPUT_DATA OR PL_BestSSN = NO_DATA_FOUND => MISSING_INPUT_DATA,
-            NOT EXISTS(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(P_InpClnArchDt), '%Y%m%d')){DateOfDeath}) => '0',
+            NOT EXISTS(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt), '%Y%m%d')){DateOfDeath}) => '0',
             '1');
 Person: => PL_BestSSNDeceasedDt := MAP(
             PL_BestSSN = MISSING_INPUT_DATA OR PL_BestSSN = NO_DATA_FOUND => MISSING_INPUT_DATA,
             PL_BestSSNIsDeceasedFlag = '0' => NO_DATA_FOUND,
-            ONLY(TOPN(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(P_InpClnArchDt), '%Y%m%d')), 1, -DateOfDeath), STRING(DateOfDeath)));
+            ONLY(TOPN(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt), '%Y%m%d')), 1, -DateOfDeath), STRING(DateOfDeath)));
 Person: => PL_BestSSNDeceasedMsnc := MAP(
             PL_BestSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 						PL_BestSSNDeceasedDt = NO_DATA_FOUND => NO_DATA_FOUND_INT,
