@@ -1385,6 +1385,50 @@ InputPII: => PI_InpAddrTaxValYr:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA
 			AssesdValueYear = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
 			YEAR(DATE(AssesdValueYear)));
 
+//KS-7068
+
+InputPII: => MailStreetAddr := BestMostRecentPropertyEvent.MailingFullStreetAddress;
+InputPII: => MailUnitNum := BestMostRecentPropertyEvent.MailingUnitNumber;
+InputPII: => MailCityStZip := BestMostRecentPropertyEvent.MailingCityStateZip;
+
+InputPII: => GetMailZip := Filter(MailCityStZip, '0123456789');
+InputPII: => GetMailZip5 := SUBSTR(GetMailZip, 1, 5);
+
+InputPII: => ClnAddrPrimRng_Cln := IF(P_InpClnAddrPrimRng IN [MISSING_INPUT_DATA, NO_DATA_FOUND], '', P_InpClnAddrPrimRng);
+InputPII: => ClnAddrPreDir_Cln := IF(P_InpClnAddrPreDir IN [MISSING_INPUT_DATA, NO_DATA_FOUND], '', P_InpClnAddrPreDir);
+InputPII: => ClnAddrPrimName_Cln := IF(P_InpClnAddrPrimName IN [MISSING_INPUT_DATA, NO_DATA_FOUND], '', P_InpClnAddrPrimName);
+InputPII: => ClnAddrSffx_Cln := IF(P_InpClnAddrSffx IN [MISSING_INPUT_DATA, NO_DATA_FOUND], '', P_InpClnAddrSffx);
+InputPII: => ClnAddrPostDir_Cln := IF(P_InpClnAddrPostDir IN [MISSING_INPUT_DATA, NO_DATA_FOUND], '', P_InpClnAddrPostDir);
+InputPII: => ClnAddrSecRng_Cln := IF(P_InpClnAddrSecRng IN [MISSING_INPUT_DATA, NO_DATA_FOUND], '', P_InpClnAddrSecRng);
+InputPII: => ClnAddrZip5_Cln := IF(P_InpClnAddrZip5 IN [MISSING_INPUT_DATA, NO_DATA_FOUND], '', P_InpClnAddrZip5);
+
+InputPII: => InputAddrStreetConcat := 
+				IF(IsNotEnoughToClean(ClnAddrPrimRng_Cln), '', TRIMBOTH(ClnAddrPrimRng_Cln) + ' ') +
+				IF(IsNotEnoughToClean(ClnAddrPreDir_Cln), '', TRIMBOTH(ClnAddrPreDir_Cln) + ' ') +
+				IF(IsNotEnoughToClean(ClnAddrPrimName_Cln), '', TRIMBOTH(ClnAddrPrimName_Cln) + ' ') +
+				IF(IsNotEnoughToClean(ClnAddrSffx_Cln), '', TRIMBOTH(ClnAddrSffx_Cln) + ' ') +
+				IF(IsNotEnoughToClean(ClnAddrPostDir_Cln), '', TRIMBOTH(ClnAddrPostDir_Cln));
+InputPII: => GroupedMailAddr := 
+				TRIMALL(DEFAULT(MailStreetAddr,'') + 
+				DEFAULT(MailUnitNum,'') + 
+				DEFAULT(GetMailZip5,''));
+InputPII: => GroupedInputAddrLev := TRIMALL(InputAddrStreetConcat +
+				IF(IsNotEnoughToClean(ClnAddrSecRng_Cln), '', TRIMBOTH(ClnAddrSecRng_Cln)) +
+				IF(IsNotEnoughToClean(ClnAddrZip5_Cln), '', TRIMBOTH(ClnAddrZip5_Cln)));
+
+InputPII: => MailMatchInputAddr := TRIMBOTH(MailStreetAddr) = TRIMBOTH(InputAddrStreetConcat) AND 
+										TRIMBOTH(GetMailZip5) = TRIMBOTH(ClnAddrZip5_Cln) AND
+										(TRIMBOTH(MailUnitNum) = TRIMBOTH(ClnAddrSecRng_Cln) OR 
+											((MailUnitNum = '' OR MailUnitNum:Null) AND ClnAddrSecRng_Cln != '') OR (MailUnitNum != '' AND (ClnAddrSecRng_Cln = '' OR ClnAddrSecRng_Cln:Null)));
+InputPII: => MailLevInputAddr := IF(LevenshteinSimilarity(GroupedMailAddr, GroupedInputAddrLev) >= 0.75, 1, 0);
+InputPII: => MailMatchInputAddrFlag := IF(MailMatchInputAddr, 1, 0);
+
+InputPII: => PI_InpAddrMailMatchFlag := MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+				NOT InpAddrPropertyRecord => NO_DATA_FOUND,
+				GroupedMailAddr = '' => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+				MailMatchInputAddrFlag = 1 OR MailLevInputAddr = 1 => '1',
+				'0');
+
 //KS-4736
 
 InputPII: => InpAddressIsOwnedSubjectFlag := 
