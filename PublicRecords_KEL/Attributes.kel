@@ -565,7 +565,6 @@ NameSummary: MISSING_INPUT_DATA_INT := -99999;
 SSNSummary: MISSING_INPUT_DATA := '-99999';
 SSNSummary: NO_DATA_FOUND := '-99998';
 SSNSummary: NO_DATA_FOUND_97 := '-99997';
-SSNSummary: NO_DATA_FOUND_97_INT := -99997;
 SSNSummary: MISSING_INPUT_DATA_INT := -99999;	
 	
 AddressSummary: MISSING_INPUT_DATA := '-99999';
@@ -2052,7 +2051,6 @@ SSNSummary: => P_InpClnPhoneHome := PII.InputHomePhoneCleanValue;
 SSNSummary: => P_InpClnDOB := PII.InputDOBCleanValue;
 SSNSummary: => P_InpClnNameFirst := PII.InputFirstNameCleanValue;
 SSNSummary: => P_InpClnNameLast := PII.InputLastNameCleanValue;
-SSNSummary: => P_InpClnSSNFlagValue := PII.P_InpClnSSNFlagValue;
 
 SSNSummary: => SSNNotPopulated := P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
 SSNSummary: => AddressNotPopulated := P_InpClnPrimaryRange IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPrimaryName IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnZip IN [MISSING_INPUT_DATA, NO_DATA_FOUND];
@@ -2110,15 +2108,6 @@ SSNSummary: => SSNNameSourceList := SSNNameSources(TranslatedSourceCode != '' AN
 		SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)};
 		
 SSNSummary: => SSNNameSourceListSorted := TOPN(SSNNameSourceList, 1000, SourceDateFirstSeen = NO_DATA_FOUND_97, IF(SourceDateFirstSeen = NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen), TranslatedSourceCode);
-
-SSNSummary: => LastNameDataSet := NameSummary{NameLastName};
-//Velocity SSN LastName counters
-SSNSummary: => PI_NameLastPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue != 1 => MISSING_INPUT_DATA_INT,
-																EXISTS(LastNameDataSet) AND NOT EXISTS(LastNameDataSet{NameLastName:DateFirstSeen,NameLastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(NameLastName:DateLastSeen,CURRENTDATE()) <= 12 AND MONTHSBETWEEN(NameLastName:DateLastSeen,CURRENTDATE()) >= 0)),0,255));
-SSNSummary: => PI_NameLastPerInpSSNNewCnt6M := MAP(P_InpClnSSNFlagValue != 1 => MISSING_INPUT_DATA_INT,
-																EXISTS(LastNameDataSet) AND NOT EXISTS(LastNameDataSet{NameLastName:DateFirstSeen,NameLastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(NameLastName:DateFirstSeen,CURRENTDATE()) <= 6 AND MONTHSBETWEEN(NameLastName:DateFirstSeen,CURRENTDATE()) >= 0)),0,255));	
 
 // SSN and Address Corroboration Attributes
 SSNSummary: => PI_SrcWInpASListEv := MAP(
@@ -15345,7 +15334,7 @@ Person: => PL_SSNNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT
 Person: => PL_SSNCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(PersonSSN) AND NOT EXISTS(PersonSSN{Subject:DateFirstSeen,Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
 																BOUNDSFOLD(COUNT(PersonSSN(AgeLastSeen <= 60 AND AgeLastSeen >= 0 AND EXISTS(ValidSSN.ValidSSN IN ['G','Z','R','O']) AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
-//
+//KS-7622
 Person.ReportedDatesOfBirth: => AgeFirstSeen := MONTHSBETWEEN(DateOfBirth:DateFirstSeen,Person.CURRENT_DATE);
 Person.ReportedDatesOfBirth: => AgeLastSeen := MONTHSBETWEEN(DateOfBirth:DateLastSeen,Person.CURRENT_DATE);
 Person: => PL_DOBCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
@@ -15361,7 +15350,17 @@ Person: => PL_NameLastCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_I
 																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(LastName:DateLastSeen,Person.CURRENT_DATE) <= 12 AND MONTHSBETWEEN(LastName:DateLastSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,255));
 Person: => PL_NameLastNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(LastNameDataSet) AND NOT EXISTS(LastNameDataSet{LastName:DateFirstSeen,LastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) <= 6 AND MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,255));																
+																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) <= 6 AND MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,255));		
+
+Person: => P_InpClnSSNFlagValue := PII.P_InpClnSSNFlagValue;
+PersonSSN: => SSNMatch := Social = Subject.PII.P_InpClnSSN;
+Person: => SSNLastNameDataSet:= PersonSSN(SSNMatch).Subject.FullName{LastName, HeaderHitFlag};
+Person: => PI_NameLastPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue != 1 => MISSING_INPUT_DATA_INT,
+																EXISTS(SSNLastNameDataSet) AND NOT EXISTS(SSNLastNameDataSet{LastName:DateFirstSeen,LastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
+																BOUNDSFOLD(COUNT(SSNLastNameDataSet(MONTHSBETWEEN(LastName:DateLastSeen,Person.CURRENT_DATE) <= 12 AND MONTHSBETWEEN(LastName:DateLastSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,255));
+Person: => PI_NameLastPerInpSSNNewCnt6M := MAP(P_InpClnSSNFlagValue != 1 => MISSING_INPUT_DATA_INT,
+																EXISTS(SSNLastNameDataSet) AND NOT EXISTS(SSNLastNameDataSet{LastName:DateFirstSeen,LastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
+																BOUNDSFOLD(COUNT(SSNLastNameDataSet(MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) <= 6 AND MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,255));	
 														
 //it does't work how you think it does						
 //need to use raw here because clean is already overwritten at this point		
