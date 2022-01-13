@@ -1,7 +1,5 @@
 ﻿// IMPORT KnowledgeUniverse.ClaimsAuto_KEL.Entities;
-// IMPORT Entities;
 // IMPORT ClaimsAuto_KEL.Uses;
-// IMPORT Uses;
 
 
 ClaimsAutoClaim: ACCIDENT_CODE_LIST := ['BI', 'CO', 'ME', 'MP', 'PD', 'PI', 'UM', 'UN'];
@@ -22,6 +20,7 @@ ClaimsAutoClaim: PI_CODE_LIST := ['PI'];
 ClaimsAutoClaim: UM_CODE_LIST := ['UM'];
 ClaimsAutoClaim: UN_CODE_LIST := ['UN'];
 ClaimsAutoClaim: MP_CODE_LIST := ['MP'];
+ClaimsAutoClaim: OT_CODE_LIST := ['OT'];
 
 ClaimsAutoClaim: OPEN_DISPOSITION_LIST := ['O'];
 ClaimsAutoClaim: CLOSED_DISPOSITION_LIST := ['C'];
@@ -29,6 +28,9 @@ ClaimsAutoClaim: SUBROGATION_DISPOSITION_LIST := ['S', ''];
 
 ClaimsAutoClaim: FULL_SCOPE_CODE_LIST := ['F'];
 ClaimsAutoClaim: CLSUB_CODE_LIST := ['CLSUB'];
+
+ClaimsAuto: CAP_9999999 := 9999999;
+
 
 ClaimsAutoClaim: => IsValidClaim := ISVALIDDATE(DateOfClaim) AND ISVALIDDATE(rClaimsAuto.DateOfReceipt) AND DateOfClaim < rClaimsAuto.DateOfReceipt AND rClaimsAuto.ProcessingCompletionStatus = 'C' AND ScopeOfClaim IN FULL_SCOPE_CODE_LIST AND SectionIdentifier IN CLSUB_CODE_LIST;
 
@@ -64,6 +66,7 @@ ClaimsAutoClaim: => IsMPClaim := EXISTS(Payments(cClaimCatType IN MP_CODE_LIST))
 ClaimsAutoClaim: => IsGMClaim := EXISTS(Payments(cClaimCatType IN GEN_MED_CODE_LIST));
 ClaimsAutoClaim: => IsCPClaim := EXISTS(Payments(cClaimCatType IN CP_CODE_LIST));
 ClaimsAutoClaim: => IsBIClaim := EXISTS(Payments(cClaimCatType IN BI_CODE_LIST));
+ClaimsAutoClaim: => IsOTClaim := EXISTS(Payments(cClaimCatType IN OT_CODE_LIST));
 
 ClaimsAutoClaim: => IsPIClaimZ := EXISTS(Payments(cClaimCatType IN PI_CODE_LIST AND cClaimCatAmount = 0));
 ClaimsAutoClaim: => IsPDClaimZ := EXISTS(Payments(cClaimCatType IN PD_CODE_LIST AND cClaimCatAmount = 0));
@@ -135,7 +138,9 @@ ClaimsAuto: => AvgClmAmtWithin2Yr := MAP(NumNZNonClosedClmWithin2Yr = 0 => 99999
 ClaimsAuto: => AvgClmAmtWithin3Yr := MAP(NumNZNonClosedClmWithin3Yr = 0 => 9999999.99, 
 										NumClmWithin3Yr = 0 => 9999999.99, 
 										MIN(ROUND(TotalClmAmtWithin3YrTmp / NumClmWithin3Yr), 9999992));
-
+			
+// AVGPRV3_MV - The attribute below is specific for DHDB2 model
+ClaimsAuto: => AvgClmAmtWithin3YrDHDB2 := IF(NumClmWithin3Yr = 0, CAP_9999999, MIN(ROUND(TotalClmAmtWithin3YrTmp / NumClmWithin3Yr), 9999992));
 
 //	ACLE1001	ACLE1002	ACLE1003	ACLE1004	ACLE1005	ACLE1006	ACLE1007
 ClaimsAuto: => NumAccidentsLE100Within1Yr := MIN(COUNT(ClaimsAutoClaim(IsAccidentClaimNZ = TRUE AND (TotalClaimAmount > 0 AND TotalClaimAmount <= 100) AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1)), 992);
@@ -288,7 +293,7 @@ ClaimsAuto: => NumNZClmLE100Within6Yr := MIN(COUNT(ClaimsAutoClaim(TotalClaimAmo
 ClaimsAuto: => NumNZClmLE100Within7Yr := MIN(COUNT(ClaimsAutoClaim(TotalClaimAmount > 0 AND TotalClaimAmount <= 100 AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 7)), 992);
 
 
-//	MOSINCE	MOSINCAF		
+//	MOSINCE	MOSINCAF(same as MVR_ATFAULTMNTH for DHDB2)		
 ClaimsAuto: => NumMosSinceLastClm := IF(LatestClaimDate:Null, 9999, MONTHSBETWEEN(LatestClaimDate, ClaimsAuto.DateOfReceipt));
 ClaimsAuto: => NumMosSinceLastAtFaultClm := IF(LatestClaimDateAF:Null, 9999, MONTHSBETWEEN(LatestClaimDateAF, ClaimsAuto.DateOfReceipt));
 
@@ -310,6 +315,10 @@ ClaimsAuto: => NumPropDamClmWithin5Yr := MIN(COUNT(ClaimsAutoClaim(IsPDClaim = T
 
 //	PD_Z_PR3
 ClaimsAuto: => ExistPropDamZClmWithin3Yr := IF(ClaimsAutoClaim(IsPDClaimZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3), 1, 0);
+
+
+//	PD_Z_PR4
+ClaimsAuto: => ExistPropDamZClmWithin4Yr := IF(ClaimsAutoClaim(IsPDClaimZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4), 1, 0);
 
 
 //	PD_PR1NZ PD_PR2NZ PD_PR3NZ PD_PR4NZ PD_PR5NZ PD_PR6NZ PD_PR7NZ
@@ -536,6 +545,9 @@ ClaimsAuto: => ExistRentalReimbClmWithin3Yr := IF(ClaimsAutoClaim(IsRRClaim = TR
 ClaimsAuto: => ExistRentalReimbClmWithin5Yr := IF(ClaimsAutoClaim(IsRRClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5), 1, 0);
 
 
+// OT_PR5
+ClaimsAuto: => ExistOtherClmWithin5Yr := IF(ClaimsAutoClaim(IsOTClaim = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5), 1, 0);
+
 //RR_PR1NZ, RR_PR2NZ, RR_PR3NZ, RR_PR4NZ, RR_PR5NZ, RR_PR6NZ, RR_PR7NZ
 ClaimsAuto: => ExistNZRentalReimbClmWithin1Yr := IF(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 1), 1, 0);
 ClaimsAuto: => ExistNZRentalReimbClmWithin2Yr := IF(ClaimsAutoClaim(IsRRClaimNZ = TRUE AND IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2), 1, 0);
@@ -566,6 +578,8 @@ ClaimsAuto: => NumClmWithin1Yr := MIN(COUNT(ClaimsAutoClaim(IsValidClaim = TRUE 
 ClaimsAuto: => NumClmWithin2Yr := MIN(COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 2)), 992);
 ClaimsAuto: => NumClmWithin3Yr := MIN(COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 3)), 992);
 ClaimsAuto: => NumClmWithin5Yr := MIN(COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 5)), 992);
+
+ClaimsAuto: => NumClmWithin4Yr := MIN(COUNT(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4)), 992);
 
 
 //	TOT_CLMS_NJ
@@ -681,6 +695,10 @@ ClaimsAutoClaim: => ClaimAmount5YrTmp1 := IF(IsZeroClosedClaimV2 = FALSE AND IsV
 ClaimsAuto: => TotalClmAmtWithin5Yr := MAP(NumClmWithin5Yr = 0 => 99999999,
 											ALL(ClaimsAutoClaim(IsValidClaim=TRUE AND YrBetweenClaimDateAndReceiptDate < 5), IsZeroClosedClaimV2) => 99999999,
 											MIN(SUM(ClaimsAutoClaim, ClaimAmount5YrTmp1), 99999992));
+
+// TOTAMT4 - The attribute below is specific for DHDB2 model
+ClaimsAuto: => TotalClmAmtWithin4YrDHDB2Tmp := SUM(ClaimsAutoClaim(IsValidClaim = TRUE AND YrBetweenClaimDateAndReceiptDate < 4), TotalClaimAmount);
+ClaimsAuto: => TotalClmAmtWithin4YrDHDB2 := IF(NumClmWithin4Yr = 0, 99999999, MIN(TotalClmAmtWithin4YrDHDB2Tmp, 99999992));
 
 
 //CP_ZR_N1 CPLAST24
