@@ -182,9 +182,6 @@ FUNCTION: IsPhoneMatchMiskey(STRING PhoneOnFile, STRING InputPhone) <=
 			LENGTH(PhoneOnFile) = 7 AND LENGTH(InputPhone) = 10 => IsPhone10MatchMiskey(SUBSTR(InputPhone, 1, 3) + PhoneOnFile, InputPhone),
 			FALSE);	
 FUNCTION: FnIPValidate(STRING field1) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_IPValidate(field1)) FROM PublicRecords_KEL RETURNS STRING;	
-FUNCTION: IsFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;
-FUNCTION: IsNonFcraInquiry(STRING FunctionDescription) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.IsNonFcra(FunctionDescription)) FROM PublicRecords_KEL RETURNS BOOLEAN;	
-FUNCTION: IsValidInquiryProductCode(INTEGER ProductCode) <= ECL((STRING)ProductCode IN PublicRecords_KEL.ECL_Functions.AccLogs_Constants.valid_product_codes) FROM PublicRecords_KEL RETURNS BOOLEAN;	
 FUNCTION: IsInquirySSNMatch(STRING SSN1, STRING SSN2) <= SSN1 = SSN2; 
 FUNCTION: IsInquiryAddressMatch(INTEGER zip51, STRING PrimRange1, STRING PrimName1, STRING SecRange1, STRING PreDir1, STRING Suffix1, 
 												 INTEGER zip52, STRING PrimRange2, STRING PrimName2, STRING SecRange2, STRING PreDir2, STRING Suffix2) <= 
@@ -7156,16 +7153,12 @@ Inquiry: => InquiryIndustry := DEFAULT(ONLY(BusIntel, Industry), '');
 Inquiry: => InquiryVertical := DEFAULT(ONLY(BusIntel, Vertical), '');
 Inquiry: => InquirySubMarket := DEFAULT(ONLY(BusIntel, SubMarket), '');
 Inquiry: => InquiryMethod := DEFAULT(ONLY(SearchInfo, Method), '');
-Inquiry: => InquiryProductCode := ONLY(SearchInfo, ProductCode);
 Inquiry: => InquiryFunctionDescription := DEFAULT(ONLY(SearchInfo, FunctionDescription), '');
 
 Inquiry: => IsLengthSubMarket := STARTSWITH(UPCASE(TRIM(InquirySubMarket)),'FIRST PARTY');
 Inquiry: => IsBatchMonitoringMethod := UPCASE(TRIM(InquiryMethod)) IN Inquiry.METHOD;
 
 Inquiry: => IsCollection := UPCASE(TRIM(InquiryIndustry)) IN Inquiry.COLLECTION_INDUSTRY OR UPCASE(TRIM(InquiryVertical)) IN Inquiry.COLLECTION_VERTICAL OR IsLengthSubMarket;
-Inquiry: => IsNonFcraOk := IsNonFcraInquiry(UPCASE(TRIM(InquiryFunctionDescription)));
-Inquiry: => IsFcraOk := IsFcraInquiry(UPCASE(TRIM(InquiryFunctionDescription)));
-Inquiry: => IsProductCodeOk := IsValidInquiryProductCode(InquiryProductCode);
 
 Inquiry: => InquiryFCRAPurpose := ONLY(Permissions, FCRAPurpose);
 Inquiry: => InquiryHHID := ONLY(SearchInfo, ClientIdentifierHHID);
@@ -7179,11 +7172,8 @@ PersonInquiry: => GatherInquiries := Transaction{
 																						Vertical := InquiryVertical,
 																						Industry := InquiryIndustry,
 																						InqDate := TimeStampToDate(TransactionID:DateFirstSeen),
-																						IsNonFcraOk,
-																						IsFcraOk,
 																						IsCollection,
 																						IsBatchMonitoringMethod,
-																						IsProductCodeOk,
 																						InquiryFCRAPurpose,
 																						InquiryHHID,
 																						InquirySegmentID,
@@ -7200,13 +7190,12 @@ PersonInquiry.GatherInquiries: => ExcludedHHIDs := IF(InquiryHHID IN [7066, 2357
 PersonInquiry.GatherInquiries: => ExcludedSegments := IF(InquirySegmentID IN [4, 87, 22], '0', '1');
 PersonInquiry.GatherInquiries: => PurposeIsFCRAColl := InquiryFCRAPurpose = 164 AND IsCollection ; 
 //This will not be the check for all FCRA Inquiry attributes
-PersonInquiry.GatherInquiries: => ValidInquiriesFCRA := IsFcraOk AND
+PersonInquiry.GatherInquiries: => ValidInquiriesFCRA := 
 		UPCASE(TRIM(Industry)) != '' AND
 		ExcludeFunctionDescription AND //Bank Batch
 		PurposeIsFCRA AND
 		ExcludedHHIDs = '1' AND 
 		ExcludedSegments = '1' AND
-		IsProductCodeOk AND
 		NOT IsBatchMonitoringMethod;
 		
 //specifically used for count of all inquiries becuase the InquiryFCRAPurpose is specific for collections
@@ -7258,21 +7247,21 @@ Person: => RetailPaymentInquiries1YListSorted := TOPN(PersonInquiry.GatherInquir
 Person: => RetailPaymentInquiries2YListSorted := TOPN(PersonInquiry.GatherInquiries(Seen_In_Two_Years AND ValidInquiriesFCRA AND NOT IsCollection AND IsRetailPayment){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 
 PersonInquiry.GatherInquiries: =>ExcludeFunctionDescription :=UPCASE(TRIM(FunctionDescription)) != 'BANKO BATCH';
-PersonInquiry.GatherInquiries: =>ValidCollection:=IsNonFcraOk AND IsBatchMonitoringMethod AND ExcludeFunctionDescription AND IsCollection;
+PersonInquiry.GatherInquiries: =>ValidCollection:=IsBatchMonitoringMethod AND ExcludeFunctionDescription AND IsCollection;
 PersonInquiry.GatherInquiries: =>Seen_In_Five_Years := AgeinDays<=FIVE_YEARS_IN_DAYS;
 Person: =>Inquiries5YListSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidCollection){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 Person: =>Inquiry5YNewDate :=IsBlank(STRING(MAX(Inquiries5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>Inquiry5YOldDate :=IsBlank(STRING(MIN(Inquiries5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiriesDt5YList:= CONCAT(Inquiries5YListSorted,InqDate,'|');
 PersonInquiry.GatherInquiries: =>IsHighRisk := UPCASE(TRIM(Industry)) IN Inquiry.HIGH_RISK_CREDIT_INDUSTRY;
-PersonInquiry.GatherInquiries: =>ValidHighRisk:=IsNonFcraOk AND IsHighRisk AND NOT IsBatchMonitoringMethod AND ExcludeFunctionDescription AND NOT IsCollection;
+PersonInquiry.GatherInquiries: =>ValidHighRisk:=IsHighRisk AND NOT IsBatchMonitoringMethod AND ExcludeFunctionDescription AND NOT IsCollection;
 Person: =>InquiriesHighRisk5YListSorted :=TOPN(PersonInquiry.GatherInquiries(Seen_In_Five_Years AND ValidHighRisk){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
 Person: =>InquiriesHighRisk5YDtList:= CONCAT(InquiriesHighRisk5YListSorted,InqDate,'|');
 Person: =>InquiryHighRisk5YNewDate :=IsBlank(STRING(MAX(InquiriesHighRisk5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiryHighRisk5YOldDate :=IsBlank(STRING(MIN(InquiriesHighRisk5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 
 PersonInquiry.GatherInquiries: =>IsBanking := UPCASE(TRIM(Industry)) IN Inquiry.BANKING_INDUSTRY;
-PersonInquiry.GatherInquiries: =>ValidInquiries:=IsNonFcraOk AND NOT IsBatchMonitoringMethod AND ExcludeFunctionDescription AND NOT IsCollection AND NOT IsHighRisk;
+PersonInquiry.GatherInquiries: =>ValidInquiries:=NOT IsBatchMonitoringMethod AND ExcludeFunctionDescription AND NOT IsCollection AND NOT IsHighRisk;
 PersonInquiry.GatherInquiries: =>ValidBanking:=ValidInquiries AND IsBanking;
 PersonInquiry.GatherInquiries: => IsRetail := UPCASE(TRIM(Industry)) IN Inquiry.RETAIL_INDUSTRY;
 PersonInquiry.GatherInquiries: => ValidRetail := ValidInquiries AND IsRetail;
@@ -7452,16 +7441,12 @@ Person: =>InquiryUtilities2YOldDate :=IsBlank(STRING(MIN(InquiriesUtilities2YLis
 Inquiry: => IsValidVelocityInquiryNonFCRA := AgeinDays <= 365 AND 
 																						NOT IsCollection AND 
 																						NOT IsBatchMonitoringMethod AND
-																						IsProductCodeOk AND
-																						NOT InquiryFunctionDescription IN Inquiry.CHARGEBACK_FUNCTIONS AND
-																						IsNonFcraOk;
+																						NOT InquiryFunctionDescription IN Inquiry.CHARGEBACK_FUNCTIONS;
 Inquiry: => IsValidVelocityInquiryFCRA := AgeinDays <= 365 AND 
 																						NOT IsCollection AND 
 																						NOT IsBatchMonitoringMethod AND
-																						IsProductCodeOk AND
 																						NOT InquiryFunctionDescription IN Inquiry.CHARGEBACK_FUNCTIONS AND
-																						NOT InquiryIndustry IN Inquiry.COMMUNICATIONS_INDUSTRY AND
-																						IsFcraOk;
+																						NOT InquiryIndustry IN Inquiry.COMMUNICATIONS_INDUSTRY;
 
 Inquiry.PersonInfo: => TransactionID := Inquiry.TransactionID;
 Inquiry.PersonInfo: => InquiryAgeinDays := ABSDAYSBETWEEN(TimeStampToDate(Inquiry.TransactionID:DateFirstSeen), CURRENT_DATE);
@@ -8368,7 +8353,6 @@ Person: =>PL_InqAutoNewMsnc2Y  := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_I
 PersonInquiry.GatherInquiries: => ValidCollectionFcra := ExcludedHHIDs = '1' AND
 		UPCASE(TRIM(Industry)) != '' AND
 		ExcludedSegments = '1' AND 
-		IsFcraOk AND 
 		ExcludeFunctionDescription AND 
 		PurposeIsFCRAColl;
 		
