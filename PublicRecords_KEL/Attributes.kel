@@ -1675,7 +1675,7 @@ InputPII: =>PI_InpDOBAge := MAP(P_InpClnDOBFlagValue <>1 => MISSING_INPUT_DATA_I
 																BOUNDSFOLD(YEARSBETWEEN(P_InpClnDOB,FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')),0,120));
 
 InputPII: =>PI_InpSSNIsDeceasedFlag := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')){DateOfDeath}) => 0,
+																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')){DateOfDeath}) => 0,
 																						 1);
 InputPII: =>PI_InpSSNDeceasedDt := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 PI_InpSSNIsDeceasedFlag = 0 => NO_DATA_FOUND_INT,
@@ -3401,7 +3401,7 @@ Person: => EarliestDeceasedDate := MAP(P_LexIDDeceasedDtIsValid <= PI_InpSSNDece
 Person: => P_LexIDDeceasedDtList := TOPN(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')),1,-DateOfDeath);
 
 Person: => P_LexIDIsDeceasedFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-													NOT EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d'))) => '0',
+													NOT EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d'))) => '0',
 													'1');
 Person: => P_LexIDDeceasedDt := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 													P_LexIDIsDeceasedFlag = '0' => NO_DATA_FOUND_INT,
@@ -4450,7 +4450,7 @@ Person: => PL_BestSSNIsDeceasedFlag := MAP(
 Person: => PL_BestSSNDeceasedDt := MAP(
             PL_BestSSN = MISSING_INPUT_DATA OR PL_BestSSN = NO_DATA_FOUND => MISSING_INPUT_DATA,
             PL_BestSSNIsDeceasedFlag = '0' => NO_DATA_FOUND,
-            ONLY(TOPN(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt), '%Y%m%d')), 1, -DateOfDeath), STRING(DateOfDeath)));
+            ONLY(TOPN(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(CURRENTDATE()), '%Y%m%d')), 1, -DateOfDeath), STRING(DateOfDeath)));
 Person: => PL_BestSSNDeceasedMsnc := MAP(
             PL_BestSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 						PL_BestSSNDeceasedDt = NO_DATA_FOUND => NO_DATA_FOUND_INT,
@@ -4540,6 +4540,7 @@ Person: => CollegeAddressesCountByUseCode := IF(EXISTS(PII.Location.AddressPrope
 PersonAddress: => IsAddressHistoryAddress := EXISTS(AddressHierarchy(AddressRank > 0));
 PersonAddress: => IsCollegeAddressHistoryAddress := IsAddressHistoryAddress AND (Location.CollegeFlag = 'Y' OR Location.SeasonalDeliveryFlag = 'E');
 Person: => HasCollegeAddressOnADVO := EXISTS(PersonAddress(IsCollegeAddressHistoryAddress));
+Person: => P_InpClnDOBRaw := PII.P_InpClnDOB;
 
 
 /**************************************************************************/
@@ -4679,7 +4680,7 @@ Person: => EmrgDate := MIN(DataSources(HeaderHitFlag), HeaderHitFlag:DateFirstSe
 
 Person: => PL_EmrgAge := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA_INT,
 												NOT BestDOB:Null => BOUNDSFOLD(ABSYEARSBETWEEN(EmrgDate, BestDOB), 0, 62),
-												NOT PII.P_InpClnDOB:Null => BOUNDSFOLD(ABSYEARSBETWEEN(EmrgDate, PII.P_InpClnDOB), 0, 62),
+												NOT P_InpClnDOBRaw:Null => BOUNDSFOLD(ABSYEARSBETWEEN(EmrgDate, P_InpClnDOBRaw), 0, 62),
 												Person.NO_DATA_FOUND_INT);
 												
 AddressSlim: => EmergingPerfectAddressMatch := 
@@ -7535,7 +7536,6 @@ Person: => P_InpClnAddrPostDir := PII.InputPostDirectionCleanValue;
 Person: => P_InpClnNameFirstRaw := PII.P_InpClnNameFirst;
 Person: => P_InpClnNameLastRaw := PII.P_InpClnNameLast;
 Person: => P_InpClnPhoneHomeRaw := PII.P_InpClnPhoneHome;
-Person: => P_InpClnDOBRaw := PII.P_InpClnDOB;
 Person: => P_InpClnSSNRaw := PII.P_InpClnSSN;
 Person: => P_InpClnAddrZip5Raw := PII.P_InpClnAddrZip5;
 Person: => P_InpClnAddrPrimRngRaw := PII.P_InpClnAddrPrimRng;
@@ -7546,8 +7546,10 @@ Person: => P_InpClnAddrSffxRaw := PII.P_InpClnAddrSffx;
 Person: => P_InpClnAddrPostDirRaw := PII.P_InpClnAddrPostDir;
 Person: => P_InpClnAddrFull := PII.InputFullAddressCleanValue;
 Person: => P_InpSSNRaw := PII.P_InpSSN;
-
-
+Person: => P_InpClnArchDtF1YRaw := PII.P_InpClnArchDtF1Y;
+Person: => P_InpValDOBYearAllZeroFlag :=PII.P_InpValDOBYearAllZeroFlag;
+Person: => P_InpClnAddrLat := PII.P_InpClnAddrLat;
+Person: => P_InpSSNFlagValue := PII.P_InpSSNFlagValue;
 
 Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputSSNMatch := IsInquirySSNMatch(SSN, Person.P_InpClnSSNRaw);
 Person.VelocityInquiriesPerLexIDNonFCRA: => IsInputAddressMatch := IsInquiryAddressMatch(INTEGER(ZIP5), PrimaryRange, PrimaryName, SecondaryRange, Predirectional, Suffix, INTEGER(Person.P_InpClnAddrZip5Raw), Person.P_InpClnAddrPrimRngRaw, Person.P_InpClnAddrPrimNameRaw, Person.P_InpClnAddrSecRngRaw, Person.P_InpClnAddrPreDirRaw, Person.P_InpClnAddrSffxRaw);
@@ -8928,16 +8930,16 @@ InputPII: => 	P_InpClnArchDtF2Y := MAP(P_InpClnArchDtFlagValue != '1' => MISSING
 																		CURRENT_DATE_2YEARS > TODAY() => NO_DATA_FOUND,
 																		DATETOSTRING(CURRENT_DATE_2YEARS,'%Y%m%d'));
 																		
-Person: =>  PL_DrgCrimFelCnt1YF1Y := IF( PII.P_InpClnArchDtF1Y IN [MISSING_INPUT_DATA,NO_DATA_FOUND], CriminalOffense.MISSING_INPUT_DATA_INT, 
+Person: =>  PL_DrgCrimFelCnt1YF1Y := IF(P_InpClnArchDtF1YRaw IN [MISSING_INPUT_DATA,NO_DATA_FOUND], CriminalOffense.MISSING_INPUT_DATA_INT, 
 																				BOUNDSFOLD(COUNT(PersonOffenses.Offense(IsFelonyFCRA AND WithinF1Y(CriminalDate, CURRENTDATE()))), 0, 999));		// this version of the felony derog is intentionally chosen to be FCRA for now
 
-Person: =>  PL_DrgLienCnt1YF1Y :=IF(PII.P_InpClnArchDtF1Y IN [MISSING_INPUT_DATA,NO_DATA_FOUND], LienJudgment.MISSING_INPUT_DATA_INT,
+Person: =>  PL_DrgLienCnt1YF1Y :=IF(P_InpClnArchDtF1YRaw IN [MISSING_INPUT_DATA,NO_DATA_FOUND], LienJudgment.MISSING_INPUT_DATA_INT,
 																			BOUNDSFOLD(COUNT(AllLienData( WithinF1Y(OriginalFilingDate, CURRENTDATE()) AND  IsOverAllLien = TRUE) ),0,999));											
 
-Person: =>  PL_DrgBkCnt1YF1Y := IF(PII.P_InpClnArchDtF1Y IN [MISSING_INPUT_DATA,NO_DATA_FOUND], Bankruptcy.MISSING_INPUT_DATA_INT,
+Person: =>  PL_DrgBkCnt1YF1Y := IF(P_InpClnArchDtF1YRaw IN [MISSING_INPUT_DATA,NO_DATA_FOUND], Bankruptcy.MISSING_INPUT_DATA_INT,
 																			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(WithinF1Y(DateFiled, CURRENTDATE()) AND IsBankruptcy)), 0, 999));			
 
-Person: =>  PL_DrgLTD1YF1Y := IF(PII.P_InpClnArchDtF1Y IN [MISSING_INPUT_DATA,NO_DATA_FOUND], LienJudgment.MISSING_INPUT_DATA_INT,
+Person: =>  PL_DrgLTD1YF1Y := IF(P_InpClnArchDtF1YRaw IN [MISSING_INPUT_DATA,NO_DATA_FOUND], LienJudgment.MISSING_INPUT_DATA_INT,
 																				BOUNDSFOLD(COUNT(AllLienData(WithinF1Y(OriginalFilingDate, CURRENTDATE()) AND  IsLandlordTenantDispute = TRUE) ),0,999));
 
 /**************************************************************************/
@@ -14389,16 +14391,16 @@ Person.ReportedDatesOfBirth: => FullyValidFlag  := IF(DateOfBirthPadded = '', 1,
 Person.ReportedDatesOfBirth: => MonthPaddedFlag  := IF(DateOfBirthPadded = 'YYYY0101',1,0);
 Person.ReportedDatesOfBirth: => DayPaddedFlag  := IF(DateOfBirthPadded = 'YYYYMM01',1,0);
 Person: => PL_VerDOBYearFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-																		PII.P_InpValDOBYearMissingFlag = 1 OR PII.P_InpValDOBYearAllZeroFlag = 1 => NO_DATA_FOUND_INT,
-																		EXISTS(ReportedDatesOfBirth(HeaderHitFlag AND YEAR(PII.P_InpClnDOB) = YEAR(DateOfBirth))) => 1,
+																		P_InpValDOBYearMissingFlag = 1 OR P_InpValDOBYearAllZeroFlag = 1 => NO_DATA_FOUND_INT,
+																		EXISTS(ReportedDatesOfBirth(HeaderHitFlag AND YEAR(P_InpClnDOBRaw) = YEAR(DateOfBirth))) => 1,
 																		0);
 Person: => PL_VerDOBMonFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-																		PII.P_InpValDOBMonMissingFlag = 1 OR PII.P_InpValDOBMonAllZeroFlag = 1 OR ALL(ReportedDatesOfBirth,MonthPaddedFlag = 1) => NO_DATA_FOUND_INT,
-																		EXISTS(ReportedDatesOfBirth(HeaderHitFlag AND MONTH(PII.P_InpClnDOB) = MONTH(DateOfBirth))) => 1,
+																		P_InpValDOBMonMissingFlag = 1 OR P_InpValDOBMonAllZeroFlag = 1 OR ALL(ReportedDatesOfBirth,MonthPaddedFlag = 1) => NO_DATA_FOUND_INT,
+																		EXISTS(ReportedDatesOfBirth(HeaderHitFlag AND MONTH(P_InpClnDOBRaw) = MONTH(DateOfBirth))) => 1,
 																		0);
 Person: => PL_VerDOBDayFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-																		PII.P_InpValDOBMonMissingFlag = 1 OR PII.P_InpValDOBMonAllZeroFlag = 1  OR ALL(ReportedDatesOfBirth,DayPaddedFlag = 1)=> NO_DATA_FOUND_INT,
-																		EXISTS(ReportedDatesOfBirth(HeaderHitFlag AND DAY(PII.P_InpClnDOB) = DAY(DateOfBirth))) => 1,
+																		P_InpValDOBMonMissingFlag = 1 OR P_InpValDOBMonAllZeroFlag = 1  OR ALL(ReportedDatesOfBirth,DayPaddedFlag = 1)=> NO_DATA_FOUND_INT,
+																		EXISTS(ReportedDatesOfBirth(HeaderHitFlag AND DAY(P_InpClnDOBRaw) = DAY(DateOfBirth))) => 1,
 																		0); 
 
 Person: => VersonOneHouseHolds := HouseholdMember(Version = 1).Household;//only 1 household id per version #
@@ -14468,13 +14470,13 @@ Person: => CurrentAddressMatchSourcesSortedFCRA := TOPN(CurrentAddressMatchSourc
 			
 Person: => PL_VerCurrAddrFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
 				PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagNonFCRA = '1' AND PII.InputFullAddressCleanValue != PL_CurrAddrFull => 0,
-				PII.InputFullAddressCleanValue = PL_CurrAddrFull => 1,
+				PL_VerAddrFlagNonFCRA = '1' AND P_InpClnAddrFull != PL_CurrAddrFull => 0,
+				P_InpClnAddrFull = PL_CurrAddrFull => 1,
 				NO_DATA_FOUND_INT);
 Person: => PL_VerCurrAddrFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
 				PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagFCRA = '1' AND PII.InputFullAddressCleanValue != PL_CurrAddrFull => 0,
-				PII.InputFullAddressCleanValue = PL_CurrAddrFull => 1,
+				PL_VerAddrFlagFCRA = '1' AND P_InpClnAddrFull != PL_CurrAddrFull => 0,
+				P_InpClnAddrFull = PL_CurrAddrFull => 1,
 				NO_DATA_FOUND_INT);
 
 
@@ -14596,13 +14598,13 @@ Person: => PreviousAddressMatchSourcesSortedFCRA := TOPN(PreviousAddressMatchSou
 			
 Person: => PL_VerPrevAddrFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
 				PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagNonFCRA = '1' AND PII.InputFullAddressCleanValue != PL_PrevAddrFull => 0,
-				PII.InputFullAddressCleanValue = PL_PrevAddrFull => 1,
+				PL_VerAddrFlagNonFCRA = '1' AND P_InpClnAddrFull != PL_PrevAddrFull => 0,
+				P_InpClnAddrFull = PL_PrevAddrFull => 1,
 				NO_DATA_FOUND_INT);
 Person: => PL_VerPrevAddrFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
 				PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagFCRA = '1' AND PII.InputFullAddressCleanValue != PL_PrevAddrFull => 0,
-				PII.InputFullAddressCleanValue = PL_PrevAddrFull => 1,
+				PL_VerAddrFlagFCRA = '1' AND P_InpClnAddrFull != PL_PrevAddrFull => 0,
+				P_InpClnAddrFull = PL_PrevAddrFull => 1,
 				NO_DATA_FOUND_INT);
 
 Person: => PL_PrevAddrSrcCntEv  := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
@@ -14899,6 +14901,12 @@ Person: => P_InpValDOBDayAllZeroFlag  := PII.P_InpValDOBDayAllZeroFlag;
 Person: => P_InpValDOBMonMissingFlag  := PII.P_InpValDOBMonMissingFlag;
 Person: => P_InpValDOBMonAllZeroFlag  := PII.P_InpValDOBMonAllZeroFlag;
 Person: => P_InpValDOBYearMissingFlag  := PII.P_InpValDOBYearMissingFlag;
+Person: => P_LexID	:= PII.P_LexID;
+Person: => P_InpClnAddrLng := PII.P_InpClnAddrLng;
+Person: => P_InpClnSSNFlagValue := PII.P_InpClnSSNFlagValue;
+Person: => P_InpClnAddrFullFlagValue := PII.P_InpClnAddrFullFlagValue;
+
+
 Person.ReportedDatesOfBirth: => ValidDOBCheck := ((ValidDOB:Null AND ValidDOB != 'M') OR NOT DateOfBirth:Null);
 Person: => ValidDOBLogicCheck1 := P_InpValDOBYearInvalidFlag = 0 AND
 																	P_InpValDOBInFutureFlag = 0 AND
@@ -14907,13 +14915,13 @@ Person: => ValidDOBLogicCheck1 := P_InpValDOBYearInvalidFlag = 0 AND
 																	EXISTS(ReportedDatesOfBirth((MonthPaddedFlag = 0) AND (DayPaddedFlag = 0))) AND
 																	DOBInputMatches;
 Person: => ValidDOBLogicCheck2 := P_InpValDOBYearInvalidFlag = 0 AND
-																	SUBSTR(P_InpClnDOB, 1, 6) <= SUBSTR(STRING(PII.P_InpClnArchDt), 1, 6) AND
+																	SUBSTR(P_InpClnDOB, 1, 6) <= SUBSTR(STRING(CURRENTDATE()), 1, 6) AND
 																	P_InpValDOBMonInvalidFlag = 0 AND
 																	(P_InpValDOBDayMissingFlag = 1 OR P_InpValDOBDayAllZeroFlag = 1) AND
 																	EXISTS(ReportedDatesOfBirth(MonthPaddedFlag = 0)) AND
 																	EXISTS(ReportedDatesOfBirth(SUBSTR(DATETOSTRING(ReportedDatesOfBirth.DateOfBirth,'%Y%m%d'), 1, 6) = SUBSTR(Person.P_InpClnDOB, 1, 6)));
 Person: => ValidDOBLogicCheck3 := P_InpValDOBYearInvalidFlag = 0 AND
-																	SUBSTR(P_InpClnDOB, 1, 4) <= SUBSTR(STRING(PII.P_InpClnArchDt), 1, 4) AND
+																	SUBSTR(P_InpClnDOB, 1, 4) <= SUBSTR(STRING(CURRENTDATE()), 1, 4) AND
 																	(P_InpValDOBMonMissingFlag = 1 OR P_InpValDOBMonAllZeroFlag =  1) AND
 																	(P_InpValDOBDayMissingFlag = 1 OR P_InpValDOBDayAllZeroFlag = 1) AND
 																	EXISTS(ReportedDatesOfBirth(SUBSTR(DATETOSTRING(ReportedDatesOfBirth.DateOfBirth,'%Y%m%d'), 1, 4) = SUBSTR(Person.P_InpClnDOB, 1, 4)));
@@ -15239,27 +15247,27 @@ Person: => PL_InpDOBSrcNonDrgOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_Inp
 //KS-1878 Input/best PII matching
 Person: => PL_VerBestNameFirstFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestNameFirst = NO_DATA_FOUND OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerNameFirstSrcCntEvFCRA < 1 => NO_DATA_FOUND,
-								PL_VerNameFirstFlagFCRA = 1 AND NOT IsFirstNameMatch(TRIM(UPCASE(PL_BestNameFirst)),TRIM(UPCASE(PII.P_InpClnNameFirst))) => '0',
+								PL_VerNameFirstFlagFCRA = 1 AND NOT IsFirstNameMatch(TRIM(UPCASE(PL_BestNameFirst)),TRIM(UPCASE(P_InpClnNameFirstRaw))) => '0',
                 '1');
 Person: => PL_VerBestNameFirstFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestNameFirst = NO_DATA_FOUND OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
                 PL_VerNameFirstSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
-								PL_VerNameFirstFlagNonFCRA = 1 AND NOT IsFirstNameMatch(TRIM(UPCASE(PL_BestNameFirst)),TRIM(UPCASE(PII.P_InpClnNameFirst))) => '0',
+								PL_VerNameFirstFlagNonFCRA = 1 AND NOT IsFirstNameMatch(TRIM(UPCASE(PL_BestNameFirst)),TRIM(UPCASE(P_InpClnNameFirstRaw))) => '0',
                 '1');
 Person: => PL_VerBestNameLastFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestNameLast = NO_DATA_FOUND OR P_InpClnNameLast  IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerNameLastSrcCntEvFCRA < 1 => NO_DATA_FOUND,
-								PL_VerNameLastFlagFCRA = 1 AND NOT IsFirstNameMatch(TRIM(UPCASE(PL_BestNameLast)),TRIM(UPCASE(PII.P_InpClnNameLast))) => '0',
+								PL_VerNameLastFlagFCRA = 1 AND NOT IsFirstNameMatch(TRIM(UPCASE(PL_BestNameLast)),TRIM(UPCASE(P_InpClnNameLastRaw))) => '0',
                 '1');
 Person: => PL_VerBestNameLastFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestNameLast = NO_DATA_FOUND OR P_InpClnNameLast  IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
                 PL_VerNameLastSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
-								PL_VerNameLastFlagNonFCRA = 1 AND NOT IsLastNameMatch(TRIM(UPCASE(PL_BestNameLast)),TRIM(UPCASE(PII.P_InpClnNameLast))) => '0',
+								PL_VerNameLastFlagNonFCRA = 1 AND NOT IsLastNameMatch(TRIM(UPCASE(PL_BestNameLast)),TRIM(UPCASE(P_InpClnNameLastRaw))) => '0',
                 '1');
 Person: => PL_VerBestSSNFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestSSN = NO_DATA_FOUND OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerSSNSrcCntEvFCRA < 1 => NO_DATA_FOUND,
-								PL_VerSSNFlagFCRA = 1 AND NOT EditDistanceWithinRadius(PL_BestSSN, PII.P_InpClnSSN, 2) => '0',
+								PL_VerSSNFlagFCRA = 1 AND NOT EditDistanceWithinRadius(PL_BestSSN, P_InpClnSSNRaw, 2) => '0',
 								'1');
 Person: => PL_VerBestSSNFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_BestSSN = NO_DATA_FOUND OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 								PL_VerSSNSrcCntEvNonFCRA < 1 => NO_DATA_FOUND,
-								PL_VerSSNFlagNonFCRA = 1 AND NOT EditDistanceWithinRadius(PL_BestSSN, PII.P_InpClnSSN, 2) => '0',
+								PL_VerSSNFlagNonFCRA = 1 AND NOT EditDistanceWithinRadius(PL_BestSSN, P_InpClnSSNRaw, 2) => '0',
 								'1');
 
 Person: => BestDobCheck := SUBSTR(PL_BestDOB, 7, 8) IN ['00','01'];
@@ -15273,13 +15281,13 @@ Person: => BestValidDOBLogicCheck1 := P_InpValDOBYearInvalidFlag = 0 AND
 																	EXISTS(ReportedDatesOfBirth((MonthPaddedFlag = 0) AND (DayPaddedFlag = 0))) AND
 																	DOBBestMatches;
 Person: => BestValidDOBLogicCheck2 := P_InpValDOBYearInvalidFlag = 0 AND
-																	SUBSTR(P_InpClnDOB, 1, 6) <= SUBSTR(STRING(PII.P_InpClnArchDt), 1, 6) AND
+																	SUBSTR(P_InpClnDOB, 1, 6) <= SUBSTR(STRING(CURRENTDATE()), 1, 6) AND
 																	P_InpValDOBMonInvalidFlag = 0 AND
 																	(P_InpValDOBDayMissingFlag = 1 OR P_InpValDOBDayAllZeroFlag = 1) AND
 																	EXISTS(ReportedDatesOfBirth(MonthPaddedFlag = 0)) AND
 																	SUBSTR(PL_BestDOB, 1, 6) = SUBSTR(P_InpClnDOB, 1, 6);
 Person: => BestValidDOBLogicCheck3 := P_InpValDOBYearInvalidFlag = 0 AND
-																	SUBSTR(P_InpClnDOB, 1, 4) <= SUBSTR(STRING(PII.P_InpClnArchDt), 1, 4) AND
+																	SUBSTR(P_InpClnDOB, 1, 4) <= SUBSTR(STRING(CURRENTDATE()), 1, 4) AND
 																	(P_InpValDOBMonMissingFlag = 1 OR P_InpValDOBMonAllZeroFlag =  1) AND
 																	(P_InpValDOBDayMissingFlag = 1 OR P_InpValDOBDayAllZeroFlag = 1) AND
 																	SUBSTR(PL_BestDOB, 1, 4) = SUBSTR(P_InpClnDOB, 1, 4);
@@ -15423,17 +15431,17 @@ InputPII: => P_InpValAddrZipMismatchIndx := MAP((P_InpClnAddrCityFlagValue IN [M
 						
 // KS-4491
 
-Person: => PL_CurrAddrToInpDist := MAP(PII.P_InpClnAddrFullFlagValue != '1' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-					PII.P_InpClnAddrLat = NO_DATA_FOUND_INT OR PII.P_InpClnAddrLng = NO_DATA_FOUND_INT OR PL_CurrAddrLat = NO_DATA_FOUND_INT OR PL_CurrAddrLng = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
-					Dist(REAL(PII.P_InpClnAddrLat), REAL(PII.P_InpClnAddrLng), REAL(PL_CurrAddrLat), REAL(PL_CurrAddrLng)));
+Person: => PL_CurrAddrToInpDist := MAP(P_InpClnAddrFullFlagValue != '1' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+					P_InpClnAddrLat = NO_DATA_FOUND_INT OR P_InpClnAddrLng = NO_DATA_FOUND_INT OR PL_CurrAddrLat = NO_DATA_FOUND_INT OR PL_CurrAddrLng = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+					Dist(REAL(P_InpClnAddrLat), REAL(P_InpClnAddrLng), REAL(PL_CurrAddrLat), REAL(PL_CurrAddrLng)));
 
 Person: => PL_CurrAddrToPrevDist := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 					PL_CurrAddrLat = NO_DATA_FOUND_INT OR PL_CurrAddrLng = NO_DATA_FOUND_INT OR PL_PrevAddrLat = NO_DATA_FOUND_INT OR PL_PrevAddrLng = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 					Dist(REAL(PL_CurrAddrLat), REAL(PL_CurrAddrLng), REAL(PL_PrevAddrLat), REAL(PL_PrevAddrLng)));
 
-Person: => PL_PrevAddrToInpDist := MAP(PII.P_InpClnAddrFullFlagValue != '1' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-					PII.P_InpClnAddrLat = NO_DATA_FOUND_INT OR PII.P_InpClnAddrLng = NO_DATA_FOUND_INT OR PL_PrevAddrLat = NO_DATA_FOUND_INT OR PL_PrevAddrLng = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
-					Dist(REAL(PII.P_InpClnAddrLat), REAL(PII.P_InpClnAddrLng), REAL(PL_PrevAddrLat), REAL(PL_PrevAddrLng)));
+Person: => PL_PrevAddrToInpDist := MAP(P_InpClnAddrFullFlagValue != '1' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+					P_InpClnAddrLat = NO_DATA_FOUND_INT OR P_InpClnAddrLng = NO_DATA_FOUND_INT OR PL_PrevAddrLat = NO_DATA_FOUND_INT OR PL_PrevAddrLng = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+					Dist(REAL(P_InpClnAddrLat), REAL(P_InpClnAddrLng), REAL(PL_PrevAddrLat), REAL(PL_PrevAddrLng)));
 
 //KS 6536
 PersonPhone.DataSources: => PhonesPlusSourcesTranslated := MAP(
@@ -15450,7 +15458,7 @@ PersonPhone: => TranslatedSourcesNonFCRA := DataSources(PhonesPlusSourcesTransla
 PersonPhone.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
 PersonPhone: => TranslatedSourcesFCRA := DataSources(Source != 'PP' AND TranslatedSourceCode != '' AND NOT TranslatedSourceCode:Null){TranslatedSourceCode};
 
-PersonPhone: => PhoneIsVerified := IsPhoneMatch(PhoneNumber,Subject.PII.P_InpClnPhoneHome);
+PersonPhone: => PhoneIsVerified := IsPhoneMatch(PhoneNumber,Subject.P_InpClnPhoneHomeRaw);
 
 Person: => PhoneVerSourceListFCRAPre := PersonPhone(PhoneIsVerified).TranslatedSourcesFCRA{
 	TranslatedSourceCode := TranslatedSourceCode,
@@ -15635,13 +15643,13 @@ Person: => PL_VerPhoneSrcBureauOnlyFlagEvFCRA := MAP(P_LexIDSeenFlagFCRA = '0' O
 // KS-7070
 Person: => PL_VerBestPhoneHomeFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR PL_BestPhoneHomeNonFCRA = NO_DATA_FOUND =>  MISSING_INPUT_DATA,
 																		PL_VerPhoneSrcCntEv < 1 => NO_DATA_FOUND,
-																		PL_VerPhoneFlag = '1' AND PII.P_InpClnPhoneHome != PL_BestPhoneHomeNonFCRA => '0',
-																		PII.P_InpClnPhoneHome = PL_BestPhoneHomeNonFCRA => '1');
+																		PL_VerPhoneFlag = '1' AND P_InpClnPhoneHome != PL_BestPhoneHomeNonFCRA => '0',
+																		P_InpClnPhoneHome = PL_BestPhoneHomeNonFCRA => '1');
 																		
 Person: => PL_VerBestPhoneHomeFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR PL_BestPhoneHomeFCRA = NO_DATA_FOUND =>  MISSING_INPUT_DATA,
 																		PL_VerPhoneSrcCntEvFCRA < 1 => NO_DATA_FOUND,
-																		PL_VerPhoneFlag = '1' AND PII.P_InpClnPhoneHome != PL_BestPhoneHomeFCRA => '0',
-																		PII.P_InpClnPhoneHome = PL_BestPhoneHomeFCRA => '1');
+																		PL_VerPhoneFlag = '1' AND P_InpClnPhoneHome != PL_BestPhoneHomeFCRA => '0',
+																		P_InpClnPhoneHome = PL_BestPhoneHomeFCRA => '1');
 
 //KS-7458
 Person: => PL_InpPhoneSrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
@@ -15806,7 +15814,7 @@ Person: => SSNLength := LENGTH(CleanRawSSN);
 
 
 
-Person: => PL_VerSSNLookupFlag := MAP(P_LexIDSeenFlag = '0' OR PII.P_InpSSNFlagValue = 0 => MISSING_INPUT_DATA,
+Person: => PL_VerSSNLookupFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpSSNFlagValue = 0 => MISSING_INPUT_DATA,
 																	SSNLength > 4 => NO_DATA_FOUND,
 																	SSNLength = 4 AND (CleanRawSSN = FourDigitBest) => '1',
                                   '0');
@@ -15918,43 +15926,43 @@ Person: => PL_VerSSNSrcBureauOnlyFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_In
 				'0');
 //Bureau flags overall KS-7415
 //nonFCRA
-Person: => PL_InpAddrSrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_LexID = MISSING_INPUT_DATA OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+Person: => PL_InpAddrSrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																								PL_VerAddrSrcBureauCntEvNonFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerAddrSrcBureauCntEvNonFCRA = 0 => 0,
 																								PL_VerAddrSrcBureauCntEvNonFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_InpDOBSrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_LexID = MISSING_INPUT_DATA OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+Person: => PL_InpDOBSrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR  P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																								PL_VerDOBSrcBureauCntEvNonFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerDOBSrcBureauCntEvNonFCRA = 0 => 0,
 																								PL_VerDOBSrcBureauCntEvNonFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_SrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_LexID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+Person: => PL_SrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																								PL_VerSrcBureauCntEvNonFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerSrcBureauCntEvNonFCRA = 0 => 0,
 																								PL_VerSrcBureauCntEvNonFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_InpSSNSrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_LexID = MISSING_INPUT_DATA OR PII.P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
+Person: => PL_InpSSNSrcBureauFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
 																								PL_VerSSNSrcBureauCntEvNonFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerSSNSrcBureauCntEvNonFCRA = 0 => 0,
 																								PL_VerSSNSrcBureauCntEvNonFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
 //FCRA
-Person: => PL_InpAddrSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_LexID = MISSING_INPUT_DATA OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+Person: => PL_InpAddrSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																								PL_VerAddrSrcBureauCntEvFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerAddrSrcBureauCntEvFCRA = 0 => 0,
 																								PL_VerAddrSrcBureauCntEvFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_InpDOBSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_LexID = MISSING_INPUT_DATA OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+Person: => PL_InpDOBSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																								PL_VerDOBSrcBureauCntEvFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerDOBSrcBureauCntEvFCRA = 0 => 0,
 																								PL_VerDOBSrcBureauCntEvFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_SrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_LexID = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+Person: => PL_SrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0'  => MISSING_INPUT_DATA_INT,
 																								PL_VerSrcBureauCntEvFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerSrcBureauCntEvFCRA = 0 => 0,
 																								PL_VerSrcBureauCntEvFCRA > 0 => 1,
 																								NO_DATA_FOUND_INT);//Shouldn't reach this line
-Person: => PL_InpSSNSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PII.P_LexID = MISSING_INPUT_DATA OR PII.P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
+Person: => PL_InpSSNSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
 																								PL_VerSSNSrcBureauCntEvFCRA = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
 																								PL_VerSSNSrcBureauCntEvFCRA = 0 => 0,
 																								PL_VerSSNSrcBureauCntEvFCRA > 0 => 1,
