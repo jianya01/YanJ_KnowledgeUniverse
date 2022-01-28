@@ -6805,13 +6805,14 @@ Person: => PL_ProfLicFlagEv := MAP(
 Person: => PL_ProfLicActvCnt := MAP( 
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA_INT,	 
 			PL_ProfLicFlagEv = '0' =>	ProfessionalLicense.NO_DATA_FOUND_PROF_INT,
-			ActiveLicenseFlag => BOUNDSFOLD(ActiveLicenseCount, 1, 99),
+			ActiveLicenseFlag => BOUNDSFOLD(ActiveLicenseCount, 1, 99), 
 			0);
 
 Person: => PL_ProfLicCntEv := IF(P_LexIDSeenFlag = '0', ProfessionalLicense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense)),0,99));
 Person: => PL_ProfLicIssueDtListEv := CONCAT(ProfessionalLicenseDates{ProfLicUID, MaxIssueDate}, MaxIssueDate, '|');
 Person: => PL_ProfLicExpDtListEv := CONCAT(ProfessionalLicenseDates{ProfLicUID, MaxExpireDate}, MaxExpireDate, '|');
-Person: => PL_ProfLicIndxByLicListEvPre := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID,LicenseCategory := IF(LicenseDescription.LicenseCategory:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, LicenseDescription.LicenseCategory)}, 100, LicenseCategory);
+ProfessionalLicense: => MaxLicensecatogory :=ONLY(TOPN(LicenseDates,1,-(IF(ISVALIDDATE(LicenseCategory:DateLastSeen),LicenseCategory:DateLastSeen,LicenseCategory:Archive_Date)),-LicenseCategory),LicenseCategory);
+Person: => PL_ProfLicIndxByLicListEvPre := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense){ProfLicUID := UID,LicenseCategory := IF(MaxLicensecatogory:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, MaxLicensecatogory),MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')) }, 100, MaxIssueDate = ProfessionalLicense.REC_FOUND_BUT_INVALID, MaxIssueDate);
 Person: => PL_ProfLicIndxByLicListEv := CONCAT(PL_ProfLicIndxByLicListEvPre, LicenseCategory, '|');
 Person: => PL_ProfLicActvFlag := MAP(
 			P_LexIDSeenFlag = '0' => ProfessionalLicense.MISSING_INPUT_DATA,	
@@ -14428,16 +14429,15 @@ Person: => PL_HHMmbrAge18uCnt := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA
 
 //Verified current address person
 // KS 3378
-PersonAddress: => CurrentPerfectAddressMatch := 
-	IsNullOrEqual(TRIMBOTH(PrimaryRange), TRIMBOTH(Subject.PII.CurrentAddrPrimRng)) AND  
-	IsNullOrEqual(TRIMBOTH(Predirectional), TRIMBOTH(Subject.PII.CurrentAddrPreDir)) AND
-	IsNullOrEqual(TRIMBOTH(PrimaryName), TRIMBOTH(Subject.PII.CurrentAddrPrimName)) AND
-	IsNullOrEqual(TRIMBOTH(Suffix), TRIMBOTH(Subject.PII.CurrentAddrSffx)) AND
-	IsNullOrEqual(TRIMBOTH(Postdirectional), TRIMBOTH(Subject.PII.CurrentAddrPostDir)) AND
-	IsNullOrEqual(TRIMBOTH(INTFORMAT(ZIP5,5,1)), TRIMBOTH(Subject.PII.CurrentAddrZip5)) AND
-	IsNullOrEqual(TRIMBOTH(SecondaryRange), TRIMBOTH(Subject.PII.CurrentAddrSecRng));
-	
-	
+PersonAddress: => CurrentPerfectAddressMatch := ( 
+		TRIMALL(DEFAULT(Subject.PII.CurrentAddrPrimRng,'')) = TRIMALL(DEFAULT(PrimaryRange,'')) AND
+		TRIMALL(DEFAULT(Subject.PII.CurrentAddrPreDir,'')) = TRIMALL(DEFAULT(Predirectional,'')) AND
+		TRIMALL(DEFAULT(Subject.PII.CurrentAddrPrimName,'')) = TRIMALL(DEFAULT(PrimaryName,'')) AND
+		TRIMALL(DEFAULT(Subject.PII.CurrentAddrPostDir,'')) = TRIMALL(DEFAULT(Postdirectional,'')) AND 
+		TRIMALL(DEFAULT(Subject.PII.CurrentAddrSffx,'')) = TRIMALL(DEFAULT(Suffix,'')) AND
+		TRIMALL(DEFAULT(Subject.PII.CurrentAddrZip5,'')) = TRIMALL(DEFAULT(INTFORMAT(ZIP5,5,1),'')) AND
+		(TRIMALL(DEFAULT(Subject.PII.CurrentAddrSecRng,'')) = TRIMALL(DEFAULT(SecondaryRange,'')) OR ((Subject.PII.CurrentAddrSecRng = '' OR Subject.PII.CurrentAddrSecRng:Null) AND SecondaryRange != '') OR (Subject.PII.CurrentAddrSecRng != '' AND (SecondaryRange = '' OR SecondaryRange:Null))));
+		
 PersonAddress.DataSources: => TranslatedSource := ConsumerSourceGroup(Source);
 PersonAddress: => GroupedCurrentAddress := 
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrPrimRng,'')) +
@@ -14556,14 +14556,15 @@ Person: => PL_CurrAddrSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAd
 				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_CurrAddrSrcNewDtEvFCRA), CURRENT_DATE), 0, 960));
 
 //KS3379
-PersonAddress: => PreviousPerfectAddressMatch := 
-	IsNullOrEqual(TRIMBOTH(PrimaryRange), TRIMBOTH(Subject.PII.PreviousAddrPrimRng)) AND  
-	IsNullOrEqual(TRIMBOTH(Predirectional), TRIMBOTH(Subject.PII.PreviousAddrPreDir)) AND
-	IsNullOrEqual(TRIMBOTH(PrimaryName), TRIMBOTH(Subject.PII.PreviousAddrPrimName)) AND
-	IsNullOrEqual(TRIMBOTH(Suffix), TRIMBOTH(Subject.PII.PreviousAddrSffx)) AND
-	IsNullOrEqual(TRIMBOTH(Postdirectional), TRIMBOTH(Subject.PII.PreviousAddrPostDir)) AND
-	IsNullOrEqual(TRIMBOTH(INTFORMAT(ZIP5,5,1)), TRIMBOTH(Subject.PII.PreviousAddrZip5)) AND
-	IsNullOrEqual(TRIMBOTH(SecondaryRange), TRIMBOTH(Subject.PII.PreviousAddrSecRng));
+PersonAddress: => PreviousPerfectAddressMatch := (
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPrimRng,'')) = TRIMALL(DEFAULT(PrimaryRange,'')) AND
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPreDir,'')) = TRIMALL(DEFAULT(Predirectional,'')) AND
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPrimName,'')) = TRIMALL(DEFAULT(PrimaryName,'')) AND
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrPostDir,'')) = TRIMALL(DEFAULT(Postdirectional,'')) AND 
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrSffx,'')) = TRIMALL(DEFAULT(Suffix,'')) AND
+		TRIMALL(DEFAULT(Subject.PII.PreviousAddrZip5,'')) = TRIMALL(DEFAULT(INTFORMAT(ZIP5,5,1),'')) AND
+		(TRIMALL(DEFAULT(Subject.PII.PreviousAddrSecRng,'')) = TRIMALL(DEFAULT(SecondaryRange,'')) OR ((Subject.PII.PreviousAddrSecRng = '' OR Subject.PII.PreviousAddrSecRng:Null) AND SecondaryRange != '') OR (Subject.PII.PreviousAddrSecRng != '' AND (SecondaryRange = '' OR SecondaryRange:Null))));
+		
 	
 
 PersonAddress: => GroupedPreviousAddress := 
