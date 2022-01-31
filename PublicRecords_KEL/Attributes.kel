@@ -14449,6 +14449,9 @@ PersonAddress: => GroupedCurrentAddress :=
 		TRIMALL(DEFAULT(Subject.PII.CurrentAddrSecRng,''));
 
 PersonAddress: => CurrentLevenshteinMatch := IF(LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress)>= 0.75 AND LevenshteinSimilarity(GroupedAddress, GroupedCurrentAddress) < 1, 1, 0);
+PersonAddress: => CurrentInputLevenshteinMatch := IF(LevenshteinSimilarity(GroupedInputAddress, GroupedCurrentAddress)>= 0.75 AND LevenshteinSimilarity(GroupedInputAddress, GroupedCurrentAddress) <= 1, 1, 0);
+PersonAddress: => PreviousInputLevenshteinMatch := IF(LevenshteinSimilarity(GroupedInputAddress, GroupedPreviousAddress)>= 0.75 AND LevenshteinSimilarity(GroupedInputAddress, GroupedPreviousAddress) <= 1, 1, 0);
+
 Person: => CurrentAddressMatchSourcesPre := PersonAddress(CurrentPerfectAddressMatch OR CurrentLevenshteinMatch = 1).DataSources(HeaderHitFlag AND TranslatedSources != ''){TranslatedSource,
 					RecordCount := TranslatedSource:Weight,
 					MyDateFirstSeen := TranslatedSource:DateFirstSeen,
@@ -14470,15 +14473,12 @@ Person: => CurrentAddressMatchSourcesSortedFCRA := TOPN(CurrentAddressMatchSourc
 			
 Person: => PL_VerCurrAddrFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
 				PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagNonFCRA = '1' AND P_InpClnAddrFull != PL_CurrAddrFull => 0,
-				P_InpClnAddrFull = PL_CurrAddrFull => 1,
-				NO_DATA_FOUND_INT);
+				EXISTS(PersonAddress(CurrentInputLevenshteinMatch = 1)) => '1',
+				'0');
 Person: => PL_VerCurrAddrFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
 				PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagFCRA = '1' AND P_InpClnAddrFull != PL_CurrAddrFull => 0,
-				P_InpClnAddrFull = PL_CurrAddrFull => 1,
-				NO_DATA_FOUND_INT);
-
+				EXISTS(PersonAddress(CurrentInputLevenshteinMatch = 1)) => '1',
+				'0');
 
 Person: => PL_CurrAddrSrcCntEv  := IF(P_LexIDSeenFlag = '0' OR PL_CurrAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] , MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(COUNT(CurrentAddressMatchSourcesSorted), 0, 99));
@@ -14599,14 +14599,12 @@ Person: => PreviousAddressMatchSourcesSortedFCRA := TOPN(PreviousAddressMatchSou
 			
 Person: => PL_VerPrevAddrFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] => MISSING_INPUT_DATA_INT,
 				PL_VerAddrSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagNonFCRA = '1' AND P_InpClnAddrFull != PL_PrevAddrFull => 0,
-				P_InpClnAddrFull = PL_PrevAddrFull => 1,
-				NO_DATA_FOUND_INT);
+				EXISTS(PersonAddress(PreviousInputLevenshteinMatch = 1)) => '1',
+				'0');
 Person: => PL_VerPrevAddrFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] OR P_InpClnAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ]=> MISSING_INPUT_DATA_INT,
 				PL_VerAddrSrcCntEvFCRA < 1 => NO_DATA_FOUND_INT,
-				PL_VerAddrFlagFCRA = '1' AND P_InpClnAddrFull != PL_PrevAddrFull => 0,
-				P_InpClnAddrFull = PL_PrevAddrFull => 1,
-				NO_DATA_FOUND_INT);
+				EXISTS(PersonAddress(PreviousInputLevenshteinMatch = 1)) => '1',
+				'0');
 
 Person: => PL_PrevAddrSrcCntEv  := IF(P_LexIDSeenFlag = '0' OR PL_PrevAddrFull IN [MISSING_INPUT_DATA,NO_DATA_FOUND ] , MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(COUNT(PreviousAddressMatchSourcesSorted), 0, 99));
