@@ -1473,22 +1473,24 @@ InputPII: => PI_InpAddrSubjOwnedTaxValYr := MAP(P_LexID = MISSING_INPUT_DATA_INT
 
 //KS-3397
 
-InputPII: => PI_InpAddrNamePropMatchIndx := MAP(PI_InpAddrOnFileFlagEv != 1 => MISSING_INPUT_DATA_INT,
-                                                P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-                                                P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-                                                NOT EXISTS(BestMostRecentPropertyEvent) => NO_DATA_FOUND_INT,
-                                                NOT EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND (FirstName != '' OR LastName != '')){FirstName, LastName}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-                                                EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 3,
-                                                EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 2,
-                                                EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))))) => 1,
-                                                0);
-InputPII: => PI_InpAddrFamilyOwnedFlag := MAP(PI_InpAddrOnFileFlagEv != 1 => MISSING_INPUT_DATA_INT,
-                                                P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-                                                P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
-                                                NOT EXISTS(BestMostRecentPropertyEvent) => NO_DATA_FOUND_INT,
-																								PI_InpAddrNamePropMatchIndx = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
-																								PI_InpAddrNamePropMatchIndx IN [0,1,3] => 0,
-																								PI_InpAddrNamePropMatchIndx = 2 => 1);
+InputPII: => PI_InpAddrNamePropMatchIndx := MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				InputFirstNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				InputLastNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				NOT EXISTS(BestMostRecentPropertyEvent) => NO_DATA_FOUND_INT,
+				NOT EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND (FirstName != '' OR LastName != '')){FirstName, LastName}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+				EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 3,
+				EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(InputPII.P_InpClnNameLast))))) => 2,
+				EXISTS(BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails(PartyIsBuyerOrOwner AND IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(InputPII.P_InpClnNameFirst))))) => 1,
+				0);
+
+InputPII: => PI_InpAddrFamilyOwnedFlag := MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+				InputFirstNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				InputLastNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+				NOT EXISTS(BestMostRecentPropertyEvent) => NO_DATA_FOUND_INT,
+				PI_InpAddrNamePropMatchIndx = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+				PI_InpAddrNamePropMatchIndx IN [0,1,3] => 0,
+				PI_InpAddrNamePropMatchIndx = 2 => 1);
+
 
 //KS-6100
 
@@ -3799,28 +3801,27 @@ Person: => PL_CurrAddrMailMatchFlag := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DAT
 				'0');
 
 //KS-3406		
-Person: => NameDataSet := TOPN(CurrAddrHelperAttribute.AddressProperty
-    {
-        NonDerogDateFirstSeen := BestMostRecentPropertyEvent.DtFirstSeen,
-        FirstName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.FirstName,
-        LastName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.LastName,
-        PartyIsBuyerOrOwner := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.PartyIsBuyerOrOwner
-    },1,-NonDerogDateFirstSeen);   
-Person: => matchIndex := NameDataSet(PartyIsBuyerOrOwner){
-        NonDerogDateFirstSeen,
-        NameMatch := FirstName != '' OR LastName != '',
-        MatchFirstLastName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
-        MatchLastName := IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
-        MatchFirstName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst)))};  
+Person: => NameDataSet := CurrAddrHelperAttribute.AddressProperty{
+		NonDerogDateFirstSeen := BestMostRecentPropertyEvent.DtFirstSeen,
+		FirstName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.FirstName,
+		LastName := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.LastName,
+		PartyIsBuyerOrOwner := BestMostRecentPropertyEvent.PersonPropertyEvent.PartyDetails.PartyIsBuyerOrOwner};
+
+Person: => matchIndex := NameDataSet(PartyIsBuyerOrOwner AND (FirstName != '' OR LastName != '')){
+		NonDerogDateFirstSeen,
+		MatchFirstLastName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst))) AND IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
+		MatchLastName := IsLastNameMatch(TRIM(UPCASE(LastName)),TRIM(UPCASE(Person.P_InpClnNameLast))),
+		MatchFirstName := IsFirstNameMatch(TRIM(UPCASE(FirstName)),TRIM(UPCASE(Person.P_InpClnNameFirst)))};
+
 		
 Person: => PL_CurrAddrNamePropMatchIndx := MAP(
 			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND,''] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND,''] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND]  OR P_InpClnNameFirst:Null OR P_InpClnNameLast:Null=> MISSING_INPUT_DATA,
 			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
-			NOT EXISTS(matchIndex(NameMatch)) => NO_DATA_FOUND_97,
-      EXISTS(matchIndex(MatchFirstLastName)) => '3',
-      EXISTS(matchIndex(MatchLastName)) => '2',
-      EXISTS(matchIndex(MatchFirstName)) => '1',
-      '0');				
+ 				NOT EXISTS(matchIndex) => NO_DATA_FOUND_97,
+				EXISTS(matchIndex(MatchFirstLastName)) => '3',
+				EXISTS(matchIndex(MatchLastName)) => '2',
+				EXISTS(matchIndex(MatchFirstName)) => '1',
+				'0');		
 Person: => PL_CurrAddrFamilyOwnedFlag := MAP(
 			PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND,''] OR P_InpClnNameFirst IN [MISSING_INPUT_DATA,NO_DATA_FOUND,''] OR P_InpClnNameLast IN [MISSING_INPUT_DATA,NO_DATA_FOUND] OR P_InpClnNameFirst:Null OR P_InpClnNameLast:Null => MISSING_INPUT_DATA,			
 			NOT CurrAddrPropertyRecord => NO_DATA_FOUND,
