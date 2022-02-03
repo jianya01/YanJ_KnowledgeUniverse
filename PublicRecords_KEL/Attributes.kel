@@ -4471,8 +4471,8 @@ Person: => PL_BestSSNDeceasedMsnc := MAP(
 Person: => PL_BestDOB:= MAP(
 			P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 			BestDOB:Null => NO_DATA_FOUND,
-			DATETOSTRING(BestDOB,'%Y%m%d'));
-			
+			DATETOSTRING(BestDOB,'%Y%m%d'));	 
+
 Person: => PL_BestDOBAge:= MAP(
 			P_LexIDSeenFlag = '0' OR BestDOBAge:Null => MISSING_INPUT_DATA_INT,
 			//BestDOBAge:Null => NO_DATA_FOUND_INT,
@@ -14132,8 +14132,24 @@ Person: => PL_VerSSNSrcOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN
 Person: => PL_VerSSNSrcNewMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT, 
 																					PL_VerSSNSrcCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
 																					PL_VerSSNSrcNewDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
-																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerSSNSrcNewDtEvFCRA),Person.CURRENT_DATE),0,960));   
-																					
+																					BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_VerSSNSrcNewDtEvFCRA),Person.CURRENT_DATE),0,960));   																					
+//KS-7461
+InputPII: => SSNLexIDCnt := COUNT(TOPN(InputCleanSSN.PersonSSN(DataSources.HeaderHitFlag){Social}, 999, Social));
+
+Person: => PL_InpSSNIndxNonFCRA := MAP(
+            (P_LexIDSeenFlag = 0 OR P_InpClnSSN = MISSING_INPUT_DATA OR P_InpClnSSN = NO_DATA_FOUND)  => MISSING_INPUT_DATA,
+						((COUNT(SSNVerSourceListSorted) > 0 ) AND EXISTS(PersonSSN(InputSSNDirectMatch)))=> '2',
+						((COUNT(SSNVerSourceListSorted) > 0 ) AND PersonSSN(MiskeySSNMatch = '1'))=> '1',
+						(PII.SSNLexIDCnt > 1) => '0',
+						(NO_DATA_FOUND));
+						
+Person: => PL_InpSSNIndxFCRA := MAP(
+            (P_LexIDSeenFlag = 0 OR P_InpClnSSN = MISSING_INPUT_DATA OR P_InpClnSSN = NO_DATA_FOUND)  => MISSING_INPUT_DATA,
+						((COUNT(SSNVerSourceListSortedFCRA) > 0 ) AND EXISTS(PersonSSN(InputSSNDirectMatch)))=> '2',
+						((COUNT(SSNVerSourceListSortedFCRA) > 0 ) AND PersonSSN(MiskeySSNMatch = '1'))=> '1',
+						(PII.SSNLexIDCnt > 1) => '0',
+						(NO_DATA_FOUND));
+//END KS-7461
 																					
 Person: => PersonSSNMatchTypeAll := PersonSSN(InputSSNMatch).ValidSSN{
 	ValidSSN,
