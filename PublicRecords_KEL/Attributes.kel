@@ -343,7 +343,8 @@ PersonAccident: CURRENT_DATE := MIN(GETBUILDDATE('accident_build_version'), CURR
 Person: CURRENT_DATE_THRIVE := MIN(GETBUILDDATE('thrive_build_version'), CURRENTDATE());
 InputPII: CURRENT_DATE_BIP  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
 AddressSlim: CURRENT_DATE_BIP  := MIN(GETBUILDDATE('bip_build_version'), CURRENTDATE());
-
+PersonPhone: CURRENT_DATE_GONG := MIN(GETBUILDDATE('gong_weekly'), CURRENTDATE());
+PersonPhone: CURRENT_DATE_PHONESPLUS := MIN(GETBUILDDATE('phonesplusv2_build_version'), CURRENTDATE());
 
 //These are the dates for inferred performance attributes. The inferred performance attributes are run with a query 2 years in the future. These are the cut off dates for the 3 time periods wanted.
 InputPII: => CURRENT_DATE_2YEARS := CURRENTDATE();//2 years in the future
@@ -17237,3 +17238,13 @@ Person: => PL_FileAddrTypeFCRA := MAP(
 		PL_CurrAddrType = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
 		PL_FileAddrFlagFCRA = 0 OR PL_CurrAddrType = NO_DATA_FOUND => NO_DATA_FOUND,
 		PL_CurrAddrType); 
+		
+PersonPhone: => AgeFirstSeenGong := MONTHSBETWEEN(Subject:DateFirstSeen, CURRENT_DATE_GONG);
+PersonPhone: => AgeFirstSeenPhonePlus := MONTHSBETWEEN(Subject:DateFirstSeen, CURRENT_DATE_PHONESPLUS);
+PersonPhone: => PhoneCheck := AgeFirstSeen <= 6 AND AgeFirstSeen >= 0 AND EXISTS(DataSources(HeaderHitFlag));
+PersonPhone: => GongCheck := AgeFirstSeenGong <= 6 AND AgeFirstSeenGong >= 0 AND EXISTS(DataSources(Source IN ['GO','GN']));
+PersonPhone: => PhonePlusCheck := AgeFirstSeenPhonePlus <= 6 AND AgeFirstSeenPhonePlus >= 0 AND EXISTS(DataSources(Source = 'PP'));
+
+InputPII: => PI_LexIDNewPerInpPhoneCnt6M := MAP(P_InpClnPhoneHomeFlagValue != '1'  => MISSING_INPUT_DATA_INT,
+		EXISTS(InputCleanPhone.PersonPhone) AND NOT EXISTS(InputCleanPhone.PersonPhone{Subject:DateFirstSeen, Subject:DateLastSeen}) => Phone.NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(InputCleanPhone.PersonPhone(PhoneCheck OR GongCheck OR PhonePlusCheck){Subject}), 0, 99));
