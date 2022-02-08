@@ -17248,3 +17248,32 @@ PersonPhone: => PhonePlusCheck := AgeFirstSeenPhonePlus <= 6 AND AgeFirstSeenPho
 InputPII: => PI_LexIDNewPerInpPhoneCnt6M := MAP(P_InpClnPhoneHomeFlagValue != '1'  => MISSING_INPUT_DATA_INT,
 		EXISTS(InputCleanPhone.PersonPhone) AND NOT EXISTS(InputCleanPhone.PersonPhone{Subject:DateFirstSeen, Subject:DateLastSeen}) => Phone.NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(COUNT(InputCleanPhone.PersonPhone(PhoneCheck OR GongCheck OR PhonePlusCheck){Subject}), 0, 99));
+
+// Logic for gathering Inquiry data for Linkset Attribute calculations. 
+Inquiry: => ValidLinksetInquiry := AgeinDays <= Person.FIVE_YEARS_IN_DAYS;
+
+Inquiry: => LinksetAddressRecord := ONLY(TOPN(PersonInfo, 1, -PrimaryRange, -Predirectional, -PrimaryName, -Suffix, -Postdirectional, -ZIP5, -SecondaryRange));
+Inquiry: => LinksetAddress := 
+								DEFAULT(LinksetAddressRecord.PrimaryRange, '') + ' ' +
+								DEFAULT(LinksetAddressRecord.Predirectional, '') + ' ' +
+								DEFAULT(LinksetAddressRecord.PrimaryName, '') + ' ' +
+								DEFAULT(LinksetAddressRecord.Suffix, '') + ' ' +
+								DEFAULT(LinksetAddressRecord.Postdirectional, '') + ' ' +
+								DEFAULT(LinksetAddressRecord.SecondaryRange, '') + ' ' +
+								DEFAULT(LinksetAddressRecord.ZIP5, '');
+								
+Inquiry: => LinksetDOB := ONLY(TOPN(PersonInfo, 1, -DateOfBirth), DateOfBirth);
+Inquiry: => LinksetEmail := ONLY(TOPN(PersonInfo, 1, -EmailAddress), EmailAddress);
+Inquiry: => LinksetIP := ONLY(TOPN(PersonInfo, 1, IPAddress), IPAddress);
+Inquiry: => LinksetNameRecord := ONLY(TOPN(PersonInfo, 1, -LastName, -FirstName));
+Inquiry: => LinksetName := LinksetNameRecord.FirstName + ' ' + LinksetNameRecord.LastName;
+Inquiry: => LinksetPhone := ONLY(TOPN(PersonInfo, 1, -PersonalPhoneNumber), PersonalPhoneNumber);
+Inquiry: => LinksetSSN := ONLY(TOPN(PersonInfo, 1, -SSN), SSN);
+Inquiry: => LinksetNetworkID := UID;
+Inquiry: => LinksetAddressType := ONLY(TOPN(PersonInfo, 1, AddressType), AddressType);
+// Inquiry: => LinksetHomePhoneType := ONLY(TOPN(PersonInfo, 1,));
+// Inquiry: => LinksetSSNFlag := ONLY(TOPN(PersonInfo, 1,));
+Inquiry: => LinksetIndustry := ONLY(TOPN(BusIntel, 1, -IndustryCode1), IndustryCode1);
+Inquiry: => LinksetApplicationDate := TimeStampToDate(UID:DateFirstSeen);
+// Inquiry: => AgeinDays := ABSDAYSBETWEEN(TimeStampToDate(TransactionID:DateFirstSeen), CURRENT_DATE);
+Inquiry: => LinksetSource := ONLY(DataSources, Source);
