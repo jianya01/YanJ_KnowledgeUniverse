@@ -3250,6 +3250,8 @@ Person: => PreviousAddrStatus := DEFAULT(PII.PreviousAddrStatus, '');
 Person: => PreviousAddrDateFirstSeen := PII.PreviousAddrDateFirstSeen;
 Person: => PreviousAddrDateLastSeen := PII.PreviousAddrDateLastSeen;
 Person: => PreviousAddrFull := DEFAULT(PII.PreviousAddrFull, '');
+Person: => PreviousAddrUnitDsgEmptyCheck :=IF(PreviousAddrUnitDesignation = '', 1, 0);
+Person: => PreviousAddrSecRngEmptyCheck :=IF(PreviousAddrSecRng = '', 1, 0);
 Person: => PersonPrevAddrLocID := AppendLocationID(PreviousAddrPrimRng,
                                                    PreviousAddrPreDir,  
                                                    PreviousAddrPrimName, 
@@ -17383,3 +17385,126 @@ Inquiry: => LinksetIndustry := ONLY(TOPN(BusIntel, 1, -IndustryCode1), IndustryC
 Inquiry: => LinksetApplicationDate := TimeStampToDate(UID:DateFirstSeen);
 // Inquiry: => AgeinDays := ABSDAYSBETWEEN(TimeStampToDate(TransactionID:DateFirstSeen), CURRENT_DATE);
 Inquiry: => LinksetSource := ONLY(DataSources, Source);
+
+Person: => PL_CurrAddrIsSFDFlag := MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		NOT IsCurrentPostalSource => NO_DATA_FOUND,
+		CurrentAddrType IN ['S', 'SD'] AND
+		NOT (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1)) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) => '1', '0');
+		
+Person: => PL_FileAddrIsSFDFlagNonFCRA := MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		NOT IsCurrentPostalSource OR PL_FileAddrFlagNonFCRA = 0 => NO_DATA_FOUND,
+		CurrentAddrType IN ['S', 'SD'] AND
+		NOT (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1)) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) => '1', '0');
+		
+Person: => PL_FileAddrIsSFDFlagFCRA := MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		NOT IsCurrentPostalSource OR PL_FileAddrFlagFCRA = 0 => NO_DATA_FOUND,
+		CurrentAddrType IN ['S', 'SD'] AND
+		NOT (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1)) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) => '1', '0');
+		
+Person: => PL_PrevAddrIsMultiUnitFlag := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
+		PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1 => '1', '0');
+
+Person: => PL_PrevAddrIsAptFlag := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
+		NOT IsPreviousPostalSource => NO_DATA_FOUND,	
+		OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) => '1', '0');
+		
+Person: => PL_PrevAddrIsSFDFlag := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean => MISSING_INPUT_DATA,
+		NOT IsPreviousPostalSource => NO_DATA_FOUND,
+		PreviousAddrType IN ['S', 'SD'] AND 
+		NOT (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1)) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagBD) => '1', '0');
+		
+Person: => PL_AddrMovePrevToCurrFlag5Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		ValidPrevAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidPrevAddrDtLastSn = NO_DATA_FOUND_97 OR ValidCurrAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidCurrAddrDtLastSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+		MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE) <= 60 AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagBD) AND 
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) AND 
+		MONTHSBETWEEN(DATE(ValidPrevAddrDtFirstSn), Person.CURRENT_DATE) > MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE) AND 
+		MONTHSBETWEEN(DATE(ValidPrevAddrDtLastSn), Person.CURRENT_DATE) > MONTHSBETWEEN(DATE(ValidCurrAddrDtLastSn), Person.CURRENT_DATE) => '1', '0');
+		
+Person: => PL_AddrMovePrevToCurrAddrType5Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		PL_AddrMovePrevToCurrFlag5Y < '1' OR NOT IsPreviousPostalSource OR NOT IsCurrentPostalSource => NO_DATA_FOUND,
+		OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) AND OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) => '1',
+		PreviousAddrType IN ['S', 'SD'] AND 
+		NOT (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1)) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagBD) AND 
+		OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) => '2',
+		OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) AND
+		CurrentAddrType IN ['S', 'SD'] AND
+		NOT (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1)) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) => '3',
+		CurrentAddrType IN ['S', 'SD'] AND
+		NOT (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1)) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) AND
+		PreviousAddrType IN ['S', 'SD'] AND 
+		NOT (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1)) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagBD) => '4', 
+		NO_DATA_FOUND_97);
+		
+Person: => PL_AddrMovePrevToCurrAVMRatio5Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMovePrevToCurrFlag5Y < '1' OR NOT CurrentAddressOnAVM OR NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		(CurrAddressPropertyCnt = 0 OR CurrAddrAVMValueUnCap = NO_DATA_FOUND_97_INT) OR (PreviousAddressPropertyCntCurr = 0 OR PreviousAddressAVMValueCurrUnCap = NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(CurrAddrAVMValueUnCap/PreviousAddressAVMValueCurrUnCap,2),99.99));
+	
+Person: => PL_AddrMovePrevToCurrDist5Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMovePrevToCurrFlag5Y < '1'	OR CurrentAddrLat = '' OR CurrentAddrLng = '' OR PreviousAddrLat = '' OR PreviousAddrLng = '' => NO_DATA_FOUND_INT,
+		Dist(REAL(CurrentAddrLat), REAL(CurrentAddrLng), REAL(PreviousAddrLat), REAL(PreviousAddrLng)));
+		
+Person: => PL_AddrMovePrevToCurrMsnc5Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMovePrevToCurrFlag5Y < '1' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE), 0, 60));
+		
+Person: => PL_AddrMovePrevToCurrFlag1Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		ValidPrevAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidPrevAddrDtLastSn = NO_DATA_FOUND_97 OR ValidCurrAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidCurrAddrDtLastSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+		MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE) <= 12 AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagBD) AND 
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) AND 
+		MONTHSBETWEEN(DATE(ValidPrevAddrDtFirstSn), Person.CURRENT_DATE) > MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE) AND 
+		MONTHSBETWEEN(DATE(ValidPrevAddrDtLastSn), Person.CURRENT_DATE) > MONTHSBETWEEN(DATE(ValidCurrAddrDtLastSn), Person.CURRENT_DATE) => '1', '0');
+		
+Person: => PL_AddrMovePrevToCurrAddrType1Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		PL_AddrMovePrevToCurrFlag1Y < '1' OR NOT IsPreviousPostalSource OR NOT IsCurrentPostalSource => NO_DATA_FOUND,
+		OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) AND OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) => '1',
+		PreviousAddrType IN ['S', 'SD'] AND 
+		NOT (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1)) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagBD) AND 
+		OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) => '2',
+		OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) AND
+		CurrentAddrType IN ['S', 'SD'] AND
+		NOT (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1)) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) => '3',
+		CurrentAddrType IN ['S', 'SD'] AND
+		NOT (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagAC AND (CurrentAddrType = 'H' OR CurrentAddrType = 'HD' OR CurrAddrUnitDsgEmptyCheck !=1 OR CurrAddrSecRngEmptyCheck !=1)) AND
+		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) AND
+		PreviousAddrType IN ['S', 'SD'] AND 
+		NOT (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagAC AND (PreviousAddrType = 'H' OR PreviousAddrType = 'HD' OR PreviousAddrUnitDsgEmptyCheck !=1 OR PreviousAddrSecRngEmptyCheck !=1)) AND 
+		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagBD) => '4', 
+		NO_DATA_FOUND_97);
+		
+Person: => PL_AddrMovePrevToCurrAVMRatio1Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMovePrevToCurrFlag1Y < '1' OR NOT CurrentAddressOnAVM OR NOT PreviousAddressOnAVM => NO_DATA_FOUND_INT,
+		(CurrAddressPropertyCnt = 0 OR CurrAddrAVMValueUnCap = NO_DATA_FOUND_97_INT) OR (PreviousAddressPropertyCntCurr = 0 OR PreviousAddressAVMValueCurrUnCap = NO_DATA_FOUND_97_INT) => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(CurrAddrAVMValueUnCap/PreviousAddressAVMValueCurrUnCap,2),99.99));
+		
+Person: => PL_AddrMovePrevToCurrDist1Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMovePrevToCurrFlag1Y < '1'	OR CurrentAddrLat = '' OR CurrentAddrLng = '' OR PreviousAddrLat = '' OR PreviousAddrLng = '' => NO_DATA_FOUND_INT,
+		Dist(REAL(CurrentAddrLat), REAL(CurrentAddrLng), REAL(PreviousAddrLat), REAL(PreviousAddrLng)));
+		
+Person: => PL_AddrMovePrevToCurrMsnc1Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMovePrevToCurrFlag1Y < '1' => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE), 0, 12));
