@@ -4568,10 +4568,13 @@ Person: => NewestColTier2 := ONLY(EduCollRecVerSourceNewListFiltered, INTEGER(Ti
 Person: => ColTierAvail := EXISTS(EduCollRecVerSourceListSorted(Tier IN ['1', '2', '3', '4', '5', '6']));
 Person: => ColTier2Avail := EXISTS(EduCollRecVerSourceListSorted(Tier2 IN ['1', '2', '3', '4', '5', '6']));
 
-Person: EDUCATION_LAND_USE_CODES := ['0118', '0119', '0656', '0664', '0680', '1111', '9103', '9203', '9204'];
-Person: => CollegeAddressesCountByUseCode := IF(EXISTS(PII.Location.AddressProperty.Prop{PropertyEvent(StandardizedLandUseCode IN Person.EDUCATION_LAND_USE_CODES)}),1,0) + 
-																						 IF(EXISTS(PII.CurrentAddress.AddressProperty.Prop{PropertyEvent(StandardizedLandUseCode IN Person.EDUCATION_LAND_USE_CODES)}),1,0) +
-																						 IF(EXISTS(PII.PreviousAddress.AddressProperty.Prop{PropertyEvent(StandardizedLandUseCode IN Person.EDUCATION_LAND_USE_CODES)}),1,0);
+Person: EDUCATION_LAND_USE_CODES := ['0118', '0119', '0680', '1111', '9103', '9203', '9204'];
+Person: => InputAddressLandUseCodes := PII.Location.AddressProperty.Prop.PropertyEvent{StandardizedLandUseCode};
+Person: => CurrentAddressLandUseCodes := PII.CurrentAddress.AddressProperty.Prop.PropertyEvent{StandardizedLandUseCode};
+Person: => PreviousAddressLandUseCodes := PII.PreviousAddress.AddressProperty.Prop.PropertyEvent{StandardizedLandUseCode};
+Person: => CollegeAddressesCountByUseCode := EXISTS(InputAddressLandUseCodes(StandardizedLandUseCode IN Person.EDUCATION_LAND_USE_CODES)) OR
+																						 EXISTS(CurrentAddressLandUseCodes(StandardizedLandUseCode IN Person.EDUCATION_LAND_USE_CODES)) OR
+																						 EXISTS(PreviousAddressLandUseCodes(StandardizedLandUseCode IN Person.EDUCATION_LAND_USE_CODES));
 PersonAddress: => IsAddressHistoryAddress := EXISTS(AddressHierarchy(AddressRank > 0));
 PersonAddress: => IsCollegeAddressHistoryAddress := IsAddressHistoryAddress AND (Location.CollegeFlag = 'Y' OR Location.SeasonalDeliveryFlag = 'E');
 Person: => HasCollegeAddressOnADVO := EXISTS(PersonAddress(IsCollegeAddressHistoryAddress));
@@ -4704,7 +4707,7 @@ Person: => PL_EduCollTierBestEv := MAP(
 		
 Person: => PL_AddrCollegeFlag := MAP(P_LexIDSeenFlag = '0' => Person.MISSING_INPUT_DATA_INT,
 																 PL_AddrHistOnFileFlag = 0 => NO_DATA_FOUND_INT,
-																 CollegeAddressesCountByUseCode > 0 OR HasCollegeAddressOnADVO => 1,
+																 CollegeAddressesCountByUseCode OR HasCollegeAddressOnADVO => 1,
 																 0);
 																 
 //KS-5920
@@ -8949,7 +8952,65 @@ Person: => PL_InqPhonePerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPU
 Person: => PL_InqDOBPerLexIDCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		PL_InqPerLexIDCnt1Y = 0 => NO_DATA_FOUND_INT,
 		BOUNDSFOLD(COUNT(VelocityInquiryDOBsPerLexIDFCRA), 0, 999));
+//KS-7542
+InputPII: => PI_InpAddrIsSFDFlag := MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+																		PI_InpAddrOnFileFlagEv = 0 OR NOT IsPostalSource => NO_DATA_FOUND_INT,
+																		 PI_InpAddrType = 'S' AND PI_InpAddrIsMultiUnitFlag != 1 AND PI_InpAddrIsAptFlag != 1 AND PI_InpAddrIsBusinessFlag != 1 => 1,
+																		 0);
 
+PersonAddress: => DateLastSeenAge := IF(ISVALIDDATE(Subject:DateLastSeen),DAYSBETWEEN(MIN(Subject:DateLastSeen,CURRENT_DATE), CURRENT_DATE),Person.NO_DATA_FOUND_97_INT);
+
+Person: => PL_LexIDPerSubjAddrCnt6MNonFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																		PL_VerAddrSrcOldMsncEvNonFCRA < 6 => NO_DATA_FOUND_INT,
+																		NOT EXISTS(PII.Location.PersonAddress(EXISTS(DataSources(HeaderHitFlag)) AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}) AND EXISTS(PII.Location.PersonAddress(EXISTS(DataSources(HeaderHitFlag))){Subject}) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(PII.Location.PersonAddress(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
+
+Person: => PL_LexIDPerSubjAddrSFDCnt6MNonFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																		PL_VerAddrSrcOldMsncEvNonFCRA < 6  OR PII.PI_InpAddrIsSFDFlag != 1 => NO_DATA_FOUND_INT,
+																		NOT EXISTS(PII.Location.PersonAddress(EXISTS(DataSources(HeaderHitFlag)) AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}) AND EXISTS(PII.Location.PersonAddress(EXISTS(DataSources(HeaderHitFlag))){Subject}) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(PII.Location.PersonAddress(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
+
+Person: => PL_LexIDPerSubjAddrCnt6MFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																		PL_VerAddrSrcOldMsncEvFCRA < 6 => NO_DATA_FOUND_INT,
+																		NOT EXISTS(PII.Location.PersonAddress(EXISTS(DataSources(HeaderHitFlag)) AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}) AND EXISTS(PII.Location.PersonAddress(EXISTS(DataSources(HeaderHitFlag))){Subject}) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(PII.Location.PersonAddress(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
+
+Person: => PL_LexIDPerSubjAddrSFDCnt6MFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																		PL_VerAddrSrcOldMsncEvFCRA < 6  OR PII.PI_InpAddrIsSFDFlag != 1 => NO_DATA_FOUND_INT,
+																		NOT EXISTS(PII.Location.PersonAddress(EXISTS(DataSources(HeaderHitFlag)) AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}) AND EXISTS(PII.Location.PersonAddress(EXISTS(DataSources(HeaderHitFlag))){Subject}) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(PII.Location.PersonAddress(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
+
+AddressPhone: => DateLastSeenAge := IF(ISVALIDDATE(PhoneNumber:DateLastSeen),DAYSBETWEEN(MIN(PhoneNumber:DateLastSeen,Phone.CURRENT_DATE),Phone.CURRENT_DATE),Person.NO_DATA_FOUND_97_INT);
+Person: => PL_PhonePerSubjAddrCnt6MNonFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																		PL_VerAddrSrcOldMsncEvNonFCRA < 6 => NO_DATA_FOUND_INT,
+																		NOT EXISTS(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) AND EXISTS(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber),0,99));
+Person: => PL_PhonePerSubjAddrCnt6MFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																		PL_VerAddrSrcOldMsncEvFCRA < 6 => NO_DATA_FOUND_INT,
+																		NOT EXISTS(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) AND EXISTS(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber),0,99));
+
+Person: => PL_PhonePerSubjAddrSFDCnt6MNonFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																		PL_VerAddrSrcOldMsncEvNonFCRA < 6 OR PII.PI_InpAddrIsSFDFlag != 1 => NO_DATA_FOUND_INT,
+																		NOT EXISTS(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) AND EXISTS(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber),0,99));
+Person: => PL_PhonePerSubjAddrSFDCnt6MFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																		PL_VerAddrSrcOldMsncEvFCRA < 6 OR PII.PI_InpAddrIsSFDFlag != 1 => NO_DATA_FOUND_INT,
+																		NOT EXISTS(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) AND EXISTS(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(PII.Location.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber),0,99));
+
+PersonSSN: => HeaderLastSeenAge := IF(ISVALIDDATE(MIN(DataSources(HeaderHitFlag),Source:DateLastSeen)), DAYSBETWEEN(MIN(MIN(DataSources(HeaderHitFlag),Source:DateLastSeen),Person.CURRENT_DATE), Person.CURRENT_DATE),Person.NO_DATA_FOUND_97_INT);
+
+InputPII: => PI_LexIDPerInpSSNCnt6M := MAP(Subject.P_InpClnSSNFlagValue != 1 => MISSING_INPUT_DATA_INT,
+																		NOT EXISTS(InputCleanSSN.PersonSSN(HeaderLastSeenAge != Person.NO_DATA_FOUND_97_INT)) AND EXISTS(InputCleanSSN.PersonSSN.DataSources(HeaderHitFlag)) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+																		BOUNDSFOLD(COUNT(InputCleanSSN.PersonSSN(HeaderLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND HeaderLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}),0,99));
+
+PersonPhone: => HeaderLastSeenAge := IF(ISVALIDDATE(MIN(DataSources(HeaderHitFlag),Source:DateLastSeen)), DAYSBETWEEN(MIN(MIN(DataSources(HeaderHitFlag),Source:DateLastSeen),Phone.CURRENT_DATE), Phone.CURRENT_DATE),Person.NO_DATA_FOUND_97_INT);
+
+Person: => PL_LexIDPerSubjPhoneCnt6M := MAP(P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+																					PL_VerPhoneSrcOldMsncEv < 6 => NO_DATA_FOUND_INT,
+																					NOT EXISTS(PII.InputCleanPhone.PersonPhone(HeaderLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}) AND EXISTS(PII.InputCleanPhone.PersonPhone.DataSources(HeaderHitFlag)) => NO_DATA_FOUND_97_INT,
+																					BOUNDSFOLD(COUNT(PII.InputCleanPhone.PersonPhone(HeaderLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND HeaderLastSeenAge != Person.NO_DATA_FOUND_97_INT)),0,99));
 /**************************************************************************/
 /*                                                                        */
 /*           			  Inferred Performace Attributes                        */
