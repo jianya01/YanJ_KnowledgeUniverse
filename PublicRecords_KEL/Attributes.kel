@@ -14185,7 +14185,7 @@ Person: => PL_VerNameLastSrcBureauOnlyFlagEvNonFCRA := MAP(P_LexIDSeenFlag = '0'
 // SSN Verification Sources Helper Attributes
 PersonSSN: => InputSSNMatch := EditDistanceWithinRadius(Social, Subject.P_InpClnSSN, 2);
 PersonSSN.DataSources: => TranslatedSourceCode := ConsumerSourceGroup(Source);
-Person: => SSNTranslatedSources := PersonSSN(InputSSNMatch AND ValidSSN IN ['G','Z','R','O', 'F']).DataSources(HeaderHitFlag AND TranslatedSourceCode != ''){TranslatedSourceCode};
+Person: => SSNTranslatedSources := PersonSSN(InputSSNMatch).DataSources(HeaderHitFlag AND ValidSSN IN ['G','Z','R','O', 'F'] AND TranslatedSourceCode != ''){TranslatedSourceCode};
 Person.SSNTranslatedSources: => AgeInDays := ABSDAYSBETWEEN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE);
 Person: => PersonSSNMatchSourcesAll := SSNTranslatedSources(TranslatedSourceCode != ''){
 	TranslatedSourceCode := TranslatedSourceCode,
@@ -14199,7 +14199,7 @@ Person: => SSNVerSourceListSortedFCRA := TOPN(PersonSSNMatchSourcesAll(ValidBank
 Person: => SSNVerSourceListSorted := TOPN(PersonSSNMatchSourcesAll{TranslatedSourceCode, SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 99, FirstSeenDate, TranslatedSourceCode);
 PersonSSN.DataSources: => SSNSourceDateFirstSeen := Source:DateFirstSeen;
 PersonSSN.DataSources: => SSNSourceDateLastSeen := Source:DateLastSeen;
-Person: => PersonSSNMatchSourcesAllPre := PersonSSN(InputSSNMatch AND ValidSSN IN ['G','Z','R','O', 'F'] ).DataSources(HeaderHitFlag AND TranslatedSourceCode != ''){TranslatedSourceCode, SSNSourceDateFirstSeen, SSNSourceDateLastSeen};
+Person: => PersonSSNMatchSourcesAllPre := PersonSSN(InputSSNMatch).DataSources(HeaderHitFlag AND ValidSSN IN ['G','Z','R','O', 'F'] AND TranslatedSourceCode != ''){TranslatedSourceCode, SSNSourceDateFirstSeen, SSNSourceDateLastSeen};
 Person: => PersonSSNMatchSourcesGroupAll := PersonSSNMatchSourcesAllPre(TranslatedSourceCode != ''){
 									TranslatedSourceCode,
 									SSNSourceDateFirstSeen,
@@ -14229,8 +14229,10 @@ Person: => VerSSNSourceListAllNonFCRA := VerSSNSourceListNonFCRADataSet{
 											SSNSrcLastSeenDate := MAX(GROUP,INTEGER(IF(ISVALIDDATE(SSNSourceDateLastSeen), DATETOSTRING(SSNSourceDateLastSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97)))};
 Person: => SSNVerSourceGroupListSortedFCRA := TOPN(VerSSNSourceListAllFCRA, 100, SSNSrcFirstSeenDate);
 Person: => SSNVerSourceGroupListSorted := TOPN(VerSSNSourceListAllNonFCRA, 100, SSNSrcFirstSeenDate);
+Person: => InpSSN4Digit :=  LENGTH(STRING(INTEGER(P_InpClnSSN))) = 4;
 // SSN Verification Sources Attributes
-Person: => PL_VerSSNSrcCntEvNonFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnSSN  IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
+Person: => PL_VerSSNSrcCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN  IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																InpSSN4Digit => 0,
 																BOUNDSFOLD(COUNT(SSNVerSourceListSorted), 0, 99));
 Person: => PL_VerSSNSrcListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA,
 																 PL_VerSSNSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
@@ -14242,7 +14244,8 @@ Person: => PL_VerSSNSrcLastDtListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_Inp
 																			 PL_VerSSNSrcCntEvNonFCRA < 1 => Person.NO_DATA_FOUND,
 																			 CONCAT(SSNVerSourceListSorted, SourceDateLastSeen, '|'));
 																			 
-Person: => PL_VerSSNSrcCntEvFCRA := IF(P_LexIDSeenFlag = '0' OR P_InpClnSSN  IN [MISSING_INPUT_DATA,NO_DATA_FOUND], MISSING_INPUT_DATA_INT,
+Person: => PL_VerSSNSrcCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN  IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																InpSSN4Digit => 0,
 																BOUNDSFOLD(COUNT(SSNVerSourceListSortedFCRA), 0, 99));
 Person: => PL_VerSSNSrcListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA, 
 																 PL_VerSSNSrcCntEvFCRA < 1 => Person.NO_DATA_FOUND,
@@ -15949,10 +15952,10 @@ Person: => PL_PhoneCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																BOUNDSFOLD(COUNT(PersonPhone(AgeLastSeen <= 60 AND AgeLastSeen >= 0 AND EXISTS(DataSources(Source IN ['PP','GO','GN'] OR HeaderHitFlag)))),0,99));
 Person: => PL_SSNNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(PersonSSN) AND NOT EXISTS(PersonSSN{Subject:DateFirstSeen,Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(PersonSSN(AgeFirstSeen <= 6 AND AgeFirstSeen >= 0 AND EXISTS(ValidSSN.ValidSSN IN ['G','Z','R','O']) AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
+																BOUNDSFOLD(COUNT(PersonSSN(AgeFirstSeen <= 6 AND AgeFirstSeen >= 0 AND EXISTS(DataSources(HeaderHitFlag AND ValidSSN IN ['G','Z','R','O'])))),0,99));
 Person: => PL_SSNCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(PersonSSN) AND NOT EXISTS(PersonSSN{Subject:DateFirstSeen,Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(PersonSSN(AgeLastSeen <= 60 AND AgeLastSeen >= 0 AND EXISTS(ValidSSN.ValidSSN IN ['G','Z','R','O']) AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
+																BOUNDSFOLD(COUNT(PersonSSN(AgeLastSeen <= 60 AND AgeLastSeen >= 0 AND EXISTS(DataSources(HeaderHitFlag AND ValidSSN IN ['G','Z','R','O'])))),0,99));
 //KS-7622
 Person.ReportedDatesOfBirth: => AgeFirstSeen := MONTHSBETWEEN(DateOfBirth:DateFirstSeen,Person.CURRENT_DATE);
 Person.ReportedDatesOfBirth: => AgeLastSeen := MONTHSBETWEEN(DateOfBirth:DateLastSeen,Person.CURRENT_DATE);
