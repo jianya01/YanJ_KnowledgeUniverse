@@ -7255,6 +7255,7 @@ Inquiry: => IsLengthSubMarket := STARTSWITH(UPCASE(TRIM(InquirySubMarket)),'FIRS
 Inquiry: => IsBatchMonitoringMethod := UPCASE(TRIM(InquiryMethod)) IN Inquiry.METHOD;
 
 Inquiry: => IsCollection := UPCASE(TRIM(InquiryIndustry)) IN Inquiry.COLLECTION_INDUSTRY OR UPCASE(TRIM(InquiryVertical)) IN Inquiry.COLLECTION_VERTICAL OR IsLengthSubMarket;
+Inquiry: => IsAutoMortgage := UPCASE(TRIM(InquiryIndustry)) IN Inquiry.MORTGAGE_INDUSTRY OR UPCASE(TRIM(InquiryIndustry)) IN Inquiry.AUTO_INDUSTRY;
 
 Inquiry: => InquiryFCRAPurpose := ONLY(Permissions, FCRAPurpose);
 Inquiry: => InquiryHHID := ONLY(SearchInfo, ClientIdentifierHHID);
@@ -7304,6 +7305,7 @@ PersonInquiry: => GatherInquiries := Transaction{
 																						Industry := InquiryIndustry,
 																						InqDate := TimeStampToDate(TransactionID:DateFirstSeen),
 																						IsCollection,
+																						IsAutoMortgage,
 																						IsBatchMonitoringMethod,
 																						InquiryFCRAPurpose,
 																						InquiryHHID,
@@ -7316,6 +7318,33 @@ PersonInquiry: => GatherInquiries := Transaction{
 																						InquiryProductCode IN [1,2,7] => 'LN', ''),
 																						InqIDCommon};
 
+PersonInquiry: => GatherInquiriesAutoMortgage := GatherInquiries(
+		InquirySubset != '' AND
+		UPCASE(TRIM(Industry)) != '' AND
+		ExcludeFunctionDescription AND //Bank Batch
+		PurposeIsFCRA AND
+		ExcludedHHIDs = '1' AND 
+		ExcludedSegments = '1' AND
+		NOT IsBatchMonitoringMethod AND
+		IsAutoMortgage)
+		{InqIDCommon, InquiryQueryID, InquiryEventType, Industry};
+
+PersonInquiry: => CombinedInquiriesAutoMortgagePre := Sequence.Dedup(
+    GatherInquiriesAutoMortgage,
+			LEFT.InqIDCommon = RIGHT.InqIDCommon AND 
+			LEFT.InquiryQueryID = RIGHT.InquiryQueryID AND 
+			SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND 
+			SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0),
+    InquiryEventType, -InqIDCommon:DateFirstSeen);
+
+PersonInquiry: => CombinedInquiriesAutoMortgage45Day := Sequence.Dedup( // This set is for Credit deduping not to be used with Velocity
+		CombinedInquiriesAutoMortgagePre, 
+			DAYSBETWEEN(TimeStampToDate(RIGHT.InqIDCommon:DateFirstSeen), TimeStampToDate(LEFT.InqIDCommon:DateFirstSeen)) < 45 AND 
+			LEFT.InqIDCommon = RIGHT.InqIDCommon AND 
+			SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND 
+			SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0),
+		InquiryEventType, -InqIDCommon:DateFirstSeen){InqIDCommon, InquiryQueryID, InquiryEventType, InqDate := TimeStampToDate(InqIDCommon:DateFirstSeen), Industry};
+
 PersonInquiry: => GatherInquiriesUpdate := GatherInquiries(
 		InquirySubset != '' AND
 		UPCASE(TRIM(Industry)) != '' AND
@@ -7324,18 +7353,19 @@ PersonInquiry: => GatherInquiriesUpdate := GatherInquiries(
 		ExcludedHHIDs = '1' AND 
 		ExcludedSegments = '1' AND
 		NOT IsBatchMonitoringMethod AND
-		NOT IsCollection)
-		{InqDate := InqIDCommon:DateFirstSeen, InqIDCommon, InquiryQueryID, InquiryEventType, TransactionID, Industry};
+		NOT IsCollection AND
+		NOT IsAutoMortgage)
+		{InqIDCommon, InquiryQueryID, InquiryEventType, Industry};
 
 PersonInquiry: => CombinedInquiriesPre := Sequence.Dedup(
     GatherInquiriesUpdate,
-    LEFT.InqIDCommon = RIGHT.InqIDCommon AND LEFT.InquiryQueryID = RIGHT.InquiryQueryID AND SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND LEFT.TransactionID = RIGHT.TransactionID AND SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0),
+    LEFT.InqIDCommon = RIGHT.InqIDCommon AND LEFT.InquiryQueryID = RIGHT.InquiryQueryID AND SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0),
     InquiryEventType, -InqIDCommon:DateFirstSeen);
 	
 PersonInquiry: => CombinedInquiries := Sequence.Dedup(
     CombinedInquiriesPre,
-    TimeStampToDate(LEFT.InqIDCommon:DateFirstSeen) = TimeStampToDate(RIGHT.InqIDCommon:DateFirstSeen) AND LEFT.InqIDCommon = RIGHT.InqIDCommon AND SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0), 
-    InquiryEventType, -InqIDCommon:DateFirstSeen){InqIDCommon, InquiryQueryID, InquiryEventType, TransactionID, InqDate := TimeStampToDate(InqIDCommon:DateFirstSeen), Industry};
+    TimeStampToDate(LEFT.InqIDCommon:DateFirstSeen) = TimeStampToDate(RIGHT.InqIDCommon:DateFirstSeen) AND LEFT.InqIDCommon = RIGHT.InqIDCommon AND SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0),
+    InquiryEventType, -InqIDCommon:DateFirstSeen){InqIDCommon, InquiryQueryID, InquiryEventType, InqDate := TimeStampToDate(InqIDCommon:DateFirstSeen), Industry};
 
 PersonInquiry: => GatherInquiriesUpdateCollections := GatherInquiries(
 		InquirySubset != '' AND
@@ -7344,17 +7374,23 @@ PersonInquiry: => GatherInquiriesUpdateCollections := GatherInquiries(
 		ExcludedSegments = '1' AND 
 		ExcludeFunctionDescription AND 
 		PurposeIsFCRAColl)
-		{InqDate := InqIDCommon:DateFirstSeen, InqIDCommon, InquiryQueryID, InquiryEventType, TransactionID, Industry};
+		{InqIDCommon, InquiryQueryID, InquiryEventType, Industry};
 
 PersonInquiry: => CombinedInquiriesCollectionsPre := Sequence.Dedup(
     GatherInquiriesUpdateCollections,
-    LEFT.InqIDCommon = RIGHT.InqIDCommon AND LEFT.InquiryQueryID = RIGHT.InquiryQueryID AND SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND LEFT.TransactionID = RIGHT.TransactionID AND SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0),
+    LEFT.InqIDCommon = RIGHT.InqIDCommon AND LEFT.InquiryQueryID = RIGHT.InquiryQueryID AND SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0),
     InquiryEventType, -InqIDCommon:DateFirstSeen);
 	
 PersonInquiry: => CombinedInquiriesCollections := Sequence.Dedup(
     CombinedInquiriesCollectionsPre,
-    TimeStampToDate(LEFT.InqIDCommon:DateFirstSeen) = TimeStampToDate(RIGHT.InqIDCommon:DateFirstSeen) AND LEFT.InqIDCommon = RIGHT.InqIDCommon AND SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0), 
-    InquiryEventType, -InqIDCommon:DateFirstSeen){InqIDCommon, InquiryQueryID, InquiryEventType, TransactionID, InqDate := TimeStampToDate(InqIDCommon:DateFirstSeen), Industry};	
+    TimeStampToDate(LEFT.InqIDCommon:DateFirstSeen) = TimeStampToDate(RIGHT.InqIDCommon:DateFirstSeen) AND LEFT.InqIDCommon = RIGHT.InqIDCommon AND SUBSTR(LEFT.InquiryEventType, 0, 0) = SUBSTR(RIGHT.InquiryEventType, 0, 0) AND SUBSTR(LEFT.Industry, 0, 0) = SUBSTR(RIGHT.Industry, 0, 0),
+    InquiryEventType, -InqIDCommon:DateFirstSeen){InqIDCommon, InquiryQueryID, InquiryEventType, InqDate := TimeStampToDate(InqIDCommon:DateFirstSeen), Industry};	
+
+PersonInquiry.CombinedInquiriesAutoMortgage45Day: => Seen_In_One_Month := ABSDAYSBETWEEN(InqDate, Inquiry.CURRENT_DATE) <= ONE_MONTH_IN_DAYS;
+PersonInquiry.CombinedInquiriesAutoMortgage45Day: => Seen_In_Three_Months := ABSDAYSBETWEEN(InqDate, Inquiry.CURRENT_DATE) <= THREE_MONTHS_IN_DAYS;
+PersonInquiry.CombinedInquiriesAutoMortgage45Day: => Seen_In_Six_Months := ABSDAYSBETWEEN(InqDate, Inquiry.CURRENT_DATE) <= SIX_MONTHS_IN_DAYS;
+PersonInquiry.CombinedInquiriesAutoMortgage45Day: => Seen_In_One_Year := ABSDAYSBETWEEN(InqDate, Inquiry.CURRENT_DATE) <= ONE_YEAR_IN_DAYS;
+PersonInquiry.CombinedInquiriesAutoMortgage45Day: => Seen_In_Two_Years := ABSDAYSBETWEEN(InqDate, Inquiry.CURRENT_DATE) <= TWO_YEARS_IN_DAYS;
 
 PersonInquiry.CombinedInquiries: => Seen_In_One_Month := ABSDAYSBETWEEN(TimeStampToDate(InqIDCommon:DateFirstSeen), Inquiry.CURRENT_DATE) <= ONE_MONTH_IN_DAYS;
 PersonInquiry.CombinedInquiries: => Seen_In_Three_Months := ABSDAYSBETWEEN(TimeStampToDate(InqIDCommon:DateFirstSeen), Inquiry.CURRENT_DATE) <= THREE_MONTHS_IN_DAYS;
@@ -7382,56 +7418,65 @@ PersonInquiry.GatherInquiries: => PurposeIsFCRAColl := InquiryFCRAPurpose = 164 
 // OR ValidCollectionFcra
 Person: => MaxDateInq := TOPN(Inquiries2YListSorted, 1, -InqDate);
 Person: => MaxDateInqCol := TOPN(Inquiries2YListSortedCol, 1, -InqDate);
+Person: => MaxDateInq45Day := TOPN(Inquiries2YListSortedAutoMortgage45Day, 1, -InqDate);
 Person: => OnlyMaxDateInq := ONLY(MaxDateInq,InqDate);
 Person: => OnlyMaxDateInqCol := ONLY(MaxDateInqCol,InqDate);
-Person: => MaxDateInq2 := MAX(OnlyMaxDateInq, OnlyMaxDateInqCol);
+Person: => OnlyMaxDateInq45Day := ONLY(MaxDateInq45Day,InqDate);
+Person: => MaxDateInq3 := MAX(OnlyMaxDateInq, OnlyMaxDateInqCol, OnlyMaxDateInq45Day);
 
-Person: => Inquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => Inquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => Inquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => Inquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => Inquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+Person: => Inquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
 
-Person: => Inquiries1MListSortedCol := PersonInquiry.CombinedInquiriesCollections(Seen_In_One_Month){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => Inquiries3MListSortedCol := PersonInquiry.CombinedInquiriesCollections(Seen_In_Three_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => Inquiries6MListSortedCol := PersonInquiry.CombinedInquiriesCollections(Seen_In_Six_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => Inquiries1YListSortedCol := PersonInquiry.CombinedInquiriesCollections(Seen_In_One_Year){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => Inquiries2YListSortedCol := TOPN(PersonInquiry.CombinedInquiriesCollections(Seen_In_Two_Years){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+Person: => Inquiries1MListSortedCol := PersonInquiry.CombinedInquiriesCollections(Seen_In_One_Month){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries3MListSortedCol := PersonInquiry.CombinedInquiriesCollections(Seen_In_Three_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries6MListSortedCol := PersonInquiry.CombinedInquiriesCollections(Seen_In_Six_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries1YListSortedCol := PersonInquiry.CombinedInquiriesCollections(Seen_In_One_Year){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries2YListSortedCol := TOPN(PersonInquiry.CombinedInquiriesCollections(Seen_In_Two_Years){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
+
+Person: => Inquiries1MListSortedAutoMortgage45Day := PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_One_Month){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries3MListSortedAutoMortgage45Day := PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Three_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries6MListSortedAutoMortgage45Day := PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Six_Months){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries1YListSortedAutoMortgage45Day := PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_One_Year){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => Inquiries2YListSortedAutoMortgage45Day := TOPN(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Two_Years){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
 
 PersonInquiry.CombinedInquiries: => IsCommercialLending := UPCASE(TRIM(Industry)) IN Inquiry.COMMERCIAL_LENDING;
-Person: => CommercialLendingInquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => CommercialLendingInquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => CommercialLendingInquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => CommercialLendingInquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => CommercialLendingInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+Person: => CommercialLendingInquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => CommercialLendingInquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => CommercialLendingInquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => CommercialLendingInquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => CommercialLendingInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsCommercialLending){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
 
 PersonInquiry.CombinedInquiries: => IsCreditCard := UPCASE(TRIM(Industry)) IN Inquiry.CREDIT_CARD;
-Person: => CreditCardInquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => CreditCardInquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => CreditCardInquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => CreditCardInquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => CreditCardInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+Person: => CreditCardInquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => CreditCardInquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => CreditCardInquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => CreditCardInquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => CreditCardInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsCreditCard){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
 
-PersonInquiry.CombinedInquiries: => IsMortgage := UPCASE(TRIM(Industry)) IN Inquiry.MORTGAGE_INDUSTRY;
-Person: => MortgageInquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => MortgageInquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => MortgageInquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => MortgageInquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => MortgageInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+PersonInquiry.CombinedInquiriesAutoMortgage45Day: => IsMortgage := UPCASE(TRIM(Industry)) IN Inquiry.MORTGAGE_INDUSTRY;
+Person: => MortgageInquiries1MListSorted := PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_One_Month AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => MortgageInquiries3MListSorted := PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Three_Months AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => MortgageInquiries6MListSorted := PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Six_Months AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => MortgageInquiries1YListSorted := PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_One_Year AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => MortgageInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Two_Years AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
 
 PersonInquiry.CombinedInquiries: => IsRetail := UPCASE(TRIM(Industry)) IN Inquiry.RETAIL_INDUSTRY;
-Person: => RetailInquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => RetailInquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => RetailInquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => RetailInquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => RetailInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+Person: => RetailInquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => RetailInquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => RetailInquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => RetailInquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => RetailInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsRetail){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
 	
 PersonInquiry.CombinedInquiries: => IsRetailPayment := UPCASE(TRIM(Industry)) IN Inquiry.RETAIL_PAYMENTS_INDUSTRY;
-Person: => RetailPaymentInquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => RetailPaymentInquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => RetailPaymentInquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => RetailPaymentInquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID};
-Person: => RetailPaymentInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+Person: => RetailPaymentInquiries1MListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => RetailPaymentInquiries3MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => RetailPaymentInquiries6MListSorted := PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => RetailPaymentInquiries1YListSorted := PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon};
+Person: => RetailPaymentInquiries2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsRetailPayment){InqDate := IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
+
 PersonInquiry.GatherInquiries: =>ExcludeFunctionDescription :=UPCASE(TRIM(FunctionDescription)) != 'BANKO BATCH';
 PersonInquiry.GatherInquiries: =>ValidCollection:=IsBatchMonitoringMethod AND ExcludeFunctionDescription AND IsCollection;
 PersonInquiry.GatherInquiries: =>Seen_In_Five_Years := AgeinDays<=FIVE_YEARS_IN_DAYS;
@@ -7505,20 +7550,19 @@ Person: =>InquiryOther5YNewDate :=IsBlank(STRING(MAX(InquiriesOther5YListSorted,
 Person: =>InquiryOther5YOldDate :=IsBlank(STRING(MIN(InquiriesOther5YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 
 PersonInquiry.CombinedInquiries: =>IsBanking := UPCASE(TRIM(Industry)) IN Inquiry.BANKING_INDUSTRY;
-Person: =>InquiriesBanking2YListSorted :=TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsBanking){InqDate:=IF(ISVALIDDATE(MIN(GROUP,InqDate)),DATETOSTRING(MIN(GROUP,InqDate),'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: =>InquiriesBanking2YListSorted :=TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsBanking){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),InqIDCommon},999,InqDate);
 Person: =>InquiriesBanking2YDtList:= CONCAT(InquiriesBanking2YListSorted,InqDate,'|');
 Person: =>InquiryBanking2YNewDate :=IsBlank(STRING(MAX(InquiriesBanking2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiryBanking2YOldDate :=IsBlank(STRING(MIN(InquiriesBanking2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 
 PersonInquiry.CombinedInquiries: => IsOther := UPCASE(TRIM(Industry)) IN Inquiry.OTHER;
-Person: =>InquiriesOther2YListSorted :=TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsOther){InqDate:=IF(ISVALIDDATE(MIN(GROUP,InqDate)),DATETOSTRING(MIN(GROUP,InqDate),'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: =>InquiriesOther2YListSorted :=TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsOther){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),InqIDCommon},999,InqDate);
 Person: =>InquiriesOther2YDtList:= CONCAT(InquiriesOther2YListSorted,InqDate,'|');
 Person: =>InquiryOther2YNewDate :=IsBlank(STRING(MAX(InquiriesOther2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiryOther2YOldDate :=IsBlank(STRING(MIN(InquiriesOther2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 
-
 PersonInquiry.CombinedInquiries: =>IsUtility := UPCASE(TRIM(Industry)) IN Inquiry.UTILITIES_INDUSTRY;
-Person: =>InquiriesUtilities2YListSorted :=TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsUtility){InqDate:=IF(ISVALIDDATE(MIN(GROUP,InqDate)),DATETOSTRING(MIN(GROUP,InqDate),'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+Person: =>InquiriesUtilities2YListSorted :=TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsUtility){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),InqIDCommon},999,InqDate);
 Person: =>InquiriesUtilities2YDtList:= CONCAT(InquiriesUtilities2YListSorted,InqDate,'|');
 Person: =>InquiryUtilities2YNewDate :=IsBlank(STRING(MAX(InquiriesUtilities2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
 Person: =>InquiryUtilities2YOldDate :=IsBlank(STRING(MIN(InquiriesUtilities2YListSorted,DATE(InqDate))),Inquiry.REC_FOUND_BUT_INVALID);
@@ -7600,8 +7644,18 @@ Person: =>InquiryUtilities2YOldDate :=IsBlank(STRING(MIN(InquiriesUtilities2YLis
 // Person: => InquiryCnt1Y := PL_InqAltLendCnt1Y + PL_InqAutoCnt1Y + PL_InqBankCnt1Y + PL_InqBusLendCnt1Y + PL_InqCardCnt1Y + PL_InqCreditHRCnt1Y + PL_InqMtgeCnt1Y + PL_InqRetailCnt1Y;
 // Person: => InquiryCnt2Y := PL_InqAltLendCnt2Y + PL_InqAutoCnt2Y + PL_InqBankCnt2Y + PL_InqBusLendCnt2Y + PL_InqCardCnt2Y + PL_InqCreditHRCnt2Y + PL_InqMtgeCnt2Y + PL_InqRetailCnt2Y;
 
-// PersonInquiry.CombinedInquiries: => ValidInquiriesCredit:= (IsAltLend OR IsAutoSrch OR IsBanking OR IsCommercialLending OR IsCreditCard OR IsHighRisk OR IsMortgage OR IsRetail);
-// Person: => InquiriesCredit2yListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND ValidInquiriesCredit){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),TransactionID},999,InqDate);
+// PersonInquiry.CombinedInquiries: => ValidInquiriesCredit:= (IsAltLend OR IsBanking OR IsCommercialLending OR IsCreditCard OR IsHighRisk OR IsRetail);
+// Person: => InquiriesCredit2yListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND ValidInquiriesCredit){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),InqIDCommon},999,InqDate);
+
+// PersonInquiry.CombinedInquiriesAutoMortgage45Day: => ValidInquiriesCreditAutoMort:= (IsAutoSrch OR IsMortgage);
+// Person: => InquiriesCreditAutoMort2yListSorted := TOPN(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Two_Years AND ValidInquiriesCreditAutoMort){InqDate:=IF(ISVALIDDATE(InqDate),DATETOSTRING(InqDate,'%Y%m%d'),Inquiry.REC_FOUND_BUT_INVALID),InqIDCommon},999,InqDate);
+
+// Person: => MaxDateInqCredit := TOPN(InquiriesCredit2yListSorted, 1, -InqDate);
+// Person: => MaxDateInqAutoMort := TOPN(InquiriesCreditAutoMort2yListSorted, 1, -InqDate);
+// Person: => OnlyMaxDateInqCredit := ONLY(MaxDateInqCredit,InqDate);
+// Person: => OnlyMaxDateInqColAutoMort := ONLY(MaxDateInqAutoMort,InqDate);
+// Person: => MaxDateInqCredit2 := MAX(OnlyMaxDateInqCredit, OnlyMaxDateInqColAutoMort);
+
 
 Inquiry: => IsValidVelocityInquiryNonFCRA := AgeinDays <= 365 AND 
 																						NOT IsCollection AND 
@@ -7749,20 +7803,21 @@ Person: => VelocityInquirySSNsPerCurrAddrNonFCRA := VelocityInquiriesPerCurrAddr
 /**************************************************************************/
 //FCRA Inquiry
 Person: => PL_InqCnt1M :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(Inquiries1MListSorted) + COUNT(Inquiries1MListSortedCol),0,999));
+		BOUNDSFOLD(COUNT(Inquiries1MListSorted) + COUNT(Inquiries1MListSortedCol) + COUNT(Inquiries2YListSortedAutoMortgage45Day),0,999));
 Person: => PL_InqCnt3M :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(Inquiries3MListSorted) + COUNT(Inquiries3MListSortedCol),0,999));	
+		BOUNDSFOLD(COUNT(Inquiries3MListSorted) + COUNT(Inquiries3MListSortedCol) + COUNT(Inquiries2YListSortedAutoMortgage45Day),0,999));	
 Person: => PL_InqCnt6M :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(Inquiries6MListSorted) + COUNT(Inquiries6MListSortedCol),0,999));		
+		BOUNDSFOLD(COUNT(Inquiries6MListSorted) + COUNT(Inquiries6MListSortedCol) + COUNT(Inquiries2YListSortedAutoMortgage45Day),0,999));		
 Person: => PL_InqCnt1Y :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(Inquiries1YListSorted) + COUNT(Inquiries1YListSortedCol),0,999));			
+		BOUNDSFOLD(COUNT(Inquiries1YListSorted) + COUNT(Inquiries1YListSortedCol) + COUNT(Inquiries2YListSortedAutoMortgage45Day),0,999));			
 Person: => PL_InqCnt2Y :=IF(P_LexIDSeenFlag = '0',Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(Inquiries2YListSorted) + COUNT(Inquiries2YListSortedCol),0,999));	
+		BOUNDSFOLD(COUNT(Inquiries2YListSorted) + COUNT(Inquiries2YListSortedCol) + COUNT(Inquiries2YListSortedAutoMortgage45Day),0,999));	
 
 Person: =>PL_InqNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
-		ALL(Inquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) AND ALL(Inquiries2YListSortedCol, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
-  	MaxDateInq2);		
+		ALL(Inquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) AND ALL(Inquiries2YListSortedCol, InqDate = Inquiry.REC_FOUND_BUT_INVALID) AND ALL(Inquiries2YListSortedAutoMortgage45Day, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
+  	MaxDateInq3);		
+		
 Person: => PL_InqNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
 		ALL(Inquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) AND ALL(Inquiries2YListSortedCol, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
@@ -7827,33 +7882,37 @@ Person: => PL_InqCardNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_I
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqCardNewDt2Y), CURRENT_DATE_INQ),0,24));			
 
 //Mortgage
+Person: => InquiriesMortgage2YListSorted := TOPN(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Two_Years AND IsMortgage){InqDate := IF(ISVALIDDATE(InqDate), DATETOSTRING(InqDate, '%Y%m%d'), Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
+Person: => InquiriesMortgage2YDtList:= CONCAT(InquiriesMortgage2YListSorted, InqDate, '|');
+Person: => InquiryMortgage2YNewDate := IsBlank(STRING(MAX(InquiriesMortgage2YListSorted, DATE(InqDate))), Inquiry.REC_FOUND_BUT_INVALID);
+Person: => InquiryMortgage2YOldDate := IsBlank(STRING(MIN(InquiriesMortgage2YListSorted, DATE(InqDate))), Inquiry.REC_FOUND_BUT_INVALID);
+
 Person: => PL_InqMtgeCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(MortgageInquiries1MListSorted),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_One_Month AND IsMortgage){InqIDCommon, InqDate}), 0, 999));
 Person: => PL_InqMtgeCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(MortgageInquiries3MListSorted),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Three_Months AND IsMortgage){InqIDCommon, InqDate}), 0, 999));
 Person: => PL_InqMtgeCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(MortgageInquiries6MListSorted),0,999));	
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Six_Months AND IsMortgage){InqIDCommon, InqDate}), 0, 999));
 Person: => PL_InqMtgeCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(MortgageInquiries1YListSorted),0,999));		
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_One_Year AND IsMortgage){InqIDCommon, InqDate}), 0, 999));
 Person: => PL_InqMtgeCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(MortgageInquiries2YListSorted),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Two_Years AND IsMortgage){InqIDCommon, InqDate}), 0, 999));
 		
 Person: => PL_InqMtgeDtList2Y := MAP(P_LexIDSeenFlag = '0'=> Inquiry.MISSING_INPUT_DATA,
 		PL_InqMtgeCnt2Y < 1  => Inquiry.NO_DATA_FOUND_INQ, 
-		CONCAT(MortgageInquiries2YListSorted, InqDate, '|'));		
+		InquiriesMortgage2YDtList);
 Person: =>PL_InqMtgeNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
 		PL_InqMtgeCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
-		ALL(MortgageInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
-  	DATETOSTRING(MAX(MortgageInquiries2YListSorted, DATE(InqDate)), '%Y%m%d'));		
+		InquiryMortgage2YNewDate);
 Person: => PL_InqMtgeNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqMtgeCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
 		ALL(MortgageInquiries2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqMtgeNewDt2Y), CURRENT_DATE_INQ),0,24));		
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryMortgage2YNewDate), CURRENT_DATE_INQ), 0, 24));
 
 // Retail
 Person: => PL_InqRetailCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
@@ -7946,17 +8005,15 @@ Person: => PL_InqRetailPymtNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MIS
 // Person: => PL_InqCreditCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		// PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
 		// BOUNDSFOLD(InquiryCnt2Y, 0, 999));
-
-// Person: => PL_InqCreditDtList2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
-		// PL_InqCreditCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
-		// CONCAT(InquiriesCredit2yListSorted, InqDate, '|'));	
+	
 // Person: => PL_InqCreditNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
 		// PL_InqCreditCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
-		// ALL(InquiriesCredit2yListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
-  	// DATETOSTRING(MAX(InquiriesCredit2yListSorted, DATE(InqDate)), '%Y%m%d'));		
+		// ALL(InquiriesCredit2yListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) AND ALL(InquiriesCreditAutoMort2yListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID,
+  	// MaxDateInqCredit2);		
+		
 // Person: => PL_InqCreditNewMsnc2Y :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPUT_DATA_INT,
 		// PL_InqCreditCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		// ALL(InquiriesCredit2yListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
+		// ALL(InquiriesCredit2yListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) AND ALL(InquiriesCreditAutoMort2yListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
 		// BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InqCreditNewDt2Y), CURRENT_DATE_INQ),0,24));			
 		
 //
@@ -8123,23 +8180,23 @@ Person: =>PL_SrchRetailPymtOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MI
 
 Person: => PL_InqBankCnt1M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsBanking){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsBanking){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqBankCnt3M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsBanking){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsBanking){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqBankCnt6M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsBanking){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsBanking){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqBankCnt1Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsBanking){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsBanking){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqBankCnt2Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsBanking){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsBanking){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqBankDtList2Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
 		PL_InqBankCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
@@ -8157,23 +8214,23 @@ Person: =>PL_InqBankNewMsnc2Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_I
 
 Person: => PL_InqOtherCnt1M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsOther){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsOther){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqOtherCnt3M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsOther){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsOther){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqOtherCnt6M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsOther){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsOther){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqOtherCnt1Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsOther){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsOther){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqOtherCnt2Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsOther){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsOther){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqOtherDtList2Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
 		PL_InqOtherCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
@@ -8190,23 +8247,23 @@ Person: =>PL_InqOtherNewMsnc2Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_
 //
 Person: => PL_InqUtilCnt1M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsUtility){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsUtility){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqUtilCnt3M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsUtility){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsUtility){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqUtilCnt6M :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsUtility){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsUtility){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqUtilCnt1Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsUtility){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsUtility){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqUtilCnt2Y :=MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsUtility){TransactionID}),0,999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsUtility){InqIDCommon, InqDate}),0,999));
 
 Person: => PL_InqUtilDtList2Y := MAP(P_LexIDSeenFlag = '0'=>Inquiry.MISSING_INPUT_DATA,
 		PL_InqUtilCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
@@ -8302,30 +8359,30 @@ Person: =>PL_SrchOldMsnc5Y  :=MAP(P_LexIDSeenFlag = '0'  => Inquiry.MISSING_INPU
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryOverAll5YOldDate),CURRENT_DATE_INQ),0,60));
 
 PersonInquiry.CombinedInquiries: => IsAltLend := UPCASE(TRIM(Industry)) IN Inquiry.ALTLEND_INDUSTRY;
-Person: => InquiriesAltLend2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsAltLend){InqDate := IF(ISVALIDDATE(MIN(GROUP, InqDate)), DATETOSTRING(MIN(GROUP, InqDate), '%Y%m%d'), Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+Person: => InquiriesAltLend2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsAltLend){InqDate := IF(ISVALIDDATE(InqDate), DATETOSTRING(InqDate, '%Y%m%d'), Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
 Person: => InquiriesAltLend2YDtList:= CONCAT(InquiriesAltLend2YListSorted, InqDate, '|');
 Person: => InquiryAltLend2YNewDate := IsBlank(STRING(MAX(InquiriesAltLend2YListSorted, DATE(InqDate))), Inquiry.REC_FOUND_BUT_INVALID);
 Person: => InquiryAltLend2YOldDate := IsBlank(STRING(MIN(InquiriesAltLend2YListSorted, DATE(InqDate))), Inquiry.REC_FOUND_BUT_INVALID);
 
 Person: => PL_InqAltLendCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsAltLend){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsAltLend){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqAltLendCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsAltLend){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsAltLend){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqAltLendCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsAltLend){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsAltLend){InqIDCommon, InqDate}), 0, 999));
 		
 Person: => PL_InqAltLendCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsAltLend){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsAltLend){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqAltLendCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsAltLend){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsAltLend){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqAltLendDtList2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
 		PL_InqAltLendCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
@@ -8341,30 +8398,30 @@ Person: =>PL_InqAltLendNewMsnc2Y  := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSIN
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryAltLend2YNewDate), CURRENT_DATE_INQ), 0, 24));
 		
 PersonInquiry.CombinedInquiries: =>IsHighRisk := UPCASE(TRIM(Industry)) IN Inquiry.HIGH_RISK_CREDIT_INDUSTRY;		
-Person: => InquiriesCreditHR2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsHighRisk){InqDate := IF(ISVALIDDATE(MIN(GROUP, InqDate)), DATETOSTRING(MIN(GROUP, InqDate), '%Y%m%d'), Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+Person: => InquiriesCreditHR2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsHighRisk){InqDate := IF(ISVALIDDATE(InqDate), DATETOSTRING(InqDate, '%Y%m%d'), Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
 Person: => InquiriesCreditHR2YDtList:= CONCAT(InquiriesCreditHR2YListSorted, InqDate, '|');
 Person: => InquiryCreditHR2YNewDate := IsBlank(STRING(MAX(InquiriesCreditHR2YListSorted, DATE(InqDate))), Inquiry.REC_FOUND_BUT_INVALID);
 Person: => InquiryCreditHR2YOldDate := IsBlank(STRING(MIN(InquiriesCreditHR2YListSorted, DATE(InqDate))), Inquiry.REC_FOUND_BUT_INVALID);
 
 Person: => PL_InqCreditHRCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsHighRisk){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsHighRisk){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqCreditHRCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsHighRisk){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsHighRisk){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqCreditHRCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsHighRisk){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsHighRisk){InqIDCommon, InqDate}), 0, 999));
 		
 Person: => PL_InqCreditHRCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsHighRisk){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsHighRisk){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqCreditHRCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsHighRisk){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsHighRisk){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqCreditHRDtList2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
 		PL_InqCreditHRCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
@@ -8379,31 +8436,32 @@ Person: =>PL_InqCreditHRNewMsnc2Y  := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSI
 		ALL(InquiriesCreditHR2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryCreditHR2YNewDate), CURRENT_DATE_INQ), 0, 24));
 		
-PersonInquiry.CombinedInquiries: =>IsAutoSrch := UPCASE(TRIM(Industry)) IN Inquiry.AUTO_INDUSTRY;		
-Person: => InquiriesAuto2YListSorted := TOPN(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsAutoSrch){InqDate := IF(ISVALIDDATE(MIN(GROUP, InqDate)), DATETOSTRING(MIN(GROUP, InqDate), '%Y%m%d'), Inquiry.REC_FOUND_BUT_INVALID), TransactionID}, 999, InqDate);
+PersonInquiry.CombinedInquiriesAutoMortgage45Day: => IsAutoSrch := UPCASE(TRIM(Industry)) IN Inquiry.AUTO_INDUSTRY;		
+// Person: => InquiriesAuto2YListSorted := TOPN(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Two_Years AND IsAutoSrch){InqDate := IF(ISVALIDDATE(MIN(GROUP, InqDate)), DATETOSTRING(MIN(GROUP, InqDate), '%Y%m%d'), Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
+Person: => InquiriesAuto2YListSorted := TOPN(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Two_Years AND IsAutoSrch){InqDate := IF(ISVALIDDATE(InqDate), DATETOSTRING(InqDate, '%Y%m%d'), Inquiry.REC_FOUND_BUT_INVALID), InqIDCommon}, 999, InqDate);
 Person: => InquiriesAuto2YDtList:= CONCAT(InquiriesAuto2YListSorted, InqDate, '|');
 Person: => InquiryAuto2YNewDate := IsBlank(STRING(MAX(InquiriesAuto2YListSorted, DATE(InqDate))), Inquiry.REC_FOUND_BUT_INVALID);
 Person: => InquiryAuto2YOldDate := IsBlank(STRING(MIN(InquiriesAuto2YListSorted, DATE(InqDate))), Inquiry.REC_FOUND_BUT_INVALID);
 
 Person: => PL_InqAutoCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Month AND IsAutoSrch){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_One_Month AND IsAutoSrch){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqAutoCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt3M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Three_Months AND IsAutoSrch){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Three_Months AND IsAutoSrch){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqAutoCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt6M < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Six_Months AND IsAutoSrch){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Six_Months AND IsAutoSrch){InqIDCommon, InqDate}), 0, 999));
 		
 Person: => PL_InqAutoCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt1Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_One_Year AND IsAutoSrch){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_One_Year AND IsAutoSrch){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqAutoCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiries(Seen_In_Two_Years AND IsAutoSrch){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesAutoMortgage45Day(Seen_In_Two_Years AND IsAutoSrch){InqIDCommon, InqDate}), 0, 999));
 
 Person: => PL_InqAutoDtList2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
 		PL_InqAutoCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
@@ -8412,26 +8470,26 @@ Person: => PL_InqAutoDtList2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_IN
 Person: => PL_InqAutoNewDt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA,
 		PL_InqAutoCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ,
 		InquiryAuto2YNewDate);
-
+		
 Person: =>PL_InqAutoNewMsnc2Y  := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
 		PL_InqAutoCnt2Y < 1 => Inquiry.NO_DATA_FOUND_INQ_INT,
 		ALL(InquiriesAuto2YListSorted, InqDate = Inquiry.REC_FOUND_BUT_INVALID) => Inquiry.REC_FOUND_BUT_INVALID_INT,
-		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryAuto2YNewDate), CURRENT_DATE_INQ), 0, 24));
+		BOUNDSFOLD(MONTHSBETWEEN(DATE(InquiryAuto2YNewDate), CURRENT_DATE_INQ), 0, 24));		
 	
 Person: => PL_InqCollCnt1M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_One_Month){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_One_Month){InqIDCommon, InqDate}), 0, 999));
 		
 Person: => PL_InqCollCnt3M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_Three_Months){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_Three_Months){InqIDCommon, InqDate}), 0, 999));
 		
 Person: => PL_InqCollCnt6M := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_Six_Months){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_Six_Months){InqIDCommon, InqDate}), 0, 999));
 		
 Person: => PL_InqCollCnt1Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_One_Year){TransactionID}), 0, 999));	
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_One_Year){InqIDCommon, InqDate}), 0, 999));	
 		
 Person: => PL_InqCollCnt2Y := MAP(P_LexIDSeenFlag = '0' => Inquiry.MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_Two_Years){TransactionID}), 0, 999));
+		BOUNDSFOLD(COUNT(PersonInquiry.CombinedInquiriesCollections(Seen_In_Two_Years){InqIDCommon, InqDate}), 0, 999));
 		
 Person: => PL_InqCollDtList2Y := MAP(P_LexIDSeenFlag = '0'=> Inquiry.MISSING_INPUT_DATA,
 		PL_InqCollCnt2Y < 1  => Inquiry.NO_DATA_FOUND_INQ, 
