@@ -4507,6 +4507,30 @@ Person: => PL_BestDOBAge:= MAP(
 			P_LexIDSeenFlag = '0' OR BestDOBAge:Null => MISSING_INPUT_DATA_INT,
 			//BestDOBAge:Null => NO_DATA_FOUND_INT,
 			BOUNDSFOLD(BestDOBAge, 0, 120));
+			
+//KS-7040
+PersonSSN: => SSNVerifySource := Social(InputPII.P_InpSSN = SSN).States(Source = 'SI2'){Source, 
+SI2SourceDateLastSeen := IF(ISVALIDDATE(Source:DateLastSeen),DATETOSTRING(Source:DateLastSeen,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)};
+Person: => SSNVerifySourceDateMax := MAX(PersonSSN.SSNVerifySource, INTEGER(SI2SourceDateLastSeen));
+
+PersonSSN: => SSNSource := Social.States(Source = 'SI2'){Source,
+SI2SourceDateFirstSeen := IF(ISVALIDDATE(Source:DateFirstSeen),DATETOSTRING(Source:DateFirstSeen,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE)};
+Person: => SSNSourceDateMin := MIN(PersonSSN.SSNSource, INTEGER(SI2SourceDateFirstSeen));
+
+Person: => P_InpValSSNInvalidFlag := PII.P_InpValSSNInvalidFlag;
+Person: => P_InpValSSNBadLenFlagValue := PII.P_InpValSSNBadLenFlagValue;
+Person: => P_InpValSSNProbIndxNonFCRA := MAP(P_InpSSNFlagValue = '0' => MISSING_INPUT_DATA,
+				PI_InpSSNIsDeceasedFlag = 1 => '5',
+				INTEGER(P_InpClnDOB) > 0 AND EXISTS(PersonSSN.SSNVerifySource) AND SSNVerifySourceDateMax < INTEGER(P_InpClnDOB) => '4',//INTEGER(P_InpClnDOB)
+				PL_VerSSNSrcCntEvNonFCRA > 0 AND EXISTS(PersonSSN.SSNSource) AND SSNSourceDateMin < INTEGER(PL_VerSSNSrcOldDtEvNonFCRA) => '3',
+				P_InpValSSNInvalidFlag = '1' OR P_InpValSSNBadLenFlagValue = '1' => '2',
+				'1');
+Person: => P_InpValSSNProbIndxFCRA := MAP(P_InpSSNFlagValue = '0' => MISSING_INPUT_DATA,
+				PI_InpSSNIsDeceasedFlag = 1 => '5',
+				INTEGER(P_InpClnDOB) > 0 AND EXISTS(PersonSSN.SSNVerifySource) AND SSNVerifySourceDateMax < INTEGER(P_InpClnDOB) => '4',//INTEGER(P_InpClnDOB)
+				PL_VerSSNSrcCntEvFCRA > 0 AND EXISTS(PersonSSN.SSNSource) AND SSNSourceDateMin < INTEGER(PL_VerSSNSrcOldDtEvFCRA) => '3',
+				P_InpValSSNInvalidFlag = '1' OR P_InpValSSNBadLenFlagValue = '1' => '2',
+				'1');
 //Best Phone
 // Phone: PHONE_PLUS_RAW_SOURCES := ['IR','01','02','05','IO','PP','WO','WR','WP','GO','IQ','IB','MT','T$','AY','L9','N2'];//Not needed for now but logic might change in the future and this might be required.
 Phone.DataSources : => TranslatedSourceCode := ConsumerSourceGroup(Source);
