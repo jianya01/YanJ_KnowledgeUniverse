@@ -12726,11 +12726,21 @@ Person: => PL_AstPropCurrWMktValCnt := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT
 				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,	
 				BOUNDSFOLD(COUNT(PersonProperty(IsCurrentlyOwned AND NOT (BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue ='')){Prop}),0,999));
 
-Person: => AstPropCurrMktValues := PersonProperty(IsCurrentlyOwned){ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',Person.NO_DATA_FOUND_97,BestMostRecentPropertyEvent.MarketTotalValue),DtFirstSeen := DEFAULT(INTEGER(BestMostRecentPropertyEvent.DtFirstSeen),99999999),BestMostRecentPropertyEvent,Prop.UID};//Was giving many weird errors before being split into 2 statements.
+Person: => PropCurrMktValList := TOPN(PersonProperty(IsCurrentlyOwned){ModMarketValue := IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue = '', Person.NO_DATA_FOUND_97, BestMostRecentPropertyEvent.MarketTotalValue), DtFirstSeen := DEFAULT(INTEGER(BestMostRecentPropertyEvent.DtFirstSeen),99999999), BestMostRecentPropertyEvent,Prop.UID}, 999, -DtFirstSeen);
 
 Person: => PL_AstPropCurrMktValList := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
-				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,
-				CONCAT(TOPN(AstPropCurrMktValues,999,-DtFirstSeen),DEFAULT(ModMarketValue,Person.NO_DATA_FOUND_97),'|'));
+				PL_AstPropCurrCnt  = 0 => NO_DATA_FOUND_INT,
+				CONCAT(PropCurrMktValList, DEFAULT(ModMarketValue, Person.NO_DATA_FOUND_97),'|'));
+
+Person: => PL_AstPropCurrMktValTot := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+				PL_AstPropCurrCnt  = 0 => NO_DATA_FOUND_INT,					
+				PL_AstPropCurrCnt > 0 AND PL_AstPropCurrWMktValCnt = 0 => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(SUM(PropCurrMktValList(ModMarketValue<> Person.NO_DATA_FOUND_97), INTEGER(ModMarketValue)), 1, 999999999));
+
+Person: => PL_AstPropCurrMktValAvg := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
+				PL_AstPropCurrCnt < 1 => NO_DATA_FOUND_INT,
+				PL_AstPropCurrCnt > 0 AND PL_AstPropCurrWMktValCnt = 0 => NO_DATA_FOUND_97_INT,
+				BOUNDSFOLD(PL_AstPropCurrMktValTot / PL_AstPropCurrWMktValCnt, 1, 999999999));
 
 Person: => PL_AstPropCurrWTaxValCnt := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
 				PL_AstPropCurrCnt  = 0 =>	NO_DATA_FOUND_INT,	
@@ -12847,7 +12857,12 @@ Person: => PL_AstPropSaleNewPurchDtEv := MAP(P_LexIDSeenFlag = '0' => MISSING_IN
 Person: => PL_AstPropSaleNewOwnedSpanEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 				PL_AstPropSaleCntEv = 0 => NO_DATA_FOUND_INT,
 				PL_AstPropSaleCntEv > 0 AND (PL_AstPropSaleDtListEv = NO_DATA_FOUND_97_INT OR PL_AstPropSaleNewPurchDtEv = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
-				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstPropSaleNewPurchDtEv),DATE(PL_AstPropSaleNewDtEv)),0,960)); 			
+				BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_AstPropSaleNewPurchDtEv),DATE(PL_AstPropSaleNewDtEv)),0,960)); 
+				
+Person: => PL_AstPropSaleNewAmtRatio7Y := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
+		PL_AstPropSaleNewMsncEv < 0 OR PL_AstPropSaleNewMsncEv > 84 => NO_DATA_FOUND_INT,
+		PL_AstPropSaleNewAmtEv = NO_DATA_FOUND_97_INT OR PL_AstPropSaleNewPurchAmtEv = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(PL_AstPropSaleNewAmtEv/PL_AstPropSaleNewPurchAmtEv, 2), 99.99));
 //Property Purchase History
 Person: => PL_AstPropPurchCnt1Y := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(Purchase1YCount,0,999));
@@ -17478,8 +17493,8 @@ Person: => PL_PrevAddrIsSFDFlag := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean 
 Person: => PL_AddrMovePrevToCurrFlag5Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA,
 		ValidPrevAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidPrevAddrDtLastSn = NO_DATA_FOUND_97 OR ValidCurrAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidCurrAddrDtLastSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
 		MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE) <= 60 AND 
-		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagBD) AND 
-		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) AND 
+		PL_CurrAddrIsBusinessFlag != 1 AND 
+		PL_PrevAddrIsBusinessFlag != 1 AND 
 		MONTHSBETWEEN(DATE(ValidPrevAddrDtFirstSn), Person.CURRENT_DATE) > MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE) AND 
 		MONTHSBETWEEN(DATE(ValidPrevAddrDtLastSn), Person.CURRENT_DATE) > MONTHSBETWEEN(DATE(ValidCurrAddrDtLastSn), Person.CURRENT_DATE) => '1', '0');
 		
@@ -17522,8 +17537,8 @@ Person: => PL_AddrMovePrevToCurrMsnc5Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrN
 Person: => PL_AddrMovePrevToCurrFlag1Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA,
 		ValidPrevAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidPrevAddrDtLastSn = NO_DATA_FOUND_97 OR ValidCurrAddrDtFirstSn = NO_DATA_FOUND_97 OR ValidCurrAddrDtLastSn = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
 		MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE) <= 12 AND 
-		NOT (OnlyPreviousAddressHelperFlag.ResBusFlagBD) AND 
-		NOT (OnlyCurrAddressHelperFlag.ResBusFlagBD) AND 
+		PL_CurrAddrIsBusinessFlag != 1 AND 
+		PL_PrevAddrIsBusinessFlag != 1 AND 
 		MONTHSBETWEEN(DATE(ValidPrevAddrDtFirstSn), Person.CURRENT_DATE) > MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE) AND 
 		MONTHSBETWEEN(DATE(ValidPrevAddrDtLastSn), Person.CURRENT_DATE) > MONTHSBETWEEN(DATE(ValidCurrAddrDtLastSn), Person.CURRENT_DATE) => '1', '0');
 		
@@ -17562,3 +17577,167 @@ Person: => PL_AddrMovePrevToCurrDist1Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrN
 Person: => PL_AddrMovePrevToCurrMsnc1Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrNoClean OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
 		PL_AddrMovePrevToCurrFlag1Y < '1' => NO_DATA_FOUND_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE), 0, 12));
+		
+InputPII: => PI_InpAddrSubjOwnedAVMVal:= MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
+		PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		InputAddressPropertyCnt = 0 OR AVMValueUnCap = 0 OR AVMValueUnCap:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(AVMValueUnCap,1,999999999));
+
+Person: => PL_CurrAddrSubjOwnedAVMVal:= MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		CurrAddressPropertyCnt = 0 OR CurrAddrAVMValueUnCap = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(CurrAddrAVMValueUnCap,1,999999999));
+
+Person: => PL_FileAddrSubjOwnedAVMValFCRA:= MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_FileAddrFlagFCRA = '0' OR PL_CurrAddrSubjOwnedAVMVal = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+		PL_CurrAddrSubjOwnedAVMVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(CurrAddrAVMValueUnCap,1,999999999));
+
+Person: => PL_FileAddrSubjOwnedAVMValNonFCRA:= MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_FileAddrFlagNonFCRA = '0' OR PL_CurrAddrSubjOwnedAVMVal = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+		PL_CurrAddrSubjOwnedAVMVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(CurrAddrAVMValueUnCap,1,999999999));
+		
+Person: => PL_AddrMoveCurrToInpFlagFCRA := MAP(PII.InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		PL_VerAddrSrcOldMsncEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+		PL_VerAddrSrcOldMsncEvFCRA <= 3 AND
+		PL_CurrAddrIsBusinessFlag != 1 AND
+		PII.PI_InpAddrIsBusinessFlag !=  1 AND
+		PL_VerCurrAddrFlagFCRA !=  '1' => '1', '0');
+		
+Person: => PL_AddrMoveCurrToInpFlagNonFCRA := MAP(PII.InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		PL_VerAddrSrcOldMsncEvNonFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+		PL_VerAddrSrcOldMsncEvNonFCRA <= 3 AND
+		PL_CurrAddrIsBusinessFlag != 1 AND
+		PII.PI_InpAddrIsBusinessFlag !=  1 AND
+		PL_VerCurrAddrFlagNonFCRA !=  '1' => '1', '0');
+		
+Person: => PL_AddrMoveCurrToInpDistFCRA := MAP(PII.InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMoveCurrToInpFlagFCRA < '1' OR PL_CurrAddrToInpDist = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+		PL_CurrAddrToInpDist);
+		
+Person: => PL_AddrMoveCurrToInpDistNonFCRA := MAP(PII.InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMoveCurrToInpFlagNonFCRA < '1' OR PL_CurrAddrToInpDist = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+		PL_CurrAddrToInpDist);
+		
+Person: => PL_AddrMoveCurrToInpAVMRatioFCRA := MAP(PII.InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMoveCurrToInpFlagFCRA < '1' OR PL_CurrAddrAVMVal = NO_DATA_FOUND_INT OR PII.PI_InpAddrAVMVal = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+		PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT OR PII.PI_InpAddrAVMVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(PII.AVMValueUnCap/CurrAddrAVMValueUnCap,2),99.99));
+		
+Person: => PL_AddrMoveCurrToInpAVMRatioNonFCRA := MAP(PII.InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+		PL_AddrMoveCurrToInpFlagNonFCRA < '1' OR PL_CurrAddrAVMVal = NO_DATA_FOUND_INT OR PII.PI_InpAddrAVMVal = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
+		PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT OR PII.PI_InpAddrAVMVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		MIN(ROUND(PII.AVMValueUnCap/CurrAddrAVMValueUnCap,2),99.99));	
+		
+Person: => PL_AddrMoveCurrToInpAddrTypeFCRA := MAP(PII.InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		PL_AddrMoveCurrToInpFlagFCRA < 1 OR PII.PI_InpAddrIsAptFlag = NO_DATA_FOUND_INT OR PII.PI_InpAddrIsSFDFlag = NO_DATA_FOUND_INT OR PL_CurrAddrIsAptFlag = NO_DATA_FOUND_INT OR PL_CurrAddrIsSFDFlag = NO_DATA_FOUND_INT =>NO_DATA_FOUND,
+		PL_CurrAddrIsAptFlag = 1 AND PII.PI_InpAddrIsAptFlag = 1 => '1',
+		PL_CurrAddrIsSFDFlag = 1 AND PII.PI_InpAddrIsAptFlag = 1 => '2',
+		PL_CurrAddrIsAptFlag = 1 AND PII.PI_InpAddrIsSFDFlag = 1 => '3',
+		PL_CurrAddrIsSFDFlag = 1 AND PII.PI_InpAddrIsSFDFlag = 1 => '4',
+		NO_DATA_FOUND_97);
+		
+Person: => PL_AddrMoveCurrToInpAddrTypeNonFCRA := MAP(PII.InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR CurrAddrNoClean => MISSING_INPUT_DATA,
+		PL_AddrMoveCurrToInpFlagNonFCRA < 1 OR PII.PI_InpAddrIsAptFlag = NO_DATA_FOUND_INT OR PII.PI_InpAddrIsSFDFlag = NO_DATA_FOUND_INT OR PL_CurrAddrIsAptFlag = NO_DATA_FOUND_INT OR PL_CurrAddrIsSFDFlag = NO_DATA_FOUND_INT =>NO_DATA_FOUND,
+		PL_CurrAddrIsAptFlag = 1 AND PII.PI_InpAddrIsAptFlag = 1 => '1',
+		PL_CurrAddrIsSFDFlag = 1 AND PII.PI_InpAddrIsAptFlag = 1 => '2',
+		PL_CurrAddrIsAptFlag = 1 AND PII.PI_InpAddrIsSFDFlag = 1 => '3',
+		PL_CurrAddrIsSFDFlag = 1 AND PII.PI_InpAddrIsSFDFlag = 1 => '4',
+		NO_DATA_FOUND_97);
+		
+Person: => PL_AddrLastMoveFlag1YFCRA := MAP(PL_AddrMovePrevToCurrFlag1Y = MISSING_INPUT_DATA AND PL_AddrMoveCurrToInpFlagFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PL_AddrMovePrevToCurrFlag1Y < '0' AND PL_AddrMoveCurrToInpFlagFCRA < '0' => NO_DATA_FOUND_97,
+		PL_AddrMovePrevToCurrFlag1Y = '1' OR PL_AddrMoveCurrToInpFlagFCRA = '1' => '1', '0');
+		
+Person: => PL_AddrLastMoveFlag1YNonFCRA := MAP(PL_AddrMovePrevToCurrFlag1Y = MISSING_INPUT_DATA AND PL_AddrMoveCurrToInpFlagNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PL_AddrMovePrevToCurrFlag1Y < '0' AND PL_AddrMoveCurrToInpFlagNonFCRA < '0' => NO_DATA_FOUND_97,
+		PL_AddrMovePrevToCurrFlag1Y = '1' OR PL_AddrMoveCurrToInpFlagNonFCRA = '1' => '1', '0');
+		
+Person: => PL_AddrLastMoveAddrType1YFCRA := MAP(PL_AddrLastMoveFlag1YFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PL_AddrLastMoveFlag1YFCRA < '1' => NO_DATA_FOUND,
+		PL_AddrMoveCurrToInpFlagFCRA = '1' => PL_AddrMoveCurrToInpAddrTypeFCRA,
+		PL_AddrMovePrevToCurrFlag1Y = '1' => PL_AddrMovePrevToCurrAddrType1Y);
+		
+Person: => PL_AddrLastMoveAddrType1YNonFCRA := MAP(PL_AddrLastMoveFlag1YNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PL_AddrLastMoveFlag1YNonFCRA < '1' => NO_DATA_FOUND,
+		PL_AddrMoveCurrToInpFlagNonFCRA = '1' => PL_AddrMoveCurrToInpAddrTypeNonFCRA,
+		PL_AddrMovePrevToCurrFlag1Y = '1' => PL_AddrMovePrevToCurrAddrType1Y);
+		
+Person: => PL_AddrLastMoveAVMRatio1YFCRA := MAP(PL_AddrLastMoveFlag1YFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag1YFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagFCRA = '1' => PL_AddrMoveCurrToInpAVMRatioFCRA,
+		PL_AddrMovePrevToCurrFlag1Y = '1' => PL_AddrMovePrevToCurrAVMRatio1Y);
+		
+Person: => PL_AddrLastMoveAVMRatio1YNonFCRA := MAP(PL_AddrLastMoveFlag1YNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag1YNonFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagNonFCRA = '1' => PL_AddrMoveCurrToInpAVMRatioNonFCRA,
+		PL_AddrMovePrevToCurrFlag1Y = '1' => PL_AddrMovePrevToCurrAVMRatio1Y);
+		
+Person: => PL_AddrLastMoveDist1YFCRA := MAP(PL_AddrLastMoveFlag1YFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag1YFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagFCRA = '1' => PL_AddrMoveCurrToInpDistFCRA,
+		PL_AddrMovePrevToCurrFlag1Y = '1' => PL_AddrMovePrevToCurrDist1Y);
+		
+Person: => PL_AddrLastMoveDist1YNonFCRA := MAP(PL_AddrLastMoveFlag1YNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag1YNonFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagNonFCRA = '1' => PL_AddrMoveCurrToInpDistNonFCRA,
+		PL_AddrMovePrevToCurrFlag1Y = '1' => PL_AddrMovePrevToCurrDist1Y);
+		
+Person: => PL_AddrLastMoveMsnc1YFCRA := MAP(PL_AddrLastMoveFlag1YFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag1YFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagFCRA = '1' => NO_DATA_FOUND_97_INT,
+		PL_AddrMovePrevToCurrFlag1Y = '1' => PL_AddrMovePrevToCurrMsnc1Y);
+		
+Person: => PL_AddrLastMoveMsnc1YNonFCRA := MAP(PL_AddrLastMoveFlag1YNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag1YNonFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagNonFCRA = '1' => NO_DATA_FOUND_97_INT,
+		PL_AddrMovePrevToCurrFlag1Y = '1' => PL_AddrMovePrevToCurrMsnc1Y);
+		
+Person: => PL_AddrLastMoveFlag5YFCRA := MAP(PL_AddrMovePrevToCurrFlag5Y = MISSING_INPUT_DATA AND PL_AddrMoveCurrToInpFlagFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PL_AddrMovePrevToCurrFlag5Y < '0' AND PL_AddrMoveCurrToInpFlagFCRA < '0' => NO_DATA_FOUND_97,
+		PL_AddrMovePrevToCurrFlag5Y = '1' OR PL_AddrMoveCurrToInpFlagFCRA = '1' => '1', '0');
+		
+Person: => PL_AddrLastMoveFlag5YNonFCRA := MAP(PL_AddrMovePrevToCurrFlag5Y = MISSING_INPUT_DATA AND PL_AddrMoveCurrToInpFlagNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PL_AddrMovePrevToCurrFlag5Y < '0' AND PL_AddrMoveCurrToInpFlagNonFCRA < '0' => NO_DATA_FOUND_97,
+		PL_AddrMovePrevToCurrFlag5Y = '1' OR PL_AddrMoveCurrToInpFlagNonFCRA = '1' => '1', '0');
+		
+Person: => PL_AddrLastMoveAddrType5YFCRA := MAP(PL_AddrLastMoveFlag5YFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PL_AddrLastMoveFlag5YFCRA < '1' => NO_DATA_FOUND,
+		PL_AddrMoveCurrToInpFlagFCRA = '1' => PL_AddrMoveCurrToInpAddrTypeFCRA,
+		PL_AddrMovePrevToCurrFlag5Y = '1' => PL_AddrMovePrevToCurrAddrType5Y);
+		
+Person: => PL_AddrLastMoveAddrType5YNonFCRA := MAP(PL_AddrLastMoveFlag5YNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+		PL_AddrLastMoveFlag5YNonFCRA < '1' => NO_DATA_FOUND,
+		PL_AddrMoveCurrToInpFlagNonFCRA = '1' => PL_AddrMoveCurrToInpAddrTypeNonFCRA,
+		PL_AddrMovePrevToCurrFlag5Y = '1' => PL_AddrMovePrevToCurrAddrType5Y);
+		
+Person: => PL_AddrLastMoveAVMRatio5YFCRA := MAP(PL_AddrLastMoveFlag5YFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag5YFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagFCRA = '1' => PL_AddrMoveCurrToInpAVMRatioFCRA,
+		PL_AddrMovePrevToCurrFlag5Y = '1' => PL_AddrMovePrevToCurrAVMRatio5Y);
+		
+Person: => PL_AddrLastMoveAVMRatio5YNonFCRA := MAP(PL_AddrLastMoveFlag5YNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag5YNonFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagNonFCRA = '1' => PL_AddrMoveCurrToInpAVMRatioNonFCRA,
+		PL_AddrMovePrevToCurrFlag5Y = '1' => PL_AddrMovePrevToCurrAVMRatio5Y);
+		
+Person: => PL_AddrLastMoveDist5YFCRA := MAP(PL_AddrLastMoveFlag5YFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag5YFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagFCRA = '1' => PL_AddrMoveCurrToInpDistFCRA,
+		PL_AddrMovePrevToCurrFlag5Y = '1' => PL_AddrMovePrevToCurrDist5Y);
+		
+Person: => PL_AddrLastMoveDist5YNonFCRA := MAP(PL_AddrLastMoveFlag5YNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag5YNonFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagNonFCRA = '1' => PL_AddrMoveCurrToInpDistNonFCRA,
+		PL_AddrMovePrevToCurrFlag5Y = '1' => PL_AddrMovePrevToCurrDist5Y);
+		
+Person: => PL_AddrLastMoveMsnc5YFCRA := MAP(PL_AddrLastMoveFlag5YFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag5YFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagFCRA = '1' => NO_DATA_FOUND_97_INT,
+		PL_AddrMovePrevToCurrFlag5Y = '1' => PL_AddrMovePrevToCurrMsnc5Y);
+		
+Person: => PL_AddrLastMoveMsnc5YNonFCRA := MAP(PL_AddrLastMoveFlag5YNonFCRA = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,
+		PL_AddrLastMoveFlag5YNonFCRA < '1' => NO_DATA_FOUND_INT,
+		PL_AddrMoveCurrToInpFlagNonFCRA = '1' => NO_DATA_FOUND_97_INT,
+		PL_AddrMovePrevToCurrFlag5Y = '1' => PL_AddrMovePrevToCurrMsnc5Y);
