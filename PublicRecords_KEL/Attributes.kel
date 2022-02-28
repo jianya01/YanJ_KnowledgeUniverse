@@ -13424,7 +13424,8 @@ Person: => VerSourceCredentialedListAllNonFCRA := VerSourceCredentialedListNonFC
 											SrcLastSeenDate := MAX(GROUP,INTEGER(IF(ISVALIDDATE(SourceDateLastSeen), DATETOSTRING(SourceDateLastSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97)))};
 Person: => VerSourceCredentialedGroupListSortedFCRA := TOPN(VerSourceCredentialedListAllFCRA, 99, SrcFirstSeenDate);
 Person: => VerSourceCredentialedGroupListSorted := TOPN(VerSourceCredentialedListAllNonFCRA, 99, SrcFirstSeenDate);
-
+Person.VerSourceCredentialedGroupListSortedFCRA: => Seen_In_One_Year := SrcFirstSeenDate != Person.NO_DATA_FOUND_97 AND DAYSBETWEEN(DATE(SrcFirstSeenDate),Person.CURRENT_DATE) <= Person.ONE_YEAR_IN_DAYS;
+Person.VerSourceCredentialedGroupListSorted: => Seen_In_One_Year := SrcFirstSeenDate != Person.NO_DATA_FOUND_97 AND DAYSBETWEEN(DATE(SrcFirstSeenDate),Person.CURRENT_DATE) <= Person.ONE_YEAR_IN_DAYS;
 
 Person: => PL_VerSrcCredCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 				NOT EXISTS(VerSourceListSorted) => MISSING_INPUT_DATA_INT,
@@ -13459,7 +13460,9 @@ Person: => PL_VerSrcCredRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_
 Person: => PL_VerSrcCredRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 				PL_VerSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
 				CONCAT(VerSourceCredentialedGroupListSorted, RecordCount, '|'));
-
+Person: => PL_SrcCredCnt1YNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(VerSourceCredentialedGroupListSorted(Seen_In_One_Year)), 0, 99));
+			
 Person: => PL_VerSrcCredCntEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 				NOT EXISTS(VerSourceListSortedFCRA) => MISSING_INPUT_DATA_INT,
 				BOUNDSFOLD(COUNT(VerSourceCredentialedListSortedFCRA), 0, 99));
@@ -13493,6 +13496,8 @@ Person: => PL_VerSrcCredRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INP
 Person: => PL_VerSrcCredRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 				PL_VerSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
 				CONCAT(VerSourceCredentialedGroupListSortedFCRA, RecordCount, '|'));
+Person: => PL_SrcCredCnt1YFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+				BOUNDSFOLD(COUNT(VerSourceCredentialedGroupListSortedFCRA(Seen_In_One_Year)), 0, 99));
 
 //Non-Derog verification
 
@@ -15104,7 +15109,15 @@ Person: => PL_FileAddrTaxValYrFCRA := MAP(PL_CurrAddrTaxValYr = MISSING_INPUT_DA
 				PL_FileAddrFlagFCRA = 0  OR PL_CurrAddrTaxValYr = NO_DATA_FOUND => NO_DATA_FOUND,
 				PL_CurrAddrTaxValYr = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
 				PL_CurrAddrTaxValYr);
-				
+Person: => PL_FileAddrMailMatchFlagNonFCRA := MAP(PL_CurrAddrMailMatchFlag = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				PL_FileAddrFlagNonFCRA = 0  OR PL_CurrAddrMailMatchFlag = NO_DATA_FOUND => NO_DATA_FOUND,
+				PL_CurrAddrMailMatchFlag = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+				PL_CurrAddrMailMatchFlag);
+Person: => PL_FileAddrMailMatchFlagFCRA := MAP(PL_CurrAddrMailMatchFlag = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				PL_FileAddrFlagFCRA = 0  OR PL_CurrAddrMailMatchFlag = NO_DATA_FOUND => NO_DATA_FOUND,
+				PL_CurrAddrMailMatchFlag = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+				PL_CurrAddrMailMatchFlag);
+
 //Verification DOB
 Person: => AllDOBSet := ReportedDatesOfBirth(HeaderHitFlag AND TranslatedSource != ''){DateOfBirth};
 Person.ReportedDatesOfBirth: => AllDobCheck := ALL(AllDOBSet,SUBSTR(DATETOSTRING(DateOfBirth,'%Y%m%d'), 7, 8) IN ['00','01']);
