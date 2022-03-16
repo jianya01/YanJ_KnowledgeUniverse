@@ -17802,3 +17802,16 @@ InputPII: => PI_LexIDEmrgPerInpAddrCnt6M := MAP(InputFullAddressCleanValue IN [M
 InputPII: => PL_LexIDEmrgPerCurrAddrCnt6M := MAP(DEFAULT(Subject.P_LexIDSeenFlag,'0') = '0' OR CurrentAddress:Null => MISSING_INPUT_DATA_INT,
 		EXISTS(LexIDsonCurrentAddr(Under6Months){LexID}) AND NOT EXISTS(LexIDsonCurrentAddr(Under6Months){AgeInMonths}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 		BOUNDSFOLD(COUNT(LexIDsonCurrentAddr(Under6Months){LexID}),0,99));
+
+//KS-2711	
+
+InputPII: => PI_LexIDNewPerInpSSNCnt6M := MAP(P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
+		EXISTS(InputCleanSSN.PersonSSN) AND NOT EXISTS(InputCleanSSN.PersonSSN{Subject:DateFirstSeen, Subject:DateLastSeen}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(COUNT(InputCleanSSN.PersonSSN(MONTHSBETWEEN(Subject:DateFirstSeen,Subject.CURRENT_DATE) <= InputPII.SIX_MONTHS AND MONTHSBETWEEN(Subject:DateFirstSeen,Subject.CURRENT_DATE) >= 0 AND EXISTS(DataSources(HeaderHitFlag))){Subject}),0,99));
+
+PersonSSN: => SSNBestMatch := Social = Subject.PL_BestSSN;
+Person: => PL_LexIDNewPerBestSSNCnt6M := MAP(PL_BestSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
+		EXISTS(PersonSSN(SSNBestMatch AND EXISTS(DataSources(HeaderHitFlag) ))) AND NOT EXISTS(PersonSSN{Subject:DateFirstSeen, Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(PersonSSN(SSNBestMatch AND MONTHSBETWEEN(Subject:DateFirstSeen,Subject.CURRENT_DATE) <= InputPII.SIX_MONTHS AND MONTHSBETWEEN(Subject:DateFirstSeen,Subject.CURRENT_DATE) >= 0 AND EXISTS(DataSources(HeaderHitFlag))){Subject}),0,99));
+
+//KS-2711 END
