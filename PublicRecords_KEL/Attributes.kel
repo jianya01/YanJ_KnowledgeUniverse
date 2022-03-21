@@ -17468,25 +17468,34 @@ InputPII: => PI_LexIDNewPerInpPhoneCnt6M := MAP(P_InpClnPhoneHomeFlagValue != '1
 // Logic for gathering Inquiry data for Linkset Attribute calculations. 
 Inquiry: => ValidLinksetInquiry := AgeinDays <= Person.FIVE_YEARS_IN_DAYS;
 
-Inquiry: => LinksetAddressRecord := ONLY(TOPN(PersonInfo, 1, -PrimaryRange, -Predirectional, -PrimaryName, -Suffix, -Postdirectional, -ZIP5, -SecondaryRange));
-Inquiry: => LinksetAddress := 
-								DEFAULT(LinksetAddressRecord.PrimaryRange, '') + ' ' +
-								DEFAULT(LinksetAddressRecord.Predirectional, '') + ' ' +
-								DEFAULT(LinksetAddressRecord.PrimaryName, '') + ' ' +
-								DEFAULT(LinksetAddressRecord.Suffix, '') + ' ' +
-								DEFAULT(LinksetAddressRecord.Postdirectional, '') + ' ' +
-								DEFAULT(LinksetAddressRecord.SecondaryRange, '') + ' ' +
-								DEFAULT(LinksetAddressRecord.ZIP5, '');
+Inquiry: => LinksetLexID := ONLY(TOPN(PersonInfo, 1, -LexID), LexID);
+Inquiry: => LinksetAddressRecord := ONLY(TOPN(PersonInfo, 1, -DEFAULT(PrimaryRange, ''), -DEFAULT(Predirectional, ''), -DEFAULT(PrimaryName, ''), -DEFAULT(Suffix, ''), -DEFAULT(Postdirectional, ''), -DEFAULT(ZIP5, ''), -DEFAULT(SecondaryRange, '')));
+Inquiry: => LinksetAddress := fnAddr1FromComponents(
+								DEFAULT(LinksetAddressRecord.PrimaryRange, ''),
+								DEFAULT(LinksetAddressRecord.Predirectional, ''),
+								DEFAULT(LinksetAddressRecord.PrimaryName, ''),
+								DEFAULT(LinksetAddressRecord.Suffix, ''),
+								DEFAULT(LinksetAddressRecord.Postdirectional, ''),
+								'', /*don't care about unit designation*/
+								DEFAULT(LinksetAddressRecord.SecondaryRange, '')) + 
+								' ' + 
+								DEFAULT(TRIM(LinksetAddressRecord.ZIP5), '');
+								
+
 								
 Inquiry: => LinksetDOB := ONLY(TOPN(PersonInfo, 1, -DateOfBirth), DateOfBirth);
 Inquiry: => LinksetEmail := ONLY(TOPN(PersonInfo, 1, -EmailAddress), EmailAddress);
 Inquiry: => LinksetIP := ONLY(TOPN(PersonInfo, 1, IPAddress), IPAddress);
 Inquiry: => LinksetNameRecord := ONLY(TOPN(PersonInfo, 1, -LastName, -FirstName));
-Inquiry: => LinksetName := LinksetNameRecord.FirstName + ' ' + LinksetNameRecord.LastName;
+Inquiry: => LinksetName := DEFAULT(TRIM(LinksetNameRecord.FirstName), '') + ' ' + DEFAULT(TRIM(LinksetNameRecord.LastName), '');
 Inquiry: => LinksetPhone := ONLY(TOPN(PersonInfo, 1, -PersonalPhoneNumber), PersonalPhoneNumber);
 Inquiry: => LinksetSSN := ONLY(TOPN(PersonInfo, 1, -SSN), SSN);
 Inquiry: => LinksetNetworkID := UID;
-Inquiry: => LinksetAddressType := ONLY(TOPN(PersonInfo, 1, AddressType), AddressType);
+Inquiry.PersonInfo: => AddressTypeDescription := MAP(
+				AddressType = 'S' => 'SINGLE',
+				AddressType = 'HD' => 'APTNOUNIT');
+				
+Inquiry: => LinksetAddressType := ONLY(TOPN(PersonInfo, 1, AddressTypeDescription), AddressTypeDescription);
 // Inquiry: => LinksetHomePhoneType := ONLY(TOPN(PersonInfo, 1,));
 // Inquiry: => LinksetSSNFlag := ONLY(TOPN(PersonInfo, 1,));
 Inquiry: => LinksetIndustry := ONLY(TOPN(BusIntel, 1, -IndustryCode1), IndustryCode1);
