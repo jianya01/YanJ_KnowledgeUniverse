@@ -4532,7 +4532,7 @@ Person: => P_InpValSSNProbIndxFCRA := MAP(P_InpSSNFlagValue = '0' => MISSING_INP
 //Best Phone
 // Phone: PHONE_PLUS_RAW_SOURCES := ['IR','01','02','05','IO','PP','WO','WR','WP','GO','IQ','IB','MT','T$','AY','L9','N2'];//Not needed for now but logic might change in the future and this might be required.
 Phone.DataSources : => TranslatedSourceCode := ConsumerSourceGroup(Source);
-Person: => BestPhoneCandidates := PersonPhone(BestPersonPhoneHitFlag){PhoneNumber.Phone10, //Neg means add - in the TopN to find biggest
+Person: => BestPhoneCandidates := PersonPhone(BestPersonPhoneHitFlag AND NOT PhoneNumber.Phone10:Null){PhoneNumber.Phone10, //Neg means add - in the TopN to find biggest
 						SortCriteria1Neg := DEFAULT(IF(YEARSBETWEEN(MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen)),D'19000101'),
 						SortCriteria2Neg := COUNT(DataSources{TranslatedSourceCode}),
 						SortCriteria3ANeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen), Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen)),D'19000101'),//Phones Plus
@@ -4542,7 +4542,7 @@ Person: => BestPhoneCandidates := PersonPhone(BestPersonPhoneHitFlag){PhoneNumbe
 						SortCriteria3DNeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'GO'),Source:DateLastSeen),Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'GO'),Source:DateLastSeen)),D'19000101'),//Gong History
 						SortCriteria3ENeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'IR'),Source:DateLastSeen),Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'IR'),Source:DateLastSeen)),D'19000101'),//Infutor
 						SortCriteria4Neg := DEFAULT(ABS(YEARSBETWEEN(ONLY(PhoneNumber,Phone10:DateFirstSeen), ONLY(PhoneNumber,Phone10:DateLastSeen))),0),
-						SortCriteria5Neg := PhoneNumber.Phone10 = Subject.P_InpClnPhoneHome};
+						SortCriteria5Neg := IF(Subject.P_InpClnPhoneHome:Null, FALSE, PhoneNumber.Phone10 = Subject.P_InpClnPhoneHome)};
 Person: => BestPhoneNonFCRA := ONLY(TOPN(BestPhoneCandidates, 1, -SortCriteria1Neg, -SortCriteria2Neg, -SortCriteria3ANeg,-SortCriteria3BNeg,-SortCriteria3CNeg,-SortCriteria3DNeg,-SortCriteria3ENeg,-SortCriteria4Neg,-SortCriteria5Neg),Phone10);						
 Person: => BestPhoneFCRA := ONLY(TOPN(BestPhoneCandidates, 1, -SortCriteria1Neg, -SortCriteria2Neg, -SortCriteria3BNeg,-SortCriteria3CNeg,-SortCriteria3DNeg,-SortCriteria3ENeg,-SortCriteria4Neg,-SortCriteria5Neg),Phone10);						
 Person: => PL_BestPhoneHomeFCRA:= MAP(
