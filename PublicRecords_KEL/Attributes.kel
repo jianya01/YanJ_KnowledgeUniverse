@@ -4561,8 +4561,8 @@ Person: => PL_BestPhoneHomeNonFCRA:= MAP(
 /*                                                                        */
 /**************************************************************************/
 
-Education: => CollRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['C','H','O']));
-Education: => EduRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['M','C','H','O']));
+Education: => CollRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['C','H','O','A']));
+Education: => EduRecFlag := EXISTS(CollegeCharacteristics(FileType IN ['M','C','H','O','A']));
 Person: => BUILD_DATE := MIN(IF(EXISTS(PersonEducation.Edu(DataSources.Source = 'AY')), Education.ALLOY_MEDIA_BUILD_DATE , Education.ASL_BUILD_DATE), CURRENTDATE());
 
 Person: => EduRecVerSourceListPre := PersonEducation.Edu(EduRecFlag).CollegeCharacteristics{FileType, CollegeCode, CollegeType, Tier, Tier2, DateFirstSeenMin := MIN(GROUP, FileType:DateFirstSeen), DateLastSeenMax := MAX(GROUP, FileType:DateLastSeen)};
@@ -4578,7 +4578,7 @@ Person: => EduRecVerSourceList := EduRecVerSourceListPre{
 	
 Person: => EduRecVerSourceListSorted := TOPN(EduRecVerSourceList, 1000, SourceDateLastSeen = Person.NO_DATA_FOUND_97, SourceDateLastSeen, SourceDateFirstSeen);
 
-Person: => EduCollRecVerSourceList := EduRecVerSourceListSorted(FileType IN ['C','H','O']);
+Person: => EduCollRecVerSourceList := EduRecVerSourceListSorted(FileType IN ['C','H','O','A']);
 Person: => EduCollRecVerSourceListFiltered := TOPN(EduCollRecVerSourceList, 1, -SourceDateLastSeen, -SourceDateFirstSeen);
 
 Person: => EduHSRecVerSourceList   := EduRecVerSourceListSorted(FileType IN ['M']);
@@ -9052,48 +9052,54 @@ InputPII: => PI_InpAddrIsSFDFlag := MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_D
 																		 0);
 
 PersonAddress: => DateLastSeenAge := IF(ISVALIDDATE(Subject:DateLastSeen),DAYSBETWEEN(MIN(Subject:DateLastSeen,CURRENT_DATE), CURRENT_DATE),Person.NO_DATA_FOUND_97_INT);
+AddressPhone: => DateLastSeenAge := IF(ISVALIDDATE(PhoneNumber:DateLastSeen),DAYSBETWEEN(MIN(PhoneNumber:DateLastSeen,Phone.CURRENT_DATE),Phone.CURRENT_DATE),Person.NO_DATA_FOUND_97_INT);
+Person: => InputAddress := PII.Location;
+Person: => InputAddressSFDFlag := PII.PI_InpAddrIsSFDFlag;
+Person: => UniqueLexIDsInputAddress := InputAddress.PersonAddress(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(HeaderHitFlag))){Subject};
+Person: => UniquePhonesInputAddressNonFCRA := InputAddress.AddressPhone(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag))){PhoneNumber};
+Person: => UniquePhonesInputAddressAllNonFCRA := InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag))){PhoneNumber};
+Person: => UniquePhonesInputAddressFCRA := InputAddress.AddressPhone(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag))){PhoneNumber};
+Person: => UniquePhonesInputAddressAllFCRA := InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag))){PhoneNumber};
 
 Person: => PL_LexIDPerSubjAddrCnt6MNonFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																		PL_InpAddrSrcOldMsncEvNonFCRA < 6 => NO_DATA_FOUND_INT,
 																		NOT EXISTS(InputAddress.PersonAddress(EXISTS(DataSources(HeaderHitFlag)) AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}) AND EXISTS(InputAddress.PersonAddress(EXISTS(DataSources(HeaderHitFlag))){Subject}) => NO_DATA_FOUND_97_INT,
-																		BOUNDSFOLD(COUNT(InputAddress.PersonAddress(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
+																		BOUNDSFOLD(COUNT(UniqueLexIDsInputAddress),0,99));
 
 Person: => PL_LexIDPerSubjAddrSFDCnt6MNonFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																		PL_InpAddrSrcOldMsncEvNonFCRA < 6  OR InputAddressSFDFlag != 1 => NO_DATA_FOUND_INT,
 																		NOT EXISTS(InputAddress.PersonAddress(EXISTS(DataSources(HeaderHitFlag)) AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}) AND EXISTS(InputAddress.PersonAddress(EXISTS(DataSources(HeaderHitFlag))){Subject}) => NO_DATA_FOUND_97_INT,
-																		BOUNDSFOLD(COUNT(InputAddress.PersonAddress(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
+																		BOUNDSFOLD(COUNT(UniqueLexIDsInputAddress),0,99));
 
 Person: => PL_LexIDPerSubjAddrCnt6MFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																		PL_InpAddrSrcOldMsncEvFCRA < 6 => NO_DATA_FOUND_INT,
 																		NOT EXISTS(InputAddress.PersonAddress(EXISTS(DataSources(HeaderHitFlag)) AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}) AND EXISTS(InputAddress.PersonAddress(EXISTS(DataSources(HeaderHitFlag))){Subject}) => NO_DATA_FOUND_97_INT,
-																		BOUNDSFOLD(COUNT(InputAddress.PersonAddress(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
-Person: => InputAddress := PII.Location;
-Person: => InputAddressSFDFlag := PII.PI_InpAddrIsSFDFlag;
+																		BOUNDSFOLD(COUNT(UniqueLexIDsInputAddress),0,99));
+
 Person: => PL_LexIDPerSubjAddrSFDCnt6MFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																		PL_InpAddrSrcOldMsncEvFCRA < 6  OR InputAddressSFDFlag != 1 => NO_DATA_FOUND_INT,
 																		NOT EXISTS(InputAddress.PersonAddress(EXISTS(DataSources(HeaderHitFlag)) AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}) AND EXISTS(InputAddress.PersonAddress(EXISTS(DataSources(HeaderHitFlag))){Subject}) => NO_DATA_FOUND_97_INT,
-																		BOUNDSFOLD(COUNT(InputAddress.PersonAddress(DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS AND DateLastSeenAge != Person.NO_DATA_FOUND_97_INT AND EXISTS(DataSources(HeaderHitFlag)))),0,99));
+																		BOUNDSFOLD(COUNT(UniqueLexIDsInputAddress),0,99));
 
-AddressPhone: => DateLastSeenAge := IF(ISVALIDDATE(PhoneNumber:DateLastSeen),DAYSBETWEEN(MIN(PhoneNumber:DateLastSeen,Phone.CURRENT_DATE),Phone.CURRENT_DATE),Person.NO_DATA_FOUND_97_INT);
 Person: => PL_PhonePerSubjAddrCnt6MNonFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																		PL_InpAddrSrcOldMsncEvNonFCRA < 6 => NO_DATA_FOUND_INT,
-																		NOT EXISTS(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) AND EXISTS(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) => NO_DATA_FOUND_97_INT,
-																		BOUNDSFOLD(COUNT(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber),0,99));
+																		NOT EXISTS(UniquePhonesInputAddressNonFCRA) AND EXISTS(UniquePhonesInputAddressAllNonFCRA) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(UniquePhonesInputAddressNonFCRA),0,99));
 Person: => PL_PhonePerSubjAddrCnt6MFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																		PL_InpAddrSrcOldMsncEvFCRA < 6 => NO_DATA_FOUND_INT,
-																		NOT EXISTS(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) AND EXISTS(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) => NO_DATA_FOUND_97_INT,
-																		BOUNDSFOLD(COUNT(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber),0,99));
+																		NOT EXISTS(UniquePhonesInputAddressFCRA) AND EXISTS(UniquePhonesInputAddressAllFCRA) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(UniquePhonesInputAddressFCRA),0,99));
 
 Person: => PL_PhonePerSubjAddrSFDCnt6MNonFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																		PL_InpAddrSrcOldMsncEvNonFCRA < 6 OR InputAddressSFDFlag != 1 => NO_DATA_FOUND_INT,
-																		NOT EXISTS(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) AND EXISTS(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) => NO_DATA_FOUND_97_INT,
-																		BOUNDSFOLD(COUNT(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN','GP'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber),0,99));
+																		NOT EXISTS(UniquePhonesInputAddressNonFCRA) AND EXISTS(UniquePhonesInputAddressAllNonFCRA) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(UniquePhonesInputAddressNonFCRA),0,99));
 Person: => PL_PhonePerSubjAddrSFDCnt6MFCRA := MAP(P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																		PL_InpAddrSrcOldMsncEvFCRA < 6 OR InputAddressSFDFlag != 1 => NO_DATA_FOUND_INT,
-																		NOT EXISTS(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) AND EXISTS(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber{UID}) => NO_DATA_FOUND_97_INT,
-																		BOUNDSFOLD(COUNT(InputAddress.AddressPhone(EXISTS(DataSources(Source IN ['GN'] OR HeaderHitFlag)) OR DateLastSeenAge <= Person.SIX_MONTHS_IN_DAYS).PhoneNumber),0,99));
+																		NOT EXISTS(UniquePhonesInputAddressFCRA) AND EXISTS(UniquePhonesInputAddressAllFCRA) => NO_DATA_FOUND_97_INT,
+																		BOUNDSFOLD(COUNT(UniquePhonesInputAddressFCRA),0,99));
 
-PersonSSN: => HeaderLastSeenAge := IF(ISVALIDDATE(MIN(DataSources(HeaderHitFlag),Source:DateLastSeen)), DAYSBETWEEN(MIN(MIN(DataSources(HeaderHitFlag),Source:DateLastSeen),Person.CURRENT_DATE), Person.CURRENT_DATE),Person.NO_DATA_FOUND_97_INT);
+PersonSSN: => HeaderLastSeenAge := IF(ISVALIDDATE(Subject:DateLastSeen), DAYSBETWEEN(MIN(Subject:DateLastSeen,Person.CURRENT_DATE), Person.CURRENT_DATE),Person.NO_DATA_FOUND_97_INT);
 
 InputPII: => PI_LexIDPerInpSSNCnt6M := MAP(Subject.P_InpClnSSNFlagValue != 1 => MISSING_INPUT_DATA_INT,
 																		NOT EXISTS(InputCleanSSN.PersonSSN(HeaderLastSeenAge != Person.NO_DATA_FOUND_97_INT)) AND EXISTS(InputCleanSSN.PersonSSN.DataSources(HeaderHitFlag)) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
@@ -16231,7 +16237,7 @@ Person.FullName: => VerifiedMiskeyFirstName := IsNameMiskeyMatch(FirstName, Pers
 
 Person.FullName: => VerifiedMiskeyLastName := IsNameMiskeyMatch(LastName, Person.P_InpClnNameLast);
 
-PersonSSN: => MiskeySSNMatch := IF(EditDistance(Social, Subject.P_InpClnSSN) = 1 OR EditDistance(Social, Subject.P_InpClnSSN) = 2, '1', '0');
+PersonSSN: => MiskeySSNMatch := IF(EditDistance(INTFORMAT(Social,9,1), Subject.P_InpClnSSN) = 1 OR EditDistance(INTFORMAT(Social,9,1), Subject.P_InpClnSSN) = 2, '1', '0');
 
 
 PersonPhone: => MiskeyPhoneMatch := IsPhoneMatchMiskey(PhoneNumber, Subject.P_InpClnPhoneHome);
@@ -16249,7 +16255,7 @@ PersonAddress: => MiskeyAddressSimilarityMatch := IF(LevenshteinSimilarity(Group
 
 Person.FullName: => InputFirstNameMatch := FirstName = Person.P_InpClnNameFirst;
 Person.FullName: => InputLastNameMatch := LastName = Person.P_InpClnNameLast;
-PersonSSN: => InputSSNDirectMatch := Social = Subject.P_InpClnSSN;
+PersonSSN: => InputSSNDirectMatch := INTFORMAT(Social,9,1) = Subject.P_InpClnSSN;
 Person.ReportedDatesOfBirth: => InputDOBDirectMatch := DATETOSTRING(DateOfBirth,'%Y%m%d') = Person.P_InpClnDOB;
 PersonPhone: => InputPhoneDirectMatch := PhoneNumber = Subject.P_InpClnPhoneHome;
 
