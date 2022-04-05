@@ -15605,13 +15605,16 @@ Person: => PL_AlrtLegalHoldFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DA
 
 Person: => P_InpClnAddrState := PII.InputStateCleanValue;
 
+
 Person: => PL_VerRIRestrictedFlag := IF(
-	(P_InpClnAddrState = 'RI' OR CurrentAddrState = 'RI') AND
-	NOT P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] AND
-	PL_InpNameFirstSrcCntEvFCRA > 0 AND
-	PL_InpNameLastSrcCntEvFCRA > 0 AND
-	(PL_InpAddrSrcCntEvFCRA > 0 OR PL_InpSSNSrcCntEvFCRA > 0 OR PL_InpPhoneSrcCntEvFCRA > 0 OR PL_InpDOBSrcCntEvFCRA > 0),
-	1, 0);
+		((P_InpClnAddrState = 'RI' OR CurrentAddrState = 'RI') AND // left.shell_input.st='RI' or current_address_st = 'RI';
+		NOT P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] AND  // left.shell_input.ssn<>''
+		PL_InpSSNSrcCntEvFCRA > 0 AND // left.iid.nas_summary in [6,7,9] , we will use ssnsrccnt as a replacement
+		PL_InpPhoneSrcCntEvFCRA < 1  AND // left.iid.nap_summary <= 2
+		PL_InpDOBSrcCntEvFCRA < 1 AND //(integer)left.dobmatchlevel< 4 
+		PL_InpAddrSrcCntEvFCRA < 1), 		// left.address_verification.input_address_information.naprop <= 2;
+		1,0);
+
 
 Person: => PL_InpNameMatchIndxFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnNameFirst IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameLast IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
 		PL_InpNameFirstFlagFCRA = '0' AND PL_InpNameLastFlagFCRA = '0' => '0',
