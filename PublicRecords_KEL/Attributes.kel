@@ -18063,5 +18063,30 @@ Person: => PL_LexIDNewPerBestSSNCnt6M := MAP(PL_BestSSN IN [MISSING_INPUT_DATA, 
 
 //KS-2711 END
 
+//KS-2703
+InputPII: => PI_LexIDPerInpSSNCnt1Y := MAP(InputSSNCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+			NOT EXISTS(InputCleanSSN.PersonSSN(HeaderLastSeenAge != Person.NO_DATA_FOUND_97_INT)) AND EXISTS(InputCleanSSN.PersonSSN.DataSources(HeaderHitFlag)) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+			BOUNDSFOLD(COUNT(InputCleanSSN.PersonSSN(HeaderLastSeenAge <= Person.ONE_YEAR_IN_DAYS AND HeaderLastSeenAge != Person.NO_DATA_FOUND_97_INT){Subject}),0,99));
+
+Person: => PL_LexIDPerBestSSNCnt1Y := MAP(PL_BestSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
+		EXISTS(PersonSSN(SSNBestMatch AND EXISTS(DataSources(HeaderHitFlag) ))) AND NOT EXISTS(PersonSSN{Subject:DateFirstSeen, Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(PersonSSN(SSNBestMatch AND MONTHSBETWEEN(Subject:DateLastSeen,Subject.CURRENT_DATE) <= InputPII.ONE_YEAR_IN_MONTHS AND MONTHSBETWEEN(Subject:DateLastSeen,Subject.CURRENT_DATE) >= 0 AND EXISTS(DataSources(HeaderHitFlag))){Subject}),0,99));
+
+PersonPhone: => PhoneCheckAgeLastSeen1Year := AgeLastSeen <= 12 AND AgeLastSeen >= 0 AND EXISTS(DataSources(HeaderHitFlag));
+PersonPhone: => GongCheckAgeLastSeen1Year := AgeLastSeenGong <= 12 AND AgeLastSeenGong >= 0 AND EXISTS(DataSources(Source IN ['GO','GN']));
+PersonPhone: => PhonePlusCheckAgeLastSeen1Year := AgeLastSeenPhonePlus <= 12 AND AgeLastSeenPhonePlus >= 0 AND EXISTS(DataSources(Source = 'PP'));
+InputPII: => PI_LexIDPerInpPhoneCnt1Y := MAP(P_InpClnPhoneHomeFlagValue != '1'  => MISSING_INPUT_DATA_INT,
+		EXISTS(InputCleanPhone.PersonPhone) AND NOT EXISTS(InputCleanPhone.PersonPhone{Subject:DateFirstSeen, Subject:DateLastSeen}) => Phone.NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(InputCleanPhone.PersonPhone(PhoneCheckAgeLastSeen1Year OR GongCheckAgeLastSeen1Year OR PhonePlusCheckAgeLastSeen1Year){Subject}), 0, 99));
+
+InputPII: => PI_LexIDPerInpAddrCnt1Y := MAP(InputFullAddressCleanValue IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+		EXISTS(LexIDsonInpAddr(Under1Year){LexID}) AND NOT EXISTS(LexIDsonInpAddr(Under1Year){AgeInMonths}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(COUNT(LexIDsonInpAddr(Under1Year){LexID}),0,99));
+
+InputPII: => PL_LexIDPerCurrAddrCnt1Y := MAP(DEFAULT(Subject.P_LexIDSeenFlag,'0') = '0' OR CurrentAddress:Null => MISSING_INPUT_DATA_INT,
+		EXISTS(LexIDsonCurrentAddr(Under1Year){LexID}) AND NOT EXISTS(LexIDsonCurrentAddr(Under1Year){AgeInMonths}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(COUNT(LexIDsonCurrentAddr(Under1Year){LexID}),0,99));
+//KS-2703 END
+
 Person: => PL_BestSSNAppendFlagPre := PII.PL_BestSSNAppendFlagInternal;
 Person: => PL_BestSSNAppendFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA, PL_BestSSNAppendFlagPre => '1', '0');
