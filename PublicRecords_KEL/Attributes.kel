@@ -6906,7 +6906,7 @@ Person: => ProfessionalLicenseDates := TOPN(ProfessionalLicensePerson.ProfLic(Va
 Person: => ActiveProfessionalLicenseIssueExpDate := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseIssueDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxIssueDate);
 Person: => ActiveProfessionalLicenseExpDt := ONLY(ActiveProfessionalLicenseIssueExpDate,MaxExpireDate);
-Person: => ActiveProfessionalLicenseIssueExpDateGroup := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, LicenseDates.LicenseDescription, LicenseDates.Occupation, LicenseDates.LicenseCategory, DataSources.Source, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
+Person: => ActiveProfessionalLicenseIssueExpDateGroup := TOPN(ProfessionalLicensePerson.ProfLic(ValidProfessionalLicense AND IsActive){ProfLicUID := UID, LicenseDates.LicenseDescription, LicenseDates.Occupation, LicenseCategory := MaxLicensecatogory, DataSources.Source, MaxIssueDate := IF(MaxIssueDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxIssueDate, '%Y%m%d')),MaxExpireDate := IF(MaxExpireDate:Null,ProfessionalLicense.REC_FOUND_BUT_INVALID, DATETOSTRING(MaxExpireDate, '%Y%m%d')) }, 1, -MaxIssueDate, -MaxExpireDate);
 Person: => ActiveProfessionalLicenseType := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseDescription, ProfessionalLicense.REC_FOUND_BUT_INVALID));
 Person: => ActiveProfessionalLicenseOccupation := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(Occupation, ProfessionalLicense.REC_FOUND_BUT_INVALID));
 Person: => ActiveProfessionalLicenseCategory := ONLY(ActiveProfessionalLicenseIssueExpDateGroup,IsBlank(LicenseCategory, ProfessionalLicense.REC_FOUND_BUT_INVALID));
@@ -13570,8 +13570,8 @@ Person: => PL_RaAMmbrHHCnt := MAP(P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOU
 														BOUNDSFOLD(COUNT(FirstDegreeRelative.Relative(Person.MembersNotSubject)), 0, 999));
 //Credentialed verification
 
-Person: CREDENTIALED_SOURCES_FCRA :=['AR', 'AM', 'BA', 'CG', 'DA', 'EB', 'EM', 'L2', 'P', 'PL', 'SL', 'VO', 'W'];
-Person: CREDENTIALED_SOURCES :=['AR', 'AM', 'BA', 'CG', 'DA', 'D', 'EB', 'EM', 'FE', 'FF', 'FR', 'L2', 'NT', 'P', 'PL', 'S1', 'SL', 'U', 'V', 'VO', 'W'];
+Person: CREDENTIALED_SOURCES_FCRA :=['AR', 'AM', 'BA', 'CG', 'DA', 'EB', 'E1','E2','E3', 'L2', 'P', 'PL', 'SL', 'VO', 'W'];
+Person: CREDENTIALED_SOURCES :=['AR', 'AM', 'BA', 'CG', 'DA', 'D', 'EB', 'E1','E2','E3', 'FE', 'FF', 'FR', 'L2', 'NT', 'P', 'PL', 'S1', 'SL', 'U', 'V', 'VO', 'W'];
 
 Person: => VerSourceCredentialedListSortedFCRA := VerSourceListSortedFCRA(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES_FCRA);
 Person: => VerSourceCredentialedListSorted := VerSourceListSorted(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES);
@@ -13859,8 +13859,9 @@ Person: => VerOtherSourceGroupListSortedFCRA := TOPN(VerOtherSourceListAllFCRA, 
 Person: => VerOtherSourceGroupListSorted := TOPN(VerOtherSourceListAllNonFCRA, 99, SrcFirstSeenDate);
 
 //FCRA
-Person: => PL_SrcOtherCntEvFCRA := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
-																	BOUNDSFOLD(COUNT(VerOtherSourceListSortedFCRA), 0, 99));
+Person: => PL_SrcOtherCntEvFCRA := MAP(P_LexIDSeenFlag = '0'=>MISSING_INPUT_DATA_INT,
+		NOT EXISTS(VerSourceListSortedFCRA) => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(VerOtherSourceListSortedFCRA), 0, 99));
 
 Person: => PL_SrcOtherListEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA, 
 																	PL_SrcOtherCntEvFCRA < 1 => NO_DATA_FOUND,
@@ -13902,8 +13903,9 @@ Person: => PL_SrcOtherRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_I
 																	CONCAT(VerOtherSourceGroupListSortedFCRA, RecordCount, '|'));																
 																	
 //NonFCRA
-Person: => PL_SrcOtherCntEv := IF(P_LexIDSeenFlag = '0', MISSING_INPUT_DATA_INT,
-																	BOUNDSFOLD(COUNT(VerOtherSourceListSorted), 0, 99));
+Person: => PL_SrcOtherCntEv := MAP(P_LexIDSeenFlag = '0'=> MISSING_INPUT_DATA_INT,
+		NOT EXISTS(VerSourceListSorted) => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(VerOtherSourceListSorted), 0, 99));
 
 Person: => PL_SrcOtherListEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA, 
 																	PL_SrcOtherCntEv < 1 => NO_DATA_FOUND,
@@ -13953,7 +13955,7 @@ Person: => SourceRiskExist5 := IF(EXISTS(VerSourceListSorted (TranslatedSourceCo
 Person: => SourceRiskExist6 := IF(EXISTS(VerSourceListSorted (TranslatedSourceCode IN ['P'])), 1, 0);
 Person: => SourceRiskExist7 := IF(EXISTS(VerSourceListSorted (TranslatedSourceCode IN ['AR', 'W', 'V'])), 1, 0);
 Person: => SourceRiskExist8 := IF(EXISTS(VerSourceListSorted (TranslatedSourceCode IN ['WP'])) OR  EXISTS(PhoneVerSourceListSortedNonFCRA (TranslatedSourceCode   IN ['GO','GN','IP','TG', 'IR','01', '02', '05', 'IO', 'WP', 'PN', 'EQ', 'U', 'P', 
-																								'VO', 'SL', 'PL', 'CY', 'EM', 'W', 'EB', 'VW', 'FF', 'FE', 'DW', 'PQ', 'V', 'D', 'EN', 'WR',
+																								'VO', 'SL', 'PL', 'CY', 'E1','E2','E3', 'W', 'EB', 'VW', 'FF', 'FE', 'DW', 'PQ', 'V', 'D', 'EN', 'WR',
 																								'WO', 'IQ', 'TN', 'TM', 'T$', 'AO', 'L9', 'N2'])) ,1,0);
 Person: => SourceRiskExist9 := IF (PL_BusHdrSeenFlagEv = 1 ,1,0);
 Person: => SourceRiskExistCount := SourceRiskExist1 + SourceRiskExist2 + SourceRiskExist3 + SourceRiskExist4 + SourceRiskExist5 + SourceRiskExist6 + SourceRiskExist7 + SourceRiskExist8 + SourceRiskExist9;
@@ -15958,15 +15960,15 @@ Person: => PL_InpPhoneSrcNewMsncEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhone
 																 BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpPhoneSrcNewDtEv),CURRENT_DATE),0,960));																
 
 // KS-6805
-PersonPhone: => PhoneVerSourceBureauTranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode};
-Person: => PhoneVerSourceBureauListPre := PersonPhone(PhoneIsVerified).PhoneVerSourceBureauTranslatedSources{
+PersonPhone: => PhoneVerSourceTranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode};
+Person: => PhoneVerSourceListPre := PersonPhone(PhoneIsVerified).PhoneVerSourceTranslatedSources{
 	TranslatedSourceCode := TranslatedSourceCode,
 	RecordCount := TranslatedSourceCode:Weight,
 	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), Phone.NO_DATA_FOUND_97),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Phone.CURRENT_DATE), '%Y%m%d'), Phone.NO_DATA_FOUND_97)};
 
-Person: => PhoneVerSourceBureauListSortedNonFCRA := TOPN(PhoneVerSourceBureauListPre(TranslatedSourceCode IN Person.BUREAU_SOURCES), 3, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
-Person: => PhoneVerSourceBureauListSortedFCRA := TOPN(PhoneVerSourceBureauListPre(TranslatedSourceCode IN Person.BUREAU_SOURCES_FCRA), 1, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+Person: => PhoneVerSourceBureauListSortedNonFCRA := TOPN(PhoneVerSourceListPre(TranslatedSourceCode IN Person.BUREAU_SOURCES), 3, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+Person: => PhoneVerSourceBureauListSortedFCRA := TOPN(PhoneVerSourceListPre(TranslatedSourceCode IN Person.BUREAU_SOURCES_FCRA), 1, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 Person: => IsBureauOnlySPhoneVerSourceFCRA := COUNT(PhoneVerSourceListSortedFCRA) = COUNT(PhoneVerSourceBureauListSortedFCRA);
 Person: => IsBureauOnlyPhoneVerSourceNonFCRA := COUNT(PhoneVerSourceListSortedNonFCRA) = COUNT(PhoneVerSourceBureauListSortedNonFCRA);
@@ -16067,13 +16069,8 @@ Person: => PL_InpPhoneSrcBureauFlagEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpC
 		PL_InpPhoneSrcBureauCntEvFCRA = 0 => '0', '1');
 		
 //KS-7482
-Person: => PhoneHeaderOnlyTranslatedSources := DataSources(HeaderHitFlag){TranslatedSourceCode := TranslatedSourceCode,
-	RecordCount := TranslatedSourceCode:Weight,//To be used later
-	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(TranslatedSourceCode:DateFirstSeen, '%Y%m%d'), Phone.NO_DATA_FOUND_97),
-	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Phone.CURRENT_DATE), '%Y%m%d'), Phone.NO_DATA_FOUND_97)};
-
-Person: => PhoneCredSourceListSortedFCRA := TOPN(PhoneHeaderOnlyTranslatedSources(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES_FCRA),	99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
-Person: => PhoneCredSourceListSortedNonFCRA := TOPN(PhoneHeaderOnlyTranslatedSources(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES), 99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+Person: => PhoneCredSourceListSortedFCRA := TOPN(PhoneVerSourceListPre(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES_FCRA),	99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+Person: => PhoneCredSourceListSortedNonFCRA := TOPN(PhoneVerSourceListPre(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES), 99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 Person: => PL_InpPhoneSrcCredCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																PL_InpPhoneSrcCntEv = 0 => NO_DATA_FOUND_INT,
@@ -16114,8 +16111,8 @@ Person: => PL_InpPhoneSrcCredOldMsncEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_Inp
 																 PL_InpPhoneSrcCredOldDtEvFCRA = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
 																 BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpPhoneSrcCredOldDtEvFCRA),CURRENT_DATE),0,960));
 //NonDerog
-Person: => PhoneNonDrgSourceListSortedFCRA := TOPN(PhoneHeaderOnlyTranslatedSources(TranslatedSourceCode IN Person.FCRA_NON_DEROG_VALID_SOURCES), 99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
-Person: => PhoneNonDrgSourceListSortedNonFCRA := TOPN(PhoneHeaderOnlyTranslatedSources(TranslatedSourceCode IN Person.NON_FCRA_NON_DEROG_VALID_SOURCES), 99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+Person: => PhoneNonDrgSourceListSortedFCRA := TOPN(PhoneVerSourceListPre(TranslatedSourceCode IN Person.FCRA_NON_DEROG_VALID_SOURCES), 99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
+Person: => PhoneNonDrgSourceListSortedNonFCRA := TOPN(PhoneVerSourceListPre(TranslatedSourceCode IN Person.NON_FCRA_NON_DEROG_VALID_SOURCES), 99, SourceDateFirstSeen = Phone.NO_DATA_FOUND_97, SourceDateFirstSeen, -SourceDateLastSeen, TranslatedSourceCode);
 
 Person: => PL_InpPhoneSrcNonDrgCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
 																PL_InpPhoneSrcCntEvFCRA = 0 => NO_DATA_FOUND_INT,
