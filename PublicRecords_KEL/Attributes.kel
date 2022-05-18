@@ -18098,3 +18098,31 @@ Person: => PL_SrcBureauOnlyCntEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_D
 		BOUNDSFOLD(COUNT(VerSourceBureauListSorted),0,3));
 
 //KS-7741 END
+
+//KS-2708
+
+AddressPhone: => Phones := PhoneNumber.UID;
+AddressPhone: => PhoneCheck6Months := MONTHSBETWEEN(PhoneNumber:DateFirstSeen,Person.CURRENT_DATE) <= InputPII.SIX_MONTHS AND MONTHSBETWEEN(PhoneNumber:DateFirstSeen,Person.CURRENT_DATE) >=0 AND EXISTS(DataSources(HeaderHitFlag)) AND NOT EXISTS(DataSources(Source IN ['GO','GN', 'PP']));
+AddressPhone: => GongCheck6Months := MONTHSBETWEEN(PhoneNumber:DateFirstSeen, PersonPhone.CURRENT_DATE_GONG) <= InputPII.SIX_MONTHS AND MONTHSBETWEEN(PhoneNumber:DateFirstSeen, PersonPhone.CURRENT_DATE_GONG) >=0 AND EXISTS(DataSources(Source IN ['GO','GN']));
+AddressPhone: => PhonePlusCheck6Months := MONTHSBETWEEN(PhoneNumber:DateFirstSeen, PersonPhone.CURRENT_DATE_PHONESPLUS) <= InputPII.SIX_MONTHS AND MONTHSBETWEEN(PhoneNumber:DateFirstSeen, PersonPhone.CURRENT_DATE_PHONESPLUS) >=0 AND EXISTS(DataSources(Source = 'PP'));
+AddressPhone: => PhoneCheck5Years := MONTHSBETWEEN(PhoneNumber:DateLastSeen, Person.CURRENT_DATE) <= InputPII.FIVE_YEARS_IN_MONTHS AND MONTHSBETWEEN(PhoneNumber:DateLastSeen, Person.CURRENT_DATE) >=0 AND EXISTS(DataSources(HeaderHitFlag)) AND NOT EXISTS(DataSources(Source IN ['GO','GN', 'PP']));
+AddressPhone: => GongCheck5Years := MONTHSBETWEEN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_GONG) <= InputPII.FIVE_YEARS_IN_MONTHS AND MONTHSBETWEEN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_GONG) >=0 AND EXISTS(DataSources(Source IN ['GO','GN']));
+AddressPhone: => PhonePlusCheck5Years := MONTHSBETWEEN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_PHONESPLUS) <= InputPII.FIVE_YEARS_IN_MONTHS AND MONTHSBETWEEN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_PHONESPLUS) >=0 AND EXISTS(DataSources(Source = 'PP'));
+
+InputPII: => PI_PhoneNewPerInpAddrCnt6M := MAP(InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
+		NOT EXISTS(Location.AddressPhone{Phones:DateFirstSeen, Phones:DateLastSeen}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(COUNT(Location.AddressPhone(PhoneCheck6Months OR GongCheck6Months OR PhonePlusCheck6Months){Phones}),0,99));	
+
+InputPII: => PI_PhonePerInpAddrCnt5Y := MAP(InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
+		NOT EXISTS(Location.AddressPhone{Phones:DateFirstSeen, Phones:DateLastSeen}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+		BOUNDSFOLD(COUNT(Location.AddressPhone(PhoneCheck5Years OR GongCheck5Years OR PhonePlusCheck5Years){Phones}),0,99));	
+
+Person: => PL_PhoneNewPerCurrAddrCnt6M := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
+		NOT EXISTS(CurrAddrHelperAttribute.AddressPhone{Phones:DateFirstSeen, Phones:DateLastSeen}) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(CurrAddrHelperAttribute.AddressPhone(PhoneCheck6Months OR GongCheck6Months OR PhonePlusCheck6Months){Phones}),0,99));	
+		
+Person: => PL_PhonePerCurrAddrCnt5Y := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
+		NOT EXISTS(CurrAddrHelperAttribute.AddressPhone{Phones:DateFirstSeen, Phones:DateLastSeen}) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(CurrAddrHelperAttribute.AddressPhone(PhoneCheck5Years OR GongCheck5Years OR PhonePlusCheck5Years){Phones}),0,99));
+
+//END KS-2708
