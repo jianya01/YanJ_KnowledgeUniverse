@@ -18278,3 +18278,35 @@ Person: => PL_PhonePerCurrAddrCnt5Y := MAP(PL_CurrAddrFull IN [MISSING_INPUT_DAT
 		BOUNDSFOLD(COUNT(CurrAddrHelperAttribute.AddressPhone(PhoneCheck5Years OR GongCheck5Years OR PhonePlusCheck5Years){Phones}),0,99));
 
 //END KS-2708
+Person: => EmrgBureauAge := BOUNDSFOLD(IF(NOT BestDOB:Null,ABSYEARSBETWEEN(BestDOB, DATE(PL_SrcBureauOldDtEvNonFCRA)),ABSYEARSBETWEEN(P_InpClnDOBRaw, DATE(PL_SrcBureauOldDtEvNonFCRA))), 0, 120);
+Person: => VerSourceEmrgListSorted := TOPN(VerSourceListSorted, 1, FirstSeenDate, TranslatedSourceCode);
+Person: OTHER_SOURCES := ['AK', 'CY', 'DE', 'EL', 'MW', 'WP'];
+Person: PROP_AIR_WTR := ['P', 'CG', 'EB', 'W', 'AM','AR'];
+Person: DEROG := ['BA', 'L2','FR','NT'];
+Person: EDUCATION := ['S1', 'SL'];
+Person: SPORT := ['E1', 'E2'];
+
+Person: => PL_EmrgBureauAge := MAP(P_LexIDSeenFlag = '0' OR (PL_BestDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] AND P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND])=> Person.MISSING_INPUT_DATA_INT,
+		PL_SrcBureauCntEvNonFCRA = 0 => NO_DATA_FOUND_INT,												
+		NOT BestDOB:Null AND PL_SrcBureauCntEvNonFCRA > 0 AND (PL_SrcBureauOldDtEvNonFCRA = NO_DATA_FOUND_97 OR PL_SrcBureauOldDtEvNonFCRA < STRING(BestDOB)) => NO_DATA_FOUND_97_INT,
+		EmrgBureauAge);
+		
+Person: => PL_EmrgBureauOnlyAge := MAP(P_LexIDSeenFlag = '0' OR (PL_BestDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] AND P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND])=> Person.MISSING_INPUT_DATA_INT,
+		PL_SrcBureauOnlyFlagEvNonFCRA < '1' => NO_DATA_FOUND_INT,												
+		NOT BestDOB:Null AND PL_SrcBureauCntEvNonFCRA > 0 AND (PL_SrcBureauOldDtEvNonFCRA = NO_DATA_FOUND_97 OR PL_SrcBureauOldDtEvNonFCRA < STRING(BestDOB)) => NO_DATA_FOUND_97_INT,
+		EmrgBureauAge);
+		
+Person: => PL_EmrgRecordType := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+		VerSourceEmrgListSorted(TranslatedSourceCode IN Person.BUREAU_SOURCES) => 'C',
+		VerSourceEmrgListSorted(TranslatedSourceCode  IN Person.PROP_AIR_WTR) => 'A',
+		VerSourceEmrgListSorted(TranslatedSourceCode  = 'PL') => 'P',
+		VerSourceEmrgListSorted(TranslatedSourceCode  IN Person.DEROG) => 'D',
+		PL_BusHdrOldDtEv < PL_SrcOldDtEvNonFCRA  => 'B',
+		VerSourceEmrgListSorted(TranslatedSourceCode  IN Person.EDUCATION)=> 'E',
+		VerSourceEmrgListSorted(TranslatedSourceCode  = 'U') => 'U',
+		VerSourceEmrgListSorted(TranslatedSourceCode  IN Person.SPORT) => 'S', 'O');
+		
+Person: => PL_EmrgSourceType := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+		VerSourceEmrgListSorted(TranslatedSourceCode  IN BUREAU_SOURCES )=> '1',
+		VerSourceEmrgListSorted (TranslatedSourceCode IN CREDENTIALED_SOURCES) => '2',
+		VerSourceEmrgListSorted(TranslatedSourceCode  IN OTHER_SOURCES) => '3');
