@@ -4538,16 +4538,16 @@ Phone.DataSources : => TranslatedSourceCode := ConsumerSourceGroup(Source);
 Person: => BestPhoneCandidates := PersonPhone(BestPersonPhoneHitFlag AND NOT PhoneNumber.Phone10:Null){PhoneNumber.Phone10, //Neg means add - in the TopN to find biggest
 						SortCriteria1Neg := DEFAULT(IF(YEARSBETWEEN(MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(PhoneNumber.DataSources,TranslatedSourceCode:DateLastSeen)),D'19000101'),
 						SortCriteria2Neg := COUNT(DataSources{TranslatedSourceCode}),
-						SortCriteria3ANeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen), Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen)),D'19000101'),//Phones Plus
+						SortCriteria3ANeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen), PersonPhone.CURRENT_DATE_PHONESPLUS) < 2,ONLY(PhoneNumber.DataSources(Source = 'PP'),Source:DateLastSeen)),D'19000101'),//Phones Plus
 						// SortCriteria3ANeg := IF(YEARSBETWEEN(MAX(PhoneNumber.DataSources(Source IN Phone.PHONE_PLUS_RAW_SOURCES),Source:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(PhoneNumber.DataSources(Source IN Phone.PHONE_PLUS_RAW_SOURCES),Source:DateLastSeen),DATE('19000000')),//Phones Plus NonFCRA only
 						SortCriteria3BNeg := DEFAULT(IF(YEARSBETWEEN(MAX(DataSources(HeaderHitFlag),TranslatedSourceCode:DateLastSeen),Person.CURRENT_DATE) < 2,MAX(DataSources(HeaderHitFlag),TranslatedSourceCode:DateLastSeen)),D'19000101'),//Header
-						SortCriteria3CNeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'GN'),Source:DateLastSeen),Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'GN'),Source:DateLastSeen)),D'19000101'),//Gong Current
-						SortCriteria3DNeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'GO'),Source:DateLastSeen),Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'GO'),Source:DateLastSeen)),D'19000101'),//Gong History
-						SortCriteria3ENeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'IR'),Source:DateLastSeen),Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'IR'),Source:DateLastSeen)),D'19000101'),//Infutor
+						SortCriteria3CNeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'GN'),Source:DateLastSeen),PersonPhone.CURRENT_DATE_GONG) < 2,ONLY(PhoneNumber.DataSources(Source = 'GN'),Source:DateLastSeen)),D'19000101'),//Gong Current
+						SortCriteria3DNeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'GO'),Source:DateLastSeen),PersonPhone.CURRENT_DATE_GONG) < 2,ONLY(PhoneNumber.DataSources(Source = 'GO'),Source:DateLastSeen)),D'19000101'),//Gong History
+						// SortCriteria3ENeg := DEFAULT(IF(YEARSBETWEEN(ONLY(PhoneNumber.DataSources(Source = 'IR'),Source:DateLastSeen),Person.CURRENT_DATE) < 2,ONLY(PhoneNumber.DataSources(Source = 'IR'),Source:DateLastSeen)),D'19000101'),//Infutor
 						SortCriteria4Neg := DEFAULT(ABS(YEARSBETWEEN(ONLY(PhoneNumber,Phone10:DateFirstSeen), ONLY(PhoneNumber,Phone10:DateLastSeen))),0),
 						SortCriteria5Neg := IF(Subject.P_InpClnPhoneHome:Null, FALSE, PhoneNumber.Phone10 = Subject.P_InpClnPhoneHome)};
-Person: => BestPhoneNonFCRA := ONLY(TOPN(BestPhoneCandidates, 1, -SortCriteria1Neg, -SortCriteria2Neg, -SortCriteria3ANeg,-SortCriteria3BNeg,-SortCriteria3CNeg,-SortCriteria3DNeg,-SortCriteria3ENeg,-SortCriteria4Neg,-SortCriteria5Neg),Phone10);						
-Person: => BestPhoneFCRA := ONLY(TOPN(BestPhoneCandidates, 1, -SortCriteria1Neg, -SortCriteria2Neg, -SortCriteria3BNeg,-SortCriteria3CNeg,-SortCriteria3DNeg,-SortCriteria3ENeg,-SortCriteria4Neg,-SortCriteria5Neg),Phone10);						
+Person: => BestPhoneNonFCRA := ONLY(TOPN(BestPhoneCandidates, 1, -SortCriteria1Neg, -SortCriteria2Neg, -SortCriteria3ANeg,-SortCriteria3BNeg,-SortCriteria3CNeg,-SortCriteria3DNeg,-SortCriteria4Neg,-SortCriteria5Neg),Phone10);						
+Person: => BestPhoneFCRA := ONLY(TOPN(BestPhoneCandidates, 1, -SortCriteria1Neg, -SortCriteria2Neg, -SortCriteria3BNeg,-SortCriteria3CNeg,-SortCriteria3DNeg,-SortCriteria4Neg,-SortCriteria5Neg),Phone10);						
 Person: => PL_BestPhoneHomeFCRA:= MAP(
 			P_LexIDSeenFlagFCRA = '0' => MISSING_INPUT_DATA,
 			BestPhoneFCRA:Null => NO_DATA_FOUND,
@@ -16163,9 +16163,12 @@ PersonSSN: => AgeLastSeen := MONTHSBETWEEN(MIN(Subject:DateLastSeen, Person.CURR
 Person: => PL_AddrNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(PersonAddress) AND NOT EXISTS(PersonAddress{Subject:DateFirstSeen,Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
 																BOUNDSFOLD(COUNT(AddressHierarchySet(MONTHSBETWEEN(HierarchyDateFirstSeen, Person.CURRENT_DATE) <= 6 AND AddressRankBest = 1){AddrFull}),0,99));
+
+Person.UniqueAddresses: => AgeInDaysLastSeen :=ABSDAYSBETWEEN(HierarchyDateLastSeen,Person.CURRENT_DATE);
+Person.UniqueAddresses: => Seen_in_last_five_years := AgeInDaysLastSeen <= FIVE_YEARS_IN_DAYS;
 Person: => PL_AddrCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
-																EXISTS(PersonAddress) AND NOT EXISTS(PersonAddress{Subject:DateFirstSeen,Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(AddressHierarchySet(MONTHSBETWEEN(HierarchyDateFirstSeen, Person.CURRENT_DATE) <= 60 AND AddressRankBest = 1){AddrFull}),0,99));
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT, 
+		BOUNDSFOLD(COUNT(UniqueAddresses(Seen_in_last_five_years)),0,99));
 
 Person: => PL_PhoneNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		EXISTS(PersonPhone) AND NOT EXISTS(PersonPhone{Subject:DateFirstSeen,Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
