@@ -18251,6 +18251,23 @@ Person: => PL_SrcBureauOnlyCntEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_D
 
 //KS-7741 END
 
+//KS-7442
+
+InputPII: => isSI2Source := InputCleanSSN.States(Source = 'SI2');
+InputPII: => SSNVerifySource := InputCleanSSN.States(Source = 'SI2'){Source, 
+						 SI2SourceDateLastSeen := IF(ISVALIDDATE(Source:DateLastSeen),DATETOSTRING(Source:DateLastSeen,'%Y%m%d'),0)};
+
+InputPII: => SSNVerifySourceDateMax := MAX(InputPII.SSNVerifySource, INTEGER(SI2SourceDateLastSeen));
+
+InputPII: => PI_InpSSNIssDtBeforeInpDOBFlag := MAP(InputDOBCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR InputSSNValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+		P_InpValSSNInvalidFlag = '1' => NO_DATA_FOUND,
+		P_InpValSSNBadLenFlagValue = '1' => NO_DATA_FOUND,
+		NOT isSI2Source => NO_DATA_FOUND, 
+		EXISTS(InputPII.SSNVerifySource) AND SSNVerifySourceDateMax < INTEGER(InputPII.InputDOBCleanValue) => '1',
+		0);
+
+//KS-7442 END
+
 //KS-2708
 
 AddressPhone: => Phones := PhoneNumber.UID;
