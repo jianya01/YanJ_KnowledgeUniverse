@@ -71,6 +71,15 @@ FUNCTION: ValidateFlag(STRING FieldToCheck) <=
 	  MAP(FieldToCheck:Null OR FieldToCheck = '' => InputBII.MISSING_INPUT_DATA_INT,
 		fnFilterOutValidChars(UPCASE(TRIMBOTH(FieldToCheck))) = '' => '0',
 	            '1');
+
+FUNCTION: IDABogusNames(STRING sNameFirst, STRING sNameLast) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_name_list(sNameFirst, sNameLast)) FROM PublicRecords_KEL RETURNS STRING;
+FUNCTION: IDABogusCitys(STRING sCity) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_city_list(sCity)) FROM PublicRecords_KEL RETURNS STRING;
+FUNCTION: IDABogusAddress(STRING sAddress, STRING sZip) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_address_list(sAddress, sZip)) FROM PublicRecords_KEL RETURNS STRING;
+FUNCTION: IDABogusPhone(STRING sPhone) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_phone_check(sPhone)) FROM PublicRecords_KEL RETURNS STRING;
+FUNCTION: IDABogusSSN(STRING sSSN) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_ssn_check(sSSN)) FROM PublicRecords_KEL RETURNS STRING;
+
+
+
 FUNCTION: fnBogusNames(STRING sNameFirst, STRING sNameMid, STRING sNameLast) <= ECL(header.BogusNames(sNameFirst, sNameMid, sNameLast)) FROM header RETURNS STRING;
 FUNCTION: fnCleanPhone(STRING P_InpPhoneHome) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Phone(P_InpPhoneHome)) FROM PublicRecords_KEL.ECL_Functions RETURNS BOOLEAN;
 FUNCTION: AppendLocationID(STRING PrimRange, STRING Predir, STRING PrimName, STRING Suffix, STRING Postdir, STRING SecRange, STRING City, STRING State, STRING ZIP) <= 
@@ -1031,7 +1040,8 @@ InputPII: => P_InpValEmailBogusFlagValue := MAP(
 				(InvalidEmail = 1) => 1  //Email Invalid
 				);
 InputPII: => P_InpValNameBogusFlag := MAP(InputFirstNameValue=MISSING_INPUT_DATA AND InputMiddleNameValue=MISSING_INPUT_DATA AND InputLastNameValue=MISSING_INPUT_DATA =>  MISSING_INPUT_DATA,
-				fnBogusNames(UPCASE(P_InpNameFirst),UPCASE(InputMiddleNameValue),UPCASE(InputLastNameValue)) = 1 => 1,0);	
+				fnBogusNames(UPCASE(P_InpNameFirst),UPCASE(InputMiddleNameValue),UPCASE(InputLastNameValue)) = 1 OR (IDABogusNames(UPCASE(P_InpNameFirst),UPCASE(InputLastNameValue)) = 1) => 1
+				,0);	
 InputPII: => P_InpValNameInvalidFlag := MAP(				
 				P_InpClnNameFirstFlagValue=MISSING_INPUT_DATA OR P_InpClnNameLastFlagValue=MISSING_INPUT_DATA => MISSING_INPUT_DATA,
 				P_InpClnNameFirstFlagValue='1' AND P_InpClnNameLastFlagValue='1' => '0',
@@ -2748,7 +2758,7 @@ InputBII: => B_Rep5InpClnDLState := 		AuthRep5.InputDLStateCleanValue;
 InputBII: => B_Rep5InpClnEmail := 			AuthRep5.InputEmailCleanValue;
 /*		Auth Rep Clean Input Attributes		*/
 InputPII: => P_InpValNameBogusFlag6thOnly := MAP(InputFirstNameValue=MISSING_INPUT_DATA AND InputMiddleNameValue=MISSING_INPUT_DATA AND InputLastNameValue=MISSING_INPUT_DATA =>  MISSING_INPUT_DATA,
-				fnBogusNames(UPCASE(P_InpClnNameFirst),UPCASE(P_InpClnNameMid),UPCASE(P_InpClnNameLast)) = 1 => 1,0);	
+				fnBogusNames(UPCASE(P_InpClnNameFirst),UPCASE(P_InpClnNameMid),UPCASE(P_InpClnNameLast)) = 1 OR (IDABogusNames(UPCASE(P_InpClnNameFirst),UPCASE(P_InpClnNameLast)) = 1) => 1,0);	
 				
 InputPII: => InputPrefixCleanValue6thOnly := MAP(P_InpValNameBogusFlag6thOnly = 1 => NO_DATA_FOUND,
 																			NameNotPopulated => MISSING_INPUT_DATA, 
