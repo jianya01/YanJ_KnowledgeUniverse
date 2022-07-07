@@ -14912,7 +14912,7 @@ Person: => PL_InpDOBDayFlag := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB  IN [MIS
 																		0); 
 
 Person: => VersonOneHouseHolds := HouseholdMember(Version = 1).Household;//only 1 household id per version #
-Person: => MembersNotSubject := VersonOneHouseHolds.HouseholdMember.Subject(UID <> Person.UID AND (LexIDSegment = LEXIDCATEGORYCCORENOVSSN OR LexIDSegment = LEXIDCATEGORYCORE)){UID,BestDOBAge};//multiple members per household
+Person: => MembersNotSubject := VersonOneHouseHolds.HouseholdMember.Subject(UID <> Person.UID AND (LexIDSegment = LEXIDCATEGORYCCORENOVSSN OR LexIDSegment = LEXIDCATEGORYCORE)){UID,BestDOBAge,IsBureauOnlySource,PL_SrcBureauCntEvNonFCRA,PL_SrcBureauOldDtEvNonFCRA,PL_SrcBureauOldMsncEvNonFCRA};//multiple members per household
 Person: => HHID :=  ONLY(TOPN(VersonOneHouseHolds{UID}, 1, -UID), UID);
 Person: =>	HHMmbrUnder18Cnt := COUNT(MembersNotSubject(BestDOBAge<18){UID});
 Person: => IsPersonUnder18 := IF((BestDOBAge<18),TRUE,FALSE);
@@ -14933,7 +14933,19 @@ Person: => PL_HHMmbrAge18uCnt := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA
 						(BestDOBAge= 0 OR BestDOBAge:Null) AND ALL(MembersNotSubject,(BestDOBAge=0 OR BestDOBAge:Null))=>NO_DATA_FOUND_97_INT,
 						BOUNDSFOLD(HHMmbrWithSujectUnder18cnt,0,999));
 
+Person: => PL_HHMmbrBureauOnlyCnt1M := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT) => MISSING_INPUT_DATA_INT,
+		PL_HHMmbrCnt = 1 => NO_DATA_FOUND_INT,
+		MembersNotSubject(PL_SrcBureauCntEvNonFCRA > 1 AND IsBureauOnlySource) AND ALL(MembersNotSubject,PL_SrcBureauOldDtEvNonFCRA = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(MembersNotSubject((PL_SrcBureauCntEvNonFCRA > 1 AND IsBureauOnlySource) AND PL_SrcBureauOldMsncEvNonFCRA <= 1)),0,999));
 
+Person: => PL_HHMmbrBureauOnlyCnt6M := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT) => MISSING_INPUT_DATA_INT,
+		PL_HHMmbrCnt = 1 => NO_DATA_FOUND_INT,
+		MembersNotSubject(PL_SrcBureauCntEvNonFCRA > 1 AND IsBureauOnlySource) AND ALL(MembersNotSubject,PL_SrcBureauOldDtEvNonFCRA = NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+		BOUNDSFOLD(COUNT(MembersNotSubject((PL_SrcBureauCntEvNonFCRA > 1 AND IsBureauOnlySource) AND PL_SrcBureauOldMsncEvNonFCRA <= 6)),0,999));
+
+Person: => PL_HHMmbrBureauOnlyCntEv := MAP((P_LexIDSeenFlag = '0' OR PL_HHID = NO_DATA_FOUND_INT) => MISSING_INPUT_DATA_INT,
+		PL_HHMmbrCnt = 1 => NO_DATA_FOUND_INT,
+		BOUNDSFOLD(COUNT(MembersNotSubject(PL_SrcBureauCntEvNonFCRA > 1 AND IsBureauOnlySource)),0,999));
 //Verified current address person
 // KS 3378
 PersonAddress: => CurrentPerfectAddressMatch := ( 
