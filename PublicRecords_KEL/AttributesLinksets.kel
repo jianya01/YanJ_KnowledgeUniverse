@@ -1,0 +1,55 @@
+﻿IMPORT KnowledgeUniverse.PublicRecords_KEL.Entities; 
+IMPORT PublicRecords_KEL.Uses;
+
+IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
+IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
+
+
+// Logic for gathering Inquiry data for Linkset Attribute calculations. 
+Inquiry: => LinksetSource := ONLY(DataSources, Source);
+Inquiry: LINKSET_EVENT_TYPES := ['CAD', 'CAN', 'CANA', 'CANAF', 'CANB', 'CAND', 'CAS'];
+Inquiry: => ValidLinksetSearch :=
+	AgeinDays <= Person.TWO_YEARS_IN_DAYS AND // V2 attributes only look at the past two years. IDA looks at records from the last 5 years for their CAD_SAPE linkage.
+	UPCASE(TRIM(InquiryIndustry)) != '' AND
+	NOT IsCollection AND
+	NOT IsBankoBatch AND
+	NOT IsBatchMonitoringMethod AND
+	InquiryProductCode IN [1,7,9] AND
+	NOT IsChargeBack;
+	
+Inquiry: => ValidLinksetInquiry := 
+	ValidLinksetSearch AND
+	((LinksetSource = 'IQ' AND IsFraudProduct) OR (LinksetSource = 'IDA' AND InquiryEventType IN LINKSET_EVENT_TYPES));
+
+Inquiry: => LinksetLexID := DEFAULT(STRING(ONLY(TOPN(PersonInfo, 1, -LexID), LexID)), '');
+Inquiry: => LinksetAddressRecord := ONLY(TOPN(PersonInfo, 1, -DEFAULT(PrimaryRange, ''), -DEFAULT(Predirectional, ''), -DEFAULT(PrimaryName, ''), -DEFAULT(Suffix, ''), -DEFAULT(Postdirectional, ''), -DEFAULT(ZIP5, ''), -DEFAULT(SecondaryRange, '')));
+Inquiry: => LinksetAddress := fnAddr1FromComponents(
+								DEFAULT(LinksetAddressRecord.PrimaryRange, ''),
+								DEFAULT(LinksetAddressRecord.Predirectional, ''),
+								DEFAULT(LinksetAddressRecord.PrimaryName, ''),
+								DEFAULT(LinksetAddressRecord.Suffix, ''),
+								DEFAULT(LinksetAddressRecord.Postdirectional, ''),
+								'', /*don't care about unit designation*/
+								DEFAULT(LinksetAddressRecord.SecondaryRange, '')) + 
+								' ' + 
+								DEFAULT(TRIM(LinksetAddressRecord.ZIP5), '');
+							
+								
+Inquiry: => LinksetDOB := DEFAULT(STRING(ONLY(TOPN(PersonInfo, 1, -DateOfBirth), DateOfBirth)), '');
+Inquiry: => LinksetEmail := ONLY(TOPN(PersonInfo, 1, -EmailAddress), EmailAddress);
+Inquiry: => LinksetIP := ONLY(TOPN(PersonInfo, 1, IPAddress), IPAddress);
+Inquiry: => LinksetNameRecord := ONLY(TOPN(PersonInfo, 1, -LastName, -FirstName));
+Inquiry: => LinksetName := DEFAULT(TRIM(LinksetNameRecord.FirstName), '') + ' ' + DEFAULT(TRIM(LinksetNameRecord.LastName), '');
+Inquiry: => LinksetPhone := DEFAULT(STRING(ONLY(TOPN(PersonInfo, 1, -PersonalPhoneNumber), PersonalPhoneNumber)), '');
+Inquiry: => LinksetSSN := ONLY(TOPN(PersonInfo, 1, -SSN), SSN);
+Inquiry: => LinksetNetworkID := UID;
+Inquiry.PersonInfo: => AddressTypeDescription := MAP(
+				AddressType = 'S' => 'SINGLE',
+				AddressType = 'HD' => 'APTNOUNIT');
+				
+Inquiry: => LinksetAddressType := ONLY(TOPN(PersonInfo, 1, AddressTypeDescription), AddressTypeDescription);
+// Inquiry: => LinksetHomePhoneType := ONLY(TOPN(PersonInfo, 1,));
+// Inquiry: => LinksetSSNFlag := ONLY(TOPN(PersonInfo, 1,));
+Inquiry: => LinksetIndustry := ONLY(TOPN(BusIntel, 1, -IndustryCode1), IndustryCode1);
+Inquiry: => LinksetApplicationDateTime := UID:DateFirstSeen;
+Inquiry: => LinksetApplicationDate := TimeStampToDate(UID:DateFirstSeen);

@@ -210,13 +210,8 @@ FUNCTION: Fn_Clean_Date_YearValid (STRING DateVar, INTEGER MinDate, INTEGER MaxD
 FUNCTION: Fn_Clean_Date_MonthValid (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].MonthValid) FROM PublicRecords_KEL RETURNS BOOLEAN;
 FUNCTION: Fn_Clean_Date_DayValid (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].DayValid) FROM PublicRecords_KEL RETURNS BOOLEAN;
 FUNCTION: Fn_Clean_Date_ChronStateUnknown (STRING DateVar, INTEGER MinDate, INTEGER MaxDate, BOOLEAN SetDef) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Clean_Date(DateVar, MinDate, MaxDate, SetDef)[1].ChronStateUnknown) FROM PublicRecords_KEL RETURNS BOOLEAN;
-FUNCTION: MillisecondsBetweenTS(TIMESTAMP x, TIMESTAMP y) <= ECL(
-					STD.Date.DaysBetween((INTEGER)((STRING) x)[..8],(INTEGER)((STRING) y)[..8]) * 86400000 +
-					( (INTEGER)((STRING) y)[9..10] - (INTEGER)((STRING) x)[9..10] )*3600000 + 
-					( (INTEGER)((STRING) y)[11..12] - (INTEGER)((STRING) x)[11..12] )*60000 + 
-					( (INTEGER)((STRING) y)[13..14] - (INTEGER)((STRING) x)[13..14] )*1000 + 
-					( (INTEGER)((STRING) y)[15..16] - (INTEGER)((STRING) x)[15..16] ) )RETURNS INTEGER;
-					
+FUNCTION: MillisecondsBetweenTS(TIMESTAMP x, TIMESTAMP y) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.MillisecondsBetweenTS((INTEGER)x, (INTEGER)y)) FROM PublicRecords_KEL RETURNS INTEGER;
+
 /*First Name Matching Logic:
 
 	1. Exact match (Verified)
@@ -18014,44 +18009,6 @@ PersonPhone: => PhonePlusCheck := AgeFirstSeenPhonePlus <= 6 AND AgeFirstSeenPho
 InputPII: => PI_LexIDNewPerInpPhoneCnt6M := MAP(P_InpClnPhoneHomeFlagValue != '1'  => MISSING_INPUT_DATA_INT,
 		EXISTS(InputCleanPhone.PersonPhone) AND NOT EXISTS(InputCleanPhone.PersonPhone{Subject:DateFirstSeen, Subject:DateLastSeen}) => Phone.NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(COUNT(InputCleanPhone.PersonPhone(PhoneCheck OR GongCheck OR PhonePlusCheck){Subject}), 0, 99));
-
-// Logic for gathering Inquiry data for Linkset Attribute calculations. 
-Inquiry: => ValidLinksetInquiry := AgeinDays <= Person.FIVE_YEARS_IN_DAYS;
-
-Inquiry: => LinksetLexID := ONLY(TOPN(PersonInfo, 1, -LexID), LexID);
-Inquiry: => LinksetAddressRecord := ONLY(TOPN(PersonInfo, 1, -DEFAULT(PrimaryRange, ''), -DEFAULT(Predirectional, ''), -DEFAULT(PrimaryName, ''), -DEFAULT(Suffix, ''), -DEFAULT(Postdirectional, ''), -DEFAULT(ZIP5, ''), -DEFAULT(SecondaryRange, '')));
-Inquiry: => LinksetAddress := fnAddr1FromComponents(
-								DEFAULT(LinksetAddressRecord.PrimaryRange, ''),
-								DEFAULT(LinksetAddressRecord.Predirectional, ''),
-								DEFAULT(LinksetAddressRecord.PrimaryName, ''),
-								DEFAULT(LinksetAddressRecord.Suffix, ''),
-								DEFAULT(LinksetAddressRecord.Postdirectional, ''),
-								'', /*don't care about unit designation*/
-								DEFAULT(LinksetAddressRecord.SecondaryRange, '')) + 
-								' ' + 
-								DEFAULT(TRIM(LinksetAddressRecord.ZIP5), '');
-								
-
-								
-Inquiry: => LinksetDOB := ONLY(TOPN(PersonInfo, 1, -DateOfBirth), DateOfBirth);
-Inquiry: => LinksetEmail := ONLY(TOPN(PersonInfo, 1, -EmailAddress), EmailAddress);
-Inquiry: => LinksetIP := ONLY(TOPN(PersonInfo, 1, IPAddress), IPAddress);
-Inquiry: => LinksetNameRecord := ONLY(TOPN(PersonInfo, 1, -LastName, -FirstName));
-Inquiry: => LinksetName := DEFAULT(TRIM(LinksetNameRecord.FirstName), '') + ' ' + DEFAULT(TRIM(LinksetNameRecord.LastName), '');
-Inquiry: => LinksetPhone := ONLY(TOPN(PersonInfo, 1, -PersonalPhoneNumber), PersonalPhoneNumber);
-Inquiry: => LinksetSSN := ONLY(TOPN(PersonInfo, 1, -SSN), SSN);
-Inquiry: => LinksetNetworkID := UID;
-Inquiry.PersonInfo: => AddressTypeDescription := MAP(
-				AddressType = 'S' => 'SINGLE',
-				AddressType = 'HD' => 'APTNOUNIT');
-				
-Inquiry: => LinksetAddressType := ONLY(TOPN(PersonInfo, 1, AddressTypeDescription), AddressTypeDescription);
-// Inquiry: => LinksetHomePhoneType := ONLY(TOPN(PersonInfo, 1,));
-// Inquiry: => LinksetSSNFlag := ONLY(TOPN(PersonInfo, 1,));
-Inquiry: => LinksetIndustry := ONLY(TOPN(BusIntel, 1, -IndustryCode1), IndustryCode1);
-Inquiry: => LinksetApplicationDate := TimeStampToDate(UID:DateFirstSeen);
-// Inquiry: => AgeinDays := ABSDAYSBETWEEN(TimeStampToDate(TransactionID:DateFirstSeen), CURRENT_DATE);
-Inquiry: => LinksetSource := ONLY(DataSources, Source);
 
 Person: => PL_CurrAddrIsSFDFlag := MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA,
 		NOT IsCurrentPostalSource => NO_DATA_FOUND,
