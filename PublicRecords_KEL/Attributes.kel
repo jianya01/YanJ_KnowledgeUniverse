@@ -71,13 +71,12 @@ FUNCTION: ValidateFlag(STRING FieldToCheck) <=
 	  MAP(FieldToCheck:Null OR FieldToCheck = '' => InputBII.MISSING_INPUT_DATA_INT,
 		fnFilterOutValidChars(UPCASE(TRIMBOTH(FieldToCheck))) = '' => '0',
 	            '1');
-
+							
 FUNCTION: IDABogusNames(STRING sNameFirst, STRING sNameLast) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_name_list(sNameFirst, sNameLast)) FROM PublicRecords_KEL RETURNS STRING;
 FUNCTION: IDABogusCitys(STRING sCity) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_city_list(sCity)) FROM PublicRecords_KEL RETURNS STRING;
 FUNCTION: IDABogusAddress(STRING sAddress, STRING sZip) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_address_list(sAddress, sZip)) FROM PublicRecords_KEL RETURNS STRING;
 FUNCTION: IDABogusPhone(STRING sPhone) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_phone_check(sPhone)) FROM PublicRecords_KEL RETURNS STRING;
 FUNCTION: IDABogusSSN(STRING sSSN) <= ECL(PublicRecords_KEL.ECL_Functions.Common_Functions.GetFriv_ssn_check(sSSN)) FROM PublicRecords_KEL RETURNS STRING;
-
 
 
 FUNCTION: fnBogusNames(STRING sNameFirst, STRING sNameMid, STRING sNameLast) <= ECL(header.BogusNames(sNameFirst, sNameMid, sNameLast)) FROM header RETURNS STRING;
@@ -970,6 +969,10 @@ InputPII: => P_InpValSSNBogusFlagValue := MAP(
 				IsBadSSN(NumericSSN) => 1, //SSN in ut.Set_BadSSN
 				0  //SSN not in ut.Set_BadSSN
 				);
+
+InputPII: => P_InpValAddrBogusFlag := MAP(InputStreetValue = MISSING_INPUT_DATA OR InputZipValue = MISSING_INPUT_DATA OR InputCityValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA,
+				IDABogusAddress(P_InpAddrLine1, P_InpAddrZip) = 1 OR IDABogusCitys(P_InpAddrCity) = 1 => '1', '0');
+
 InputPII: => P_InpValSSNNonSSAFlagValue := MAP(
 				InputSSNValue = MISSING_INPUT_DATA => MISSING_INPUT_DATA_INT,  //SSN missing
 				LENGTH(NumericSSN) != 9 => NO_DATA_FOUND_INT,  //No Data found
@@ -9126,7 +9129,7 @@ InputPII: => PI_SrchSSNPerInpAddrCnt6M := MAP(P_InpClnAddrFullFlagValue IN [MISS
 		BOUNDSFOLD(COUNT(GoodInquiriesLastYearForAddress6M{SSN}),0,999));
 InputPII: => PI_SrchSSNPerInpAddrCnt1Y := MAP(P_InpClnAddrFullFlagValue IN [MISSING_INPUT_DATA,'0'] => MISSING_INPUT_DATA_INT,PI_SrchPerInpAddrCnt1Y <1 => NO_DATA_FOUND_INT,
 		BOUNDSFOLD(COUNT(GoodInquiriesLastYearForAddress{SSN}),0,999));
-
+		
 // KS-6160 - EXTENDING WITH KS-966
 InputPII: => GoodInquiriesLastYearForPhone := InputCleanPhone.PhoneInquiry.Transaction(IsValidVelocityInquiryNonFCRA){
 									TransactionID,
