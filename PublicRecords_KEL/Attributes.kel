@@ -1376,6 +1376,7 @@ InputPII: => BestMostRecentPropertyEvent:=ONLY(TOPN(Prop.PropertyEvent(IsDeed OR
 InputPII: => BestMostRecentPropertyEventPurchase:=ONLY(TOPN(Prop.PropertyEvent(IsDeed AND PropertyPurchaseRecord),1 ,-DtFirstSeen));
 InputPII: => ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEvent.MarketTotalValue);
 InputPII: => ModAssesdValue:=IF(BestMostRecentPropertyEvent.AssessedTotalValue:Null OR BestMostRecentPropertyEvent.AssessedTotalValue='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEvent.AssessedTotalValue);
+InputPII: => LandUseCodeValue:=IF(BestMostRecentPropertyEvent.StandardizedLandUseCode:Null OR BestMostRecentPropertyEvent.StandardizedLandUseCode='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE,BestMostRecentPropertyEvent.StandardizedLandUseCode);
 InputPII: => AssesdValueYear:=IF(ISVALIDDATE(BestMostRecentPropertyEvent.AssessedValueYear),DATETOSTRING(BestMostRecentPropertyEvent.AssessedValueYear,'%Y%m%d'),InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE);
 InputPII: => ModSalePrice:=IF(BestMostRecentPropertyEventPurchase.SalePrice:Null OR BestMostRecentPropertyEventPurchase.SalePrice='',InputPII.RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,BestMostRecentPropertyEventPurchase.SalePrice);
 InputPII: => InpAddrPropertyPurchaseRecord:=EXISTS(BestMostRecentPropertyEventPurchase);
@@ -3703,6 +3704,7 @@ Person: =>CurrAddrProp :=TOPN(CurrAddrHelperAttribute.AddressProperty
 			ModMarketValue:=IF(BestMostRecentPropertyEvent.MarketTotalValue:Null OR BestMostRecentPropertyEvent.MarketTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.MarketTotalValue),
 			ModAssesdValue:=IF(BestMostRecentPropertyEvent.AssessedTotalValue:Null OR BestMostRecentPropertyEvent.AssessedTotalValue='',Person.NO_DATA_FOUND_97_INT,BestMostRecentPropertyEvent.AssessedTotalValue),
 			AssesdValueYear :=IF(ISVALIDDATE(BestMostRecentPropertyEvent.AssessedValueYear),DATETOSTRING(BestMostRecentPropertyEvent.AssessedValueYear,'%Y%m%d'),Person.NO_DATA_FOUND_97),
+			LandUseCode:=IF(BestMostRecentPropertyEvent.StandardizedLandUseCode:Null OR BestMostRecentPropertyEvent.StandardizedLandUseCode='',Person.NO_DATA_FOUND_97,BestMostRecentPropertyEvent.StandardizedLandUseCode),
 			BestMostRecentPropertyEvent.DtFirstSeen,
 			BestMostRecentPropertyEvent},1,-DtFirstSeen);			
 Person: =>CurrAddrPropertyPurchaseRecord :=EXISTS(CurrAddrPropPurchase);
@@ -18469,3 +18471,15 @@ Person: => PL_FileAddrSrcCntEvNonFCRA := MAP(PL_CurrAddrSrcCntEv = MISSING_INPUT
 Person: => PL_FileAddrSrcCntEvFCRA := MAP(PL_CurrAddrSrcCntEvFCRA = MISSING_INPUT_DATA_INT OR PL_FileAddrFlagFCRA = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
 		PL_FileAddrFlagFCRA = 0 => NO_DATA_FOUND_INT,
 		BOUNDSFOLD(PL_CurrAddrSrcCntEvFCRA,0,99));
+
+//KS-7696
+Person: =>LandUseCodeValue :=ONLY(CurrAddrProp,LandUseCode);
+InputPII: => PI_InpAddrLandUseCode:=MAP(PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA,
+			NOT InpAddrPropertyRecord => NO_DATA_FOUND,
+			LandUseCodeValue = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+			LandUseCodeValue);
+
+Person: =>PL_CurrAddrLandUseCode :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=> MISSING_INPUT_DATA,
+			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND,
+			LandUseCodeValue = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
+			LandUseCodeValue);
