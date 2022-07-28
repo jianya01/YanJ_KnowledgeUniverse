@@ -16293,7 +16293,8 @@ PersonPhone: => AgeLastSeen := MONTHSBETWEEN(MIN(Subject:DateLastSeen, Person.CU
 PersonSSN: => AgeFirstSeen := MONTHSBETWEEN(Subject:DateFirstSeen,Person.CURRENT_DATE);
 PersonSSN: => AgeLastSeen := MONTHSBETWEEN(MIN(Subject:DateLastSeen, Person.CURRENT_DATE),Person.CURRENT_DATE);
 
-Person.UniqueAddresses: => AgeInDaysLastSeen :=ABSDAYSBETWEEN(HierarchyDateLastSeen,Person.CURRENT_DATE);
+Person.UniqueAddresses: => AgeInDaysLastSeen :=ABSDAYSBETWEEN(MIN(HierarchyDateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE);
+Person.UniqueAddresses: => SeenInLastOneYear := AgeInDaysLastSeen <= ONE_YEAR_IN_DAYS;
 Person.UniqueAddresses: => Seen_in_last_five_years := AgeInDaysLastSeen <= FIVE_YEARS_IN_DAYS;
 Person: => PL_AddrCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT, 
@@ -16321,6 +16322,12 @@ Person: => PL_SSNNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT
 Person: => PL_SSNCnt5Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(PersonSSN) AND NOT EXISTS(PersonSSN{Subject:DateFirstSeen,Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
 																BOUNDSFOLD(COUNT(PersonSSN(AgeLastSeen <= 60 AND AgeLastSeen >= 0 AND EXISTS(DataSources(HeaderHitFlag AND ValidSSN IN ['G','Z','R','O'])))),0,99));
+
+//KS-7986
+Person: => PL_AddrCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+		PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND_INT, 
+		BOUNDSFOLD(COUNT(UniqueAddresses(SeenInLastOneYear)),0,99));
+
 //KS-7498
 Person: => PL_SSNNewCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(PersonSSN) AND NOT EXISTS(PersonSSN{Subject:DateFirstSeen,Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
