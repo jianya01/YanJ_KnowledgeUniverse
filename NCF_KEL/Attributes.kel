@@ -6853,3 +6853,60 @@ CreditReport: => CTotaldeferredSTL := MAP(u_TR_CntrlLevel1 = 0 => DEFAULT_L1,
 // CreditReportNarrativeRemarks: := rCreditReportTradeline.;
 // CreditReportNarrativeRemarks: := rCreditReportTradeline.;
 // CreditReportTradeline: => NarrativeCodes := CreditReportNarrativeRemarks.NarrativeCodes.NarrativeCode;
+
+//5/17/2022, State Regulated attributes, MAgeOldestTrade60M01 and MAvgLifeVlntryClosed60M16_MD
+CreditReport: => u_TR_CntrlLevel1_60M := COUNT(CreditReportTradeline(GMOSDateAccountOpened <= 60)); 
+CreditReport: => u_TR_CntrlLevel2_60M_01 := COUNT(CreditReportTradeline(GMOSDateAccountOpened <= 60)); 
+CreditReport: => u_TR_CntrlLevel31_60M_01 := COUNT(CreditReportTradeline(GMOSDateAccountOpened <= 60 AND NOT G3AllExcluded));
+
+CreditReport: => tmp_MAgeOldestTrade60M01 := MAX(CreditReportTradeline(NOT G3AllExcluded AND GMOSDateAccountOpened >= 0 AND GMOSDateAccountOpened <= 60), GMOSDateAccountOpened);
+
+CreditReport: => MAgeOldestTrade60M01 := IF(tmp_MAgeOldestTrade60M01:Null, MAP(u_TR_CntrlLevel1_60M = 0 => DEFAULT_L1,
+											//u_TR_CntrlLevel2_60M_01 = 0 => DEFAULT_L2,
+											u_TR_CntrlLevel31_60M_01 = 0 => DEFAULT_L3,
+											u_TR_CntrlLevel41o_01 = 0 => DEFAULT_L4,DEFAULT_L4),
+											MIN(tmp_MAgeOldestTrade60M01,CAP_9992));
+
+//tmp_GAvailableDate60M16 means all available dates (not including open date) are in 60 months. 	
+//u_group16 AND (tmp_GMOSOpenToLastPaymentFlag60M OR tmp_GMOSClosedDateFlag60M OR tmp_GMOSDateLastActivityFlag60M OR tmp_GMOSStatusDateFlag60M OR tmp_GMOSDateReportedFlag60M)));
+//******************************************audit********************************************************************//
+CreditReport: => audit1 := SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND tmp_GMOSOpenToLastPaymentFlag60M), MIN(60,GMOSDateAccountOpened)- MIN(60,GMOSLastPaymentDate));
+CreditReport: => audit2 := SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND tmp_GMOSClosedDateFlag60M), MIN(60,GMOSDateAccountOpened) - MIN(60,GMOSClosedDate));
+CreditReport: => audit3 := SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND NOT tmp_GMOSClosedDateFlag60M AND tmp_GMOSDateLastActivityFlag60M), MIN(60,GMOSDateAccountOpened) - MIN(60,GMOSDateLastActivity));
+CreditReport: => audit4 := SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND NOT tmp_GMOSClosedDateFlag60M AND NOT tmp_GMOSDateLastActivityFlag60M AND tmp_GMOSStatusDateFlag60M), MIN(60,GMOSDateAccountOpened) - MIN(60,GMOSStatusDate));
+CreditReport: => audit5 := SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND NOT tmp_GMOSClosedDateFlag60M AND NOT tmp_GMOSDateLastActivityFlag60M AND NOT tmp_GMOSStatusDateFlag60M AND tmp_GMOSDateReportedFlag60M), MIN(60,GMOSDateAccountOpened) - MIN(60,GMOSDateReported));
+
+CreditReportTradeline: => audit1 := NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND tmp_GMOSOpenToLastPaymentFlag60M;
+CreditReportTradeline: => audit2 := NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND tmp_GMOSClosedDateFlag60M;
+CreditReportTradeline: => audit3 := NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND NOT tmp_GMOSClosedDateFlag60M AND tmp_GMOSDateLastActivityFlag60M;
+CreditReportTradeline: => audit4 := NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND NOT tmp_GMOSClosedDateFlag60M AND NOT tmp_GMOSDateLastActivityFlag60M AND tmp_GMOSStatusDateFlag60M;
+CreditReportTradeline: => audit5 := NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND NOT tmp_GMOSClosedDateFlag60M AND NOT tmp_GMOSDateLastActivityFlag60M AND NOT tmp_GMOSStatusDateFlag60M AND tmp_GMOSDateReportedFlag60M;
+
+CreditReport: => u_TR_CntrlLevel1_MD := COUNT(CreditReportTradeline(tmp_GMOSOpenToLastPaymentFlag60M OR tmp_GMOSClosedDateFlag60M OR tmp_GMOSDateLastActivityFlag60M OR tmp_GMOSStatusDateFlag60M OR tmp_GMOSDateReportedFlag60M));
+CreditReport: => u_TR_CntrlLevel2_16_MD := COUNT(CreditReportTradeline(tmp_GMOSOpenToLastPaymentFlag60M OR tmp_GMOSClosedDateFlag60M OR tmp_GMOSDateLastActivityFlag60M OR tmp_GMOSStatusDateFlag60M OR tmp_GMOSDateReportedFlag60M AND u_group16));
+CreditReport: => u_TR_CntrlLevel317_16_MD := COUNT(CreditReportTradeline(tmp_GMOSOpenToLastPaymentFlag60M OR tmp_GMOSClosedDateFlag60M OR tmp_GMOSDateLastActivityFlag60M OR tmp_GMOSStatusDateFlag60M OR tmp_GMOSDateReportedFlag60M AND u_group16 AND NOT G3AllExcluded));
+CreditReport: => MTotLifeVlntryClosedTrades16_MD := IF(tmp_MTotLifeVlntryClosedTrades16_MD = -99999,
+													MAP(u_TR_CntrlLevel1_MD = 0 => DEFAULT_L1,
+														u_TR_CntrlLevel2_16 = 0 => DEFAULT_L2,
+														u_TR_CntrlLevel317_16 = 0 => DEFAULT_L3, DEFAULT_L4),
+													MIN(tmp_MTotLifeVlntryClosedTrades16_MD, CAP_99992));
+//******************************************audit********************************************************************//
+
+													
+CreditReport: => tmp_MTotLifeVlntryClosedTrades16_MD := IF(tmp_GAvailableDate60M16,SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND tmp_GMOSOpenToLastPaymentFlag60M), MIN(60,GMOSDateAccountOpened)- GMOSLastPaymentDate) +
+													 		SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND tmp_GMOSClosedDateFlag60M), MIN(60,GMOSDateAccountOpened) - GMOSClosedDate) +
+															SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND NOT tmp_GMOSClosedDateFlag60M AND tmp_GMOSDateLastActivityFlag60M), MIN(60,GMOSDateAccountOpened) - GMOSDateLastActivity) +
+															SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND NOT tmp_GMOSClosedDateFlag60M AND NOT tmp_GMOSDateLastActivityFlag60M AND tmp_GMOSStatusDateFlag60M), MIN(60,GMOSDateAccountOpened) - GMOSStatusDate) +
+													 		SUM(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed AND u_group16 AND NOT tmp_GMOSOpenToLastPaymentFlag60M AND NOT tmp_GMOSClosedDateFlag60M AND NOT tmp_GMOSDateLastActivityFlag60M AND NOT tmp_GMOSStatusDateFlag60M AND tmp_GMOSDateReportedFlag60M), MIN(60,GMOSDateAccountOpened) - GMOSDateReported), -99999);
+													
+CreditReport: => tmp_CTotLifeVlntryClosedTrades16_MD := COUNT(CreditReportTradeline((tmp_GMOSOpenToLastPaymentFlag60M OR tmp_GMOSClosedDateFlag60M OR tmp_GMOSDateLastActivityFlag60M OR tmp_GMOSStatusDateFlag60M OR tmp_GMOSDateReportedFlag60M) AND u_group16 AND NOT G3AllExcluded AND NOT G2Transferred AND NOT G2Derogatory AND G6Closed));													
+
+CreditReport: => MAvgLifeVlntryClosed16_MD := IF(tmp_MTotLifeVlntryClosedTrades16_MD = -99999,
+													MAP(u_TR_CntrlLevel1_MD = 0 => DEFAULT_L1,
+														u_TR_CntrlLevel2_16 = 0 => DEFAULT_L2,
+														u_TR_CntrlLevel317_16 = 0 => DEFAULT_L3, DEFAULT_L4),
+													MIN(ROUND(tmp_MTotLifeVlntryClosedTrades16_MD/tmp_CTotLifeVlntryClosedTrades16_MD), CAP_99992));
+													
+													
+												
+
