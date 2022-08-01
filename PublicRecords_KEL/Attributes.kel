@@ -634,7 +634,7 @@ InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => ipaddr :
 InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => ipresponse := GET_VALUE(NetAcuityResults, 3);
 InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => iptype := GET_VALUE(NetAcuityResults, 4);
 InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => continent := GET_VALUE(NetAcuityResults, 5);
-InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => state := GET_VALUE(NetAcuityResults, 6);
+InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => ipstate := GET_VALUE(NetAcuityResults, 6);
 InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => topleveldomain := GET_VALUE(NetAcuityResults, 7);
 InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => iproutingmethod := GET_VALUE(NetAcuityResults, 8);
 InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => areacode := GET_VALUE(NetAcuityResults, 9);
@@ -642,6 +642,9 @@ InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => ipdma :=
 InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => iptimezone := GET_VALUE(NetAcuityResults, 11);
 InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => ipconnection := GET_VALUE(NetAcuityResults, 12);
 InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => homebusiness := GET_VALUE(NetAcuityResults, 13);
+InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => iplatitude := GET_VALUE(NetAcuityResults, 14);
+InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => iplongitude := GET_VALUE(NetAcuityResults, 15);
+InputPII: NOT NetAcuityGatewayIP:Null OR NOT NetAcuityGatewayIP = '' => countrycode := GET_VALUE(NetAcuityResults, 16);
 
 
 
@@ -1709,7 +1712,117 @@ InputPII: =>PI_InpSSNDeceasedDt := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPU
 																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
 InputPII: => PI_InpSSNDeceasedMsnc := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 PI_InpSSNDeceasedDt = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,																				
-																			 BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(STRING(PI_InpSSNDeceasedDt), '%Y%m%d'), Person.CURRENT_DATE),0,960));																				
+																			 BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(STRING(PI_InpSSNDeceasedDt), '%Y%m%d'), Person.CURRENT_DATE),0,960));		
+// KS-7275
+InputPII: =>  PI_InpIPAddrDeviceFlag	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						ipaddr = '' => '0',
+																						'1');		
+																						
+InputPII: =>  PI_InpIPAddrReservedFlag	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' => NO_DATA_FOUND,
+																						TRIM(UPCASE(iptype)) = 'RESERVED' => '0',
+																						'1');		
+																						
+InputPII: =>  PI_InpIPAddrContinentCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						continent);
+																						
+InputPII: =>  PI_InpIPAddrState	:= MAP(P_InpClnIPAddrFlagValue <> 1 OR P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						ipstate = '' OR ipstate:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						ipstate);
+																						
+InputPII: =>  PI_InpIPAddrStateMatchFlag	:= MAP(P_InpClnIPAddrFlagValue <> 1 OR P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						ipstate = '' OR ipstate:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						P_InpClnAddrState = ipstate => '1',
+																						'0');
+
+InputPII: =>  PI_InpIPAddrTopLvlDomCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						topleveldomain = '' OR topleveldomain:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						TRIM(UPCASE(topleveldomain)) = 'COM' => '1',
+																						TRIM(UPCASE(topleveldomain)) = 'EDU' => '2',
+																						TRIM(UPCASE(topleveldomain)) = 'GOV' => '3',
+																						TRIM(UPCASE(topleveldomain)) = 'NET' => '4',
+																						TRIM(UPCASE(topleveldomain)) = 'ORG' => '5',
+																						TRIM(UPCASE(topleveldomain)) = 'US' => '6',
+																						TRIM(UPCASE(topleveldomain)) = 'MIL' => '7',
+																						CONTAINS(topleveldomain, '.') => '8',
+																						LENGTH(TRIM(topleveldomain)) < 3 => '9',
+																						'99');
+
+InputPII: =>  PI_InpIPAddrRoutingCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						iproutingmethod = '' OR iproutingmethod:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						iproutingmethod = '02' => '1', // Anonymous, Transparent, or Hosting
+																						iproutingmethod = '03' => '2', // AOL
+																						iproutingmethod = '13' => '3', // Broadband
+																						iproutingmethod = '14' => '4', // Cable
+																						iproutingmethod = '11' => '5', // Default
+																						iproutingmethod = '16' => '6', // Dialup
+																						iproutingmethod = '06' => '7', // Satellite
+																						iproutingmethod = '12' => '8', // T1
+																						iproutingmethod = '10' => '9', // Wireless
+																						'10'); // XDSL
+
+InputPII: =>  PI_InpIPAddrAreaCodeMatchFlag	:= MAP(P_InpClnIPAddrFlagValue <> 1 OR LENGTH(P_InpClnPhoneHome) < 10 OR P_InpClnPhoneHomeFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						areacode = '' OR areacode:Null OR areacode = '0' => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						SUBSTR(P_InpClnPhoneHome, 1, 3) = areacode => '1',
+																						'0');
+																						
+InputPII: =>  PI_InpIPAddrTZCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						iptimezone = '' OR iptimezone:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						iptimezone);
+																						
+InputPII: =>  PI_InpIPAddrHasNonUSTZFlag	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						iptimezone = '' OR iptimezone:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						iptimezone <= -400 AND iptimezone >= -800 => '0',
+																						'1');
+																																									
+InputPII: =>  PI_InpIPAddrConnCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						ipconnection = '' OR ipconnection:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						TRIM(UPCASE(ipconnection)) = 'BROADBAND' => '1',
+																						TRIM(UPCASE(ipconnection)) = 'CABLE' => '2',
+																						TRIM(UPCASE(ipconnection)) = 'DIALUP' => '3',
+																						TRIM(UPCASE(ipconnection)) = 'DSL' => '4',
+																						TRIM(UPCASE(ipconnection)) = 'MOBILE' => '5',
+																						TRIM(UPCASE(ipconnection)) = 'OC12' => '6',
+																						TRIM(UPCASE(ipconnection)) = 'OC3' => '7',
+																						TRIM(UPCASE(ipconnection)) = 'SATELLITE' => '8',
+																						TRIM(UPCASE(ipconnection)) = 'T1' => '9',
+																						TRIM(UPCASE(ipconnection)) = 'T2' => '10',
+																						TRIM(UPCASE(ipconnection)) = 'WIRELESS' => '11',
+																						TRIM(UPCASE(ipconnection)) = 'XDSL' => '12',
+																						'99');
+																						
+InputPII: =>  PI_InpIPAddrHomeBusCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						homebusiness = '' OR homebusiness:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						TRIM(UPCASE(homebusiness)) = 'HOME' => '1',
+																						TRIM(UPCASE(homebusiness)) = 'BUSINESS' => '2',
+																						'0');
+// KS-7984
+InputPII: =>  PI_InpIPAddrCountry	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						countrycode = '' OR countrycode:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						countrycode);
+																						
+InputPII: =>  PI_InpIPAddrNonUS	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
+																						countrycode = '' OR countrycode:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						TRIM(UPCASE(countrycode)) = 'US' => '0',
+																						'1');
+
+InputPII: =>  PI_InpIPAddrToInpAddrDist	:= MAP(P_InpClnIPAddrFlagValue <> 1 OR P_InpClnAddrFullFlagValue <> 1 => MISSING_INPUT_DATA_INT,
+																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' OR P_InpClnAddrLatFlagValue <> 1 OR P_InpClnAddrLngFlagValue <> 1 => NO_DATA_FOUND_INT,
+																						iplatitude = '' OR iplatitude:Null OR iplongitude = '' OR iplongitude:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+																						BOUNDSFOLD(ROUND(Dist(REAL(P_InpClnAddrLat), REAL(P_InpClnAddrLng), REAL(iplatitude), REAL(iplongitude))), 0, 9999));
+																						
 //KS-6266
 InputPII: =>PI_InpAddrStateDLAvailFlag_NonFCRA := MAP(P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 fnInDriversState(P_InpClnAddrState) => 1,
@@ -3454,7 +3567,6 @@ Person: => P_SubjDeceasedMsnc := MAP(P_LexIDIsDeceasedFlag = MISSING_INPUT_DATA 
 //KS-7022											
 Person: => P_RVUnscorableFlag := MAP(P_LexIDSeenFlag  = '1' => '0',
 													'1');
-
 
 /**************************************************************************/
 /*                                                                        */
@@ -9601,6 +9713,26 @@ Person: => PL_STLNewMsnc2Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_IN
 		PL_STLCnt2Y = 0 => NO_DATA_FOUND_INT,
 		PL_STLNewDt2Y = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_STLNewDt2Y), CURRENT_DATE_THRIVE), 0, 24));
+		
+/**************************************************************************/
+/*                                                                        */
+/*                             Person Business                            */
+/*                                                                        */
+/**************************************************************************/
+																 
+// KS-7835
+Person: => PL_BusAddrAddressHierarchyHelper := AddressHierarchySet(AddressRankBest = 1 AND NOT AddressRank IN Person.INVALIDADDRESSRANK);
+Person: => PL_BusAddrAddressHierarchyHelperArchive := PL_BusAddrAddressHierarchyHelper(HierarchyDateFirstSeen <= CURRENTDATE() AND HierarchyDateLastSeen >= CURRENTDATE());
+Person: => PL_BusAddrOnlyCurrFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																				 PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND,
+																				 COUNT(PL_BusAddrAddressHierarchyHelperArchive(AddressType = Person.BUSADDRESSTYPE)) = COUNT(PL_BusAddrAddressHierarchyHelperArchive) => '1',
+																				 '0');
+Person: => PL_BusAddrOnlyFlagEv   := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+																				 PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND,
+																				 COUNT(PL_BusAddrAddressHierarchyHelper(AddressType = Person.BUSADDRESSTYPE)) = COUNT(PL_BusAddrAddressHierarchyHelper) => '1',
+																				 '0');
+
+
 /**************************************************************************/
 /*                                                                        */
 /*                   Business Helper Attributes                           */
