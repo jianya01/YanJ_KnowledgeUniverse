@@ -27,7 +27,7 @@ FUNCTION: NameNotPopulatedCheck(STRING FnameToCheck, STRING MnameToCheck, STRING
 					((FnameToCheck:Null OR FnameToCheck = '') AND (MnameToCheck:Null OR MnameToCheck = '') AND (LnameToCheck:Null OR LnameToCheck = '')), TRUE, FALSE);		
 FUNCTION: IsNotEnoughToClean(STRING FieldToCheck) <= IF(FieldToCheck:Null OR FieldToCheck = '', TRUE, FALSE);
 FUNCTION: IsNotEnoughToCleanInt(STRING FieldToCheck) <= IF(FieldToCheck:Null OR FieldToCheck = 0, TRUE, FALSE);
-					
+FUNCTION: FnStringSequenceCompare(STRING Source, STRING EmailUserName) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_String_Sequence_Compare(Source, EmailUserName)) FROM PublicRecords_KEL RETURNS INTEGER;					
 /* There is a compiler issue being worked on, that doesn't allow us to use the code below. Once the compiler is fixed, we'll use this code vs the above code.
 //https://github.com/hpcc-systems/KEL/issues/2640
 FUNCTION: NameNotPopulatedCheck(STRING FnameToCheck, STRING MnameToCheck, STRING LnameToCheck) <= IF(
@@ -18622,3 +18622,89 @@ Person: =>PL_CurrAddrLandUseCode :=MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean=
 			NOT CurrAddrPropertyRecord =>NO_DATA_FOUND,
 			LandUseCodeValue = NO_DATA_FOUND_97 => NO_DATA_FOUND_97,
 			LandUseCodeValue);
+			
+InputPII: => FNSequenceCompare := FnStringSequenceCompare(UPCASE(InputFirstNameCleanValue), P_InpClnEmailUser);
+InputPII: => LNSequenceCompare := FnStringSequenceCompare(UPCASE(InputLastNameCleanValue), P_InpClnEmailUser);
+InputPII: => ClnAddSt := FilterOut(InputStreetCleanValue, ' ');
+InputPII: => AddStSequenceCompare := FnStringSequenceCompare(UPCASE(ClnAddSt), P_InpClnEmailUser);
+InputPII: => FirstNamematchCheck := IF(FNSequenceCompare = LENGTH(TRIMALL(InputFirstNameCleanValue)),'1','0');
+InputPII: => LastNamematchCheck := IF(LNSequenceCompare = LENGTH(TRIMALL(InputLastNameCleanValue)),'1','0');
+InputPII: => FirstName := UPCASE(SUBSTR(InputFirstNameCleanValue,1,1));
+InputPII: => LastName := UPCASE(SUBSTR(InputLastNameCleanValue,1,1));
+InputPII: => Initials := FirstName+LastName;
+InputPII: => InitialsCheck := IF(FnStringSequenceCompare(Initials, P_InpClnEmailUser) = LENGTH(TRIMALL(Initials)),'1','0');
+InputPII: => PhoneLength := LENGTH(InputHomePhoneCleanValue);
+
+InputPII: => PI_InpEmailHasFNameFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		FirstNamematchCheck = '1' => '1','0');
+InputPII: => PI_InpEmailFNameConsecCharCnt := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(FNSequenceCompare,0,99));
+InputPII: => PI_InpEmailHasFNameFirstCharFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		STARTSWITH(P_InpClnEmailUser, UPCASE(InputFirstNameCleanValue)) => '1','0');
+InputPII: => PI_InpEmailFNameMatchIndx := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		PI_InpEmailHasFNameFlag = '0' AND
+		PI_InpEmailHasFNameFirstCharFlag = '0' AND
+		PI_InpEmailFNameConsecCharCnt = 0 => '0',
+		PI_InpEmailHasFNameFlag = '1' => '5',
+		PI_InpEmailFNameConsecCharCnt >= 5 => '4',
+		PI_InpEmailFNameConsecCharCnt IN [3,4] => '3',
+		PI_InpEmailHasFNameFirstCharFlag = '1' => '2',
+		PI_InpEmailFNameConsecCharCnt IN [1,2] => '1');
+InputPII: => PI_InpEmailHasLNameFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		LastNamematchCheck = '1' => '1','0');
+InputPII: => PI_InpEmailLNameConsecCharCnt := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(LNSequenceCompare,0,99));
+InputPII: => PI_InpEmailHasLNameFirstCharFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		STARTSWITH(P_InpClnEmailUser, UPCASE(InputLastNameCleanValue)) => '1','0');
+InputPII: => PI_InpEmailLNameMatchIndx := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		PI_InpEmailHasLNameFlag = '0' AND
+		PI_InpEmailHasLNameFirstCharFlag = '0' AND
+		PI_InpEmailLNameConsecCharCnt = 0 => '0',
+		PI_InpEmailHasLNameFlag = '1' => '5',
+		PI_InpEmailLNameConsecCharCnt >= 5 => '4',
+		PI_InpEmailLNameConsecCharCnt IN [3,4] => '3',
+		PI_InpEmailHasLNameFirstCharFlag = '1' => '2',
+		PI_InpEmailLNameConsecCharCnt IN [1,2] => '1');
+InputPII: => PI_InpEmailHasInitialsFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		InitialsCheck = '1' => '1','0');
+InputPII: => PI_InpEmailAddrStConsecCharCnt := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnAddrStFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(AddStSequenceCompare,0,99));
+InputPII: => FirstNameCount := MAP(PI_InpEmailFNameConsecCharCnt = 1 AND PI_InpEmailHasFNameFirstCharFlag = '0' => 0, PI_InpEmailFNameConsecCharCnt);
+InputPII: => LastNameCount := MAP(PI_InpEmailLNameConsecCharCnt = 1 AND PI_InpEmailHasLNameFirstCharFlag = '0' => 0, PI_InpEmailLNameConsecCharCnt);
+InputPII: => NamePct := MAP(FirstNameCount = 0 AND LastNameCount = 0 AND PI_InpEmailHasInitialsFlag = '1' => (2/LENGTH(P_InpClnEmailUser))*100,
+		100*((FirstNameCount+LastNameCount)/LENGTH(P_InpClnEmailUser)));
+InputPII: => PI_InpEmailNameFullUserCharPct := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(ROUND(NamePct,2), 0.00,100.00));
+InputPII: => PI_InpEmailHasPhoneAreaCodeFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		CONTAINS(P_InpClnEmailUser, SUBSTR(InputHomePhoneCleanValue,1,3)) => '1','0');
+InputPII: => PI_InpEmailHasPhoneLast4Flag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		IF(PhoneLength = 10,CONTAINS(P_InpClnEmailUser, SUBSTR(InputHomePhoneCleanValue,7,10))) OR 
+		IF(PhoneLength = 7,CONTAINS(P_InpClnEmailUser, SUBSTR(InputHomePhoneCleanValue,4,7)))=>'1','0');
+InputPII: => PI_InpEmailHasPhoneLast7Flag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		IF(PhoneLength = 10,CONTAINS(P_InpClnEmailUser, SUBSTR(InputHomePhoneCleanValue,4,10))) OR 
+		IF(PhoneLength = 7,CONTAINS(P_InpClnEmailUser, SUBSTR(InputHomePhoneCleanValue,1,7)))=>'1','0');
+InputPII: => PI_InpEmailHasPhoneAll10Flag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		IF(PhoneLength = 10,CONTAINS(P_InpClnEmailUser, SUBSTR(InputHomePhoneCleanValue,1,10))) =>'1','0');
+InputPII: => PI_InpEmailPhoneMatchIndx := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		PI_InpEmailHasPhoneAreaCodeFlag = '0' AND 
+		PI_InpEmailHasPhoneLast4Flag = '0' AND 
+		PI_InpEmailHasPhoneLast7Flag = '0' AND 
+		PI_InpEmailHasPhoneAll10Flag = '0' => '0',
+		PI_InpEmailHasPhoneAll10Flag = '1' => '4',
+		PI_InpEmailHasPhoneLast7Flag = '1' => '3', 
+		PI_InpEmailHasPhoneLast4Flag = '1' => '2', 
+		PI_InpEmailHasPhoneAreaCodeFlag = '1' => '1');
+InputPII: => FLAPCntCheck1 := MAP(PI_InpEmailHasPhoneAll10Flag = '1' => 1,0);
+InputPII: => FLAPCntCheck2 := MAP(PI_InpEmailHasFNameFlag = '1' => 1,0);
+InputPII: => FLAPCntCheck3 := MAP(PI_InpEmailHasLNameFlag = '1' => 1,0);
+InputPII: => FLAPCntCheck4 := MAP(PI_InpEmailAddrStConsecCharCnt > 0 => 1,0);
+InputPII: => FLAPLenCheck1 := MAP(PI_InpEmailHasPhoneAll10Flag = '1' => 10,0);
+InputPII: => FLAPLenCheck2 := MAP(PI_InpEmailHasFNameFlag = '1' => PI_InpEmailFNameConsecCharCnt,0);
+InputPII: => FLAPLenCheck3 := MAP(PI_InpEmailHasLNameFlag = '1' => PI_InpEmailLNameConsecCharCnt,0);
+InputPII: => FLAPLenCheck4 := MAP(PI_InpEmailAddrStConsecCharCnt > 0 => PI_InpEmailAddrStConsecCharCnt,0);
+InputPII: => PI_InpEmailFLAPCnt := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnAddrStFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
+		FLAPCntCheck1 + FLAPCntCheck2 + FLAPCntCheck3 + FLAPCntCheck4);
+InputPII: => PI_InpEmailFLAPLen := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnAddrStFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
+		FLAPLenCheck1 + FLAPLenCheck2 + FLAPLenCheck3 + FLAPLenCheck4);
+InputPII: => PI_InpEmailFLAPPct := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnAddrStFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(ROUND((PI_InpEmailFLAPLen/LENGTH(P_InpClnEmailUser))*100,2),0.00,100.00));
