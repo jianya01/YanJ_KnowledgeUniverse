@@ -5921,7 +5921,7 @@ Bankruptcy.Records: => ChildSortList := MAP(
 			7
 			); 
 /*		Create submodel that will only populate the best child.		*/
-Bankruptcy: => BestChildRecord := ONLY(TOPN(Records,1,-DateFiled,-LastStatusUpdate, ChildSortList));
+Bankruptcy: => BestChildRecord := ONLY(TOPN(Records(NOT DispositionTypeDescription = 'FILED_IN_ERROR'),1,-DateFiled,-LastStatusUpdate, ChildSortList));
 
 Bankruptcy: => HasCaseNumber := TRIMALL(CaseNumber) <> '' AND NOT CaseNumber:Null;
 Bankruptcy: => BankruptcyDate := CaseNumber:DateFirstSeen;	
@@ -5950,18 +5950,19 @@ Bankruptcy: => IsBankruptcy := HasCaseNumber AND EXISTS(CaseDetails(CaseID <> ''
 Bankruptcy: => Disposition := DEFAULT(UPCASE(TRIMALL(BestChildRecord.Disposition)), Bankruptcy.NO_DATA_FOUND_97);
 Bankruptcy: => DispositionTypeDescription := DEFAULT(UPCASE(TRIMALL(BestChildRecord.DispositionTypeDescription)), Bankruptcy.NO_DATA_FOUND_97);
 Bankruptcy: => IsDisposed := NOT Disposition = Bankruptcy.NO_DATA_FOUND_97;
-Bankruptcy: => IsDisposedPerson := EditDistanceWithinRadius('DISMISSED', DispositionTypeDescription, 3) OR EditDistanceWithinRadius('DISCHARGED', DispositionTypeDescription, 3);
+Bankruptcy: => IsDisposedPerson := DispositionTypeDescription IN ['DISMISSED','DISCHARGED'];
+
 Bankruptcy: => ModifiedDisposition := MAP(
-			EditDistanceWithinRadius('DISCHARGED', Disposition, 3) => 'DISCHARGED',
-			EditDistanceWithinRadius('DISMISSED', Disposition, 3) => 'DISMISSED',
-			EditDistanceWithinRadius('WITHDRAWN', Disposition, 3) => 'WITHDRAWN',
+			Disposition = 'DISCHARGED' => 'DISCHARGED',
+			Disposition = 'DISMISSED' => 'DISMISSED',
+			Disposition = 'WITHDRAWN' => 'WITHDRAWN',
 			NO_DATA_FOUND_97
 			); 
 			
 Bankruptcy: => ModifiedDispositionPerson := MAP(
-			EditDistanceWithinRadius('DISCHARGED', DispositionTypeDescription, 3) => 'DISCHARGED',
-			EditDistanceWithinRadius('DISMISSED', DispositionTypeDescription, 3) => 'DISMISSED',
-			EditDistanceWithinRadius('OPEN', DispositionTypeDescription, 3) => 'OPEN',
+			DispositionTypeDescription = 'DISCHARGED' => 'DISCHARGED',
+			DispositionTypeDescription = 'DISMISSED' => 'DISMISSED',
+			DispositionTypeDescription = 'OPEN' => 'OPEN',
 			NO_DATA_FOUND_97
 			);			
 			
@@ -5969,29 +5970,27 @@ Bankruptcy: => Banko1Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_
 Bankruptcy: => Banko7Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS;
 Bankruptcy: => Banko10Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TEN_YEARS_IN_DAYS;
 
-Person: => DrgBkCnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko1Year)), 0, 99);			
-Person: => DrgBkCnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko7Year)), 0, 999);
-Person: => DrgBkCnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko10Year)), 0, 999);
+Bankruptcy: => BankoGroup := MAP(DispositionTypeDescription = 'DISCHARGED' => 1,
+                                DispositionTypeDescription = 'OPEN' => 2,
+                                DispositionTypeDescription = 'DISMISSED' => 3,
+                                DispositionTypeDescription = 'DISCHARGE_NA' => 4,
+                                DispositionTypeDescription = 'TRANSFER_OUT' => 5,
+                                DispositionTypeDescription = 'SPLIT_OUT' => 6,
+                                DispositionTypeDescription = 'CONSOLIDATED_OUT' => 7,
+                                DispositionTypeDescription = 'CLOSED' =>8, 9);  
 
-Person: => Ch7Cnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko1Year AND Chapter7)), 0, 99);			
-Person: => Ch7Cnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko7Year AND Chapter7)), 0, 999);
-Person: => Ch7Cnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko10Year AND Chapter7)), 0, 999);
-
-Person: => Ch13Cnt1Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko1Year AND Chapter13)), 0, 99);			
-Person: => Ch13Cnt7Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko7Year AND Chapter13)), 0, 999);
-Person: => Ch13Cnt10Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko10Year AND Chapter13)), 0, 999);
-
-Person: => BkCnt1yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko1Year AND NOT ChapterType)), 0, 99);	
-Person: => BkCnt7yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko7Year AND NOT ChapterType)), 0, 99);
-Person: => BkCnt10yNoChpt := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko10Year AND NOT ChapterType)), 0, 99);
-
-Person: => Bankruptcies := PersonBankruptcy.Bankrupt{
+Person: => BankoDataSet := PersonBankruptcy.Bankrupt{
 			BankruptcyDate,
 			LastStatusUpdate, 
 			DateFiled, 
-			TMSID, 
+			TMSID,
+			IsDisposedPerson,
+			IsBankruptcy,
 			CourtCode, 
 			CaseNumber,
+			ChapterType,
+			Chapter7,
+			Chapter13,
 			OriginalChapter,
 			ModifiedDisposition,
 			ModifiedDispositionPerson,
@@ -6001,7 +6000,30 @@ Person: => Bankruptcies := PersonBankruptcy.Bankrupt{
 			Banko1Year,
 			Banko7Year,
 			Banko10Year,
-			StatusUpdateAgeInDays};
+			StatusUpdateAgeInDays,
+			BankoGroup
+			};
+	
+Person: => Bankruptcies := Sequence.Dedup(
+         BankoDataSet,
+         LEFT.BankruptcyDate = RIGHT.BankruptcyDate,
+         BankruptcyDate, BankoGroup);
+				 
+Person: => DrgBkCnt1Y := BOUNDSFOLD(COUNT(Bankruptcies(Banko1Year)), 0, 99);			
+Person: => DrgBkCnt7Y := BOUNDSFOLD(COUNT(Bankruptcies(Banko7Year)), 0, 999);
+Person: => DrgBkCnt10Y := BOUNDSFOLD(COUNT(Bankruptcies(Banko10Year)), 0, 999);
+
+Person: => Ch7Cnt1Y := BOUNDSFOLD(COUNT(Bankruptcies(Banko1Year AND Chapter7)), 0, 99);			
+Person: => Ch7Cnt7Y := BOUNDSFOLD(COUNT(Bankruptcies(Banko7Year AND Chapter7)), 0, 999);
+Person: => Ch7Cnt10Y := BOUNDSFOLD(COUNT(Bankruptcies(Banko10Year AND Chapter7)), 0, 999);
+
+Person: => Ch13Cnt1Y := BOUNDSFOLD(COUNT(Bankruptcies(Banko1Year AND Chapter13)), 0, 99);			
+Person: => Ch13Cnt7Y := BOUNDSFOLD(COUNT(Bankruptcies(Banko7Year AND Chapter13)), 0, 999);
+Person: => Ch13Cnt10Y := BOUNDSFOLD(COUNT(Bankruptcies(Banko10Year AND Chapter13)), 0, 999);
+
+Person: => BkCnt1yNoChpt := BOUNDSFOLD(COUNT(Bankruptcies(Banko1Year AND NOT ChapterType)), 0, 99);	
+Person: => BkCnt7yNoChpt := BOUNDSFOLD(COUNT(Bankruptcies(Banko7Year AND NOT ChapterType)), 0, 99);
+Person: => BkCnt10yNoChpt := BOUNDSFOLD(COUNT(Bankruptcies(Banko10Year AND NOT ChapterType)), 0, 99);		
 
 Person: => MostRecentBankruptcy1Y := ONLY(TOPN(Bankruptcies(Banko1Year), 1, -BankruptcyDate, -LastStatusUpdate, -DateFiled));
 Person: => MostRecentBankruptcy7Y := ONLY(TOPN(Bankruptcies(Banko7Year), 1, -BankruptcyDate, -LastStatusUpdate, -DateFiled));
@@ -6015,13 +6037,13 @@ Person: => MostRecentChapter1Y := MostRecentBankruptcy1Y.OriginalChapter;
 Person: => MostRecentChapter7Y := MostRecentBankruptcy7Y.OriginalChapter;
 Person: => MostRecentChapter10Y := MostRecentBankruptcy10Y.OriginalChapter;
 
-Person: => BkCnt1YFilingTypeAllNull := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko1Year AND FilingType = Bankruptcy.NO_DATA_FOUND_97)), 0, 99);	
-Person: => BkCnt7YFilingTypeAllNull := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko7Year AND FilingType = Bankruptcy.NO_DATA_FOUND_97)), 0, 999);	
-Person: => BkCnt10YFilingTypeAllNull := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko10Year AND FilingType = Bankruptcy.NO_DATA_FOUND_97)), 0, 999);	
+Person: => BkCnt1YFilingTypeAllNull := BOUNDSFOLD(COUNT(Bankruptcies(Banko1Year AND FilingType = Bankruptcy.NO_DATA_FOUND_97)), 0, 99);	
+Person: => BkCnt7YFilingTypeAllNull := BOUNDSFOLD(COUNT(Bankruptcies(Banko7Year AND FilingType = Bankruptcy.NO_DATA_FOUND_97)), 0, 999);	
+Person: => BkCnt10YFilingTypeAllNull := BOUNDSFOLD(COUNT(Bankruptcies(Banko10Year AND FilingType = Bankruptcy.NO_DATA_FOUND_97)), 0, 999);	
 
-Person: => BkCnt1YBusinessType := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko1Year AND FilingType = 'B')), 0, 99);	
-Person: => BkCnt7YBusinessType := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko7Year AND FilingType = 'B')), 0, 999);	
-Person: => BkCnt10YBusinessType := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko10Year AND FilingType = 'B')), 0, 999);	
+Person: => BkCnt1YBusinessType := BOUNDSFOLD(COUNT(Bankruptcies(Banko1Year AND FilingType = 'B')), 0, 99);	
+Person: => BkCnt7YBusinessType := BOUNDSFOLD(COUNT(Bankruptcies(Banko7Year AND FilingType = 'B')), 0, 999);	
+Person: => BkCnt10YBusinessType := BOUNDSFOLD(COUNT(Bankruptcies(Banko10Year AND FilingType = 'B')), 0, 999);	
 
 Bankruptcy: => Banko1YearUpdateFilter := StatusUpdateAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS AND LastStatusUpdate <= Bankruptcy.CURRENT_DATE;
 Bankruptcy: => Banko7YearUpdateFilter := StatusUpdateAgeInDays <= Bankruptcy.SEVEN_YEARS_IN_DAYS AND LastStatusUpdate <= Bankruptcy.CURRENT_DATE;
@@ -6052,23 +6074,41 @@ Person: => PL_DrgBkCnt1Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_D
 Person: => PL_DrgBkCnt7Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, DrgBkCnt7Y);
 Person: => PL_DrgBkCnt10Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, DrgBkCnt10Y);
 
-Person: => PL_DrgBkDtList1Y := CONCAT(SortedBankruptcies1Y, DATETOSTRING(BankruptcyDate, '%Y%m%d'), '|');
-Person: => PL_DrgBkDtList7Y := CONCAT(SortedBankruptcies7Y, DATETOSTRING(BankruptcyDate, '%Y%m%d'), '|');
-Person: => PL_DrgBkDtList10Y := CONCAT(SortedBankruptcies10Y, DATETOSTRING(BankruptcyDate, '%Y%m%d'), '|');
+Person: => PL_DrgBkDtList1Y := MAP(P_LexIDSeenFlag = '0'=> Bankruptcy.MISSING_INPUT_DATA,
+		PL_DrgBkCnt1Y = 0 => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+		CONCAT(SortedBankruptcies1Y, DATETOSTRING(BankruptcyDate, '%Y%m%d'), '|'));
+Person: => PL_DrgBkDtList7Y := MAP(P_LexIDSeenFlag = '0'=> Bankruptcy.MISSING_INPUT_DATA,
+		PL_DrgBkCnt7Y = 0 => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+		CONCAT(SortedBankruptcies7Y, DATETOSTRING(BankruptcyDate, '%Y%m%d'), '|'));
+Person: => PL_DrgBkDtList10Y := MAP(P_LexIDSeenFlag = '0'=> Bankruptcy.MISSING_INPUT_DATA,
+		PL_DrgBkCnt10Y = 0 => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+		CONCAT(SortedBankruptcies10Y, DATETOSTRING(BankruptcyDate, '%Y%m%d'), '|'));
 
-Person: => DrgBkNewDt1Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt(Banko1Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => DrgBkNewDt7Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt(Banko7Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => DrgBkNewDt10Y := IsBlank(STRING(MAX(PersonBankruptcy.Bankrupt(Banko10Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => DrgBkOldDt1Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt(Banko1Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => DrgBkOldDt7Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt(Banko7Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
-Person: => DrgBkOldDt10Y := IsBlank(STRING(MIN(PersonBankruptcy.Bankrupt(Banko10Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => DrgBkNewDt1Y := IsBlank(STRING(MAX(Bankruptcies(Banko1Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => DrgBkNewDt7Y := IsBlank(STRING(MAX(Bankruptcies(Banko7Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => DrgBkNewDt10Y := IsBlank(STRING(MAX(Bankruptcies(Banko10Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => DrgBkOldDt1Y := IsBlank(STRING(MIN(Bankruptcies(Banko1Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => DrgBkOldDt7Y := IsBlank(STRING(MIN(Bankruptcies(Banko7Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
+Person: => DrgBkOldDt10Y := IsBlank(STRING(MIN(Bankruptcies(Banko10Year), BankruptcyDate)), Bankruptcy.NO_DATA_FOUND_BANKRUPTCY);
 
-Person: => PL_DrgBkNewDt1Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, DrgBkNewDt1Y);
-Person: => PL_DrgBkNewDt7Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, DrgBkNewDt7Y);
-Person: => PL_DrgBkNewDt10Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, DrgBkNewDt10Y);
-Person: => PL_DrgBkOldDt1Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, DrgBkOldDt1Y);
-Person: => PL_DrgBkOldDt7Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, DrgBkOldDt7Y);
-Person: => PL_DrgBkOldDt10Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA, DrgBkOldDt10Y);
+Person: => PL_DrgBkNewDt1Y := MAP(P_LexIDSeenFlag = '0'=> Bankruptcy.MISSING_INPUT_DATA,
+		PL_DrgBkCnt1Y = 0 => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+		DrgBkNewDt1Y);
+Person: => PL_DrgBkNewDt7Y := MAP(P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA, 
+		PL_DrgBkCnt7Y = 0 => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+		DrgBkNewDt7Y);
+Person: => PL_DrgBkNewDt10Y := MAP(P_LexIDSeenFlag = '0'=> Bankruptcy.MISSING_INPUT_DATA,
+		PL_DrgBkCnt10Y = 0 => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+		DrgBkNewDt10Y);
+Person: => PL_DrgBkOldDt1Y := MAP(P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA, 
+		PL_DrgBkCnt1Y = 0 => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,		
+		DrgBkOldDt1Y);
+Person: => PL_DrgBkOldDt7Y := MAP(P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA, 
+		PL_DrgBkCnt7Y = 0 => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+		DrgBkOldDt7Y);
+Person: => PL_DrgBkOldDt10Y := MAP(P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA, 
+		PL_DrgBkCnt10Y = 0 => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+		DrgBkOldDt10Y);
 
 Person: => PL_DrgBkNewMsnc1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
@@ -6095,9 +6135,18 @@ Person: => PL_DrgBkOldMsnc10Y := MAP(
 			DrgBkOldDt10Y = Bankruptcy.NO_DATA_FOUND_BANKRUPTCY => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(DrgBkOldDt10Y), Bankruptcy.CURRENT_DATE), 0, 120));	
 			
-Person: => PL_DrgBkChList1Y := CONCAT(SortedBankruptcies1Y, OriginalChapter, '|');
-Person: => PL_DrgBkChList7Y := CONCAT(SortedBankruptcies7Y, OriginalChapter, '|');
-Person: => PL_DrgBkChList10Y := CONCAT(SortedBankruptcies10Y, OriginalChapter, '|');
+Person: => PL_DrgBkChList1Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			CONCAT(SortedBankruptcies1Y, OriginalChapter, '|'));
+Person: => PL_DrgBkChList7Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			CONCAT(SortedBankruptcies7Y, OriginalChapter, '|'));
+Person: => PL_DrgBkChList10Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			CONCAT(SortedBankruptcies10Y, OriginalChapter, '|'));
 Person: => PL_DrgBkNewChType1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
@@ -6215,9 +6264,19 @@ Person: => PL_DrgBkUpdtNewMsnc10Y := MAP(
 			(DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			(MostRecentUpdate10Y:Null) => Bankruptcy.NO_DATA_FOUND_97,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentUpdate10Y), Bankruptcy.CURRENT_DATE), 0, 120)); 
-Person: => PL_DrgBkDispList1Y := CONCAT(SortedBankruptcies1Y, DispositionTypeDescription, '|');
-Person: => PL_DrgBkDispList7Y := CONCAT(SortedBankruptcies7Y, DispositionTypeDescription, '|');
-Person: => PL_DrgBkDispList10Y := CONCAT(SortedBankruptcies10Y, DispositionTypeDescription, '|');
+Person: => PL_DrgBkDispList1Y :=  MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			CONCAT(SortedBankruptcies1Y, DispositionTypeDescription, '|'));
+Person: => PL_DrgBkDispList7Y :=  MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			CONCAT(SortedBankruptcies7Y, DispositionTypeDescription, '|'));
+Person: => PL_DrgBkDispList10Y :=  MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			CONCAT(SortedBankruptcies10Y, DispositionTypeDescription, '|'));
+
 
 Person: => PL_DrgBkNewDispType1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
@@ -6231,6 +6290,10 @@ Person: => PL_DrgBkNewDispType10Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
 			MostRecentDispo10Y);
+			
+			
+			
+			
 Person: => PL_DrgBkNewDispDt1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
 			(DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
@@ -6265,49 +6328,58 @@ Person: => PL_DrgBkNewDispMsnc10Y := MAP(
 Person: => PL_DrgBkDispCnt1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko1Year AND IsDisposedPerson)), 0, 99));
+			BOUNDSFOLD(COUNT(Bankruptcies(Banko1Year AND IsDisposedPerson)), 0, 99));
 Person: => PL_DrgBkDispCnt7Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(DrgBkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko7Year AND IsDisposedPerson)), 0, 999));
+			BOUNDSFOLD(COUNT(Bankruptcies(Banko7Year AND IsDisposedPerson)), 0, 999));
 Person: => PL_DrgBkDispCnt10Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko10Year AND IsDisposedPerson)), 0, 999));
+			BOUNDSFOLD(COUNT(Bankruptcies(Banko10Year AND IsDisposedPerson)), 0, 999));
 Person: => PL_DrgBkDsmsCnt1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(DrgBkCnt1Y > 0 AND PL_DrgBkDispCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko1Year AND ModifiedDispositionPerson = 'DISMISSED')), 0, 99)); 
+			BOUNDSFOLD(COUNT(Bankruptcies(Banko1Year AND ModifiedDispositionPerson = 'DISMISSED')), 0, 99)); 
 Person: => PL_DrgBkDsmsCnt7Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(DrgBkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(DrgBkCnt7Y > 0 AND PL_DrgBkDispCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko7Year AND ModifiedDispositionPerson = 'DISMISSED')), 0, 999)); 
+			BOUNDSFOLD(COUNT(Bankruptcies(Banko7Year AND ModifiedDispositionPerson = 'DISMISSED')), 0, 999)); 
 Person: => PL_DrgBkDsmsCnt10Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(DrgBkCnt10Y > 0 AND PL_DrgBkDispCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko10Year AND ModifiedDispositionPerson = 'DISMISSED')), 0, 999)); 
+			BOUNDSFOLD(COUNT(Bankruptcies(Banko10Year AND ModifiedDispositionPerson = 'DISMISSED')), 0, 999)); 
 Person: => PL_DrgBkDschCnt1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(DrgBkCnt1Y > 0 AND PL_DrgBkDispCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko1Year AND ModifiedDispositionPerson = 'DISCHARGED')), 0, 99));
+			BOUNDSFOLD(COUNT(Bankruptcies(Banko1Year AND ModifiedDispositionPerson = 'DISCHARGED')), 0, 99));
 Person: => PL_DrgBkDschCnt7Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(DrgBkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(DrgBkCnt7Y > 0 AND PL_DrgBkDispCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko7Year AND ModifiedDispositionPerson = 'DISCHARGED')), 0, 999)); 
+			BOUNDSFOLD(COUNT(Bankruptcies(Banko7Year AND ModifiedDispositionPerson = 'DISCHARGED')), 0, 999)); 
 Person: => PL_DrgBkDschCnt10Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
 			(DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			(DrgBkCnt10Y > 0 AND PL_DrgBkDispCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
-			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko10Year AND ModifiedDispositionPerson = 'DISCHARGED')), 0, 999)); 
+			BOUNDSFOLD(COUNT(Bankruptcies(Banko10Year AND ModifiedDispositionPerson = 'DISCHARGED')), 0, 999)); 
 			
-Person: => PL_DrgBkTypeList1Y := CONCAT(SortedBankruptcies1Y, FilingType, '|');			
-Person: => PL_DrgBkTypeList7Y := CONCAT(SortedBankruptcies7Y, FilingType, '|');			
-Person: => PL_DrgBkTypeList10Y := CONCAT(SortedBankruptcies10Y, FilingType, '|');	
+Person: => PL_DrgBkTypeList1Y :=  MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt1Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			CONCAT(SortedBankruptcies1Y, FilingType, '|'));			
+Person: => PL_DrgBkTypeList7Y :=  MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt7Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			CONCAT(SortedBankruptcies7Y, FilingType, '|'));			
+Person: => PL_DrgBkTypeList10Y :=  MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			CONCAT(SortedBankruptcies10Y, FilingType, '|'));	
 
 Person: => PL_DrgBkBusFlag1Y := MAP(
 			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
@@ -9499,7 +9571,7 @@ Person: =>  PL_DrgLienCnt1YF1Y :=IF(P_InpClnArchDtF1YRaw IN [MISSING_INPUT_DATA,
 																			BOUNDSFOLD(COUNT(AllLienData( WithinF1Y(OriginalFilingDate, CURRENTDATE()) AND  IsOverAllLien = TRUE) ),0,999));											
 
 Person: =>  PL_DrgBkCnt1YF1Y := IF(P_InpClnArchDtF1YRaw IN [MISSING_INPUT_DATA,NO_DATA_FOUND], Bankruptcy.MISSING_INPUT_DATA_INT,
-																			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(WithinF1Y(DateFiled, CURRENTDATE()) AND IsBankruptcy)), 0, 999));			
+																			BOUNDSFOLD(COUNT(Bankruptcies(WithinF1Y(DateFiled, CURRENTDATE()) AND IsBankruptcy)), 0, 999));			
 
 Person: =>  PL_DrgLTD1YF1Y := IF(P_InpClnArchDtF1YRaw IN [MISSING_INPUT_DATA,NO_DATA_FOUND], LienJudgment.MISSING_INPUT_DATA_INT,
 																				BOUNDSFOLD(COUNT(AllLienData(WithinF1Y(OriginalFilingDate, CURRENTDATE()) AND  IsLandlordTenantDispute = TRUE) ),0,999));
@@ -11115,7 +11187,7 @@ BusinessSele: => BE_DrgBkUpdtNewMsnc10Y := MAP(B_LexIDLegalSeenFlag = '0' OR Sel
 			                                     BOUNDSFOLD(MONTHSBETWEEN(DATE(MostRecentUpdate10Y), ONLY(SeleBankruptcy.Bankrupt, CURRENT_DATE)), 0, 120)); 
 BusinessSele: => BE_DrgBkDispCnt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
 			                                 (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
-		                                  	BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(Banko10Year AND IsDisposed)), 0, 999));			
+		                                  	BOUNDSFOLD(COUNT(SeleBankruptcy.Bankrupt(Banko10Year AND IsDisposedPerson)), 0, 999));			
 BusinessSele: => BE_DrgBkDschCnt10Y := MAP(B_LexIDLegalSeenFlag = '0' OR SeleID = Bankruptcy.MISSING_INPUT_DATA => Bankruptcy.MISSING_INPUT_DATA_INT,
                                       (BE_DrgBkCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
 			                                (BE_DrgBkCnt10Y > 0 AND BE_DrgBkDispCnt10Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
@@ -16512,7 +16584,7 @@ Person: => PL_EmailNewCnt6MFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DA
 
 //KS-7622
 Person.ReportedDatesOfBirth: => AgeFirstSeen := MONTHSBETWEEN(DateOfBirth:DateFirstSeen,Person.CURRENT_DATE);
-Person.ReportedDatesOfBirth: => AgeLastSeen := MONTHSBETWEEN(DateOfBirth:DateLastSeen,Person.CURRENT_DATE);
+Person.ReportedDatesOfBirth: => AgeLastSeen := MONTHSBETWEEN(MIN(DateOfBirth:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE);
 Person: => PL_DOBCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(ReportedDatesOfBirth) AND NOT EXISTS(ReportedDatesOfBirth{DateOfBirth:DateFirstSeen,DateOfBirth:DateLastSeen}) => NO_DATA_FOUND_97_INT,
 																BOUNDSFOLD(COUNT(ReportedDatesOfBirth(AgeLastSeen <= 12 AND AgeLastSeen >= 0 AND HeaderHitFlag)),0,99));
@@ -16523,7 +16595,7 @@ Person: => PL_DOBNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT
 Person: => LastNameDataSet := FullName{LastName, HeaderHitFlag};
 Person: => PL_NameLastCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(LastNameDataSet) AND NOT EXISTS(LastNameDataSet{LastName:DateFirstSeen,LastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(LastName:DateLastSeen,Person.CURRENT_DATE) <= 12 AND MONTHSBETWEEN(LastName:DateLastSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,99));
+																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(MIN(LastName:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE) <= 12 AND MONTHSBETWEEN(MIN(LastName:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,99));
 Person: => PL_NameLastNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(LastNameDataSet) AND NOT EXISTS(LastNameDataSet{LastName:DateFirstSeen,LastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
 																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) <= 6 AND MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,99));		
@@ -16532,7 +16604,7 @@ PersonSSN: => SSNMatch := Social = Subject.PII.P_InpClnSSN;
 Person: => SSNLastNameDataSet:= PersonSSN(SSNMatch).Subject.FullName{LastName, HeaderHitFlag};
 Person: => PI_NameLastPerInpSSNCnt1Y := MAP(P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
 																EXISTS(SSNLastNameDataSet) AND NOT EXISTS(SSNLastNameDataSet{LastName:DateFirstSeen,LastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(SSNLastNameDataSet(MONTHSBETWEEN(LastName:DateLastSeen,Person.CURRENT_DATE) <= 12 AND MONTHSBETWEEN(LastName:DateLastSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,99));
+																BOUNDSFOLD(COUNT(SSNLastNameDataSet(MONTHSBETWEEN(MIN(LastName:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE) <= 12 AND MONTHSBETWEEN(MIN(LastName:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,99));
 Person: => PI_NameLastPerInpSSNNewCnt6M := MAP(P_InpClnSSNFlagValue != '1' => MISSING_INPUT_DATA_INT,
 																EXISTS(SSNLastNameDataSet) AND NOT EXISTS(SSNLastNameDataSet{LastName:DateFirstSeen,LastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
 																BOUNDSFOLD(COUNT(SSNLastNameDataSet(MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) <= 6 AND MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,99));	
@@ -18484,7 +18556,7 @@ InputPII: => PI_LexIDPerInpSSNCnt1Y := MAP(InputSSNCleanValue IN [MISSING_INPUT_
 
 Person: => PL_LexIDPerBestSSNCnt1Y := MAP(PL_BestSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
 		EXISTS(PersonSSN(SSNBestMatch AND EXISTS(DataSources(HeaderHitFlag) ))) AND NOT EXISTS(PersonSSN{Subject:DateFirstSeen, Subject:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-		BOUNDSFOLD(COUNT(PersonSSN(SSNBestMatch AND MONTHSBETWEEN(Subject:DateLastSeen,Subject.CURRENT_DATE) <= InputPII.ONE_YEAR_IN_MONTHS AND MONTHSBETWEEN(Subject:DateLastSeen,Subject.CURRENT_DATE) >= 0 AND EXISTS(DataSources(HeaderHitFlag))){Subject}),0,99));
+		BOUNDSFOLD(COUNT(PersonSSN(SSNBestMatch AND MONTHSBETWEEN(MIN(Subject:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE) <= InputPII.ONE_YEAR_IN_MONTHS AND MONTHSBETWEEN(MIN(Subject:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE) >= 0 AND EXISTS(DataSources(HeaderHitFlag))){Subject}),0,99));
 
 PersonPhone: => PhoneCheckAgeLastSeen1Year := AgeLastSeen <= 12 AND AgeLastSeen >= 0 AND EXISTS(DataSources(HeaderHitFlag));
 PersonPhone: => GongCheckAgeLastSeen1Year := AgeLastSeenGong <= 12 AND AgeLastSeenGong >= 0 AND EXISTS(DataSources(Source IN ['GO','GN']));
@@ -18539,9 +18611,9 @@ AddressPhone: => PhonePlusCheck6Months := MONTHSBETWEEN(PhoneNumber:DateFirstSee
 AddressPhone: => PhoneCheck1YearDateLastSeen := MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen,Person.CURRENT_DATE), Person.CURRENT_DATE) <= InputPII.ONE_YEAR_IN_MONTHS AND MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen,Person.CURRENT_DATE), Person.CURRENT_DATE) >=0 AND EXISTS(DataSources(HeaderHitFlag)) AND NOT EXISTS(DataSources(Source IN ['GO','GN', 'PP']));
 AddressPhone: => GongCheck1YearDateLastSeen := MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen,PersonPhone.CURRENT_DATE_GONG), PersonPhone.CURRENT_DATE_GONG) <= InputPII.ONE_YEAR_IN_MONTHS AND MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen,PersonPhone.CURRENT_DATE_GONG), PersonPhone.CURRENT_DATE_GONG) >=0 AND EXISTS(DataSources(Source IN ['GO','GN']));
 AddressPhone: => PhonePlusCheck1YearDateLastSeen := MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen,PersonPhone.CURRENT_DATE_PHONESPLUS), PersonPhone.CURRENT_DATE_PHONESPLUS) <= InputPII.ONE_YEAR_IN_MONTHS AND MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen,PersonPhone.CURRENT_DATE_PHONESPLUS), PersonPhone.CURRENT_DATE_PHONESPLUS) >=0 AND EXISTS(DataSources(Source = 'PP'));
-AddressPhone: => PhoneCheck5Years := MONTHSBETWEEN(PhoneNumber:DateLastSeen, Person.CURRENT_DATE) <= InputPII.FIVE_YEARS_IN_MONTHS AND MONTHSBETWEEN(PhoneNumber:DateLastSeen, Person.CURRENT_DATE) >=0 AND EXISTS(DataSources(HeaderHitFlag)) AND NOT EXISTS(DataSources(Source IN ['GO','GN', 'PP']));
-AddressPhone: => GongCheck5Years := MONTHSBETWEEN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_GONG) <= InputPII.FIVE_YEARS_IN_MONTHS AND MONTHSBETWEEN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_GONG) >=0 AND EXISTS(DataSources(Source IN ['GO','GN']));
-AddressPhone: => PhonePlusCheck5Years := MONTHSBETWEEN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_PHONESPLUS) <= InputPII.FIVE_YEARS_IN_MONTHS AND MONTHSBETWEEN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_PHONESPLUS) >=0 AND EXISTS(DataSources(Source = 'PP'));
+AddressPhone: => PhoneCheck5Years := MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen, Person.CURRENT_DATE), Person.CURRENT_DATE) <= InputPII.FIVE_YEARS_IN_MONTHS AND MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen, Person.CURRENT_DATE), Person.CURRENT_DATE) >=0 AND EXISTS(DataSources(HeaderHitFlag)) AND NOT EXISTS(DataSources(Source IN ['GO','GN', 'PP']));
+AddressPhone: => GongCheck5Years := MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_GONG), PersonPhone.CURRENT_DATE_GONG) <= InputPII.FIVE_YEARS_IN_MONTHS AND MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_GONG), PersonPhone.CURRENT_DATE_GONG) >=0 AND EXISTS(DataSources(Source IN ['GO','GN']));
+AddressPhone: => PhonePlusCheck5Years := MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_PHONESPLUS), PersonPhone.CURRENT_DATE_PHONESPLUS) <= InputPII.FIVE_YEARS_IN_MONTHS AND MONTHSBETWEEN(MIN(PhoneNumber:DateLastSeen, PersonPhone.CURRENT_DATE_PHONESPLUS), PersonPhone.CURRENT_DATE_PHONESPLUS) >=0 AND EXISTS(DataSources(Source = 'PP'));
 
 InputPII: => PI_PhoneNewPerInpAddrCnt6M := MAP(InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
 		NOT EXISTS(Location.AddressPhone{Phones:DateFirstSeen, Phones:DateLastSeen}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
@@ -18746,3 +18818,25 @@ InputPII: => PI_SSNNewPerInpAddrSFDCnt6M := MAP(P_InpClnAddrFullFlagValue  != '1
 		PI_InpAddrIsSFDFlag !=1 => NO_DATA_FOUND_INT,
 		NOT EXISTS(Location.SSNAddress{Social:DateFirstSeen, Social:DateLastSeen}) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 		BOUNDSFOLD(COUNT(Location.SSNAddress(MONTHSBETWEEN(Social:DateFirstSeen,Person.CURRENT_DATE) <= InputPII.SIX_MONTHS AND MONTHSBETWEEN(Social:DateFirstSeen,Person.CURRENT_DATE) >= 0 AND isValidSSN){Social}),0,99));
+		
+InputPII: => InputDOBMonth := STRING(MONTH(FROMSTRINGTODATE(InputDOBCleanValue,'%Y%m%d')));
+InputPII: => InputDOBMonthZero := IF(SUBSTR(InputDOBMonth, 1,1) = '0', SUBSTR(InputDOBMonth,2,2),InputDOBMonth);
+InputPII: => InputDOBDay := STRING(DAY(FROMSTRINGTODATE(InputDOBCleanValue,'%Y%m%d')));
+InputPII: => InputDOBDayZero := IF(SUBSTR(InputDOBDay, 1,1) = '0', SUBSTR(InputDOBDay,2,2),InputDOBDay);
+InputPII: => InputDOBMonDay := InputDOBMonth+InputDOBDay;
+InputPII: => InputDOBMonDayZero := InputDOBMonthZero+InputDOBDayZero;
+InputPII: => InputDOBYear := STRING(YEAR(FROMSTRINGTODATE(InputDOBCleanValue,'%Y%m%d')));
+
+InputPII: => PI_InpEmailHasDOBMonthDayFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnDOBFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		CONTAINS(P_InpClnEmailUser, InputDOBMonDay) OR CONTAINS(P_InpClnEmailUser, InputDOBMonDayZero) =>'1','0');
+InputPII: => PI_InpEmailHasDOBYearLast2Flag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnDOBFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		CONTAINS(P_InpClnEmailUser, SUBSTR(InputDOBYear,3,4))  =>'1','0');
+InputPII: => PI_InpEmailHasDOBYearAll4Flag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnDOBFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		CONTAINS(P_InpClnEmailUser, InputDOBYear)  =>'1','0');
+InputPII: => PI_InpEmailDOBMatchIndx := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnDOBFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
+		PI_InpEmailHasDOBMonthDayFlag = '0' AND
+		PI_InpEmailHasDOBYearAll4Flag = '0' AND
+		PI_InpEmailHasDOBYearLast2Flag = '0' => '0',
+		PI_InpEmailHasDOBMonthDayFlag = '1' => '3',
+		PI_InpEmailHasDOBYearAll4Flag = '1' => '2',
+		PI_InpEmailHasDOBYearLast2Flag = '1' => '1');
