@@ -7294,13 +7294,26 @@ Person: => EmailList := PersonEmail.DataSources(Source IN PersonEmail.SOURCESNON
 			SourceDateFirstSeen := IF(ISVALIDDATE(SourceDateFirstSeenPre), DATETOSTRING(MIN(SourceDateFirstSeenPre, Email.CURRENT_DATE_FCRA), '%Y%m%d'), Person.MAX_DATE),
 			SourceDateLastSeen := IF(ISVALIDDATE(SourceDateLastSeenPre), DATETOSTRING(MIN(SourceDateLastSeenPre, Email.CURRENT_DATE_FCRA), '%Y%m%d'), Person.NO_DATA_FOUND_97)};
 
+PersonEmail: => EmailMatch := UPCASE(Email.EmailAddress) = UPCASE(Subject.PII.InputEmailCleanValue);
+Person: => InputEmailList := PersonEmail(EmailMatch).DataSources(Source IN PersonEmail.SOURCESNONFCRA){Source,
+			SourceDateFirstSeen := IF(ISVALIDDATE(SourceDateFirstSeenPre), DATETOSTRING(MIN(SourceDateFirstSeenPre, Email.CURRENT_DATE_FCRA), '%Y%m%d'), Person.MAX_DATE),
+			SourceDateLastSeen := IF(ISVALIDDATE(SourceDateLastSeenPre), DATETOSTRING(MIN(SourceDateLastSeenPre, Email.CURRENT_DATE_FCRA), '%Y%m%d'), Person.NO_DATA_FOUND_97)};
+
 Person: => EmailAllList := EmailList{Source,
 			RecordCount := GROUP:Count,
 			FirstSeenDate := MIN(GROUP, INTEGER(SourceDateFirstSeen)),
 			EmailSourceFirstSeenDate := IF(MIN(GROUP, INTEGER(SourceDateFirstSeen)) = 99999999, Person.NO_DATA_FOUND_97, MIN(GROUP, INTEGER(SourceDateFirstSeen))),
 			EmailSourceLastSeenDate := MAX(GROUP, INTEGER(SourceDateLastSeen))};
 
+Person: => InputEmailAllList := InputEmailList{Source,
+			RecordCount := GROUP:Count,
+			FirstSeenDate := MIN(GROUP, INTEGER(SourceDateFirstSeen)),
+			EmailSourceFirstSeenDate := IF(MIN(GROUP, INTEGER(SourceDateFirstSeen)) = Person.MAX_DATE_INT, Person.NO_DATA_FOUND_97, MIN(GROUP, INTEGER(SourceDateFirstSeen))),
+			EmailSourceLastSeenDate := MAX(GROUP, INTEGER(SourceDateLastSeen))};
+
 Person: => EmailAllListSorted := TOPN(EmailAllList, 9, FirstSeenDate, Source);
+
+Person: => InputEmailAllListSorted := TOPN(InputEmailAllList, 9, FirstSeenDate, Source);
 
 Person: => EmailListNonFcra7Y := PersonEmail.DataSources(EmailsFirstSeen7y AND Source IN PersonEmail.EMAILNONFCRASOURCES7YEARS){Source,
 			SourceDateFirstSeen := IF(ISVALIDDATE(SourceDateFirstSeenPre), DATETOSTRING(MIN(SourceDateFirstSeenPre, Email.CURRENT_DATE_FCRA), '%Y%m%d'), Person.MAX_DATE),
@@ -7368,6 +7381,38 @@ Person: => PL_SrcEmailNewMsncEv := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DA
 			PL_SrcEmailCntEv > 0 AND PL_SrcEmailNewDtEv = NO_DATA_FOUND_97 => NO_DATA_FOUND_97_INT,
 			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_SrcEmailNewDtEv), Email.CURRENT_DATE_FCRA), 0, 960));
 			
+//KS-256
+Person: => P_InpClnEmailFlag := PII.P_InpClnEmailFlagValue;
+Person: => PL_InpEmailSrcEmailCntEv := IF(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' ,MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(InputEmailAllListSorted), 0, 999));
+Person: => PL_InpEmailSrcEmailListEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA, 
+			PL_InpEmailSrcEmailCntEv = 0 => NO_DATA_FOUND,
+			CONCAT(InputEmailAllListSorted, Source, '|'));
+Person: => PL_InpEmailSrcEmailRecListEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA, 
+			PL_InpEmailSrcEmailCntEv = 0 => NO_DATA_FOUND,
+			CONCAT(InputEmailAllListSorted, RecordCount, '|'));
+Person: => PL_InpEmailSrcEmailEmrgDtListEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA, 
+			PL_InpEmailSrcEmailCntEv = 0 => NO_DATA_FOUND,
+			CONCAT(InputEmailAllListSorted, EmailSourceFirstSeenDate, '|'));
+Person: => PL_InpEmailSrcEmailLastDtListEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA, 
+			PL_InpEmailSrcEmailCntEv = 0 => NO_DATA_FOUND,
+			CONCAT(InputEmailAllListSorted, EmailSourceLastSeenDate, '|'));
+Person: => PL_InpEmailSrcEmailOldDtEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA, 
+			PL_InpEmailSrcEmailCntEv = 0 => NO_DATA_FOUND,
+			PL_InpEmailSrcEmailCntEv > 0 AND ALL(InputEmailAllListSorted, EmailSourceFirstSeenDate = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+			DATETOSTRING(MIN(InputEmailAllListSorted, DATE(EmailSourceFirstSeenDate)), '%Y%m%d'));
+Person: => PL_InpEmailSrcEmailNewDtEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA, 
+			PL_InpEmailSrcEmailCntEv = 0 => NO_DATA_FOUND,
+			PL_InpEmailSrcEmailCntEv > 0 AND ALL(InputEmailAllListSorted, EmailSourceLastSeenDate = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97,
+			DATETOSTRING(MAX(InputEmailAllListSorted, DATE(EmailSourceLastSeenDate)), '%Y%m%d'));
+Person: => PL_InpEmailSrcEmailOldMsncEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA_INT, 
+			PL_InpEmailSrcEmailCntEv = 0 => NO_DATA_FOUND_INT,
+			PL_InpEmailSrcEmailCntEv > 0 AND ALL(InputEmailAllListSorted, EmailSourceFirstSeenDate = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpEmailSrcEmailOldDtEv), Email.CURRENT_DATE_FCRA), 0, 960));
+Person: => PL_InpEmailSrcEmailNewMsncEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA_INT, 
+			PL_InpEmailSrcEmailCntEv = 0 => NO_DATA_FOUND_INT,
+			PL_InpEmailSrcEmailCntEv > 0 AND ALL(InputEmailAllListSorted, EmailSourceLastSeenDate = Person.NO_DATA_FOUND_97) => NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(MONTHSBETWEEN(DATE(PL_InpEmailSrcEmailNewDtEv), Email.CURRENT_DATE_FCRA), 0, 960));
+
 Person: => PL_SrcEmailCnt7YFCRA := IF(P_LexIDSeenFlag = '0' , MISSING_INPUT_DATA_INT, BOUNDSFOLD(COUNT(EmailAllListFcra7YSorted), 0, 3));
 Person: => PL_SrcEmailList7YFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA, 
 			PL_SrcEmailCnt7YFCRA = 0 => NO_DATA_FOUND,
@@ -13454,6 +13499,7 @@ Person: => PL_AccCnt1Y := MAP(P_LexIDSeenFlag = '0' => PersonAccident.MISSING_IN
 /*                                                                        */
 /**************************************************************************/
 Person: MAX_DATE := '99999999';
+Person: MAX_DATE_INT := 99999999;
 Person: TEN_YEARS_IN_DAYS := 3652;
 
 
