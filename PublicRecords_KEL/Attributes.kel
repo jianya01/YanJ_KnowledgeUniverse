@@ -16585,20 +16585,48 @@ Person: => PL_EmailNewCnt6MFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DA
 //KS-7622
 Person.ReportedDatesOfBirth: => AgeFirstSeen := MONTHSBETWEEN(DateOfBirth:DateFirstSeen,Person.CURRENT_DATE);
 Person.ReportedDatesOfBirth: => AgeLastSeen := MONTHSBETWEEN(MIN(DateOfBirth:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE);
+
+Person.ReportedDatesOfBirth: => DateFirstSeenTest := DateOfBirth:DateFirstSeen;
+				
+Person : => FilteredReportedDOBs1Y := ReportedDatesOfBirth(
+		NOT DateFirstSeenTest:Null AND
+		AgeLastSeen <= 12 AND 
+		AgeLastSeen >= 0 AND 
+		HeaderHitFlag AND
+		ValidDOBCheck){DateOfBirth, DateOfBirthPadded, MonthPaddedFlag, DayPaddedFlag};
+
+Person : => FilteredReportedDOBs6M := ReportedDatesOfBirth(
+		NOT DateFirstSeenTest:Null AND
+		AgeFirstSeen <= 6 AND 
+		AgeFirstSeen >= 0 AND 
+		HeaderHitFlag AND
+		ValidDOBCheck){DateOfBirth, DateOfBirthPadded, MonthPaddedFlag, DayPaddedFlag};
+
+ Person: => UniqueDOB1Y := Sequence.Dedup(FilteredReportedDOBs1Y,(RIGHT.DateOfBirth = LEFT.DateOfBirth) OR
+              (RIGHT.DayPaddedFlag = 1 AND YEAR(LEFT.DateOfBirth) = YEAR(RIGHT.DateOfBirth) AND MONTH(LEFT.DateOfBirth) = MONTH(RIGHT.DateOfBirth)) OR
+              (RIGHT.MonthPaddedFlag = 1 AND YEAR(LEFT.DateOfBirth) = YEAR(RIGHT.DateOfBirth)),
+              -DateOfBirth){DateOfBirth};
+
+ Person: => UniqueDOB6M := Sequence.Dedup(FilteredReportedDOBs6M,(RIGHT.DateOfBirth = LEFT.DateOfBirth) OR
+              (RIGHT.DayPaddedFlag = 1 AND YEAR(LEFT.DateOfBirth) = YEAR(RIGHT.DateOfBirth) AND MONTH(LEFT.DateOfBirth) = MONTH(RIGHT.DateOfBirth)) OR
+              (RIGHT.MonthPaddedFlag = 1 AND YEAR(LEFT.DateOfBirth) = YEAR(RIGHT.DateOfBirth)),
+              -DateOfBirth){DateOfBirth};
+						
 Person: => PL_DOBCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(ReportedDatesOfBirth) AND NOT EXISTS(ReportedDatesOfBirth{DateOfBirth:DateFirstSeen,DateOfBirth:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(ReportedDatesOfBirth(AgeLastSeen <= 12 AND AgeLastSeen >= 0 AND HeaderHitFlag)),0,99));
+																BOUNDSFOLD(COUNT(UniqueDOB1Y),0,99));
+
 Person: => PL_DOBNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(ReportedDatesOfBirth) AND NOT EXISTS(ReportedDatesOfBirth{DateOfBirth:DateFirstSeen,DateOfBirth:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(ReportedDatesOfBirth(AgeFirstSeen <= 6 AND AgeFirstSeen >= 0 AND HeaderHitFlag)),0,99));
-
+																BOUNDSFOLD(COUNT(UniqueDOB6M),0,99));
+																
 Person: => LastNameDataSet := FullName{LastName, HeaderHitFlag};
 Person: => PL_NameLastCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(LastNameDataSet) AND NOT EXISTS(LastNameDataSet{LastName:DateFirstSeen,LastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
 																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(MIN(LastName:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE) <= 12 AND MONTHSBETWEEN(MIN(LastName:DateLastSeen,Person.CURRENT_DATE),Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,99));
 Person: => PL_NameLastNewCnt6M := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 																EXISTS(LastNameDataSet) AND NOT EXISTS(LastNameDataSet{LastName:DateFirstSeen,LastName:DateLastSeen}) => NO_DATA_FOUND_97_INT,
-																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) <= 6 AND MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,99));		
+																BOUNDSFOLD(COUNT(LastNameDataSet(MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) <= 6 AND MONTHSBETWEEN(LastName:DateFirstSeen,Person.CURRENT_DATE) >= 0 AND HeaderHitFlag)),0,99));
 
 PersonSSN: => SSNMatch := Social = Subject.PII.P_InpClnSSN;
 Person: => SSNLastNameDataSet:= PersonSSN(SSNMatch).Subject.FullName{LastName, HeaderHitFlag};
