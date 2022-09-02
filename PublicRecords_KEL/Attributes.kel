@@ -675,6 +675,65 @@ InputPII: => InsurancePhoneResults := GATEWAY_INSURANCE_PHONE(InsurancePhoneGate
 InputPII: NOT InsurancePhoneGatewayIP:Null OR NOT InsurancePhoneGatewayIP = '' => InsPhoneHit  := GET_VALUE(InsurancePhoneResults, 2);
 InputPII: NOT InsurancePhoneGatewayIP:Null OR NOT InsurancePhoneGatewayIP = '' => InsPhoneSrc := GET_VALUE(InsurancePhoneResults, 3);
 
+//emailage
+
+FUNCTION: GET_EMAILAGE_URL(STRING StoredName) <= ECL(PublicRecords_KEL.MAS_get.MASGateway.EmailAgeFunctions.GrabEmailAgeURL(StoredName)) FROM PublicRecords_KEL  RETURNS STRING;
+FUNCTION: GATEWAY_EMAILAGE(STRING InputEmail, STRING InputArchiveDate, INTEGER DPPAPurpose, INTEGER GLBPurpose,  BOOLEAN IsFCRA, STRING GatewayURL) <= ECL(PublicRecords_KEL.MAS_get.MASGateway.EmailAgeFunctions.EmailAgeWrapper(InputEmail, InputArchiveDate, DPPAPurpose, GLBPurpose,  IsFCRA, GatewayURL)) FROM PublicRecords_KEL RETURNS SET OF STRING;
+// InsurancePhone Attributes			 
+InputPII: => EmailAgeGatewayIP := IF(P_InpClnEmailFlagValue < '1', '', GET_EMAILAGE_URL('DummyValue')); // KEL doesn't allow empty functions so we substitute DummyValue
+InputPII: => EmailAgeResults := GATEWAY_EMAILAGE(P_InpClnEmail, P_InpClnArchDt,  DPPAPurpose, GLBPurpose, GatewayIsFCRA, EmailAgeGatewayIP);
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMAEmailExists  := GET_VALUE(EmailAgeResults, 2);//EmailExists
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMAEmailAddress  := GET_VALUE(EmailAgeResults, 3);//EmailAddress
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMAEmailCreatedDate  := GET_VALUE(EmailAgeResults, 4);//EmailCreatedDate
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMAEmailCreatedDateTime  := GET_VALUE(EmailAgeResults, 5);//EmailCreatedDateTime
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMAEmailFirstVerificationDate  := GET_VALUE(EmailAgeResults, 6);//EmailFirstVerificationDate
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMAEmailFirstVerificationDateTime  := GET_VALUE(EmailAgeResults, 7);//EmailFirstVerificationDateTime
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMAEmailFirstVerificationDays  := GET_VALUE(EmailAgeResults, 8);//EmailFirstVerificationDays
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMAEmailAddressAge  := GET_VALUE(EmailAgeResults, 9);//EmailAddressAge
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMADomainExists  := GET_VALUE(EmailAgeResults, 10);//DomainExists
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMADomainCreatedDate  := GET_VALUE(EmailAgeResults, 11);//DomainCreatedDate
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMADomainCreatedDateTime  := GET_VALUE(EmailAgeResults, 12);//DomainCreatedDateTime
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMADomainAge  := GET_VALUE(EmailAgeResults, 13);//DomainAge
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMASrc := GET_VALUE(EmailAgeResults, 14);		//EMASrc
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMARoyalty := GET_VALUE(EmailAgeResults, 15);		//gatewayused
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMADomainName := GET_VALUE(EmailAgeResults, 16);//DomainName
+InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMADomainCorporate := GET_VALUE(EmailAgeResults, 17);		//DomainCorporate
+
+
+																					
+InputPII: => PI_InpEmailDomainOldMsnc := MAP(P_InpClnEmailFlagValue < '1' => MISSING_INPUT_DATA_INT,
+        EMADomainName:Null OR DATE(EMADomainCreatedDate)>DATE(P_InpClnArchDt)  => NO_DATA_FOUND_INT,// or EMADomainCreatedDate after P_InpClnArchDt
+        NOT ISVALIDDATE(DATE(EMADomainCreatedDate)) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,     
+        BOUNDSFOLD(MONTHSBETWEEN(DATE(EMADomainCreatedDate),DATE(P_InpClnArchDt)), 0, 960));							
+
+Email: EMAILNONFCRASOURCES := ['AW', 'ET', '!I', 'W@', 'M1', 'DG', 'AN', 'RS'];
+
+Email: => InquiryEmailCheck := EXISTS(EmailInquiry.DataSources(Source IN ['IQ','IDA']));
+Email: => EmailCheck := EXISTS(DataSources(Source IN EMAILNONFCRASOURCES));
+Email: CANNOT_CALCULATE := -99997;	
+
+EmailInquiry: => EmailInqDateFirstSeen := TimeStampToDate(EmailAddress:DateFirstSeen);
+Email: => EmailDateFirstSeen := EmailAddress:DateFirstSeen;
+
+
+InputPII: => DFSEmailInqMin := MIN(InputCleanEmailForInquiry(InquiryEmailCheck AND ISVALIDDATE(EmailInquiry.EmailInqDateFirstSeen)), EmailInquiry.EmailInqDateFirstSeen);
+InputPII: => DFSEmailMin := MIN(InputCleanEmail(EmailCheck AND ISVALIDDATE(EmailDateFirstSeen)), EmailDateFirstSeen);
+
+InputPII: => DFSEmailInq := IF(NOT DFSEmailInqMin:Null,  MONTHSBETWEEN(DFSEmailInqMin, Inquiry.CURRENT_DATE), RECS_AVAIL_BUT_CANNOT_CALCULATE_INT);
+InputPII: => DFSEmail := IF(NOT DFSEmailMin:Null,  MONTHSBETWEEN(DFSEmailMin, Email.CURRENT_DATE_FCRA), RECS_AVAIL_BUT_CANNOT_CALCULATE_INT);
+InputPII: => DFSEMA := IF(ISVALIDDATE(DATE(EMAEmailFirstVerificationDate)),  MONTHSBETWEEN(DATE(EMAEmailFirstVerificationDate), DATE(P_InpClnArchDt)), RECS_AVAIL_BUT_CANNOT_CALCULATE_INT);
+
+InputPII: => DFSEmailInqMod := IF(DFSEmailInq < 0, 99999, DFSEmailInq);
+InputPII: => DFSEmailMod := IF(DFSEmail < 0, 99999, DFSEmail);
+InputPII: => DFSEMAMod := IF(DFSEMA < 0, 99999, DFSEMA);
+
+InputPII: => CombinedMinEmail := MIN(DFSEmailInqMod, DFSEmailMod, DFSEMAMod);
+InputPII: => CombinedMinEmailFinal := IF(CombinedMinEmail = 99999, RECS_AVAIL_BUT_CANNOT_CALCULATE_INT, CombinedMinEmail );
+
+InputPII: => PI_InpEmailOldMsnc := MAP(P_InpClnEmailFlagValue < '1' => MISSING_INPUT_DATA_INT,
+				NOT InputCleanEmailForInquiry.InquiryEmailCheck AND NOT InputCleanEmail.EmailCheck AND (EMAEmailAddress:Null OR DATE(EMAEmailFirstVerificationDate)>DATE(P_InpClnArchDt))  => NO_DATA_FOUND_INT,// or EMADomainCreatedDate after P_InpClnArchDt
+				(DFSEmailInq = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT AND DFSEmail = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT AND DFSEMA = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT) OR CombinedMinEmailFinal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
+				 BOUNDSFOLD(CombinedMinEmailFinal, 0, 960));
 /**************************************************************************/
 /*                                                                        */
 /*         Input PII input Echo attributes                                */
