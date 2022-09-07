@@ -1765,11 +1765,11 @@ InputPII: =>PI_InpDOBAge := IF(P_InpClnDOBFlagValue <>1, MISSING_INPUT_DATA_INT,
 																BOUNDSFOLD(YEARSBETWEEN(P_InpClnDOB,FROMSTRINGTODATE(STRING(P_InpClnArchDt),'%Y%m%d')),0,120));
 
 InputPII: =>PI_InpSSNIsDeceasedFlag := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
-																						 NOT EXISTS(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')){DateOfDeath}) => 0,
-																						 1);
+																						 EXISTS(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')){DateOfDeath}) => 1,
+																						 0);
 InputPII: =>PI_InpSSNDeceasedDt := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 PI_InpSSNIsDeceasedFlag = 0 => NO_DATA_FOUND_INT,
-																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
+																				ONLY(TOPN(InputCleanSSN.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')),1,-DateOfDeath),	INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
 InputPII: => PI_InpSSNDeceasedMsnc := MAP(P_InpClnSSNFlagValue <> 1 => MISSING_INPUT_DATA_INT,
 																			 PI_InpSSNDeceasedDt = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,																				
 																			 BOUNDSFOLD(MONTHSBETWEEN(FROMSTRINGTODATE(STRING(PI_InpSSNDeceasedDt), '%Y%m%d'), Person.CURRENT_DATE),0,960));		
@@ -3607,8 +3607,8 @@ Person: => EarliestDeceasedDate := MAP(P_LexIDDeceasedDtIsValid <= PI_InpSSNDece
 Person: => P_LexIDDeceasedDtList := TOPN(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')),1,-DateOfDeath);
 
 Person: => P_LexIDIsDeceasedFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
-													NOT EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d'))) => '0',
-													'1');
+													EXISTS(ReportedDatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath<FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d'))) => '1',
+													'0');
 Person: => P_LexIDDeceasedDt := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
 													P_LexIDIsDeceasedFlag = '0' => NO_DATA_FOUND_INT,
 													ONLY(P_LexIDDeceasedDtList, INTEGER(DATETOSTRING(DateOfDeath,'%Y%m%d'))));
@@ -4676,8 +4676,8 @@ Person: => PL_BestSSN:= MAP(
 			BestSSN);
 Person: => PL_BestSSNIsDeceasedFlag := MAP(
             PL_BestSSN = MISSING_INPUT_DATA OR PL_BestSSN = NO_DATA_FOUND => MISSING_INPUT_DATA,
-            NOT EXISTS(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(InputPII.P_InpClnArchDt), '%Y%m%d')){DateOfDeath}) => '0',
-            '1');
+            EXISTS(PersonSSN(IsBestSSN).Social.DatesOfDeath(DeathMasterFlag AND ISVALIDDATE(DateOfDeath) AND DateOfDeath < FROMSTRINGTODATE(STRING(CURRENTDATE()), '%Y%m%d')){DateOfDeath}) => '1',
+            '0');
 Person: => PL_BestSSNDeceasedDt := MAP(
             PL_BestSSN = MISSING_INPUT_DATA OR PL_BestSSN = NO_DATA_FOUND => MISSING_INPUT_DATA,
             PL_BestSSNIsDeceasedFlag = '0' => NO_DATA_FOUND,
@@ -16274,10 +16274,19 @@ Person: => PL_InpAddrMatchIndx := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull 
 		PL_InpAddrFlagNonFCRA = '1' => '1');
 
 // KS-2334
+ZipCode: => PII := ONLY(InputPII);
+ZipCode: => P_InpClnAddrCity := PII.InputCityCleanValue; 
+ZipCode: => P_InpClnAddrState := PII.InputStateCleanValue;
+ZipCode: => P_InpClnAddrZip5 := PII.InputZip5CleanValue;
+
+ZipCode: => CityCheck := EXISTS(Cities(City = P_InpClnAddrCity));
+ZipCode: => StateCheck := State = P_InpClnAddrState;
+ZipCode: => ZipCheck := INTFORMAT(UID,5,1) = P_InpClnAddrZip5;
+
 InputPII: => P_InpValAddrZipMismatchIndx := MAP((P_InpClnAddrCityFlagValue IN [MISSING_INPUT_DATA, '0']) OR (P_InpClnAddrStateFlagValue IN [MISSING_INPUT_DATA, '0']) OR (P_InpClnAddrZip5FlagValue IN [MISSING_INPUT_DATA, '0']) => MISSING_INPUT_DATA,
-						ZIP5.UID = Subject.P_InpClnAddrZip5 AND ZIP5.State = Subject.P_InpClnAddrState AND ZIP5.City = P_InpClnAddrCity => '0',
-						ZIP5.UID = Subject.P_InpClnAddrZip5 AND ZIP5.State = Subject.P_InpClnAddrState AND ZIP5.City != P_InpClnAddrCity => '1',
-						ZIP5.UID = Subject.P_InpClnAddrZip5 AND ZIP5.State != Subject.P_InpClnAddrState AND ZIP5.City = P_InpClnAddrCity => '2', '3');
+						ZIP5.ZipCheck AND ZIP5.StateCheck AND ZIP5.CityCheck => '0',
+						ZIP5.ZipCheck AND ZIP5.StateCheck AND NOT ZIP5.CityCheck => '1',
+						ZIP5.ZipCheck AND NOT ZIP5.StateCheck AND ZIP5.CityCheck => '2', '3');
 						
 // KS-4491
 
@@ -18481,12 +18490,12 @@ Person: => PL_AddrMovePrevToCurrMsnc1Y := MAP(P_LexIDSeenFlag = '0' OR PrevAddrN
 		BOUNDSFOLD(MONTHSBETWEEN(DATE(ValidCurrAddrDtFirstSn), Person.CURRENT_DATE), 0, 12));
 		
 InputPII: => PI_InpAddrSubjOwnedAVMVal:= MAP(P_LexID = MISSING_INPUT_DATA_INT OR NOT EXISTS(Subject.DataSources(HeaderHitFlag)) OR PI_InpAddrOnFileFlagEv = MISSING_INPUT_DATA_INT => MISSING_INPUT_DATA_INT,
-		PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PI_InpAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] OR NOT InputAddressOnAVM=> NO_DATA_FOUND_INT,
 		InputAddressPropertyCnt = 0 OR AVMValueUnCap = 0 OR AVMValueUnCap:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 		BOUNDSFOLD(AVMValueUnCap,1,999999999));
 
 Person: => PL_CurrAddrSubjOwnedAVMVal:= MAP(P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
-		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] => NO_DATA_FOUND_INT,
+		PL_CurrAddrSubjOwnedFlag IN [NO_DATA_FOUND, '0'] OR NOT CurrentAddressOnAVM => NO_DATA_FOUND_INT,
 		CurrAddressPropertyCnt = 0 OR CurrAddrAVMValueUnCap = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(CurrAddrAVMValueUnCap,1,999999999));
 
@@ -18846,7 +18855,7 @@ InputPII: => PI_InpEmailHasFNameFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT
 InputPII: => PI_InpEmailFNameConsecCharCnt := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(FNSequenceCompare,0,99));
 InputPII: => PI_InpEmailHasFNameFirstCharFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
-		STARTSWITH(P_InpClnEmailUser, UPCASE(InputFirstNameCleanValue)) => '1','0');
+		SUBSTR(P_InpClnEmailUser,1,1)= UPCASE(SUBSTR(InputFirstNameCleanValue,1,1)) => '1','0');
 InputPII: => PI_InpEmailFNameMatchIndx := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
 		PI_InpEmailHasFNameFlag = '0' AND
 		PI_InpEmailHasFNameFirstCharFlag = '0' AND
@@ -18861,7 +18870,7 @@ InputPII: => PI_InpEmailHasLNameFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT
 InputPII: => PI_InpEmailLNameConsecCharCnt := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
 		BOUNDSFOLD(LNSequenceCompare,0,99));
 InputPII: => PI_InpEmailHasLNameFirstCharFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
-		STARTSWITH(P_InpClnEmailUser, UPCASE(InputLastNameCleanValue)) => '1','0');
+		SUBSTR(P_InpClnEmailUser,1,1)= UPCASE(SUBSTR(InputLastNameCleanValue,1,1)) => '1','0');
 InputPII: => PI_InpEmailLNameMatchIndx := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
 		PI_InpEmailHasLNameFlag = '0' AND
 		PI_InpEmailHasLNameFirstCharFlag = '0' AND
@@ -18880,7 +18889,7 @@ InputPII: => LastNameCount := MAP(PI_InpEmailLNameConsecCharCnt = 1 AND PI_InpEm
 InputPII: => NamePct := MAP(FirstNameCount = 0 AND LastNameCount = 0 AND PI_InpEmailHasInitialsFlag = '1' => (2/LENGTH(P_InpClnEmailUser))*100,
 		100*((FirstNameCount+LastNameCount)/LENGTH(P_InpClnEmailUser)));
 InputPII: => PI_InpEmailNameFullUserCharPct := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(ROUND(NamePct,2), 0.00,100.00));
+		MIN(ROUND(NamePct,2), 100.00));
 InputPII: => PI_InpEmailHasPhoneAreaCodeFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
 		CONTAINS(P_InpClnEmailUser, SUBSTR(InputHomePhoneCleanValue,1,3)) => '1','0');
 InputPII: => PI_InpEmailHasPhoneLast4Flag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA,
@@ -18913,7 +18922,7 @@ InputPII: => PI_InpEmailFLAPCnt := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA
 InputPII: => PI_InpEmailFLAPLen := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnAddrStFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
 		FLAPLenCheck1 + FLAPLenCheck2 + FLAPLenCheck3 + FLAPLenCheck4);
 InputPII: => PI_InpEmailFLAPPct := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR P_InpClnPhoneHomeFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameFirstFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnNameLastFlagValue IN [MISSING_INPUT_DATA, '0'] OR P_InpClnAddrStFlagValue IN [MISSING_INPUT_DATA, '0'] => MISSING_INPUT_DATA_INT,
-		BOUNDSFOLD(ROUND((PI_InpEmailFLAPLen/LENGTH(P_InpClnEmailUser))*100,2),0.00,100.00));
+		MIN(ROUND((PI_InpEmailFLAPLen/LENGTH(P_InpClnEmailUser))*100,2),100.00));
 
 //KS-7979
 InputPII: => PI_PhonePerInpAddrCnt1Y := MAP(InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
