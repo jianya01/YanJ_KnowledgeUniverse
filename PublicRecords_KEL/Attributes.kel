@@ -19047,4 +19047,59 @@ InputPII: => PI_InpEmailHighRiskIndx := MAP(P_InpClnEmailUser  IN [MISSING_INPUT
 																			PI_InpEmailHas4pNumFlag = '1' => '2',
 																			PI_InpEmailHas13pCharFlag = '1' => '1',
 																			'0');
+
+Email: => PII := ONLY(InputPII);
+PersonEmailPhoneAddress: => PII := Email.PII;
+PersonEmailPhoneAddress: => FirstNameMatch := EXISTS(Name(FirstName = PII.InputFirstNameCleanValue));
+PersonEmailPhoneAddress: => LastNameMatch := EXISTS(Name(LastName = PII.InputLastNameCleanValue));
+PersonEmailPhoneAddress: => AddrMatch :=  ( 
+		TRIMALL(DEFAULT(PII.P_InpClnAddrPrimRng,'')) = TRIMALL(DEFAULT(PrimaryRange,'')) AND
+		TRIMALL(DEFAULT(PII.P_InpClnAddrPreDir,'')) = TRIMALL(DEFAULT(Predirectional,'')) AND
+		TRIMALL(DEFAULT(PII.P_InpClnAddrPrimName,'')) = TRIMALL(DEFAULT(PrimaryName,'')) AND
+		TRIMALL(DEFAULT(PII.P_InpClnAddrSffx,'')) = TRIMALL(DEFAULT(Suffix,'')) AND
+		TRIMALL(DEFAULT(PII.P_InpClnAddrPostDir,'')) = TRIMALL(DEFAULT(Postdirectional,'')) AND 
+		TRIMALL(DEFAULT(PII.P_InpClnAddrZip5,'')) = TRIMALL(DEFAULT(INTFORMAT(ZIP5,5,1),'')) AND
+		(TRIMALL(DEFAULT(PII.P_InpClnAddrSecRng,'')) = TRIMALL(DEFAULT(SecondaryRange,'')) OR ((PII.P_InpClnAddrSecRng = '' OR PII.P_InpClnAddrSecRng:Null) AND SecondaryRange != '') OR (PII.P_InpClnAddrSecRng != '' AND (SecondaryRange = '' OR SecondaryRange:Null))));
+		
+PersonEmailPhoneAddress:SOURCESNONFCRAEMAIL := ['!I', 'ET', 'AN', 'AW', 'M1', 'DG', 'RS', 'SC', 'W@','AP'];
+PersonEmailPhoneAddress.DataSources: => SourceDateFirstSeen := Source:DateFirstSeen;
+PersonEmailPhoneAddress.DataSources: => SourceDateLastSeen := Source:DateLastSeen;
+PersonEmailPhoneAddress: => EmailSources := DataSources(Source IN PersonEmailPhoneAddress.SOURCESNONFCRAEMAIL){
+Source,
+SourceDateFirstSeen,
+SourceDateLastSeen};
+PersonEmailPhoneAddress: => SourceMatch := EXISTS(DataSources(Source IN PersonEmailPhoneAddress.SOURCESNONFCRAEMAIL));
+PersonEmailPhoneAddress: => FLAEMatch := UPCASE(Email.EmailAddress) = UPCASE(PII.InputEmailCleanValue) AND
+        FirstNameMatch AND LastNameMatch AND AddrMatch;
+
+InputPII: => PI_SrcEmailWInpFLAECntEv := MAP(P_InpClnEmailFlagValue < '1' OR P_InpClnNameFirstFlagValue < '1' OR P_InpClnNameLastFlagValue < '1' OR P_InpClnAddrStFlagValue < '1' => MISSING_INPUT_DATA_INT,
+		BOUNDSFOLD(COUNT(InputCleanEmail.PersonEmailPhoneAddress(FLAEMatch).EmailSources{Source}),0,99));
+		
+InputPII: => PI_SrcEmailWInpFLAEIndx := MAP(P_InpClnEmailFlagValue < '1' => MISSING_INPUT_DATA,
+		PI_SrcEmailWInpFLAECntEv > 0 => '8',
+		InputCleanEmail.PersonEmailPhoneAddress(SourceMatch AND LastNameMatch AND AddrMatch) => '7',
+		InputCleanEmail.PersonEmailPhoneAddress(SourceMatch AND FirstNameMatch AND AddrMatch) => '6',
+		InputCleanEmail.PersonEmailPhoneAddress(SourceMatch AND LastNameMatch AND FirstNameMatch) => '5',
+		InputCleanEmail.PersonEmailPhoneAddress(SourceMatch AND LastNameMatch) => '4',
+		InputCleanEmail.PersonEmailPhoneAddress(SourceMatch AND AddrMatch) => '3',
+		InputCleanEmail.PersonEmailPhoneAddress(SourceMatch AND FirstNameMatch) => '2',
+		InputCleanEmail.PersonEmailPhoneAddress(SourceMatch AND NOT LastNameMatch AND NOT FirstNameMatch AND NOT AddrMatch) => '1',
+		PI_SrcEmailWInpFLAECntEv < 1 => NO_DATA_FOUND);
+PersonEmail: => SourceCheck := EXISTS(DataSources(Source IN PersonEmailPhoneAddress.SOURCESNONFCRAEMAIL));
+Person: => MostRecentEmailPre := TOPN(PersonEmail(SourceCheck),1, Email:DateLastSeen){Email};
+Person: => MostRecentEmail := ONLY(MostRecentEmailPre,Email);
+Person: => MostRecentEmailCheck := UPCASE(MostRecentEmail.EmailAddress) = UPCASE(PII.InputEmailCleanValue);
+Person: => PL_InpEmailSrcNewFlagEv := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA,	
+		NOT EXISTS(PersonEmail(EmailMatch)) => NO_DATA_FOUND,
+		 MostRecentEmail => '1', '0');
+
+Person: => PI_InpEmailHasFNameFlag := PII.PI_InpEmailHasFNameFlag;
+Person: => PI_InpEmailHasLNameFlag := PII.PI_InpEmailHasLNameFlag;
+
+Person: => PL_InpEmailMatchIndx := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFlag < '1' => MISSING_INPUT_DATA,
+			PL_InpEmailSrcNewFlagEv = '1' => '4',
+			PL_InpEmailSrcEmailCntEv > 0 => '3',
+			PI_InpEmailHasFNameFlag = '1' AND PI_InpEmailHasLNameFlag = '1' => '2',
+			PI_InpEmailHasFNameFlag = '1' OR PI_InpEmailHasLNameFlag = '1' => '1',
+			NOT EXISTS(PersonEmail(EmailMatch)) => NO_DATA_FOUND);
 																			 
