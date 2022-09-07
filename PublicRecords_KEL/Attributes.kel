@@ -260,6 +260,10 @@ FUNCTION: IsNameMiskeyMatch(STRING Name1, STRING Name2) <=
 		MAP((LENGTH(Name1) > 4 OR LENGTH(Name2) > 4) AND LevenshteinSimilarity(Name1, Name2) > 0.6 AND LevenshteinSimilarity(Name1, Name2) < 1 => TRUE,
 		LENGTH(Name1) < 5 AND LENGTH(Name2) < 5 AND LevenshteinSimilarity(Name1, Name2) > 0.5 AND LevenshteinSimilarity(Name1, Name2) < 1 => TRUE,
 		FALSE);
+		
+FUNCTION: GetConsecutiveDigitLengthList(STRING stringToParse) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Get_Consecutive_Digit_Length_List(stringToParse)) FROM PublicRecords_KEL RETURNS STRING;	
+FUNCTION: GetHighestNumberConsecutiveCharacters(STRING stringToParse) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Find_Highest_Number_Consecutive_Characters(stringToParse)) FROM PublicRecords_KEL RETURNS INTEGER;	
+FUNCTION: AddSpecialCharactersToString(STRING InputString, INTEGER CharacterNumber) <= ECL(PublicRecords_KEL.ECL_Functions.Fn_Add_Characters_To_String(InputString, CharacterNumber)) FROM PublicRecords_KEL RETURNS STRING;	
 //These functions are for inferred performance attributes. If the datefirstseen is within the time frame the data can be used for those attributes.	
 //Unfortunately for now you have to pass in CURRENTDATE() into the second parameter as CURRENTDATE() within a function creates broken ECL. There is no timeline for a fix as this workaround exists.	
 FUNCTION: WithinF6M(DATE InputDate, DATE reference) <= InputDate <= ADJUSTCALENDAR(reference, -1, -6, 0) AND InputDate >= ADJUSTCALENDAR(reference, -2, 0, 0) AND ISVALIDDATE( InputDate);
@@ -1786,16 +1790,16 @@ InputPII: =>  PI_InpIPAddrReservedFlag	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MI
 InputPII: =>  PI_InpIPAddrContinentCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
 																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
 																						continent);
-																						
+						
 InputPII: =>  PI_InpIPAddrState	:= MAP(P_InpClnIPAddrFlagValue <> 1 OR P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA,
 																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
-																						ipstate = '' OR ipstate:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-																						ipstate);
+																						ipstate = '' OR ipstate:Null OR (NOT TRIM(UPCASE(ipstate)) IN US_TERRITORIES) => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						TRIM(UPCASE(ipstate)));
 																						
 InputPII: =>  PI_InpIPAddrStateMatchFlag	:= MAP(P_InpClnIPAddrFlagValue <> 1 OR P_InpClnAddrStateFlagValue <> 1 => MISSING_INPUT_DATA,
 																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
-																						ipstate = '' OR ipstate:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-																						P_InpClnAddrState = ipstate => '1',
+																						PI_InpIPAddrState = RECS_AVAIL_BUT_CANNOT_CALCULATE => RECS_AVAIL_BUT_CANNOT_CALCULATE,
+																						P_InpClnAddrState = PI_InpIPAddrState => '1',
 																						'0');
 
 InputPII: =>  PI_InpIPAddrTopLvlDomCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
@@ -1840,7 +1844,7 @@ InputPII: =>  PI_InpIPAddrTZCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_
 InputPII: =>  PI_InpIPAddrHasNonUSTZFlag	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
 																						PI_InpIPAddrDeviceFlag = '0' OR PI_InpIPAddrReservedFlag = '0' => NO_DATA_FOUND,
 																						iptimezone = '' OR iptimezone:Null => RECS_AVAIL_BUT_CANNOT_CALCULATE,
-																						iptimezone <= -400 AND iptimezone >= -800 => '0',
+																						INTEGER(iptimezone) <= -400 AND INTEGER(iptimezone) >= -800 => '0',
 																						'1');
 																																									
 InputPII: =>  PI_InpIPAddrConnCode	:= MAP(P_InpClnIPAddrFlagValue <> 1 => MISSING_INPUT_DATA,
@@ -1923,7 +1927,18 @@ AddressSlim: => PI_InpAddrSICCodeHRList := MAP(P_ClnAddrFullFlag != '1' => MISSI
 AddressSlim: => PI_InpAddrNAICSCodeHRList := MAP(P_ClnAddrFullFlag != '1' => MISSING_INPUT_DATA,
 	NAICSListNotFoind => NO_DATA_FOUND,
 	CONCAT(AddressNAICSSortedList,HighRiskNAICS,'|'));
-	
+
+// KS-6092
+AddressSlim: => CurrAddrFullValue := PII.Subject.PL_CurrAddrFull;
+
+AddressSlim: => PL_CurrAddrSICCodeHRList := MAP(CurrAddrFullValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+	SICListNotFound => NO_DATA_FOUND,
+	CONCAT(AddressSICSortedList,HighRiskSIC,'|'));
+AddressSlim: => PL_CurrAddrNAICSCodeHRList := MAP(CurrAddrFullValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+	NAICSListNotFoind => NO_DATA_FOUND,
+	CONCAT(AddressNAICSSortedList,HighRiskNAICS,'|'));
+
+
 AddressSlim: => PI_InpAddrIsHRCorrectFacFlag := MAP(P_ClnAddrFullFlag != '1' => MISSING_INPUT_DATA,
 	(AddressSICContainsCorrectional  OR AddressNAICSContainsCorrectional) => '1',
 	'0');
@@ -18973,3 +18988,63 @@ InputPII: => PI_InpEmailDOBMatchIndx := MAP(P_InpClnEmailUser  IN [MISSING_INPUT
 		PI_InpEmailHasDOBMonthDayFlag = '1' => '3',
 		PI_InpEmailHasDOBYearAll4Flag = '1' => '2',
 		PI_InpEmailHasDOBYearLast2Flag = '1' => '1');
+
+// KS-1315
+
+InputPII: => P_InpClnEmailUserLength := LENGTH(P_InpClnEmailUser);
+InputPII: => EmailDigitsOnly := Filter(P_InpClnEmailUser, '0123456789');
+InputPII: => EmailDigitsLength := LENGTH(EmailDigitsOnly);
+InputPII: => PI_InpEmailDigitCnt := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																			BOUNDSFOLD(EmailDigitsLength, 0, 999));
+InputPII: => PI_InpEmailDigitPct := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																			ROUND((PI_InpEmailDigitCnt/P_InpClnEmailUserLength)*100,2));
+InputPII: => PI_InpEmailUserLen := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																			P_InpClnEmailUserLength);
+InputPII: => PI_InpEmailConsecDigitLenList := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																			PI_InpEmailDigitCnt = 0 => NO_DATA_FOUND,
+																			TRIMALL(GetConsecutiveDigitLengthList(P_InpClnEmailUser)));
+InputPII: => PI_InpEmailConsecDigitGroupCnt := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+																			PI_InpEmailConsecDigitLenList = NO_DATA_FOUND => 0,
+																			LENGTH(PI_InpEmailConsecDigitLenList));
+
+// KS-1316
+
+InputPII: => PI_InpEmailHasOnly1CharFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																			PI_InpEmailUserLen > 1 => '0',
+																			'1');
+InputPII: => PI_InpEmailHas3RepeatCharFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																			GetHighestNumberConsecutiveCharacters(P_InpClnEmailUser) >= 3 => '1',
+																			'0');
+InputPII: KEYBOARDLIST1 := '0123456789-=`~!@#$%^&*()_+';
+InputPII: KEYBOARDLIST2 := AddSpecialCharactersToString('QWERTYUIOP[]{}|', 2);
+InputPII: KEYBOARDLIST3 := AddSpecialCharactersToString('ASDFGHJKL;:"', 1);
+InputPII: KEYBOARDLIST4 := 'ZXCVBNM,./<>?';
+InputPII: => KeyboardList1Characters := Filter(UPCASE(TRIM(P_InpClnEmailUser)), KEYBOARDLIST1);			
+InputPII: => KeyboardList1CharactersIsNonZero := LENGTH(KeyboardList1Characters) > 0;
+InputPII: => KeyboardList2Characters := Filter(UPCASE(TRIM(P_InpClnEmailUser)), KEYBOARDLIST2);
+InputPII: => KeyboardList2CharactersIsNonZero := LENGTH(KeyboardList2Characters) > 0;					
+InputPII: => KeyboardList3Characters := Filter(UPCASE(TRIM(P_InpClnEmailUser)), KEYBOARDLIST3);		
+InputPII: => KeyboardList3CharactersIsNonZero := LENGTH(KeyboardList3Characters) > 0;						
+InputPII: => KeyboardList4Characters := Filter(UPCASE(TRIM(P_InpClnEmailUser)), KEYBOARDLIST4);	
+InputPII: => KeyboardList4CharactersIsNonZero := LENGTH(KeyboardList4Characters) > 0;							
+InputPII: => PI_InpEmailQwertyOneRowFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																			(KeyboardList1CharactersIsNonZero AND NOT KeyboardList2CharactersIsNonZero AND NOT KeyboardList3CharactersIsNonZero AND NOT KeyboardList4CharactersIsNonZero) OR
+																			(KeyboardList2CharactersIsNonZero AND NOT KeyboardList1CharactersIsNonZero AND NOT KeyboardList3CharactersIsNonZero AND NOT KeyboardList4CharactersIsNonZero) OR
+																			(KeyboardList3CharactersIsNonZero AND NOT KeyboardList1CharactersIsNonZero AND NOT KeyboardList2CharactersIsNonZero AND NOT KeyboardList4CharactersIsNonZero) OR
+																			(KeyboardList4CharactersIsNonZero AND NOT KeyboardList1CharactersIsNonZero AND NOT KeyboardList2CharactersIsNonZero AND NOT KeyboardList3CharactersIsNonZero) => '1',
+																			'0');
+																			
+InputPII: => PI_InpEmailHas4pNumFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																			EmailDigitsLength >= 4 => '1',
+																			'0');
+InputPII: => PI_InpEmailHas13pCharFlag := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																			PI_InpEmailUserLen >= 13 => '1',
+																			'0');
+InputPII: => PI_InpEmailHighRiskIndx := MAP(P_InpClnEmailUser  IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+																			PI_InpEmailHasOnly1CharFlag = '1' => '5',
+																			PI_InpEmailHas3RepeatCharFlag = '1' => '4',
+																			PI_InpEmailQwertyOneRowFlag  = '1' => '3',
+																			PI_InpEmailHas4pNumFlag = '1' => '2',
+																			PI_InpEmailHas13pCharFlag = '1' => '1',
+																			'0');
+																			 
