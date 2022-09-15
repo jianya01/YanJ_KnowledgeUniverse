@@ -705,10 +705,10 @@ InputPII: NOT EmailAgeGatewayIP:Null OR NOT EmailAgeGatewayIP = '' => EMADomainC
 
 
 																					
-InputPII: => PI_InpEmailDomainOldMsnc := MAP(P_InpClnEmailFlagValue < '1' => MISSING_INPUT_DATA_INT,
-        EMADomainName:Null OR DATE(EMADomainCreatedDate)>DATE(P_InpClnArchDt)  => NO_DATA_FOUND_INT,// or EMADomainCreatedDate after P_InpClnArchDt
+InputPII: => PI_InpEmailDomainOldMsnc := MAP(P_InpClnEmailDom  IN  [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+        EMADomainName:Null OR EMADomainName = '' OR INTEGER(DATE(EMADomainCreatedDate))>INTEGER(CURRENTDATE())  => NO_DATA_FOUND_INT,// or EMADomainCreatedDate after P_InpClnArchDt
         NOT ISVALIDDATE(DATE(EMADomainCreatedDate)) => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,     
-        BOUNDSFOLD(MONTHSBETWEEN(DATE(EMADomainCreatedDate),DATE(P_InpClnArchDt)), 0, 960));							
+        BOUNDSFOLD(MONTHSBETWEEN(DATE(EMADomainCreatedDate),FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')), 0, 960));							
 
 Email: EMAILNONFCRASOURCES := ['AW', 'ET', '!I', 'W@', 'M1', 'DG', 'AN', 'RS'];
 
@@ -725,17 +725,17 @@ InputPII: => DFSEmailMin := MIN(InputCleanEmail(EmailCheck AND ISVALIDDATE(Email
 
 InputPII: => DFSEmailInq := IF(NOT DFSEmailInqMin:Null,  MONTHSBETWEEN(DFSEmailInqMin, Inquiry.CURRENT_DATE), RECS_AVAIL_BUT_CANNOT_CALCULATE_INT);
 InputPII: => DFSEmail := IF(NOT DFSEmailMin:Null,  MONTHSBETWEEN(DFSEmailMin, Email.CURRENT_DATE_FCRA), RECS_AVAIL_BUT_CANNOT_CALCULATE_INT);
-InputPII: => DFSEMA := IF(ISVALIDDATE(DATE(EMAEmailFirstVerificationDate)),  MONTHSBETWEEN(DATE(EMAEmailFirstVerificationDate), DATE(P_InpClnArchDt)), RECS_AVAIL_BUT_CANNOT_CALCULATE_INT);
+InputPII: => DFSEMA := IF(ISVALIDDATE(DATE(EMAEmailFirstVerificationDate)),  MONTHSBETWEEN(DATE(EMAEmailFirstVerificationDate), FROMSTRINGTODATE(STRING(CURRENTDATE()),'%Y%m%d')), RECS_AVAIL_BUT_CANNOT_CALCULATE_INT);
 
-InputPII: => DFSEmailInqMod := IF(DFSEmailInq < 0, 99999, DFSEmailInq);
-InputPII: => DFSEmailMod := IF(DFSEmail < 0, 99999, DFSEmail);
-InputPII: => DFSEMAMod := IF(DFSEMA < 0, 99999, DFSEMA);
+InputPII: => DFSEmailInqMod := IF(DFSEmailInq < 0, -1, DFSEmailInq);
+InputPII: => DFSEmailMod := IF(DFSEmail < 0, -1, DFSEmail);
+InputPII: => DFSEMAMod := IF(DFSEMA < 0, -1, DFSEMA);
 
-InputPII: => CombinedMinEmail := MIN(DFSEmailInqMod, DFSEmailMod, DFSEMAMod);
-InputPII: => CombinedMinEmailFinal := IF(CombinedMinEmail = 99999, RECS_AVAIL_BUT_CANNOT_CALCULATE_INT, CombinedMinEmail );
+InputPII: => CombinedOldEmail := MAX(DFSEmailInqMod, DFSEmailMod, DFSEMAMod);
+InputPII: => CombinedMinEmailFinal := IF(CombinedOldEmail = -1, RECS_AVAIL_BUT_CANNOT_CALCULATE_INT, CombinedOldEmail );
 
 InputPII: => PI_InpEmailOldMsnc := MAP(P_InpClnEmailFlagValue < '1' => MISSING_INPUT_DATA_INT,
-				NOT InputCleanEmailForInquiry.InquiryEmailCheck AND NOT InputCleanEmail.EmailCheck AND (EMAEmailAddress:Null OR DATE(EMAEmailFirstVerificationDate)>DATE(P_InpClnArchDt))  => NO_DATA_FOUND_INT,// or EMADomainCreatedDate after P_InpClnArchDt
+				NOT InputCleanEmailForInquiry.InquiryEmailCheck AND NOT InputCleanEmail.EmailCheck AND (EMAEmailAddress:Null OR INTEGER(DATE(EMAEmailFirstVerificationDate))>INTEGER(CURRENTDATE()))  => NO_DATA_FOUND_INT,// or EMADomainCreatedDate after P_InpClnArchDt
 				(DFSEmailInq = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT AND DFSEmail = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT AND DFSEMA = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT) OR CombinedMinEmailFinal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 				 BOUNDSFOLD(CombinedMinEmailFinal, 0, 960));
 /**************************************************************************/
