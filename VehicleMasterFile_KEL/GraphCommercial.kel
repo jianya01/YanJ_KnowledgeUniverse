@@ -1,19 +1,18 @@
-﻿// #OPTION(persist, 0) // Set to 0 to disable PERSIST functionality
+#OPTION(persist, 0) // Set to 0 to disable PERSIST functionality
 // #OPTION(querytypes, 'normal') // Only generate the Q_* Functions for execution on Thor against the base files
 // #OPTION(exportpreentity) // Force the Pre-Entity code generation so that the Thor code generated is optimized
-
 
 	// --- ENTITY Definitions Section --- 
 IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Entities;
 
 // --- USE Statements Section ---
-IMPORT VehicleMasterFile_KEL.Uses;
+IMPORT VehicleMasterFileCom_KEL.Uses;
 
 // --- Attributes Section ---
 IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Attributes;
 
 
-QUERY: VehicleMasterFile(PERMITS DPM) <= 
+QUERY: VehicleMasterFileCommercial(PERMITS DPM) <= 
 	Policy{
 		VIN := VehiclePolicy.Vehicle.VIN,
 		ValidVIN := VehiclePolicy.Vehicle.ValidVIN,
@@ -35,10 +34,9 @@ QUERY: VehicleMasterFile(PERMITS DPM) <=
 	{
 		VIN,
 		ValidVIN,
-		CommercialVIN := FALSE,
+		CommercialVIN := TRUE,
 		VehicleGroupID,
 		VehicleGroupStart := MIN(GROUP,VehicleGroupStart),
-
 		VehicleGroupEnd := IF(MAX(GROUP,VehicleGroupEnd) <= CURRENTDATE(), MAX(GROUP,VehicleGroupEnd),Policy.NULLDATEVALUE),
 		LexID,
 		LexIDStart := MAX(MIN(GROUP,LexIDStart),MIN(GROUP,VehicleGroupStart)),
@@ -46,10 +44,21 @@ QUERY: VehicleMasterFile(PERMITS DPM) <=
 						MIN(MAX(GROUP,LexIDEnd),MAX(GROUP,BestCoverageEndDate)) > CURRENTDATE() => Policy.NULLDATEVALUE,
 						MIN(MAX(GROUP,LexIDEnd),MAX(GROUP,BestCoverageEndDate))),
 		PrimaryFlag := MAX(GROUP,IF(LexID = PrimaryPolicyHolderLexID, 1, 0)) = 1
-
 	}
 		((LexIDStart < VehicleGroupEnd OR NOT ISVALIDDATE(VehicleGroupEnd) OR VehicleGroupEnd:Null OR VehicleGroupEnd = Policy.NULLDATEVALUE) AND
-		(LexIDEnd > VehicleGroupStart OR NOT ISVALIDDATE(LexIDEnd) OR LexIDEnd:Null)), // Conditions on output eliminate empty outputs
+		(LexIDEnd > VehicleGroupStart OR NOT ISVALIDDATE(LexIDEnd) OR LexIDEnd:Null))
+	{
+		VIN,
+		ValidVIN,
+		CommercialVIN,
+		VehicleGroupID,
+		VehicleGroupStart,
+		VehicleGroupEnd,
+		LexID := 0,
+		LexIDStart := 0,
+		LexIDEnd := 0,
+		PrimaryFlag := Policy.NULLDATEVALUE
+	},
 	Policy{
 		VehiclePolicy(Vehicle.VIN != '' AND NOT Vehicle.VIN:Null).VehicleGroupID,
 		LexID := PersonPolicy.Subject.UID,
@@ -62,8 +71,10 @@ QUERY: VehicleMasterFile(PERMITS DPM) <=
 		((LexIDStart < BestCoverageEndDate) AND
 		(LexIDEnd > BestCoverageStartDate OR NOT ISVALIDDATE(LexIDEnd) OR LexIDEnd:Null) AND
 		NOT InvalidPolicy)
-	{
-		LexID,
+	{	
+		LexID := 0,
 		VehicleGroupID
 	}
 USING DPM;
+
+
