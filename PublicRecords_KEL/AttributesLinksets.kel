@@ -6,20 +6,6 @@ IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
 
 
 // Logic for gathering Inquiry data for Linkset Attribute calculations. 
-Inquiry: => LinksetSource := ONLY(DataSources, Source);
-Inquiry: LINKSET_EVENT_TYPES := ['CAD', 'CAN', 'CANA', 'CANAF', 'CANB', 'CAND', 'CAS'];
-Inquiry: => ValidLinksetSearch :=
-	AgeinDays <= Person.TWO_YEARS_IN_DAYS AND // V2 attributes only look at the past two years. IDA looks at records from the last 5 years for their CAD_SAPE linkage.
-	UPCASE(TRIM(InquiryIndustry)) != '' AND
-	NOT IsCollection AND
-	NOT IsBankoBatch AND
-	NOT IsBatchMonitoringMethod AND
-	InquiryProductCode IN [1,7,9] AND
-	NOT IsChargeBack;
-	
-Inquiry: => ValidLinksetInquiry := 
-	ValidLinksetSearch AND
-	((LinksetSource = 'IQ' AND IsFraudProduct) OR (LinksetSource = 'IDA' AND InquiryEventType IN LINKSET_EVENT_TYPES));
 
 Inquiry: => LinksetLexID := DEFAULT(STRING(ONLY(TOPN(PersonInfo, 1, -LexID), LexID)), '');
 Inquiry: => LinksetAddressRecord := ONLY(TOPN(PersonInfo, 1, -DEFAULT(PrimaryRange, ''), -DEFAULT(Predirectional, ''), -DEFAULT(PrimaryName, ''), -DEFAULT(Suffix, ''), -DEFAULT(Postdirectional, ''), -DEFAULT(ZIP5, ''), -DEFAULT(SecondaryRange, '')));
@@ -54,3 +40,42 @@ Inquiry: => LinksetIndustry := ONLY(TOPN(BusIntel, 1, -IndustryCode1), IndustryC
 Inquiry: => LinksetApplicationDateTime := UID:DateFirstSeen;
 Inquiry: => LinksetApplicationDate := TimeStampToDate(UID:DateFirstSeen);
 Inquiry: => IsSpecialFinance := UPCASE(TRIM(InquiryIndustry)) IN SPECIAL_FINANCE_INDUSTRY;
+
+Inquiry: => LinksetSource := ONLY(DataSources, Source);
+
+Inquiry: LINKSET_EVENT_TYPES := ['CAD', 'CAN', 'CANA', 'CANAF', 'CANB', 'CAND', 'CAS'];
+
+
+Inquiry: => PII := ONLY(InputPII);
+
+InputPII: => FullAddress := fnAddr1FromComponents(
+	DEFAULT(P_InpClnAddrPrimRng, ''),
+	DEFAULT(P_InpClnAddrPreDir, ''),
+	DEFAULT(P_InpClnAddrPrimName, ''),
+	DEFAULT(P_InpClnAddrSffx, ''),
+	DEFAULT(P_InpClnAddrPostDir, ''),
+	'',
+	DEFAULT(P_InpClnAddrSecRng, '')) + 
+	' ' + 
+	DEFAULT(P_InpClnAddrZip5, '');
+
+Inquiry: => InquiryMatchesInputTransaction := 
+	DEFAULT(PII.InputQueryID, '') <> ''	AND 	DEFAULT(PII.InputQueryID, '') = InquiryQueryID AND
+	DEFAULT(PII.InputHHID, '') <> '' AND DEFAULT(PII.InputHHID, '') = DEFAULT(STRING(InqIDCommon), '') AND
+	DEFAULT(PII.P_InpClnSSN, '') = DEFAULT(LinksetSSN, '') AND
+	DEFAULT(PII.P_InpClnPhoneHome, '') = DEFAULT(LinksetPhone, '') AND
+	PII.FullAddress = LinksetAddress;
+	
+Inquiry: => ValidLinksetSearch :=
+	AgeinDays <= Person.TWO_YEARS_IN_DAYS AND // V2 attributes only look at the past two years. IDA looks at records from the last 5 years for their CAD_SAPE linkage.
+	UPCASE(TRIM(InquiryIndustry)) != '' AND
+	NOT IsCollection AND
+	NOT IsBankoBatch AND
+	NOT IsBatchMonitoringMethod AND
+	InquiryProductCode IN [1,7,9] AND
+	NOT IsChargeBack AND
+	NOT InquiryMatchesInputTransaction;
+	
+Inquiry: => ValidLinksetInquiry := 
+	ValidLinksetSearch AND
+	((LinksetSource = 'IQ' AND IsFraudProduct) OR (LinksetSource = 'IDA' AND InquiryEventType IN LINKSET_EVENT_TYPES));
