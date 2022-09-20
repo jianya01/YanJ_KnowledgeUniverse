@@ -19148,5 +19148,84 @@ Person: => PL_InpEmailMatchIndx := MAP(P_LexIDSeenFlag = '0' OR P_InpClnEmailFla
 			PI_InpEmailHasFNameFlag = '1' OR PI_InpEmailHasLNameFlag = '1' => '1',
 			NOT EXISTS(PersonEmail(EmailMatch)) => NO_DATA_FOUND);
 																			 
+Inquiry: => InqTimeStampDLS := TimeStampToDate(TransactionID:DateFirstSeen);       
+Inquiry: TWO_YEARS_IN_DAYS := 730;     
+Person: => GatherNonFCRAInquiriesFraudPerLexID:= PersonInquiry.Transaction{
+        TransactionID,
+        InqTimeStampDLS,
+				ReportedFraudTypeCode := ONLY(ReportedFraud, ReportedFraudTypeCode)
+				};
+Person.GatherNonFCRAInquiriesFraudPerLexID: => AgeInDays := ABSDAYSBETWEEN(InqTimeStampDLS,Inquiry.CURRENT_DATE);
+Person.GatherNonFCRAInquiriesFraudPerLexID: => Seen_In_One_Year := AgeInDays <= Inquiry.ONE_YEAR_IN_DAYS;
+Person.GatherNonFCRAInquiriesFraudPerLexID: => Seen_In_Two_Years := AgeInDays <= Inquiry.TWO_YEARS_IN_DAYS;
+Person.GatherNonFCRAInquiriesFraudPerLexID: => FraudCheck := IF(ReportedFraudTypeCode%10 IN [1,5,9],'1','0');
+
+InputPII: => GatherNonFCRAInquiriesFraudPerInputAddress:= Location.AddressInquiry.Transaction{
+        TransactionID,
+        InqTimeStampDLS,
+				ReportedFraudTypeCode := ONLY(ReportedFraud, ReportedFraudTypeCode)
+        };
+InputPII.GatherNonFCRAInquiriesFraudPerInputAddress: => AgeInDays := ABSDAYSBETWEEN(InqTimeStampDLS,Inquiry.CURRENT_DATE);
+InputPII.GatherNonFCRAInquiriesFraudPerInputAddress: => Seen_In_One_Year := AgeInDays <= Inquiry.ONE_YEAR_IN_DAYS;
+InputPII.GatherNonFCRAInquiriesFraudPerInputAddress: => Seen_In_Two_Years := AgeInDays <= Inquiry.TWO_YEARS_IN_DAYS;
+InputPII.GatherNonFCRAInquiriesFraudPerInputAddress: => FraudCheck := IF(ReportedFraudTypeCode%10 IN [1,5,9],'1','0');
+
+InputPII: => GatherNonFCRAInquiriesFraudPerInputPhone:= InputCleanPhone.PhoneInquiry.Transaction{
+        TransactionID,
+        InqTimeStampDLS,
+				ReportedFraudTypeCode := ONLY(ReportedFraud, ReportedFraudTypeCode)
+        };
+InputPII.GatherNonFCRAInquiriesFraudPerInputPhone: => AgeInDays := ABSDAYSBETWEEN(InqTimeStampDLS,Inquiry.CURRENT_DATE);
+InputPII.GatherNonFCRAInquiriesFraudPerInputPhone: => Seen_In_One_Year := AgeInDays <= Inquiry.ONE_YEAR_IN_DAYS;
+InputPII.GatherNonFCRAInquiriesFraudPerInputPhone: => Seen_In_Two_Years := AgeInDays <= Inquiry.TWO_YEARS_IN_DAYS;
+InputPII.GatherNonFCRAInquiriesFraudPerInputPhone: => FraudCheck := IF(ReportedFraudTypeCode%10 IN [1,5,9],'1','0');
+
+InputPII: => GatherNonFCRAInquiriesFraudPerInputSSN:= InputCleanSSN.SSNInquiry.Transaction{
+        TransactionID,
+        InqTimeStampDLS,
+				PersonInfo.FirstName,
+				PersonInfo.LastName,
+				ReportedFraudTypeCode := ONLY(ReportedFraud, ReportedFraudTypeCode)
+        };
+InputPII.GatherNonFCRAInquiriesFraudPerInputSSN: => AgeInDays := ABSDAYSBETWEEN(InqTimeStampDLS,Inquiry.CURRENT_DATE);
+InputPII.GatherNonFCRAInquiriesFraudPerInputSSN: => Seen_In_One_Year := AgeInDays <= Inquiry.ONE_YEAR_IN_DAYS;
+InputPII.GatherNonFCRAInquiriesFraudPerInputSSN: => Seen_In_Two_Years := AgeInDays <= Inquiry.TWO_YEARS_IN_DAYS;
+InputPII.GatherNonFCRAInquiriesFraudPerInputSSN: => FraudCheck := IF(ReportedFraudTypeCode%10 IN [1,5,9],'1','0');
+InputPII.GatherNonFCRAInquiriesFraudPerInputSSN: => IsInputFirstNameMatch := IsFirstNameMatch(FirstName, InputFirstNameCleanValue);
+InputPII.GatherNonFCRAInquiriesFraudPerInputSSN: => IsInputLastNameMatch := IsLastNameMatch(LastName, InputLastNameCleanValue);
+
+Person: => PL_InqPerLexIDFrdCnt1Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerLexID(Seen_In_One_Year)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerLexID(Seen_In_One_Year AND FraudCheck = '1')),0,999));
+Person: => PL_InqPerLexIDFrdCnt2Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerLexID(Seen_In_Two_Years)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerLexID(Seen_In_Two_Years AND FraudCheck = '1')),0,999));
+				
+InputPII: => PI_InqPerInpAddrFrdCnt1Y := MAP(InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerInputAddress(Seen_In_One_Year)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerInputAddress(Seen_In_One_Year AND FraudCheck = '1')),0,999));
+InputPII: => PI_InqPerInpAddrFrdCnt2Y := MAP(InputFullAddressCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerInputAddress(Seen_In_Two_Years)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerInputAddress(Seen_In_Two_Years AND FraudCheck = '1')),0,999));
+				
+InputPII: => PI_InqPerInpPhoneFrdCnt1Y := MAP(InputHomePhoneCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerInputPhone(Seen_In_One_Year)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerInputPhone(Seen_In_One_Year AND FraudCheck = '1')),0,999));
+InputPII: => PI_InqPerInpPhoneFrdCnt2Y := MAP(InputHomePhoneCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerInputPhone(Seen_In_Two_Years)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerInputPhone(Seen_In_Two_Years AND FraudCheck = '1')),0,999));
+				
+InputPII: => PI_InqPerInpSSNFrdCnt1Y := MAP(InputSSNCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_One_Year)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_One_Year AND FraudCheck = '1')),0,999));
+InputPII: => PI_InqPerInpSSNFrdCnt2Y := MAP(InputSSNCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_Two_Years)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_Two_Years AND FraudCheck = '1')),0,999));
+				
+InputPII: => PI_InqPerInpNameSSNFrdCnt1Y := MAP(InputSSNCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR InputFirstNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR InputLastNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT,
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_One_Year AND IsInputFirstNameMatch AND IsInputLastNameMatch)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_One_Year AND FraudCheck = '1' AND IsInputFirstNameMatch AND IsInputLastNameMatch)),0,999));
+InputPII: => PI_InqPerInpNameSSNFrdCnt2Y := MAP(InputSSNCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR InputFirstNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR InputLastNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT, 
+        NOT EXISTS(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_Two_Years AND IsInputFirstNameMatch AND IsInputLastNameMatch)) => NO_DATA_FOUND_INT,
+        BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_Two_Years AND FraudCheck = '1' AND IsInputFirstNameMatch AND IsInputLastNameMatch)),0,999));
 																			 
-						
