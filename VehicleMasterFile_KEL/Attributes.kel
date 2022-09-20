@@ -1,14 +1,14 @@
 ﻿IMPORT KnowledgeUniverse.VehicleMasterFile_KEL.Entities; 
-IMPORT VehicleMasterFile_KEL.Uses;
+// IMPORT VehicleMasterFile_KEL.Uses;
 
 IMPORT KnowledgeUniverse.KELFunctionLibraries.KELGlobalFunctionLibrary;
 FUNCTION: TimeStampToDate(TIMESTAMP x) <= ECL((STRING) x[..8]) RETURNS DATE; //most date functions are not supported by timestamp. This casts to date so you just use that.
 
 Policy: NULLDATEVALUE := DATE(0);
 
-
 PersonPolicy: => G_BestHolderStartDate := MIN(OriginDates, OriginDate);
 PersonPolicy: => G_BestHolderEndDate := MIN(MAX(CancellationDates,CancellationDate),MAX(EndDates,EndDate));
+
 // this is to rank the person in a policy. Used to find out a primary holder when we have two or none primary holders in a policy for a vehicle due to data issue.
 PersonPolicy: => G_RankHolder := MAP(PolicyHolderRelation = 'A1' => 1,  PolicyHolderRelation = 'B1' => 2, 3);
 
@@ -18,14 +18,18 @@ VehiclePolicy: => G_BestCoverageEndDate := MIN(CancellationDate,MAX(CoverageEndD
 
 VehiclePolicy: => G_InvalidPolicy := G_BestCoverageStartDate >= G_BestCoverageEndDate OR COUNT(Policy.PersonPolicy(G_BestHolderEndDate > VehiclePolicy.G_BestCoverageStartDate AND G_BestHolderStartDate < VehiclePolicy.G_BestCoverageEndDate)) = 0;
 
-VehiclePolicy: => G_FirstPurchase := G_BestCoverageStartDate = MIN(Vehicle.VehiclePolicy,G_BestCoverageStartDate);
+VehiclePolicy: => G_FirstPurchase := G_BestCoverageStartDate = MIN(Vehicle.VehiclePolicy(NOT G_InvalidPolicy),G_BestCoverageStartDate);
 VehiclePolicy: => G_PreviousAppearanceDate := MAX(Vehicle.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, Policy !=  VehiclePolicy.Policy, G_BestCoverageStartDate <= VehiclePolicy.G_BestCoverageStartDate,NOT G_InvalidPolicy,ISVALIDDATE(G_BestCoverageStartDate)), G_BestCoverageStartDate);
-VehiclePolicy: => G_HasBefore := EXISTS(Policy.PersonPolicy.Subject.PersonPolicy.Policy.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, G_BestCoverageStartDate = VehiclePolicy.G_PreviousAppearanceDate,ISVALIDDATE(G_BestCoverageStartDate)));
+// VehiclePolicy: => G_PreviousAppearanceDate := MAX(Vehicle.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, Policy !=  VehiclePolicy.Policy, G_BestCoverageEndDate <= VehiclePolicy.G_BestCoverageEndDate,NOT G_InvalidPolicy,ISVALIDDATE(G_BestCoverageEndDate)), G_BestCoverageEndDate);
+
+VehiclePolicy: => G_HasBefore := EXISTS(Policy.PersonPolicy.Subject.PersonPolicy.Policy.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, G_BestCoverageStartDate = VehiclePolicy.G_PreviousAppearanceDate,NOT G_InvalidPolicy,ISVALIDDATE(G_BestCoverageStartDate)));
+// VehiclePolicy: => G_HasBefore := EXISTS(Policy.PersonPolicy.Subject.PersonPolicy.Policy.VehiclePolicy(Vehicle = VehiclePolicy.Vehicle, G_BestCoverageEndDate = VehiclePolicy.G_PreviousAppearanceDate,NOT G_InvalidPolicy,ISVALIDDATE(G_BestCoverageEndDate)));
+
 VehiclePolicy: => G_ChangedOwnership := NOT(G_FirstPurchase OR G_HasBefore);
 
 
 // this is to find the min apearance date or G_BestCoverageStartDate for a ownership
-VehiclePolicy: => G_MinAppearanceDate := IF(G_FirstPurchase OR G_ChangedOwnership, G_BestCoverageStartDate);
+VehiclePolicy: => G_MinAppearanceDate := IF((G_FirstPurchase OR G_ChangedOwnership) AND NOT G_InvalidPolicy, G_BestCoverageStartDate);
 // this is to fill in the min apearance date or G_BestCoverageStartDate for policies in one ownership
 VehiclePolicy: => G_GetMinAppearanceDate := MAX(Vehicle.VehiclePolicy(NOT G_MinAppearanceDate:Null AND VehiclePolicy.G_MinAppearanceDate:Null AND G_BestCoverageStartDate < VehiclePolicy.G_BestCoverageStartDate AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_InvalidPolicy),G_BestCoverageStartDate);
 
@@ -39,7 +43,21 @@ VehiclePolicy: => G_PrimaryPolicyHolderLexID := ONLY(TOPN(Policy.PersonPolicy(G_
 VehiclePolicy: => G_LatestPrimaryHolder := ONLY(Vehicle.VehiclePolicy(VehicleGroupID = VehiclePolicy.VehicleGroupID AND Policy = VehiclePolicy.G_LatestPolicy), G_PrimaryPolicyHolderLexID);
 
 
-VehiclePolicy: => VehicleGroupStart := IF(NOT G_MinAppearanceDate:Null, G_MinAppearanceDate, G_GetMinAppearanceDate);
-VehiclePolicy: => VehicleGroupEnd := MIN(Vehicle.VehiclePolicy(VehicleGroupStart > VehiclePolicy.VehicleGroupStart AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_InvalidPolicy),VehicleGroupStart);
+VehiclePolicy: => VehicleGroupStart := MAX(G_VehicleGroupStart, G_MinGroupHolderStart);
+VehiclePolicy: => G_VehicleGroupStart := IF(NOT G_MinAppearanceDate:Null, G_MinAppearanceDate, G_GetMinAppearanceDate);
+
 VehiclePolicy : => VehicleGroupID := TRIMBOTH(Vehicle.VIN) + '_' + DATETOSTRING(VehicleGroupStart,'%Y%m%d');
+VehiclePolicy: => G_AllHolderHaveEnd := ALL(Policy.PersonPolicy(G_BestHolderEndDate > VehiclePolicy.G_BestCoverageStartDate AND G_BestHolderStartDate < VehiclePolicy.G_BestCoverageEndDate), NOT G_BestHolderEndDate:Null);
+
+VehiclePolicy: => G_MinHolderStart := MIN(Policy.PersonPolicy(G_BestHolderEndDate > VehiclePolicy.G_BestCoverageStartDate AND G_BestHolderStartDate < VehiclePolicy.G_BestCoverageEndDate), G_BestHolderStartDate);
+VehiclePolicy: => G_MaxHolderEnd := MAX(Policy.PersonPolicy(G_BestHolderEndDate > VehiclePolicy.G_BestCoverageStartDate AND G_BestHolderStartDate < VehiclePolicy.G_BestCoverageEndDate), G_BestHolderEndDate);
+
+VehiclePolicy: => G_MinGroupHolderStart := MIN(Vehicle.VehiclePolicy(G_VehicleGroupStart = VehiclePolicy.G_VehicleGroupStart AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_InvalidPolicy), G_MinHolderStart);
+
+VehiclePolicy: => G_MaxGroupHolderEnd := MAX(Vehicle.VehiclePolicy(G_VehicleGroupStart = VehiclePolicy.G_VehicleGroupStart AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_InvalidPolicy), G_MaxHolderEnd);
+
+VehiclePolicy: => G_NextGroupStart := MIN(Vehicle.VehiclePolicy(G_VehicleGroupStart > VehiclePolicy.G_VehicleGroupStart AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_InvalidPolicy),G_VehicleGroupStart);
+VehiclePolicy: => G_BestGroupEnd := MAX(Vehicle.VehiclePolicy(G_VehicleGroupStart = VehiclePolicy.G_VehicleGroupStart AND NOT Policy.PersonPolicy.Subject:Null AND NOT G_InvalidPolicy), G_BestCoverageEndDate);
+VehiclePolicy: => VehicleGroupEnd := IF(G_NextGroupStart:Null, MIN(G_MaxGroupHolderEnd, G_BestGroupEnd), MIN(G_MaxGroupHolderEnd, G_BestGroupEnd, G_NextGroupStart));
+
 
