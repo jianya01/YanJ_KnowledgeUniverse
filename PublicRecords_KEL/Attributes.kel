@@ -13821,11 +13821,13 @@ Person: => NonDerogSourceListAllNonFCRAPre := NonDerogSourceListNonFCRADataSet{
 											SourceDateLastSeen := TranslatedSourceCode:DateLastSeen};
 Person: => NonDerogSourceListAllFCRA := NonDerogSourceListAllFCRAPre{
 											TranslatedSourceCode,
+                      RecordCount := TranslatedSourceCode:Weight, 
 											AgeInDays := DAYSBETWEEN(SourceDateLastSeen,Person.CURRENT_DATE),
 											SrcFirstSeenDate := DEFAULT(DATETOSTRING(SourceDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
 											SrcLastSeenDate := IF(ISVALIDDATE(SourceDateLastSeen), DATETOSTRING(MIN(SourceDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)}; 
 Person: => NonDerogSourceListAllNonFCRA := NonDerogSourceListAllNonFCRAPre{
 											TranslatedSourceCode,
+                      RecordCount := TranslatedSourceCode:Weight,
 											AgeInDays := DAYSBETWEEN(SourceDateLastSeen,Person.CURRENT_DATE),
 											SrcFirstSeenDate := DEFAULT(DATETOSTRING(SourceDateFirstSeen, '%Y%m%d'), Person.NO_DATA_FOUND_97),
 											SrcLastSeenDate := IF(ISVALIDDATE(SourceDateLastSeen), DATETOSTRING(MIN(SourceDateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), NO_DATA_FOUND_97)}; 
@@ -14882,14 +14884,15 @@ Person: => SSNTranslatedSources := PersonSSN(InputSSNMatch).DataSources(HeaderHi
 Person.SSNTranslatedSources: => AgeInDays := ABSDAYSBETWEEN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE);
 Person: => PersonSSNMatchSourcesAll := SSNTranslatedSources(TranslatedSourceCode != ''){
 	TranslatedSourceCode := TranslatedSourceCode,
+  RecordCount := TranslatedSourceCode:Weight,
 	SourceDateFirstSeen := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97),
 	FirstSeenDate := IF(ISVALIDDATE(TranslatedSourceCode:DateFirstSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateFirstSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.MAX_DATE),
 	SourceDateLastSeen :=  IF(ISVALIDDATE(TranslatedSourceCode:DateLastSeen), DATETOSTRING(MIN(TranslatedSourceCode:DateLastSeen, Person.CURRENT_DATE), '%Y%m%d'), Person.NO_DATA_FOUND_97),
 	ValidBankruptcySources := (TranslatedSourceCode = 'BA' AND AgeInDays <= Person.TEN_YEARS_IN_DAYS AND NOT AgeInDays:Null),
 	ValidLiensSources := (TranslatedSourceCode = 'L2' AND AgeInDays <= Person.SEVEN_YEARS_IN_DAYS AND NOT AgeInDays:Null),
 	OtherSources := (TranslatedSourceCode <> 'BA' AND TranslatedSourceCode <> 'L2')};
-Person: => SSNVerSourceListSortedFCRA := TOPN(PersonSSNMatchSourcesAll(ValidBankruptcySources OR ValidLiensSources OR OtherSources){TranslatedSourceCode, SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 99, FirstSeenDate, TranslatedSourceCode);
-Person: => SSNVerSourceListSorted := TOPN(PersonSSNMatchSourcesAll{TranslatedSourceCode, SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 99, FirstSeenDate, TranslatedSourceCode);
+Person: => SSNVerSourceListSortedFCRA := TOPN(PersonSSNMatchSourcesAll(ValidBankruptcySources OR ValidLiensSources OR OtherSources){TranslatedSourceCode, RecordCount, SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 99, FirstSeenDate, TranslatedSourceCode);
+Person: => SSNVerSourceListSorted := TOPN(PersonSSNMatchSourcesAll{TranslatedSourceCode, RecordCount, SourceDateFirstSeen, FirstSeenDate, SourceDateLastSeen}, 99, FirstSeenDate, TranslatedSourceCode);
 PersonSSN.DataSources: => SSNSourceDateFirstSeen := Source:DateFirstSeen;
 PersonSSN.DataSources: => SSNSourceDateLastSeen := Source:DateLastSeen;
 Person: => PersonSSNMatchSourcesAllPre := PersonSSN(InputSSNMatch).DataSources(HeaderHitFlag AND ValidSSN IN ['G','Z','R','O', 'F'] AND TranslatedSourceCode != ''){TranslatedSourceCode, SSNSourceDateFirstSeen, SSNSourceDateLastSeen};
@@ -19228,4 +19231,141 @@ InputPII: => PI_InqPerInpNameSSNFrdCnt1Y := MAP(InputSSNCleanValue IN [MISSING_I
 InputPII: => PI_InqPerInpNameSSNFrdCnt2Y := MAP(InputSSNCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR InputFirstNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND] OR InputLastNameCleanValue IN [MISSING_INPUT_DATA, NO_DATA_FOUND]=> MISSING_INPUT_DATA_INT, 
         NOT EXISTS(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_Two_Years AND IsInputFirstNameMatch AND IsInputLastNameMatch)) => NO_DATA_FOUND_INT,
         BOUNDSFOLD(COUNT(GatherNonFCRAInquiriesFraudPerInputSSN(Seen_In_Two_Years AND FraudCheck = '1' AND IsInputFirstNameMatch AND IsInputLastNameMatch)),0,999));
-																			 
+
+//KS-7848
+//SrcNonDRG
+Person: => NonDrgSrcGrpRecListSorted := TOPN(VerSourceListAllNonFCRA(TranslatedSourceCode IN Person.NON_FCRA_NON_DEROG_VALID_SOURCES), 100, SrcFirstSeenDate);
+Person: => NonDrgSrcGrpRecListSortedFCRA := TOPN(VerSourceListAllFCRA(TranslatedSourceCode IN Person.FCRA_NON_DEROG_VALID_SOURCES), 100, SrcFirstSeenDate);
+
+Person: => PL_SrcNonDrgRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+    BOUNDSFOLD(SUM(NonDrgSrcGrpRecListSorted, RecordCount), 0, 9999));
+Person: => PL_SrcNonDrgRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_INT,
+    BOUNDSFOLD(SUM(NonDrgSrcGrpRecListSortedFCRA, RecordCount), 0, 9999));
+    
+Person: => PL_SrcNonDrgRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+    PL_SrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(NonDrgSrcGrpRecListSorted, RecordCount, '|'));
+Person: => PL_SrcNonDrgRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
+    PL_SrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(NonDrgSrcGrpRecListSortedFCRA, RecordCount, '|'));
+
+//InpAddr
+Person: => PL_InpAddrSrcCredRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpAddrSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(InpAddrSourceCredentialListSorted, RecordCount), 0, 9999));
+Person: => PL_InpAddrSrcCredRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpAddrSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(InpAddrSourceCredentialListSortedFCRA, RecordCount), 0, 9999));
+    
+Person: => PL_InpAddrSrcCredRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpAddrSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(InpAddrSourceCredentialListSorted, RecordCount, '|'));
+Person: => PL_InpAddrSrcCredRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpAddrSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(InpAddrSourceCredentialListSortedFCRA, RecordCount, '|'));
+    
+Person: => PL_InpAddrSrcNonDrgRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpAddrSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(InpAddrSourceNonDerogListSorted, RecordCount), 0, 9999));
+Person: => PL_InpAddrSrcNonDrgRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpAddrSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(InpAddrSourceNonDerogListSortedFCRA, RecordCount), 0, 9999));
+    
+Person: => PL_InpAddrSrcNonDrgRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpAddrSrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(InpAddrSourceNonDerogListSorted, RecordCount, '|'));
+Person: => PL_InpAddrSrcNonDrgRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnAddrFull IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpAddrSrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(InpAddrSourceNonDerogListSortedFCRA, RecordCount, '|'));
+    
+//InpSSN
+Person: => InpSSNSrcCredRecListSorted := TOPN(VerSSNSourceListAllNonFCRA(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES), 100, SSNSrcFirstSeenDate);
+Person: => InpSSNSrcCredRecListSortedFCRA := TOPN(VerSSNSourceListAllFCRA(TranslatedSourceCode IN Person.CREDENTIALED_SOURCES_FCRA), 100, SSNSrcFirstSeenDate);
+Person: => InpSSNSrcNonDrgRecListSorted := TOPN(VerSSNSourceListAllNonFCRA(TranslatedSourceCode IN Person.NON_FCRA_NON_DEROG_VALID_SOURCES), 100, SSNSrcFirstSeenDate);
+Person: => InpSSNSrcNonDrgRecListSortedFCRA := TOPN(VerSSNSourceListAllFCRA(TranslatedSourceCode IN Person.FCRA_NON_DEROG_VALID_SOURCES), 100, SSNSrcFirstSeenDate);
+
+Person: => PL_InpSSNSrcCredRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpSSNSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(InpSSNSrcCredRecListSorted, RecordCount), 0, 9999));
+Person: => PL_InpSSNSrcCredRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpSSNSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(InpSSNSrcCredRecListSortedFCRA, RecordCount), 0, 9999));
+
+Person: => PL_InpSSNSrcCredRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpSSNSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(InpSSNSrcCredRecListSorted, RecordCount, '|'));
+Person: => PL_InpSSNSrcCredRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpSSNSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(InpSSNSrcCredRecListSortedFCRA, RecordCount, '|'));
+
+Person: => PL_InpSSNSrcNonDrgRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpSSNSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(InpSSNSrcNonDrgRecListSorted, RecordCount), 0, 9999));
+Person: => PL_InpSSNSrcNonDrgRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpSSNSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(InpSSNSrcNonDrgRecListSortedFCRA, RecordCount), 0, 9999));
+
+Person: => PL_InpSSNSrcNonDrgRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpSSNSrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(InpSSNSrcNonDrgRecListSorted, RecordCount, '|'));
+Person: => PL_InpSSNSrcNonDrgRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnSSN IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpSSNSrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(InpSSNSrcNonDrgRecListSortedFCRA, RecordCount, '|'));
+
+//InpDOB
+Person: => PL_InpDOBSrcCredRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpDOBSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(DOBMatchCredentialedSourcesSortedNonFCRA, RecordCount), 0, 9999));
+Person: => PL_InpDOBSrcCredRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA,NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpDOBSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(DOBMatchCredentialedSourcesSortedFCRA, RecordCount), 0, 9999));
+
+Person: => PL_InpDOBSrcCredRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpDOBSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(DOBMatchCredentialedSourcesSortedNonFCRA, RecordCount, '|'));
+Person: => PL_InpDOBSrcCredRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpDOBSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(DOBMatchCredentialedSourcesSortedFCRA, RecordCount, '|'));
+
+Person: => PL_InpDOBSrcNonDrgRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpDOBSrcRecCntEvNonFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(DOBMatchNonDerogSourcesSortedNonFCRA, RecordCount), 0, 9999));
+Person: => PL_InpDOBSrcNonDrgRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpDOBSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(DOBMatchNonDerogSourcesSortedFCRA, RecordCount), 0, 9999));
+
+Person: => PL_InpDOBSrcNonDrgRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpDOBSrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(DOBMatchNonDerogSourcesSortedNonFCRA, RecordCount, '|'));
+Person: => PL_InpDOBSrcNonDrgRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnDOB IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpDOBSrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(DOBMatchNonDerogSourcesSortedFCRA, RecordCount, '|'));
+    
+//InpPhone
+Person: => PL_InpPhoneSrcCredRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpPhoneSrcRecCntEv < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(PhoneCredSourceListSortedNonFCRA, RecordCount), 0, 9999));
+Person: => PL_InpPhoneSrcCredRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpPhoneSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(PhoneCredSourceListSortedFCRA, RecordCount), 0, 9999));
+
+Person: => PL_InpPhoneSrcCredRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpPhoneSrcCredCntEvNonFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(PhoneCredSourceListSortedNonFCRA, RecordCount, '|'));
+Person: => PL_InpPhoneSrcCredRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpPhoneSrcCredCntEvFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(PhoneCredSourceListSortedFCRA, RecordCount, '|'));
+
+Person: => PL_InpPhoneSrcNonDrgRecCntEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpPhoneSrcRecCntEv < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(PhoneNonDrgSourceListSortedNonFCRA, RecordCount), 0, 9999));
+Person: => PL_InpPhoneSrcNonDrgRecCntEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA_INT,
+    PL_InpPhoneSrcRecCntEvFCRA < 1 => NO_DATA_FOUND_INT,
+    BOUNDSFOLD(SUM(PhoneNonDrgSourceListSortedFCRA, RecordCount), 0, 9999));
+
+Person: => PL_InpPhoneSrcNonDrgRecCntListEvNonFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpPhoneSrcNonDrgCntEvNonFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(PhoneNonDrgSourceListSortedNonFCRA, RecordCount, '|'));
+Person: => PL_InpPhoneSrcNonDrgRecCntListEvFCRA := MAP(P_LexIDSeenFlag = '0' OR P_InpClnPhoneHome IN [MISSING_INPUT_DATA, NO_DATA_FOUND] => MISSING_INPUT_DATA,
+    PL_InpPhoneSrcNonDrgCntEvFCRA < 1 => NO_DATA_FOUND,
+    CONCAT(PhoneNonDrgSourceListSortedFCRA, RecordCount, '|'));                                        
