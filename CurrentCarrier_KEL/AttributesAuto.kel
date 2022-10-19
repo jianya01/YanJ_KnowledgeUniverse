@@ -1,1 +1,732 @@
 ﻿IMPORT KnowledgeUniverse.CurrentCarrier_KEL.Entities;
+
+
+//Constant
+Policy: C_DEFAULT_99999 := -99999;
+Policy: C_DEFAULT_99998 := -99998;
+Report: C_DEFAULT_1 := -1;
+Report: C_DEFAULT_2 := -2;
+Report: C_DEFAULT_3 := -3;
+Report: C_DEFAULT_4 := -4;
+Report: C_CAP_992 := 992;
+Report: C_CAP_9992 := 9992;
+Report: C_CAP_99999992 := 99999992;
+Report: C_CAP_99999999_92 := 99999999.92;
+
+
+Policy: => SubjectEndDatePolicy := MAX(PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0), EndDate);// null, if not valid records
+Policy: => SubjectBeginDatePolicy := MIN(PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0 AND EndDate = Policy.SubjectEndDatePolicy), StartDate);
+Policy: => PeriodBeginDate := MIN(MIN(PeriodStartDate, DateOfReport), SubjectEndDatePolicy);
+Policy: => DateOfReport := rReport.DateOfReport;
+Policy: => Calculated_End_Date := IF(NOT SubjectEndDatePolicy:Null, MIN(SubjectEndDatePolicy, DateOfReport));//null, if no subject end date at all. of course, not valid policy
+Policy: => Calculated_Start_Date:= IF(NOT SubjectBeginDatePolicy:Null, MIN(InceptionDate,SubjectBeginDatePolicy),InceptionDate);//added inceptiondate if no subjectbegindate
+Policy: => Capped_Start_Date := MAX(Calculated_Start_Date, CUTOFFDAYOF5Y);
+
+//Function
+// round to 2 decimals
+FUNCTION: ROUND2(REAL inreal) <= ECL(ROUND(inreal + 0.00000000001, 2)) RETURNS REAL;
+
+//Globals
+Policy: => Subject := PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0){SubjectNumber}; // Grab the primary policy holder for this policy (Relation = 'B1' would be additional policy holders)
+
+//Constant
+Policy: C_POLICYTYPE_PA := ['AU', 'MO', 'BO', 'WC', 'XO'];
+Policy: C_POLICYTYPE_AU := ['AU'];
+Policy: C_POLICYTYPE_MO := ['MO'];
+Policy: C_POLICYTYPE_BO := ['BO'];
+Policy: C_POLICYTYPE_WC := ['WC'];
+Policy: C_POLICYTYPE_XO := ['XO'];
+
+Policy: C_CANCELLATIONREASON_COMP := ['COMP'];
+Policy: C_CANCELLATIONREASON_NONP := ['NONP'];
+Policy: C_CANCELLATIONREASON_CUST := ['CUST'];
+Policy: C_CANCELLATIONREASON_LAPS := ['LAPS'];
+Policy: C_CANCELLATIONREASON_MISR := ['MISR'];
+Policy: C_CANCELLATIONREASON_SUSR := ['SUSR'];
+Policy: C_CANCELLATIONREASON_NYDI := ['NYDI'];
+Policy: C_CANCELLATIONREASON_NYSI := ['NYSI'];
+Policy: C_CANCELLATIONREASON_OTHR := ['OTHR'];
+Policy: C_CANCELLATIONREASON_PROP := ['PROP'];
+Policy: C_CANCELLATIONREASON_REWR := ['REWR'];
+Policy: C_CANCELLATIONREASON_RTCK := ['RTCK'];
+Policy: C_CANCELLATIONREASON_SOLD := ['SOLD'];
+Policy: C_CANCELLATIONREASON_TRAN := ['TRAN'];
+
+Policy: C_STATUS_EFFECT := ['IN-EFFECT'];
+Policy: C_STATUS_CANCELLED := ['CANCELLED'];
+Policy: C_STATUS_EXPIRED := ['EXPIRED'];
+Policy: C_STATUS_DISPUTED := ['DISPUTED'];
+// Report: DAYSOF5Y := 1827;
+// Report: DAYSOF4Y := 1461;
+// Report: DAYSOF3Y := 1096;
+// Report: DAYSOF2Y := 731;
+// Report: DAYSOF1Y := 365;
+// Policy: DAYSOF5Y := 1827;
+// Policy: DAYSOF4Y := 1461;
+// Policy: DAYSOF3Y := 1096;
+// Policy: DAYSOF2Y := 731;
+// Policy: DAYSOF1Y := 365;
+
+// Report: => DateOfReport := Policy.DateOfReport;
+Report: => CUTOFFDAYOF5Y := ADJUSTCALENDAR(DateOfReport,-5,0,0);
+Report: => CUTOFFDAYOF4Y := ADJUSTCALENDAR(DateOfReport,-4,0,0);
+Report: => CUTOFFDAYOF3Y := ADJUSTCALENDAR(DateOfReport,-3,0,0);
+Report: => CUTOFFDAYOF2Y := ADJUSTCALENDAR(DateOfReport,-2,0,0);
+Report: => CUTOFFDAYOF1Y := ADJUSTCALENDAR(DateOfReport,-1,0,0);
+Policy: => CUTOFFDAYOF5Y := ADJUSTCALENDAR(DateOfReport,-5,0,0);
+Policy: => CUTOFFDAYOF4Y := ADJUSTCALENDAR(DateOfReport,-4,0,0);
+Policy: => CUTOFFDAYOF3Y := ADJUSTCALENDAR(DateOfReport,-3,0,0);
+Policy: => CUTOFFDAYOF2Y := ADJUSTCALENDAR(DateOfReport,-2,0,0);
+Policy: => CUTOFFDAYOF1Y := ADJUSTCALENDAR(DateOfReport,-1,0,0);
+
+Report: => DAYSOF5Y := DAYSBETWEEN(CUTOFFDAYOF5Y,DateOfReport);
+Report: => DAYSOF4Y := DAYSBETWEEN(CUTOFFDAYOF4Y,DateOfReport);
+Report: => DAYSOF3Y := DAYSBETWEEN(CUTOFFDAYOF3Y,DateOfReport);
+Report: => DAYSOF2Y := DAYSBETWEEN(CUTOFFDAYOF2Y,DateOfReport);
+Report: => DAYSOF1Y := DAYSBETWEEN(CUTOFFDAYOF1Y,DateOfReport);
+Policy: => DAYSOF5Y := DAYSBETWEEN(CUTOFFDAYOF5Y,DateOfReport);
+Policy: => DAYSOF4Y := DAYSBETWEEN(CUTOFFDAYOF4Y,DateOfReport);
+Policy: => DAYSOF3Y := DAYSBETWEEN(CUTOFFDAYOF3Y,DateOfReport);
+Policy: => DAYSOF2Y := DAYSBETWEEN(CUTOFFDAYOF2Y,DateOfReport);
+Policy: => DAYSOF1Y := DAYSBETWEEN(CUTOFFDAYOF1Y,DateOfReport);
+
+
+//Globals
+Policy: => G_ValidPolicy := EXISTS(Subject) AND 
+							// (InsuranceType = 'PA' OR (InsuranceType = '' AND DataSource = 'CCABatch')) AND 
+                            (SubjectEndDatePolicy > InceptionDate);
+                            // For Intermediate the InsuranceType == ?PA', but for Batch InsuranceType isn?t populated
+
+Report: => G_SetDefault1 := COUNT(Policy(G_ValidPolicy)) = 0;
+Report: => G_SetDefault2AU := COUNT(Policy(G_ValidPolicy AND G_Auto)) = 0;
+Report: => G_SetDefault3AU := NOT EXISTS(Policy(G_ValidPolicy AND G_Auto AND NOT SubjectEndDatePolicy:Null AND NOT SubjectBeginDatePolicy:Null AND Calculated_Start_Date < DateOfReport));//IF all subject end dates are blank, 
+Policy: => G_CountablePolicy := G_ValidPolicy AND NOT SubjectEndDatePolicy:Null AND Calculated_Start_Date < DateOfReport AND Calculated_End_Date > Calculated_Start_Date;//exclud future policies; should the policy with missing end date be included? this should be happen in the report. 
+//Policy: => G_PolicyIn5Years := MONTHSBETWEEN(Calculated_End_Date,DateOfReport) <= 60;
+//Policy: => G_PolicyIn4Years := MONTHSBETWEEN(Calculated_End_Date,DateOfReport) <= 48;
+//Policy: => G_PolicyIn3Years := MONTHSBETWEEN(Calculated_End_Date,DateOfReport) <= 36;
+//Policy: => G_PolicyIn2Years := MONTHSBETWEEN(Calculated_End_Date,DateOfReport) <= 24;
+//Policy: => G_PolicyIn1Years := MONTHSBETWEEN(Calculated_End_Date,DateOfReport) <= 12;
+
+Policy: => G_PolicyIn5Years := DAYSBETWEEN(Calculated_End_Date,DateOfReport) <= DAYSOF5Y;
+Policy: => G_PolicyIn4Years := DAYSBETWEEN(Calculated_End_Date,DateOfReport) <= DAYSOF4Y;
+Policy: => G_PolicyIn3Years := DAYSBETWEEN(Calculated_End_Date,DateOfReport) <= DAYSOF3Y;
+Policy: => G_PolicyIn2Years := DAYSBETWEEN(Calculated_End_Date,DateOfReport) <= DAYSOF2Y;
+Policy: => G_PolicyIn1Years := DAYSBETWEEN(Calculated_End_Date,DateOfReport) <= DAYSOF1Y;
+
+//Groups
+Policy: => G_Auto := PolicyType IN C_POLICYTYPE_AU;
+Policy: => G_Motorcycle := PolicyType IN C_POLICYTYPE_MO;
+Policy: => G_Boat := PolicyType IN C_POLICYTYPE_BO;
+Policy: => G_Watercraft := PolicyType IN C_POLICYTYPE_WC;
+Policy: => G_Other := PolicyType IN C_POLICYTYPE_XO;
+
+//Attributes
+//CntDistctCarrier5Y_Auto
+/**
+* Number of different carriers over the last 5 years
+* @comments There are some cases where two carriers have been keyed with a very similar names and we could consider these to be the same carrier. After some analysis, it didn't appear that mapping carriers onto standardised clean names would significantly change the distribution of these attributes, so we don't currently clean these up in the attribute logic _Y
+*/
+Report: => I_CntDistctCarrier5Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+										    G_SetDefault2AU => C_DEFAULT_2,
+											G_SetDefault3AU => C_DEFAULT_3, 
+											MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years){CarrierName}), C_CAP_992));
+
+//CntDistctCarrier4Y_Auto
+/**
+* Number of different carriers over the last 4 years
+*/
+Report: => I_CntDistctCarrier4Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+										    G_SetDefault2AU => C_DEFAULT_2,
+											G_SetDefault3AU => C_DEFAULT_3, 
+											MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years){CarrierName}), C_CAP_992));
+                      
+//CntDistctCarrier3Y_Auto
+/**
+* Number of different carriers over the last 3 years
+*/
+Report: => I_CntDistctCarrier3Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+										    G_SetDefault2AU => C_DEFAULT_2,
+											G_SetDefault3AU => C_DEFAULT_3, 
+											MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years){CarrierName}), C_CAP_992));
+                      
+//CntDistctCarrier2Y_Auto
+/**
+* Number of different carriers over the last 2 years
+*/
+Report: => I_CntDistctCarrier2Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+										    G_SetDefault2AU => C_DEFAULT_2,
+											G_SetDefault3AU => C_DEFAULT_3, 
+											MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years){CarrierName}), C_CAP_992));
+                      
+//CntDistctCarrier1Y_Auto
+/**
+* Number of different carriers over the last year
+*/
+Report: => I_CntDistctCarrier1Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+										    G_SetDefault2AU => C_DEFAULT_2,
+											G_SetDefault3AU => C_DEFAULT_3, 
+											MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years){CarrierName}), C_CAP_992));
+                      
+                      
+                      
+//CntDistctCoverageTypes5Y
+// VehiclePolicy: => CoverageTypes := Coverages(IndividualLimit > 0 OR OccurrenceLimit > 0){CoverageType};
+VehiclePolicy: => CoverageTypes := Coverages{CoverageType};
+Policy: => H_CovrageTypes := TOPN(VehiclePolicy.CoverageTypes{CoverageType},100,CoverageType);
+
+/**
+* Number of distinct coverage types over the last 5 years
+*/
+Report: => I_CntDistctCoverageTypes5Y_Auto := MAP(G_SetDefault1  => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years).H_CovrageTypes{CoverageType}), C_CAP_992));
+/**
+* Number of distinct coverage types over the last 4 years
+*/
+Report: => I_CntDistctCoverageTypes4Y_Auto := MAP(G_SetDefault1  => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years).H_CovrageTypes{CoverageType}), C_CAP_992));
+
+/**
+* Number of distinct coverage types over the last 3 years
+*/                                            
+Report: => I_CntDistctCoverageTypes3Y_Auto := MAP(G_SetDefault1  => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years).H_CovrageTypes{CoverageType}), C_CAP_992));
+
+/**
+* Number of distinct coverage types over the last 2 years
+*/
+Report: => I_CntDistctCoverageTypes2Y_Auto := MAP(G_SetDefault1  => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years).H_CovrageTypes{CoverageType}), C_CAP_992));
+
+/**
+* Number of distinct coverage types over the last year
+*/
+Report: => I_CntDistctCoverageTypes1Y_Auto := MAP(G_SetDefault1  => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years).H_CovrageTypes{CoverageType}), C_CAP_992));
+
+
+
+//sample data includes some policies with out subject end date, using Countable indicator to exclude them. This should not happen in report, need double check with Technology/Product team.
+Policy:G_PolicyIn5Years => NextPolicy5Y := Sequence.NextWhere(rReport = Policy.rReport AND G_CountablePolicy AND G_Auto AND G_PolicyIn5Years,-Calculated_End_Date,-Calculated_Start_Date);//return null if the policy is not in 5 years
+Policy:G_PolicyIn4Years => NextPolicy4Y := Sequence.NextWhere(rReport = Policy.rReport AND G_CountablePolicy AND G_Auto AND G_PolicyIn4Years,-Calculated_End_Date,-Calculated_Start_Date);
+Policy:G_PolicyIn3Years => NextPolicy3Y := Sequence.NextWhere(rReport = Policy.rReport AND G_CountablePolicy AND G_Auto AND G_PolicyIn3Years,-Calculated_End_Date,-Calculated_Start_Date);
+Policy:G_PolicyIn2Years => NextPolicy2Y := Sequence.NextWhere(rReport = Policy.rReport AND G_CountablePolicy AND G_Auto AND G_PolicyIn2Years,-Calculated_End_Date,-Calculated_Start_Date);
+Policy:G_PolicyIn1Years => NextPolicy1Y := Sequence.NextWhere(rReport = Policy.rReport AND G_CountablePolicy AND G_Auto AND G_PolicyIn1Years,-Calculated_End_Date,-Calculated_Start_Date);
+
+//Audit
+Policy: => AuditNextPolicyStartDate5Y := NextPolicy5Y.Calculated_Start_Date;
+Policy: => AuditNextCalculated_End_Date5Y := NextPolicy5Y.Calculated_End_Date;
+
+//LAPSE of middle policies
+Policy:G_PolicyIn5Years => Lapse5Y := IF(NOT NextPolicy5Y.Calculated_End_Date:Null, DAYSBETWEEN(NextPolicy5Y.Calculated_End_Date,Calculated_Start_Date), 0);
+Policy:G_PolicyIn4Years => Lapse4Y := IF(NOT NextPolicy4Y.Calculated_End_Date:Null, DAYSBETWEEN(NextPolicy4Y.Calculated_End_Date,Calculated_Start_Date), 0);
+Policy:G_PolicyIn3Years => Lapse3Y := IF(NOT NextPolicy3Y.Calculated_End_Date:Null, DAYSBETWEEN(NextPolicy3Y.Calculated_End_Date,Calculated_Start_Date), 0);
+Policy:G_PolicyIn2Years => Lapse2Y := IF(NOT NextPolicy2Y.Calculated_End_Date:Null, DAYSBETWEEN(NextPolicy2Y.Calculated_End_Date,Calculated_Start_Date), 0);
+Policy:G_PolicyIn1Years => Lapse1Y := IF(NOT NextPolicy1Y.Calculated_End_Date:Null, DAYSBETWEEN(NextPolicy1Y.Calculated_End_Date,Calculated_Start_Date), 0);
+
+//Lapse of the most recent policy
+Report: => LapseLatestPolicy5Y := IF(NOT DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years),Calculated_End_Date),DateOfReport):Null,DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years),Calculated_End_Date),DateOfReport),DAYSOF5Y);//This can only be >= 0. can be used for all years' windows.
+Report: => LapseLatestPolicy4Y := IF(NOT DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years),Calculated_End_Date),DateOfReport):Null,DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years),Calculated_End_Date),DateOfReport),DAYSOF4Y);//This can only be >= 0. can be used for all years' windows.
+Report: => LapseLatestPolicy3Y := IF(NOT DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years),Calculated_End_Date),DateOfReport):Null,DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years),Calculated_End_Date),DateOfReport),DAYSOF3Y);//This can only be >= 0. can be used for all years' windows.
+Report: => LapseLatestPolicy2Y := IF(NOT DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years),Calculated_End_Date),DateOfReport):Null,DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years),Calculated_End_Date),DateOfReport),DAYSOF2Y);//This can only be >= 0. can be used for all years' windows.
+Report: => LapseLatestPolicy1Y := IF(NOT DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years),Calculated_End_Date),DateOfReport):Null,DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years),Calculated_End_Date),DateOfReport),DAYSOF1Y);//This can only be >= 0. can be used for all years' windows.
+
+Report: => LapseBetween5Y := SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND Lapse5Y > 0),Lapse5Y);//audit purpose
+Report: => LapseBetween4Y := SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years AND Lapse4Y > 0),Lapse4Y);//audit purpose
+Report: => LapseBetween3Y := SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years AND Lapse3Y > 0),Lapse3Y);//audit purpose
+Report: => LapseBetween2Y := SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years AND Lapse2Y > 0),Lapse2Y);//audit purpose
+Report: => LapseBetween1Y := SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years AND Lapse1Y > 0),Lapse1Y);//audit purpose
+
+/**
+* Total numbers of days between policies over the last 5 years
+* @comments The lapses only scan the inception date of the first policy to the retro date _Y
+*/
+Report: => I_DaysLapseinPolicyIn5Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                               G_SetDefault2AU => C_DEFAULT_2,
+                                               G_SetDefault3AU => C_DEFAULT_3, 
+                                               MIN(SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND Lapse5Y > 0),Lapse5Y) + LapseLatestPolicy5Y, C_CAP_9992));
+/**
+* Total number of days between policies over the last 4 years
+* @comments The lapses only scan the inception date of the first policy to the retro date
+*/											   
+Report: => I_DaysLapseinPolicyIn4Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                               G_SetDefault2AU => C_DEFAULT_2,
+                                               G_SetDefault3AU => C_DEFAULT_3, 
+                                               MIN(SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years AND Lapse4Y > 0),Lapse4Y) + LapseLatestPolicy4Y, C_CAP_9992));
+/**
+* Total number of days between policies over the last 3 years
+* @comments The lapses only scan the inception date of the first policy to the retro date
+*/											   
+Report: => I_DaysLapseinPolicyIn3Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                               G_SetDefault2AU => C_DEFAULT_2,
+                                               G_SetDefault3AU => C_DEFAULT_3, 
+                                               MIN(SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years AND Lapse3Y > 0),Lapse3Y) + LapseLatestPolicy3Y, C_CAP_9992));
+
+/**
+* Total number of days between policies over the last 2 years
+* @comments The lapses only scan the inception date of the first policy to the retro date
+*/											   
+Report: => I_DaysLapseinPolicyIn2Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                               G_SetDefault2AU => C_DEFAULT_2,
+                                               G_SetDefault3AU => C_DEFAULT_3, 
+                                               MIN(SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years AND Lapse2Y > 0),Lapse2Y) + LapseLatestPolicy2Y, C_CAP_9992));
+											   
+/**
+* Total number of days between policies over the last year
+* @comments The lapses only scan the inception date of the first policy to the retro date
+*/											   
+Report: => I_DaysLapseinPolicyIn1Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                               G_SetDefault2AU => C_DEFAULT_2,
+                                               G_SetDefault3AU => C_DEFAULT_3, 
+                                               MIN(SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years AND Lapse1Y > 0),Lapse1Y) + LapseLatestPolicy1Y, C_CAP_9992));
+
+//CntPolicyLapseIn5Y
+/**
+* Number of times there was a gap between policies over the last 5 years
+* @comments _Y
+*/
+Report: => I_CntPolicyLapseIn5Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                          G_SetDefault2AU => C_DEFAULT_2,
+                                          G_SetDefault3AU => C_DEFAULT_3, 
+                                          MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND Lapse5Y > 0)) + IF(LapseLatestPolicy5Y > 0, 1,0), C_CAP_992));
+/**
+* Number of times there was a gap between policies over the last 4 years
+* @comments The lapses only scan the inception date of the first policy to the retro date
+*/
+Report: => I_CntPolicyLapseIn4Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                          G_SetDefault2AU => C_DEFAULT_2,
+                                          G_SetDefault3AU => C_DEFAULT_3, 
+                                          MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years AND Lapse4Y > 0)) + IF(LapseLatestPolicy4Y > 0, 1,0), C_CAP_992));
+ 
+/**
+* Number of times there was a gap between policies over the last 3 years
+*/ 
+Report: => I_CntPolicyLapseIn3Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                          G_SetDefault2AU => C_DEFAULT_2,
+                                          G_SetDefault3AU => C_DEFAULT_3, 
+                                          MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years AND Lapse3Y > 0)) + IF(LapseLatestPolicy3Y > 0, 1,0), C_CAP_992));                                          
+  
+/**
+* Number of times there was a gap between policies over the last 2 years
+*/  
+Report: => I_CntPolicyLapseIn2Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                          G_SetDefault2AU => C_DEFAULT_2,
+                                          G_SetDefault3AU => C_DEFAULT_3, 
+                                          MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years AND Lapse2Y > 0)) + IF(LapseLatestPolicy2Y > 0, 1,0), C_CAP_992));      
+
+/**
+* Number of times there was a gap between policies over the last year
+*/                                         
+Report: => I_CntPolicyLapseIn1Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                          G_SetDefault2AU => C_DEFAULT_2,
+                                          G_SetDefault3AU => C_DEFAULT_3, 
+                                          MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years AND Lapse1Y > 0)) + IF(LapseLatestPolicy1Y > 0, 1,0), C_CAP_992));                                          
+                                                                                         
+//DaysCoverageIn5Y
+// Report: => Coverage_Auto := DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years),Calculated_Start_Date),MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years),Calculated_End_Date));
+Report: => Coverage_Auto5Y := IF(NOT DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years),Calculated_Start_Date),DateOfReport):Null,DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years),Calculated_Start_Date),DateOfReport),0);//null means no policy in 5 years, the coverage is 0.
+Report: => Coverage_Auto4Y := IF(NOT DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years),Calculated_Start_Date),DateOfReport):Null,DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years),Calculated_Start_Date),DateOfReport),0);
+Report: => Coverage_Auto3Y := IF(NOT DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years),Calculated_Start_Date),DateOfReport):Null,DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years),Calculated_Start_Date),DateOfReport),0);
+Report: => Coverage_Auto2Y := IF(NOT DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years),Calculated_Start_Date),DateOfReport):Null,DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years),Calculated_Start_Date),DateOfReport),0);
+Report: => Coverage_Auto1Y := IF(NOT DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years),Calculated_Start_Date),DateOfReport):Null,DAYSBETWEEN(MIN(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years),Calculated_Start_Date),DateOfReport),0);
+
+//This takes care the case that the first policy's inception date is before the 5 years cut off date.
+Report: => Coverage_AutoIn5Y := IF(Coverage_Auto5Y < DAYSOF5Y,Coverage_Auto5Y,DAYSOF5Y);
+Report: => Coverage_AutoIn4Y := IF(Coverage_Auto4Y < DAYSOF4Y,Coverage_Auto4Y,DAYSOF4Y);
+Report: => Coverage_AutoIn3Y := IF(Coverage_Auto3Y < DAYSOF3Y,Coverage_Auto3Y,DAYSOF3Y);
+Report: => Coverage_AutoIn2Y := IF(Coverage_Auto2Y < DAYSOF2Y,Coverage_Auto2Y,DAYSOF2Y);
+Report: => Coverage_AutoIn1Y := IF(Coverage_Auto1Y < DAYSOF1Y,Coverage_Auto1Y,DAYSOF1Y);
+
+Report: => Coverage_lapse := SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND Lapse5Y > 0),Lapse5Y);//audit
+
+/**
+* Number of days with coverage in last 5 years
+* @comments _Y
+*/
+Report: => I_DaysCoverageIn5Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                        G_SetDefault2AU => C_DEFAULT_2,
+                                        G_SetDefault3AU => C_DEFAULT_3,
+                                        Coverage_AutoIn5Y = 0 => 0, 
+                                      MIN(Coverage_AutoIn5Y - SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND Lapse5Y > 0),Lapse5Y) - LapseLatestPolicy5Y, C_CAP_9992));
+/**
+* Number of days with coverage in last 4 years
+*/
+Report: => I_DaysCoverageIn4Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                        G_SetDefault2AU => C_DEFAULT_2,
+                                        G_SetDefault3AU => C_DEFAULT_3, 
+                                        Coverage_AutoIn4Y = 0 => 0, 
+                                      MIN(Coverage_AutoIn4Y - SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years AND Lapse4Y > 0),Lapse4Y) - LapseLatestPolicy4Y, C_CAP_9992));
+
+/**
+* Number of days with coverage in last 3 years
+*/
+Report: => I_DaysCoverageIn3Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                        G_SetDefault2AU => C_DEFAULT_2,
+                                        G_SetDefault3AU => C_DEFAULT_3, 
+                                        Coverage_AutoIn3Y = 0 => 0, 
+                                       MIN(Coverage_AutoIn3Y - SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years AND Lapse3Y > 0),Lapse3Y) - LapseLatestPolicy3Y, C_CAP_9992));
+
+/**
+* Number of days with coverage in last 2 years
+*/
+Report: => I_DaysCoverageIn2Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                        G_SetDefault2AU => C_DEFAULT_2,
+                                        G_SetDefault3AU => C_DEFAULT_3, 
+                                        Coverage_AutoIn2Y = 0 => 0, 
+                                       MIN(Coverage_AutoIn2Y - SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years AND Lapse2Y > 0),Lapse2Y) - LapseLatestPolicy2Y, C_CAP_9992));
+
+/**
+* Number of days with coverage in last year
+*/
+Report: => I_DaysCoverageIn1Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                        G_SetDefault2AU => C_DEFAULT_2,
+                                        G_SetDefault3AU => C_DEFAULT_3, 
+                                        Coverage_AutoIn1Y = 0 => 0, 
+                                       MIN(Coverage_AutoIn1Y - SUM(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years AND Lapse1Y > 0),Lapse1Y) - LapseLatestPolicy1Y, C_CAP_9992));
+
+//CntCarrierSwitches5Y
+Report: => G_SetDefault4AU5Y := COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years)) = 1;
+Policy: => SwitchedCustomer5Y := NextPolicy5Y.CarrierName != CarrierName;
+/**
+* Number of times the inquired person switched insurance company
+* @comments _Y
+*/
+Report: => I_CntCarrierSwitches5Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            G_SetDefault4AU5Y => C_DEFAULT_4,
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND SwitchedCustomer5Y)), C_CAP_992));
+
+Report: => G_SetDefault4AU4Y := COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years)) = 1;
+Policy: => SwitchedCustomer4Y := NextPolicy4Y.Ambest != Ambest;
+/**
+* Number of times the inquired person switched insurance company over the last 4 years
+*/
+Report: => I_CntCarrierSwitches4Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            G_SetDefault4AU4Y => C_DEFAULT_4,
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years AND SwitchedCustomer4Y)), C_CAP_992));                                           
+
+Report: => G_SetDefault4AU3Y := COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years)) = 1;
+Policy: => SwitchedCustomer3Y := NextPolicy3Y.Ambest != Ambest;
+/**
+* Number of times the inquired person switched insurance company over the last 3 years
+*/
+Report: => I_CntCarrierSwitches3Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            G_SetDefault4AU3Y => C_DEFAULT_4,
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years AND SwitchedCustomer3Y)), C_CAP_992));  
+                                            
+Report: => G_SetDefault4AU2Y := COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years)) = 1;
+Policy: => SwitchedCustomer2Y := NextPolicy2Y.Ambest != Ambest;
+/**
+* Number of times the inquired person switched insurance company over the last 2 years
+*/
+Report: => I_CntCarrierSwitches2Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            G_SetDefault4AU2Y => C_DEFAULT_4,
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years AND SwitchedCustomer2Y)), C_CAP_992));
+                                            
+Report: => G_SetDefault4AU1Y := COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years)) = 1;
+Policy: => SwitchedCustomer1Y := NextPolicy1Y.Ambest != Ambest;
+/**
+* Number of times the inquired person switched insurance company over the last year
+*/
+Report: => I_CntCarrierSwitches1Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            G_SetDefault4AU1Y => C_DEFAULT_4,
+                                            MIN(COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years AND SwitchedCustomer1Y)), C_CAP_992));                                            
+
+//ExistCurrentPolicy, PolicyStatus
+// Report: => I_ExistCurrentPolicy_Auto := IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND PolicyStatus = 'Y')),1,0);
+Policy: => G_IsCurrent :=
+    SubjectEndDatePolicy > DateOfReport AND SubjectBeginDatePolicy <= DateOfReport
+    AND PolicyStatus IN C_STATUS_EFFECT;
+
+Report: => tmp_ExistCurrentPolicy_Auto := IF(
+    EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND G_IsCurrent)),1,0);
+/**
+* Does enquired person have an auto policy currently?
+* @comments _Y
+*/	
+Report: => I_ExistCurrentPolicy_Auto := MAP(
+    G_SetDefault1 => C_DEFAULT_1,
+    G_SetDefault2AU => C_DEFAULT_2,
+    G_SetDefault3AU => C_DEFAULT_3, 
+    tmp_ExistCurrentPolicy_Auto
+);
+
+//EndDateOfLastPolicy
+Report: => tmp_EndDateOfLastPolicy_Auto := MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years),SubjectEndDatePolicy);
+
+/**
+* The end date of the inquired person's most recent policy
+*/
+Report: => S_EndDateOfLastPolicy_Auto := IF(tmp_EndDateOfLastPolicy_Auto:Null, C_DEFAULT_4,INTEGERFROMDATE(tmp_EndDateOfLastPolicy_Auto));//if no policy in last 5 years, assign the value as -4. 
+
+//I_DaysLapseOfLastPolicy_Auto, this attribute searches the policy in last 5 years. if no coverage, the result will be 1827
+Report: => tmp_DaysSinceLapseLastPolicy_Auto := IF(NOT DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years),Calculated_End_Date),DateOfReport):Null,DAYSBETWEEN(MAX(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years),Calculated_End_Date),DateOfReport),DAYSOF5Y);//This can only be >= 0. can be used for all years' windows.
+/**
+* The number of days between the end of the most recent policy and the ReportDate
+*/
+Report: => I_DaysSinceLapseLastPolicy_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                            G_SetDefault2AU => C_DEFAULT_2,
+                                            G_SetDefault3AU => C_DEFAULT_3, 
+                                            MIN(tmp_DaysSinceLapseLastPolicy_Auto, C_CAP_9992));                                            
+
+//I_CoverageOfLastPolicy_Auto
+Policy: => CappedCoverage := DAYSBETWEEN(Capped_Start_Date,Calculated_End_Date);
+Report: => tmp_CappedCoverageLastPolicyAuto := TOPN(
+    Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years){CappedCoverage,Calculated_End_Date}
+    ,1,-Calculated_End_Date, -CappedCoverage);
+        //This can only be >= 0. can be used for all years' windows.
+Report: => tmp_CappedCoverage := ONLY(tmp_CappedCoverageLastPolicyAuto,CappedCoverage);
+Report: => I_CoverageOfLastPolicy_Auto := IF(tmp_CappedCoverage:Null,
+                                            MAP(G_SetDefault1 => C_DEFAULT_1,
+                                                G_SetDefault2AU => C_DEFAULT_2,
+                                                G_SetDefault3AU => C_DEFAULT_3, C_DEFAULT_4), 
+                                            MIN(tmp_CappedCoverage, C_CAP_9992)); 
+
+//I_CoverageOfLastTerm_Auto
+Policy: => TermCoverage := DAYSBETWEEN(PeriodBeginDate,Calculated_End_Date);
+Report: => tmp_CoverageOfLastTerm_Auto := TOPN(
+    Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years){TermCoverage,Calculated_End_Date}
+    ,1,-Calculated_End_Date, -TermCoverage);
+        //This can only be >= 0. can be used for all years' windows.
+Report: => tmp_TermCoverage := ONLY(tmp_CoverageOfLastTerm_Auto,TermCoverage);
+Report: => I_CoverageOfLastTerm_Auto := IF(tmp_TermCoverage:Null,
+                                            MAP(G_SetDefault1 => C_DEFAULT_1,
+                                                G_SetDefault2AU => C_DEFAULT_2,
+                                                G_SetDefault3AU => C_DEFAULT_3, C_DEFAULT_4), 
+                                            MIN(tmp_TermCoverage, C_CAP_9992)); 
+
+// I_ExistCPCov5Y_Auto
+Policy: => CPCov := EXISTS(H_CovrageTypes(CoverageType IN ['CP']));
+/**
+* Has the enquired subject had Comprehensive coverage (with coverage limit > 0) in the last 5 years?
+* @comments _Y
+*/
+Report: => I_ExistCPCov5Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND CPCov)),1,0));
+																	
+// I_ExistCPCov4Y_Auto
+/**
+* Has the enquired subject had Comprehensive coverage (with coverage limit > 0) in the last 4 years?
+*/	
+Report: => I_ExistCPCov4Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years AND CPCov)),1,0));
+
+// I_ExistCPCov3Y_Auto
+/**
+* Has the enquired subject had Comprehensive coverage (with coverage limit > 0) in the last 3 years?
+*/
+Report: => I_ExistCPCov3Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years AND CPCov)),1,0));
+
+// I_ExistCPCov2Y_Auto
+/**
+* Has the enquired subject had Comprehensive coverage (with coverage limit > 0) in the last 2 years?
+*/
+Report: => I_ExistCPCov2Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years AND CPCov)),1,0));
+
+// I_ExistCPCov1Y_Auto
+/**
+* Has the enquired subject had Comprehensive coverage (with coverage limit > 0) in the last year?
+*/
+Report: => I_ExistCPCov1Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years AND CPCov)),1,0));
+
+// I_ExistCOCov5Y_Auto
+Policy: => COCov := EXISTS(H_CovrageTypes(CoverageType IN ['CO']));
+/**
+* Has the enquired subject had Collision coverage (with coverage limit > 0) in the last 5 years?
+* @comments _Y
+*/
+Report: => I_ExistCOCov5Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND COCov)),1,0));
+
+// I_ExistCOCov4Y_Auto
+/**
+* Has the enquired subject had Collision coverage (with coverage limit > 0) in the last 4 years?
+*/
+Report: => I_ExistCOCov4Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years AND COCov)),1,0));
+
+// I_ExistCOCov3Y_Auto
+/**
+* Has the enquired subject had Collision coverage (with coverage limit > 0) in the last 3 years?
+* @comments _Y
+*/
+Report: => I_ExistCOCov3Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years AND COCov)),1,0));
+
+// I_ExistCOCov2Y_Auto
+/**
+* Has the enquired subject had Collision coverage (with coverage limit > 0) in the last 2 years?
+*/
+Report: => I_ExistCOCov2Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years AND COCov)),1,0));
+
+// I_ExistCOCov1Y_Auto
+/**
+* Has the enquired subject had Collision coverage (with coverage limit > 0) in the last year?
+*/
+Report: => I_ExistCOCov1Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years AND COCov)),1,0));
+
+//I_CntNONPCancellation5Y_Auto
+Policy: => NONPCancellation := CancelReason IN ['NONP'];
+
+/**
+* Number of policies with 'NONP' cancellation in the last 5 years
+*/
+Report: => I_CntNONPCancellation5Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND NONPCancellation)));
+
+// I_CntNONPCancellation4Y_Auto
+/**
+* Number of policies with 'NONP' cancellation in the last 4 years
+*/
+Report: => I_CntNONPCancellation4Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn4Years AND NONPCancellation)));
+
+// I_CntNONPCancellation3Y_Auto
+/**
+* Number of policies with 'NONP' cancellation in the last 3 years
+*/
+Report: => I_CntNONPCancellation3Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn3Years AND NONPCancellation)));
+
+// I_CntNONPCancellation2Y_Auto
+/**
+* Number of policies with 'NONP' cancellation in the last 2 years
+*/
+Report: => I_CntNONPCancellation2Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn2Years AND NONPCancellation)));
+
+// I_CntNONPCancellation1Y_Auto
+/**
+* Number of policies with 'NONP' cancellation in the last year
+*/
+Report: => I_CntNONPCancellation1Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
+                                    G_SetDefault2AU => C_DEFAULT_2,
+                                    G_SetDefault3AU => C_DEFAULT_3, 
+                                    COUNT(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn1Years AND NONPCancellation)));
+
+
+
+
+// S_CovLimitLastPolicy_Auto
+// VehiclePolicy: => VIN := VehiclePolicy.Auto.VIN;
+VehiclePolicy: => CoverageInfo := Coverages((IndividualLimit > 0 OR OccurrenceLimit > 0) AND (CoverageType IN ['BI','PD','CS','NB','NP','UB','CO','PI','CP','MP','ME','UM','UN','TL','RR','OT'])){CoverageType, IndividualLimit, OccurrenceLimit};
+Policy: => H_CovrageInfo := VehiclePolicy(Auto.VIN != 'NO VEHICLE'){Auto.VIN,CoverageInfo};
+// Report: => S_CovLimitLastPolicy_Auto := TOPN(Policy.H_CovrageInfo{CoverageType, IndividualLimit, OccurrenceLimit},100,CoverageType);
+Report: => tmp_CovLimitLastPolicy_Auto := TOPN(Policy{H_CovrageInfo,SubjectEndDatePolicy},1,-SubjectEndDatePolicy);
+// Report: => S_CovLimitLastPolicy_Auto := ONLY(tmp_CovLimitLastPolicy_Auto,H_CovrageInfo);
+// Report: => S_CovLimitLastPolicy_Auto := TOPN(Policy{H_CovrageInfo,SubjectEndDatePolicy},1,-SubjectEndDatePolicy);
+
+
+Policy.H_CovrageInfo: => BIIndividualLimit := IF(NOT ONLY(CoverageInfo(CoverageType IN ['BI']),IndividualLimit):Null,ONLY(CoverageInfo(CoverageType IN ['BI']),IndividualLimit),0);
+Policy.H_CovrageInfo: => BIOccurrenceLimit := IF(NOT ONLY(CoverageInfo(CoverageType IN ['BI']),OccurrenceLimit):Null,ONLY(CoverageInfo(CoverageType IN ['BI']),OccurrenceLimit),0);
+Policy.H_CovrageInfo: => UMIndividualLimit := IF(NOT ONLY(CoverageInfo(CoverageType IN ['UM']),IndividualLimit):Null,ONLY(CoverageInfo(CoverageType IN ['UM']),IndividualLimit),0);
+Policy.H_CovrageInfo: => UMOccurrenceLimit := IF(NOT ONLY(CoverageInfo(CoverageType IN ['UM']),OccurrenceLimit):Null,ONLY(CoverageInfo(CoverageType IN ['UM']),OccurrenceLimit),0);
+Policy.H_CovrageInfo: => UNIndividualLimit := IF(NOT ONLY(CoverageInfo(CoverageType IN ['UN']),IndividualLimit):Null,ONLY(CoverageInfo(CoverageType IN ['UN']),IndividualLimit),0);
+Policy.H_CovrageInfo: => UNOccurrenceLimit := IF(NOT ONLY(CoverageInfo(CoverageType IN ['UN']),OccurrenceLimit):Null,ONLY(CoverageInfo(CoverageType IN ['UN']),OccurrenceLimit),0);
+Policy.H_CovrageInfo: => PDIndividualLimit := IF(NOT ONLY(CoverageInfo(CoverageType IN ['PD']),IndividualLimit):Null,ONLY(CoverageInfo(CoverageType IN ['PD']),IndividualLimit),0);
+
+// Policy: => SelectedCoverage := TOPN(VehiclePolicy{BIIndividualLimit,BIOccurrenceLimit,PDIndividualLimit,UMIndividualLimit,UMOccurrenceLimit,UNIndividualLimit,UNOccurrenceLimit},1,BIIndividualLimit,BIOccurrenceLimit,PDIndividualLimit,UMIndividualLimit,UMOccurrenceLimit,UNIndividualLimit,UNOccurrenceLimit);
+Policy: => SelectedCoverage := TOPN(H_CovrageInfo{BIIndividualLimit,BIOccurrenceLimit,PDIndividualLimit,UMIndividualLimit,UMOccurrenceLimit,UNIndividualLimit,UNOccurrenceLimit},1,-BIIndividualLimit,-BIOccurrenceLimit,-PDIndividualLimit,-UMIndividualLimit,-UMOccurrenceLimit,-UNIndividualLimit,-UNOccurrenceLimit);
+
+
+Policy: => BIIndividualLimit := ONLY(SelectedCoverage, BIIndividualLimit);
+Policy: => BIOccurrenceLimit := ONLY(SelectedCoverage, BIOccurrenceLimit);
+Policy: => UMIndividualLimit := ONLY(SelectedCoverage, UMIndividualLimit);
+Policy: => UMOccurrenceLimit := ONLY(SelectedCoverage, UMOccurrenceLimit);
+Policy: => UNIndividualLimit := ONLY(SelectedCoverage, UNIndividualLimit);
+Policy: => UNOccurrenceLimit := ONLY(SelectedCoverage, UNOccurrenceLimit);
+Policy: => PDIndividualLimit := ONLY(SelectedCoverage, PDIndividualLimit);
+
+
+Report: => tmp_SelectedCovLimitLastPolicy_Auto := TOPN(Policy(NOT SubjectEndDatePolicy:Null AND G_Auto AND G_CountablePolicy){SubjectEndDatePolicy, BIIndividualLimit, BIOccurrenceLimit, UMIndividualLimit, UMOccurrenceLimit, UNIndividualLimit, UNOccurrenceLimit, PDIndividualLimit},
+                                                        1,-SubjectEndDatePolicy, -BIIndividualLimit, -BIOccurrenceLimit);
+
+
+/**
+* Return the individual coverage limits for Bodily Injury coverage, for the most recent policy
+* @comments _Y
+*/
+Report: =>  R_BIIndLimitLastPolicy_Auto := ONLY(tmp_SelectedCovLimitLastPolicy_Auto,BIIndividualLimit);
+/**
+* Return the per-occurence coverage limits for Bodily Injury coverage, for the most recent policy
+* @comments _Y
+*/
+Report: =>  R_BIOccLimitLastPolicy_Auto := ONLY(tmp_SelectedCovLimitLastPolicy_Auto,BIOccurrenceLimit);
+/**
+* Return the individual coverage limits for Property Damage coverage, for the most recent policy
+* @comments _Y
+*/
+Report: =>  R_PDIndLimitLastPolicy_Auto := ONLY(tmp_SelectedCovLimitLastPolicy_Auto,PDIndividualLimit);
+/**
+* Return the individual coverage limits for Uninsured Motorist coverage, for the most recent policy
+* @comments _Y
+*/
+Report: =>  R_UMIndLimitLastPolicy_Auto := ONLY(tmp_SelectedCovLimitLastPolicy_Auto,UMIndividualLimit);
+/**
+* Return the per-occurence coverage limits for Uninsured Motorist coverage, for the most recent policy
+* @comments _Y
+*/
+Report: =>  R_UMOccLimitLastPolicy_Auto := ONLY(tmp_SelectedCovLimitLastPolicy_Auto,UMOccurrenceLimit);
+/**
+* Return the individual coverage limits for Underinsured Motorist coverage, for the most recent policy
+* @comments _Y
+*/
+Report: =>  R_UNIndLimitLastPolicy_Auto := ONLY(tmp_SelectedCovLimitLastPolicy_Auto,UNIndividualLimit);
+/**
+* Return the per-occurence coverage limits for Underinsured Motorist coverage, for the most recent policy
+* @comments _Y
+*/
+Report: =>  R_UNOccLimitLastPolicy_Auto := ONLY(tmp_SelectedCovLimitLastPolicy_Auto,UNOccurrenceLimit);
+
+
