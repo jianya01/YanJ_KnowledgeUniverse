@@ -300,6 +300,7 @@ FUNCTION: GATEWAY_INSURANCE_PHONE(STRING GatewayURL, STRING FirstName, STRING La
 FUNCTION: SSNMatchScore(STRING SSN1, STRING SSN2, BOOLEAN FourOnly) <= ECL(did_add.ssn_match_score(SSN1, SSN2, FourOnly)) FROM DID_Add  RETURNS INTEGER;
 FUNCTION: GN(INTEGER I) <= ECL(risk_indicators.iid_constants.gn(I)) FROM Risk_Indicators  RETURNS BOOLEAN;
 FUNCTION: Dist(REAL latx1, REAL longx1, REAL latx2, REAL longx2) <= ECL(ut.LL_Dist(latx1, longx1, latx2, longx2)) FROM ut RETURNS REAL;
+FUNCTION: AdjustDateLastSeen(DATE Date_Last_Seen) <= ECL(PublicRecords_Kel.ECL_Functions.Common_Functions.AdjustDateLastSeen(Date_Last_Seen)) FROM PublicRecords_KEL RETURNS DATE;
 						
 						
 /**************************************************************************/
@@ -3354,6 +3355,7 @@ Person: => AddressHierarchySet := TOPN(PersonAddress.AddressHierarchy
 																		SortField := AddressRank:DateLastSeen,
 																		HierarchyDateFirstSeen := AddressRank:DateFirstSeen,
 																		HierarchyDateLastSeen := AddressRank:DateLastSeen,
+																		HierarchyHybridArchiveDate := AddressRank:HybridArchiveDate,
 																		SourceCount,
 																		PropertySourceCount,
 																		UtilitySourceCount,
@@ -9951,15 +9953,15 @@ Person: => PL_STLNewMsnc2Y := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA_IN
 /**************************************************************************/
 																 
 // KS-7835
-Person: => PL_BusAddrAddressHierarchyHelper := AddressHierarchySet(AddressRankBest = 1 AND NOT AddressRank IN Person.INVALIDADDRESSRANK);
-Person: => PL_BusAddrAddressHierarchyHelperArchive := PL_BusAddrAddressHierarchyHelper(HierarchyDateFirstSeen <= CURRENTDATE() AND HierarchyDateLastSeen >= CURRENTDATE());
+Person: => PL_BusAddrAddressHierarchyHelper := AddressHierarchySet(IsBest AND NOT AddressRank IN Person.INVALIDADDRESSRANK);
+Person: => PL_BusAddrAddressHierarchyHelperArchive := PL_BusAddrAddressHierarchyHelper(ABSDAYSBETWEEN(HierarchyDateLastSeen, HierarchyHybridArchiveDate) <= 30 OR (AdjustDateLastSeen(HierarchyDateLastSeen) >= PersonAddress.CURRENT_DATE));
 Person: => PL_BusAddrOnlyCurrFlag := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 																				 PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND,
-																				 COUNT(PL_BusAddrAddressHierarchyHelperArchive(AddressType = Person.BUSADDRESSTYPE)) = COUNT(PL_BusAddrAddressHierarchyHelperArchive) => '1',
+																				EXISTS(PL_BusAddrAddressHierarchyHelperArchive) AND COUNT(PL_BusAddrAddressHierarchyHelperArchive(AddressType = Person.BUSADDRESSTYPE)) = COUNT(PL_BusAddrAddressHierarchyHelperArchive) => '1',
 																				 '0');
 Person: => PL_BusAddrOnlyFlagEv   := MAP(P_LexIDSeenFlag = '0' => MISSING_INPUT_DATA,
 																				 PL_AddrHistOnFileFlag = '0' => NO_DATA_FOUND,
-																				 COUNT(PL_BusAddrAddressHierarchyHelper(AddressType = Person.BUSADDRESSTYPE)) = COUNT(PL_BusAddrAddressHierarchyHelper) => '1',
+																				 EXISTS(PL_BusAddrAddressHierarchyHelper) AND COUNT(PL_BusAddrAddressHierarchyHelper(AddressType = Person.BUSADDRESSTYPE)) = COUNT(PL_BusAddrAddressHierarchyHelper) => '1',
 																				 '0');
 
 
