@@ -1,0 +1,50 @@
+# -------------------------------------------------------
+# This workflow generates a new Git Tag every night,
+# allowing for us to go back in time to pretty much any
+# day's worth of code very quickly
+# -------------------------------------------------------
+
+name: Nightly Tag Generation
+
+# We want this workflow to run on a scheduled basis
+on:
+  schedule:
+    # * is a special character in YAML, so we need to put this string in quotes
+    # Schedule this to run at 04:30 UTC (11:30 PM EST) every day of every month
+    - cron: '30 4 * * *'
+  
+  # Also allow this workflow to be run manually from the Actions tab if needed
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # This workflow contains a single job called "generate-git-tag"
+  generate-git-tag:
+    # Specify which Runners to pick from - this uses all shared runners in Boca and Alpha.  Add the boca or alpha tag to pick which data center.
+    runs-on: [self-hosted, X64, Linux, on-prem, shared]
+    # This job should run very quickly
+    timeout-minutes: 10
+    
+    # We want to set up a few variables that our run script can access later on
+    env:
+      # Grab "todays" date and make the tag name as "main_YYYYMMDD"
+      TagDate: $(date +"%Y%m%d")
+      TagName: "main_$TagDate"
+    
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Check out this repositories main branch, depth of 1 to grab just the latest commit quickly
+      - uses: actions/checkout@v3
+        with:
+          ref: main
+          fetch-depth: 1
+      
+      # Generate our Git Tag for the night for push it
+      - uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUSTOM_TAG: $TagName
+          VERBOSE: true

@@ -1,0 +1,41 @@
+name: 'Clone KnowledgeUniverse'
+description: 'Clones a branch from the KnowledgeUniverse Repository'
+author: Brenton Pahl
+
+# -----------------------------------------------------------------------------
+#  Knowledge Universe Clone Workflow
+#  1. Using our GitHub App, get an Installation Token
+#  2. Authenticate using that Installation Token, and checkout the branch we want
+# -----------------------------------------------------------------------------
+
+inputs:
+  branch:
+    description: 'Which branch would you like to checkout from KnowledgeUniverse'
+    required: true
+  github-app-id:
+    description: 'Numeric ID for the GitHub App that has access to both this repository and the KnowledgeUniverse repository for authentication with KnowledgeUniverse'
+    required: true
+  github-app-key:
+    description: 'Private RSA key for the GitHub App to authenticate with'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    # Step 1.) Get an Installation Token for our GitHub App - this is needed because by default 
+    #  the GITHUB_TOKEN is only for the repository your workflow is executing in. This allows us to interact
+    #  with other LexisNexis-ECL-SP Repositories
+    - name: Get Service Account GitHub Authentication Token
+      id: service-token
+      uses: tibdex/github-app-token@v1.5.2
+      with:
+        app_id: ${{ inputs.github-app-id }}
+        private_key: ${{ inputs.github-app-key }}
+    # Step 2.) Checkout the branch we want from KnowledgeUniverse using the GitHub App Token from Step 1
+    - name: Checkout Branch
+      uses: actions/checkout@v3
+      with:
+        repository: LexisNexis-ECL-SP/KnowledgeUniverse
+        ref: ${{ inputs.branch }}
+        token: ${{ steps.service-token.outputs.token }}
+        path: KnowledgeUniverse

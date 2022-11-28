@@ -1,0 +1,43 @@
+name: 'HPCC Workflow Setup'
+description: 'Setup for an HPCC Workflow'
+author: Brenton Pahl
+
+# -----------------------------------------------------------------------------
+#  Standard HPCC Workflow Setup:
+#  1. Check out repository
+#  2. Setup Maven
+#  3. Setup Java (with ~/.m2 maven folder caching)
+# -----------------------------------------------------------------------------
+
+inputs:
+  branch:
+    description: 'Specific branch to pull. Default is the Pull Request branch if running in a pull request, else this branch, else main'
+    type: string
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    # Step 1.) Check out repository
+    - name: Checkout Repository - Main
+      # If we are not running inside a pull request, pull the main branch with a depth of 1
+      if: ${{ github.event_name != 'pull_request' }} && ${{ inputs.branch == '' }}
+      uses: actions/checkout@v3
+      with:
+        ref: main
+        fetch-depth: 1
+    - name: Checkout Reposiry - Pull Request
+      # If we are running inside a pull request workflow, grab the pull request and set the proper head reference so that any commit+push actions go back to the pull request
+      if: ${{ github.event_name == 'pull_request' }} && ${{ inputs.branch == '' }}
+      uses: actions/checkout@v3
+      with:
+        repository: ${{ github.event.pull_request.head.repo.full_name }}
+        ref: ${{ github.event.pull_request.head.ref }}
+        lfs: 'false' # Before setting to true we need to figure out how to get git-lfs working on the runners
+    - name: Checkout Reposiry - Pull Request
+      # If we are running inside a pull request workflow, grab the pull request and set the proper head reference so that any commit+push actions go back to the pull request
+      if: ${{ inputs.branch != '' }}
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.branch }}
+        lfs: 'false' # Before setting to true we need to figure out how to get git-lfs working on the runners
