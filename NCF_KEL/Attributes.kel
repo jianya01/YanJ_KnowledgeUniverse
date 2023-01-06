@@ -6919,4 +6919,14 @@ CreditReport: => CTotal60PDPDBALG7512M01 := MAP(u_TR_CntrlLevel1 = 0 => DEFAULT_
 													MIN(COUNT(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Dispute AND NOT G2Deferred AND G3_Current60PIn12M AND GCreditLimitORHighCredit > 0 AND u_GcurrentUtilization > 75.00)), CAP_992));
 													//with pastdue but creditlimit <= 75% or no pastdue at all													
 												
+// 12/13/2022 Add MAgeLatestInqTradeAct
 
+CreditReportTradeline: => GMOSLatestActivity := MIN(IF(GMOSClosedDate != -9999,GMOSClosedDate), IF(GMOSDateAccountOpened != -9999,GMOSDateAccountOpened), IF(GMOSDateLastActivity != -9999, GMOSDateLastActivity), IF(GMOSDateReported != -9999,GMOSDateReported), IF(GMOSLastPaymentDate != -9999, GMOSLastPaymentDate),IF(GMOSPaymentPatternStartDate != -9999, GMOSPaymentPatternStartDate), IF(GMOSStatusDate != -9999,GMOSStatusDate), IF(GMOSMaximumDelinquencyDate != -9999,GMOSMaximumDelinquencyDate));
+
+CreditReport: => tmp_MAgeLastActivityOfTrade01 := MIN(CreditReportTradeline(NOT G3AllExcluded), GMOSLatestActivity);
+CreditReport: => tmp_MAgeLatestInqTradeAct := MIN(tmp_MAgeYoungestInquiry01,  tmp_MAgeLastActivityOfTrade01);
+
+CreditReport: => MAgeLatestInqTradeAct := MAP(u_IQ_CntlLevel1=0 AND u_TR_CntrlLevel1=0 => DEFAULT_L1 ,
+											u_IQ_CntrlLevel3_01 = 0 AND u_TR_CntrlLevel31_01=0 => DEFAULT_L3,
+											tmp_MAgeLatestInqTradeAct:Null OR tmp_MAgeLatestInqTradeAct <0 => DEFAULT_L4,
+											MIN(tmp_MAgeLatestInqTradeAct, CAP_9992));
