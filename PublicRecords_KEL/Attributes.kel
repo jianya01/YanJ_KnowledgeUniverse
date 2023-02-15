@@ -1420,7 +1420,7 @@ InputPII: => InputAddressPropertyCnt5Y := COUNT(InputAddressPropertySet5Y);
 InputPII: =>AVMValueUnCap :=ONLY(InputAddressPropertySet,AVMAutomatedValuation);
 InputPII: =>AVMValue1YUnCap :=ONLY(InputAddressPropertySet1Y,AVMAutomatedValuation);
 InputPII: =>AVMValue5YUnCap :=ONLY(InputAddressPropertySet5Y,AVMAutomatedValuation);
-InputPII: => InputAddrGeoLinkCounty := TOPN(GeoLinkID.AVM
+InputPII: => InputAddrGeoLinkCounty := TOPN(GeoLink5.AVM
 								{MedianValuation, MedianValuationDate := MedianValuation:DateFirstSeen}, 1, -MedianValuationDate, -MedianValuation);
 InputPII: => InputAddrMedAVMCtyVal := ONLY(InputAddrGeoLinkCounty, MedianValuation);
 //Input PII address AVM Attributes
@@ -4132,11 +4132,10 @@ Person: => PL_CurrAddrIsMilitaryFlag := MAP(
 			PL_CurrAddrType = 'M' OR CurrAddrHelperAttribute.ZIP5.ZipClass = 'M' => 1,
 			0);
 
-Person: => CurrAddrGeoLinkCty := TOPN(PersonAddress(CurrentPerfectAddressMatch).AddressHierarchy(IsBest).GeoLinkID.AVM
+InputPII: => CurrAddrGeoLinkCty := TOPN(CurrGeoLink5.AVM
 			{MedianValuation, MedianValuationDate := MedianValuation:DateFirstSeen}, 1, -MedianValuationDate, -MedianValuation);					
 
-Person: => CurrAddrMedAVMCtyVal := ONLY(CurrAddrGeoLinkCty, MedianValuation);
-
+InputPII: => CurrAddrMedAVMCtyVal := ONLY(CurrAddrGeoLinkCty, MedianValuation);
 Person: => CurrAddressAVM1Y := TOPN(PII.CurrentAddress.AddressProperty.Prop.AutomatedValuationModel(AVMYears >= 1 AND AVMYears < 2)
 	                             {AVMAutomatedValuation := IF(AVMAutomatedValuation:Null OR AVMAutomatedValuation = '', Person.NO_DATA_FOUND_97_INT, AVMAutomatedValuation) ,AVMValueDate,AVMConfidenceScore},1,-AVMValueDate);	
 Person: => CurrAddressAVM5Y := TOPN(PII.CurrentAddress.AddressProperty.Prop.AutomatedValuationModel(AVMYears >= 5 AND AVMYears < 6)
@@ -4192,17 +4191,20 @@ Person: => PL_CurrAddrAVMConfScore := MAP(
 		PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
 		BOUNDSFOLD(ONLY(CurrentAddressPropertySet,AVMConfidenceScore),0,100));
 
-Person: => PL_CurrAddrMedAVMCtyVal := MAP(
-		P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+InputPII: => PL_CurrAddrMedAVMCtyVal := MAP(
+		Subject.P_LexIDSeenFlag = '0' OR Subject.CurrAddrNoClean => MISSING_INPUT_DATA_INT,
 		CurrAddrMedAVMCtyVal:Null OR CurrAddrMedAVMCtyVal = '' => NO_DATA_FOUND_INT,
-		CurrAddrMedAVMCtyVal = 0 => NO_DATA_FOUND_97_INT,
+		CurrAddrMedAVMCtyVal = 0 => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 		BOUNDSFOLD(CurrAddrMedAVMCtyVal, 1, 999999999));
 		
-Person: =>PL_CurrAddrMedAVMCtyRatio := MAP(
-		P_LexIDSeenFlag = '0' OR CurrAddrNoClean => MISSING_INPUT_DATA_INT,
+InputPII: => PL_CurrAddrAVMVal :=Subject.PL_CurrAddrAVMVal;
+InputPII: =>PL_CurrAddrMedAVMCtyRatio := MAP(
+		Subject.P_LexIDSeenFlag = '0' OR Subject.CurrAddrNoClean => MISSING_INPUT_DATA_INT,
 		PL_CurrAddrAVMVal = NO_DATA_FOUND_INT OR PL_CurrAddrMedAVMCtyVal = NO_DATA_FOUND_INT => NO_DATA_FOUND_INT,
-		PL_CurrAddrAVMVal = NO_DATA_FOUND_97_INT OR PL_CurrAddrMedAVMCtyVal = NO_DATA_FOUND_97_INT => NO_DATA_FOUND_97_INT,
+		PL_CurrAddrAVMVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT OR PL_CurrAddrMedAVMCtyVal = RECS_AVAIL_BUT_CANNOT_CALCULATE_INT => RECS_AVAIL_BUT_CANNOT_CALCULATE_INT,
 		MIN(ROUND(PL_CurrAddrAVMVal / PL_CurrAddrMedAVMCtyVal,2), 99.99));
+Person: => PL_CurrAddrMedAVMCtyRatio := PII.PL_CurrAddrMedAVMCtyRatio;
+Person: => PL_CurrAddrMedAVMCtyVal := PII.PL_CurrAddrMedAVMCtyVal;
 /**************************************************************************/
 /*                                                                        */
 /*                    Previous Address Characteristics                    */
