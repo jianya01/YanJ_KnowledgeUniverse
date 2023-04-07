@@ -13,13 +13,31 @@ Report: C_CAP_9992 := 9992;
 Report: C_CAP_99999992 := 99999992;
 Report: C_CAP_99999999_92 := 99999999.92;
 
+// The cancellation date for this subject
+Policy: => SubjectCancelDate    := MAX(PolicyHolder(SubjectNumber > 0), HolderCancelDate);
+Policy: => SubjectEndDate       := MAX(PolicyHolder(SubjectNumber > 0), EndDate);// null, if not valid records
+Policy: => SubjectEndDatePolicy := MIN(SubjectCancelDate, SubjectEndDate);
 
-Policy: => SubjectEndDatePolicy := MAX(PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0), EndDate);// null, if not valid records
-Policy: => SubjectBeginDatePolicy := MIN(PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0 AND EndDate = Policy.SubjectEndDatePolicy), StartDate);
+// The start date of the subject's current policy period
+Policy: => SubjectStartDate := MIN(PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0 AND EndDate = Policy.SubjectEndDatePolicy), StartDate);
+// The original start date of the subject on the policy
+Policy: => SubjectOrigDate  := MIN(PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0 AND EndDate = Policy.SubjectEndDatePolicy), OrigDate);
+// The subject's overall begin date
+// Generally the orig_date is older than the start_date, so this doesn't seem to be necessary
+// However there are some cases in the data where this isn't true 
+// They look like they're policies cancelled from inception
+Policy: => SubjectBeginDatePolicy := MIN(SubjectStartDate, SubjectOrigDate);
+
 Policy: => PeriodBeginDate := MIN(MIN(PeriodStartDate, DateOfReport), SubjectEndDatePolicy);
 Policy: => DateOfReport := rReport.DateOfReport;
-Policy: => Calculated_End_Date := IF(NOT SubjectEndDatePolicy:Null, MIN(SubjectEndDatePolicy, DateOfReport));//null, if no subject end date at all. of course, not valid policy
-Policy: => Calculated_Start_Date:= IF(NOT SubjectBeginDatePolicy:Null, MIN(InceptionDate,SubjectBeginDatePolicy),InceptionDate);//added inceptiondate if no subjectbegindate
+
+Policy: => Calculated_End_Date := 
+    IF(NOT SubjectEndDatePolicy:Null OR NOT CancellationDate:Null, 
+        MIN(SubjectEndDatePolicy, DateOfReport, CancellationDate));
+        // If both of the dates relating to the policy end are NULL, we don't want to give DateOfReport
+        // As the end date, we want it to be NULL
+Policy: => Calculated_Start_Date:=
+    MIN(InceptionDate,SubjectBeginDatePolicy);
 Policy: => Capped_Start_Date := MAX(Calculated_Start_Date, CUTOFFDAYOF5Y);
 
 //Function
@@ -32,6 +50,7 @@ Policy: => Subject := PolicyHolder(NOT EndDate:Null AND SubjectNumber > 0){Subje
 //Constant
 Policy: C_POLICYTYPE_PA := ['AU', 'MO', 'BO', 'WC', 'XO'];
 Policy: C_POLICYTYPE_AU := ['AU'];
+Policy: C_POLICYTYPE_AU_ONLINE := ['PA'];
 Policy: C_POLICYTYPE_MO := ['MO'];
 Policy: C_POLICYTYPE_BO := ['BO'];
 Policy: C_POLICYTYPE_WC := ['WC'];
@@ -53,6 +72,7 @@ Policy: C_CANCELLATIONREASON_SOLD := ['SOLD'];
 Policy: C_CANCELLATIONREASON_TRAN := ['TRAN'];
 
 Policy: C_STATUS_EFFECT := ['IN-EFFECT'];
+Policy: C_STATUS_EFFECT_ONLINE := ['A'];
 Policy: C_STATUS_CANCELLED := ['CANCELLED'];
 Policy: C_STATUS_EXPIRED := ['EXPIRED'];
 Policy: C_STATUS_DISPUTED := ['DISPUTED'];
@@ -454,7 +474,7 @@ Report: => I_CntCarrierSwitches1Y_Auto := MAP(G_SetDefault1 => C_DEFAULT_1,
 // Report: => I_ExistCurrentPolicy_Auto := IF(EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND PolicyStatus = 'Y')),1,0);
 Policy: => G_IsCurrent :=
     SubjectEndDatePolicy > DateOfReport AND SubjectBeginDatePolicy <= DateOfReport
-    AND PolicyStatus IN C_STATUS_EFFECT;
+    AND PolicyStatus IN IF(DataSource = 'CCABatch', C_STATUS_EFFECT, C_STATUS_EFFECT_ONLINE);
 
 Report: => tmp_ExistCurrentPolicy_Auto := IF(
     EXISTS(Policy(G_CountablePolicy AND G_Auto AND G_PolicyIn5Years AND G_IsCurrent)),1,0);
