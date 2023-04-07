@@ -6930,3 +6930,155 @@ CreditReport: => MAgeLatestInqTradeAct := MAP(u_IQ_CntlLevel1=0 AND u_TR_CntrlLe
 											u_IQ_CntrlLevel3_01 = 0 AND u_TR_CntrlLevel31_01=0 => DEFAULT_L3,
 											tmp_MAgeLatestInqTradeAct:Null OR tmp_MAgeLatestInqTradeAct <0 => DEFAULT_L4,
 											MIN(tmp_MAgeLatestInqTradeAct, CAP_9992));
+
+
+// 3/27/2023 Add 10 new attributes for AllState ISM8
+
+//POpned12MToAllOpnTrades01: Percentage of open trade accounts that were opened within the past year
+CreditReport: => tmp_CTotalOpnTradesOpned12M01 := COUNT(CreditReportTradeline(NOT G3AllExcluded AND NOT G6Closed AND GMOSDateAccountOpened >= 0 AND GMOSDateAccountOpened <= 12));
+CreditReport: => POpned12MToAllOpnTrades01 := MAP(CTotalOpnTrades01 > 0 AND tmp_CTotalOpnTradesOpned12M01 >= 0 => MIN(ROUND2(tmp_CTotalOpnTradesOpned12M01 * 100 / CTotalOpnTrades01), CAP_100),
+												u_TR_CntrlLevel1 = 0 => DEFAULT_L1,
+												u_TR_CntrlLevel31_01 = 0 => DEFAULT_L3, DEFAULT_L4);
+												
+
+//CTotalTrades60M01: The number of all trade accounts held during the past 5 years
+CreditReport: => tmp_CTotalTrades60M01 := COUNT(CreditReportTradeline(NOT G3AllExcluded AND (NOT G6Closed OR (G6Closed AND GMOSClosedDate >= 0 AND GMOSClosedDate <= 60))));
+CreditReport: => CTotalTrades60M01 := IF(tmp_CTotalTrades60M01 = 0,
+												MAP(u_TR_CntrlLevel1 = 0 => DEFAULT_L1,
+													u_TR_CntrlLevel2_01 = 0 => DEFAULT_L2,
+													u_TR_CntrlLevel31_01 = 0 => DEFAULT_L3,
+													u_TR_CntrlLevel41o_01 = 0 => DEFAULT_L4, 0),
+												MIN(tmp_CTotalTrades60M01, CAP_992));
+
+//PTDAVGPaidOffMonth13: Average paid balance percentage on revolving trades
+CreditReportTradeline.Trended: => GTDNPaidOff := MAP(GTDoverBalanceM > 0 => 1, 
+														GTDoverBalanceM < 0 AND GTDoverBalanceM >= -25 => 1, 
+														GTDoverBalanceM = 0 => 1, 0);
+CreditReportTradeline.Trended: => GTDNBalanceAPG0 := MAP(GTDBalanceM > 0 OR GTDActualPaymentM > 0 => 1,
+														GTDoverBalanceM = 0 => 1,0); // account with activities
+
+CreditReportTradeline: => GTDNBalanceAPG0_24 := GTDNBalanceAPG0$Trended(MonthCounter >= 1 AND MonthCounter <= 24):Sum; 
+CreditReportTradeline: => GTDNPaidOff_24 := GTDNPaidOff$Trended(MonthCounter >= 1 AND MonthCounter <= 24):Sum;
+
+CreditReport: => tmp_CTDMOPaidOff := SUM(CreditReportTradeline(u_group13 AND NOT GTDAllExcluded), GTDNPaidOff_24); 
+CreditReport: => tmp_CTDMOBalanceAPG0 := SUM(CreditReportTradeline(u_group13 AND NOT GTDAllExcluded),GTDNBalanceAPG0_24);
+
+CreditReport: => PTDAVGPaidOffMonth13 := MAP(tmp_CTDMOPaidOff >= 0 AND tmp_CTDMOBalanceAPG0 > 0 => MIN(ROUND2(tmp_CTDMOPaidOff * 100 / tmp_CTDMOBalanceAPG0), CAP_100),
+												u_TD_CntrlLevel1 = 0 => -1,
+												u_TD_CntrlLevel2_13 = 0 => -2,
+												u_TD_CntrlLevel3TD1_13 = 0 => -3, -4);
+
+
+//PTDAVGPaidasAgreedMonth13: Average percentage of months revolving trades are used and paid as agreed
+CreditReportTradeline.Trended: => GTDNPaidasAgreed := MAP(GTDBalanceM >0 AND PreviousGTDBalanceM >= 0 AND PreviousGTDScheduledPaymentM >= 0 AND GTDActualPaymentM >= PreviousGTDScheduledPaymentM => 1,
+														GTDBalanceM >0 AND GTDActualPaymentM < 0 AND (PreviousGTDBalanceM - GTDBalanceM >= PreviousGTDScheduledPaymentM) AND PreviousGTDScheduledPaymentM > 0 => 1, 0);
+														
+CreditReportTradeline: => GTDNPaidasAgreed_24 := GTDNPaidasAgreed$Trended(MonthCounter >= 1 AND MonthCounter <= 24):Sum; 
+CreditReportTradeline: => GTDNBalanceG0_24_01 := GTDNBalanceG0$Trended(MonthCounter >= 1 AND MonthCounter <= 24):Sum;
+
+CreditReport: => tmp_CTDMOPaidasAgreed := SUM(CreditReportTradeline(u_group13 AND NOT GTDAllExcluded AND NOT (G3EverDerog OR G3Ever90P OR G3Ever60 OR G3Ever30)), GTDNPaidasAgreed_24);
+CreditReport: => tmp_CTDMOBalanceG0 := SUM(CreditReportTradeline(u_group13 AND NOT GTDAllExcluded AND NOT (G3EverDerog OR G3Ever90P OR G3Ever60 OR G3Ever30)),GTDNBalanceG0_24_01);
+
+CreditReport: => PTDAVGPaidasAgreedMonth13 := MAP(tmp_CTDMOPaidasAgreed >= 0 AND tmp_CTDMOBalanceG0 > 0 => MIN(ROUND2(tmp_CTDMOPaidasAgreed * 100 / tmp_CTDMOBalanceG0), CAP_100),
+													u_TD_CntrlLevel1 = 0 => -1,
+													u_TD_CntrlLevel2_13 = 0 => -2,
+													u_TD_CntrlLevel3TD1_13 = 0 => -3, -4); 
+
+
+//PTDAvgBaltoMaxCrLim13: Average balance to Maximum Credit Limit for all revolving trades
+CreditReportTradeline.Trended: => GTDSumBalanceM := MAX(GTDBalanceM, 0);
+CreditReportTradeline: => GTDSumBalance24 := GTDSumBalanceM$Trended(MonthCounter >= 1 AND MonthCounter <= 25):Sum;
+CreditReportTradeline: => GTDAvgBalance24 := IF(GTDSumBalance24 >=0 AND GTDNBalanceG0_24 >0, ROUND2(GTDSumBalance24/GTDNBalanceG0_24), 0);
+
+
+CreditReport: => tmp_GTDAvgBalance24 := SUM(CreditReportTradeline(u_group13 AND NOT GTDAllExcluded), GTDAvgBalance24); 
+CreditReport: => tmp_GTDmaxLoanCreditLimit24 := SUM(CreditReportTradeline(u_group13 AND NOT GTDAllExcluded),GTDmaxLoanCreditLimit24);
+
+CreditReport: => PTDAvgBaltoMaxCrLim13 := MAP(tmp_GTDAvgBalance24 >= 0 AND tmp_GTDmaxLoanCreditLimit24 > 0 => MIN(ROUND2(tmp_GTDAvgBalance24 * 100 / tmp_GTDmaxLoanCreditLimit24), CAP_100),
+												u_TD_CntrlLevel1 = 0 => -1,
+												u_TD_CntrlLevel2_13 = 0 => -2,
+												u_TD_CntrlLevel3TD1_13 = 0 => -3, -4);
+
+
+//MTDAgeBalanceGCrLim13: Number of months since balance exceeded credit limit on a revolving trade
+CreditReportTradeline.Trended: => GTDMOSBalanceGCrLim := IF(GTDBalanceM >0 AND GTDLoanAmountCreditLimitM >0 AND GTDBalanceM > GTDLoanAmountCreditLimitM, MonthCounter-1, -9999); 
+CreditReportTradeline: => tmp_MTDAgeBalanceGCrLim13 := MIN(Trended,IF(GTDMOSBalanceGCrLim >= 0,GTDMOSBalanceGCrLim));
+CreditReport: => MTDAgeBalanceGCrLim13_tmp := MIN(CreditReportTradeline(u_group13 AND NOT GTDAllExcluded),tmp_MTDAgeBalanceGCrLim13);
+CreditReport: => MTDAgeBalanceGCrLim13 := MAP(u_TD_CntrlLevel1 = 0 => -1,
+											u_TD_CntrlLevel2_13 = 0 => -2,
+											u_TD_CntrlLevel3TD1_13 = 0 => -3,
+											MTDAgeBalanceGCrLim13_tmp:Null => -4,
+											MTDAgeBalanceGCrLim13_tmp);
+
+
+//Create new inquiry globals for 45-day drop period
+
+//Auto dedupe
+CreditReportInquiry: => AutoFirstInquiryEach45D := EXISTS(Sequence.Dedup(CreditReportInquiry(NOT u_GIQExcluded AND GAutoDedupeSubjectSetLday), LEFT.TransactionID = RIGHT.TransactionID AND LEFT.ReportLexID = RIGHT.ReportLexID AND (RIGHT.GDaysSinceInquiry - LEFT.GDaysSinceInquiry) <= 45,TransactionID, GDaysSinceInquiry, u_iqsortorder, u_koborder, IQKOB, u_typeorder, IQType)(UID = CreditReportInquiry.UID)); // need add the ReportLexID
+CreditReportInquiry: => u45d_LastAdaysSince := Sequence.PreviousWhere(TransactionID = CreditReportInquiry.TransactionID AND ReportLexID = CreditReportInquiry.ReportLexID AND AutoFirstInquiryEach45D, TransactionID, GDaysSinceInquiry, u_iqsortorder, u_koborder, IQKOB, u_typeorder, IQType).GDaysSinceInquiry;
+CreditReportInquiry: => tmp45d_GDropInquiryA := IF(u45d_LastAdaysSince:Null, FALSE, (GDaysSinceInquiry - u45d_LastAdaysSince) <= 45);
+CreditReportInquiry: => u45d_GDropInquiryA := tmp45d_GDropInquiryA AND GAutoDedupeSubject AND NOT u_GIQExcluded;
+
+//mortgage dedupe
+CreditReportInquiry: => MortgageFirstInquiryEach45D := EXISTS(Sequence.Dedup(CreditReportInquiry(NOT u_GIQExcluded AND GMortgageDedupeSubjectSetLday), LEFT.TransactionID = RIGHT.TransactionID AND LEFT.ReportLexID = RIGHT.ReportLexID AND (RIGHT.GDaysSinceInquiry - LEFT.GDaysSinceInquiry) <= 45,TransactionID, GDaysSinceInquiry, u_iqsortorder, u_koborder, IQKOB, u_typeorder, IQType)(UID = CreditReportInquiry.UID)); // need add the ReportLexID
+CreditReportInquiry: => u45d_LastMdaysSince := Sequence.PreviousWhere(TransactionID = CreditReportInquiry.TransactionID AND ReportLexID = CreditReportInquiry.ReportLexID AND MortgageFirstInquiryEach45D, TransactionID, GDaysSinceInquiry, u_iqsortorder, u_koborder, IQKOB, u_typeorder, IQType).GDaysSinceInquiry;
+CreditReportInquiry: => tmp45d_GDropInquiryM := IF(u45d_LastMdaysSince:Null, FALSE, (GDaysSinceInquiry - u45d_LastMdaysSince) <= 45);
+CreditReportInquiry: => u45d_GDropInquiryM := tmp45d_GDropInquiryM AND GMortgageDedupeSubject AND NOT u_GIQExcluded;
+
+CreditReportInquiry: => GDropInquiryAMDrop45D :=  u45d_GDropInquiryA OR u45d_GDropInquiryM;
+CreditReportInquiry: => GIQExcludedDrop45D := GCollectionInquiry   /* skip search inq */
+             OR GGovernmentInquiry
+             OR GInsuranceInquiry
+             OR GMedicalInquiry
+             OR GTenantScreenInquiry
+             OR GFamilySupport
+             OR (GDaysSinceInquiry < 0)
+             OR (GMOSInquiryDate > 24)
+             OR IQKOB:Null      /* see blank KOB in Experian data */
+             OR GDropInquiryAMDrop45D         /* 45 days duplicate inq */
+  ; //DELETE(NOT GCreditInquiry)
+
+
+//CTotalInquiries45Dedup03: Number of Auto Inquires in the past 2 years (45-day drop period)
+CreditReport: => u45d_IQ_CntrlLevel3_03 := COUNT(CreditReportInquiry(u_IQ_Group03 AND NOT GIQExcludedDrop45D));
+CreditReport: => CTotalInquiries45Dedup03 := MAP(u_IQ_CntlLevel1 =0 => DEFAULT_L1,
+                                        u_IQ_CntrlLevel2_03 =0 => 0, 
+                                        u45d_IQ_CntrlLevel3_03 =0 => DEFAULT_L3,
+                                        MIN(COUNT(CreditReportInquiry(NOT GIQExcludedDrop45D AND u_IQ_Group03)), CAP_992));
+
+//CTotalInquiries45Dedup04: Number of Home Related Inquires in the past 2 years (45-day drop period)
+CreditReport: => u45d_IQ_CntrlLevel3_04 := COUNT(CreditReportInquiry(u_IQ_Group04 AND NOT GIQExcludedDrop45D));
+CreditReport: => CTotalInquiries45Dedup04 := MAP(u_IQ_CntlLevel1 =0 => DEFAULT_L1,
+                                        u_IQ_CntrlLevel2_04 =0 => 0, 
+                                        u45d_IQ_CntrlLevel3_04 =0 => DEFAULT_L3,
+                                        MIN(COUNT(CreditReportInquiry(NOT GIQExcludedDrop45D AND u_IQ_Group04)), CAP_992));
+
+//CTotalInquiries45Dedup07: Number of Other Financial Related Inquires in the past 2 years (45-day drop period)
+CreditReport: => u45d_IQ_CntrlLevel3_07 := COUNT(CreditReportInquiry(u_IQ_Group07 AND NOT GIQExcludedDrop45D));
+CreditReport: => CTotalInquiries45Dedup07 := MAP(u_IQ_CntlLevel1 =0 => DEFAULT_L1,
+                                        u_IQ_CntrlLevel2_07 =0 => 0, 
+                                        u45d_IQ_CntrlLevel3_07 =0 => DEFAULT_L3,
+                                        MIN(COUNT(CreditReportInquiry(NOT GIQExcludedDrop45D AND u_IQ_Group07)), CAP_992));
+
+
+
+//MAgeYoungest30PDRG01exBKP: Months since the most recent Delinquency other than a Bankruptcy, Charge-off or Collection
+CreditReport: => tmp1_MAgeYoungest30PDRG01exBKP := MIN(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Bankruptcy AND NOT G3Collection AND (NOT G2Dispute OR NOT (G3Ever30 OR G3Ever60 OR G3Ever90P OR G3EverDerog))
+    AND NOT G2Deferred AND (G3EverDerog OR G3Ever90P OR G3Ever60 OR G3Ever30) AND G2Derogatory AND (G3MOSDerogatory >=0)),  G3MOSDerogatory);
+CreditReport: => tmp2_MAgeYoungest30PDRG01exBKP := MIN(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Bankruptcy AND NOT G3Collection AND (NOT G2Dispute OR NOT (G3Ever30 OR G3Ever60 OR G3Ever90P OR G3EverDerog))
+    AND(NOT G2Deferred) AND (G3EverDerog OR G3Ever90P OR G3Ever60 OR G3Ever30) AND (G2Current120180 OR G2Current90 OR G2Current60 OR G2Current30) AND (GMOSDateReported >=0)), GMOSDateReported);
+CreditReport: => tmp3_MAgeYoungest30PDRG01exBKP := MIN(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Bankruptcy AND NOT G3Collection AND (NOT G2Dispute OR NOT (G3Ever30 OR G3Ever60 OR G3Ever90P OR G3EverDerog))
+    AND(NOT G2Deferred) AND (G3EverDerog OR G3Ever90P OR G3Ever60 OR G3Ever30) AND (tmp_indexc_30PD_02 > 0) AND (GMOSDateReported>=0)),GMOSDateReported + tmp_indexc_30PD_02);
+CreditReport: => tmp4_MAgeYoungest30PDRG01exBKP := MIN(CreditReportTradeline(NOT G3AllExcluded AND NOT G2Bankruptcy AND NOT G3Collection AND (NOT G2Dispute OR NOT (G3Ever30 OR G3Ever60 OR G3Ever90P OR G3EverDerog))
+    AND(NOT G2Deferred) AND (G3EverDerog OR G3Ever90P OR G3Ever60 OR G3Ever30) AND (GMOSMaximumDelinquencyDate > 0)),GMOSMaximumDelinquencyDate);
+
+
+CreditReport: => tmp_MAgeYoungest30PDRG01exBKP := IF(tmp1_MAgeYoungest30PDRG01exBKP:Null AND tmp2_MAgeYoungest30PDRG01exBKP:Null AND tmp3_MAgeYoungest30PDRG01exBKP:Null AND tmp4_MAgeYoungest30PDRG01exBKP:Null,
+													MAP(u_TR_CntrlLevel1 = 0 => DEFAULT_L1,
+														u_TR_CntrlLevel37_01 = 0 => DEFAULT_L3,
+														u_TR_CntrlLevel42G030DNoRdate_01 > 0 OR 
+														u_TR_CntrlLevel42G060DNoRdate_01 > 0 OR 
+														u_TR_CntrlLevel42G090PNoRdate_01 > 0 OR
+														u_TR_CntrlLevel42G0drgNoRdate_01 > 0 => DEFAULT_L4, DEFAULT_L3), 
+														MIN(tmp1_MAgeYoungest30PDRG01exBKP,tmp2_MAgeYoungest30PDRG01exBKP,tmp3_MAgeYoungest30PDRG01exBKP,tmp4_MAgeYoungest30PDRG01exBKP));
+CreditReport: => MAgeYoungest30PDRG01exBKP := IF(tmp_MAgeYoungest30PDRG01exBKP > 60, DEFAULT_L3, tmp_MAgeYoungest30PDRG01exBKP);
