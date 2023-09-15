@@ -65,6 +65,13 @@ IMPORT KnowledgeUniverse.PublicRecords_KEL.Attributes;
 //YanJ Added Function
 FUNCTION: Get_category_from_bitmap(INTEGER offense_category) <= ECL(hygenics_crim._functions.Get_category_from_bitmap(offense_category)) FROM hygenics_crim RETURNS STRING;
 //YanJ New Added Attributes
+
+//------------------------------------------------------------------------------------------//
+//							     															//
+//           		                       Criminal (Yan)        S                           //
+//                               															//
+//------------------------------------------------------------------------------------------//
+
 //-------------------------CriminalFelonyCount**Month--------------------------------
 // CriminalOffense: => IsOffense1Year := AgeInDays <= CriminalOffense.ONE_YEAR_IN_DAYS;
 CriminalOffense: => IsOffense2Year := AgeInDays <= CriminalOffense.TWO_YEARS_IN_DAYS;
@@ -146,6 +153,12 @@ Person: => PL_DrgCrimNfelCnt5YFCRA := IF(P_LexIDSeenFlag = '0', CriminalOffense.
 Person: => DrgCrimNfelCnt6YFCRA := COUNT(PersonOffenses.Offense(IsNonFelonyRecordsFCRA AND IsOffense6Year));
 Person: => PL_DrgCrimNfelCnt6YFCRA := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA_INT, BOUNDSFOLD(DrgCrimNfelCnt6YFCRA, 0, 999));
 
+//------------------------------------------------------------------------------------------//
+//							     															//
+//           		                       LNJ (Yan)                                        //
+//                               															//
+//------------------------------------------------------------------------------------------//
+
 //--------------------------LienJudgmentCount**Month--------------------------------
 // LienJudgment: ONE_YEAR_IN_DAYS := 365;
 // LienJudgment: SEVEN_YEAR_IN_DAYS := 2556;
@@ -189,32 +202,268 @@ PersonOffenses: => OffenseCharges := Offense.OffenseCharges {
 PersonOffenses: => CriminalDate := MIN(OffenseCharges(ISVALIDDATE(MyCrimDate)), MyCrimDate);
 //PersonOffenses: => CriminalDate := MIN(Offense.OffenseCharges(ISVALIDDATE(CaseNumber:DateFirstSeen)), CaseNumber:DateFirstSeen);
 
-//YanJ Added Functionpub
+//YanJ Added Functions
 //hygFUNCTION: Get_category_from_bitmap(INTEGER offense_category) <= ECL(hygenics_crim._functions.Get_category_from_bitmap(offense_category)) FROM hygenics_crim RETURNS STRING;
 
 //only keep felony and nonfelony records
 //Top 3 records
-Person: => DrgCrim1stNew := TOPN(PersonOffenses(Offense.IsFelonyFCRA OR Offense.IsNonFelonyRecordsFCRA){CriminalDate,OffenseCharges.CaseNumber,OffenseCharges.CaseDate,Offense.CourtOffenseLevelMapped,Offense.StateOfSource,Offense.CriminalDate,Offense.OffenseCategory,Offense.IsFelonyFCRA,Offense.IsNonFelonyRecordsFCRA}, 1, -CriminalDate,CaseNumber, CaseDate);
-Person: => DrgCrim2ndNew := TOPN(TOPN(PersonOffenses(Offense.IsFelonyFCRA OR Offense.IsNonFelonyRecordsFCRA){CriminalDate,OffenseCharges.CaseNumber,OffenseCharges.CaseDate,Offense.CourtOffenseLevelMapped,Offense.StateOfSource,Offense.CriminalDate,Offense.OffenseCategory,Offense.IsFelonyFCRA,Offense.IsNonFelonyRecordsFCRA}, 2, -CriminalDate, CaseNumber, CaseDate), 1, CriminalDate, CaseNumber, CaseDate);
-Person: => DrgCrim3rdNew := TOPN(TOPN(PersonOffenses(Offense.IsFelonyFCRA OR Offense.IsNonFelonyRecordsFCRA){CriminalDate,OffenseCharges.CaseNumber,OffenseCharges.CaseDate,Offense.CourtOffenseLevelMapped,Offense.StateOfSource,Offense.CriminalDate,Offense.OffenseCategory,Offense.IsFelonyFCRA,Offense.IsNonFelonyRecordsFCRA}, 3, -CriminalDate, CaseNumber, CaseDate), 1, CriminalDate, CaseNumber, CaseDate);
+// Person: => DrgCrim1stNew := TOPN(PersonOffenses(Offense.IsFelonyFCRA OR Offense.IsNonFelonyRecordsFCRA){CriminalDate,OffenseCharges.CaseNumber,OffenseCharges.CaseDate,Offense.CourtOffenseLevelMapped,Offense.StateOfSource,Offense.CriminalDate,Offense.OffenseCategory,Offense.IsFelonyFCRA,Offense.IsNonFelonyRecordsFCRA}, 1, -CriminalDate,CaseNumber, CaseDate);
+// Person: => DrgCrim2ndNew := TOPN(TOPN(PersonOffenses(Offense.IsFelonyFCRA OR Offense.IsNonFelonyRecordsFCRA){CriminalDate,OffenseCharges.CaseNumber,OffenseCharges.CaseDate,Offense.CourtOffenseLevelMapped,Offense.StateOfSource,Offense.CriminalDate,Offense.OffenseCategory,Offense.IsFelonyFCRA,Offense.IsNonFelonyRecordsFCRA}, 2, -CriminalDate, CaseNumber, CaseDate), 1, CriminalDate, CaseNumber, CaseDate);
+// Person: => DrgCrim3rdNew := TOPN(TOPN(PersonOffenses(Offense.IsFelonyFCRA OR Offense.IsNonFelonyRecordsFCRA){CriminalDate,OffenseCharges.CaseNumber,OffenseCharges.CaseDate,Offense.CourtOffenseLevelMapped,Offense.StateOfSource,Offense.CriminalDate,Offense.OffenseCategory,Offense.IsFelonyFCRA,Offense.IsNonFelonyRecordsFCRA}, 3, -CriminalDate, CaseNumber, CaseDate), 1, CriminalDate, CaseNumber, CaseDate);
 
-//87 Court Offense Level Mapped
-Person : => PL_DrgCrim1stNewOffCat := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim1stNew, CourtOffenseLevelMapped));
-Person : => PL_DrgCrim2ndNewOffCat := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim2ndNew, CourtOffenseLevelMapped));
-Person : => PL_DrgCrim3rdNewOffCat := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim3rdNew, CourtOffenseLevelMapped));
-//State
-Person : => PL_DrgCrim1stNewState := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim1stNew, StateOfSource));
-Person : => PL_DrgCrim2ndNewState := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim2ndNew, StateOfSource));
-Person : => PL_DrgCrim3rdNewState := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim3rdNew, StateOfSource));
-//fcra_date(DriminalDate)
-Person : => PL_DrgCrim1stNewDate := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, DATETOSTRING(ONLY(DrgCrim1stNew, CriminalDate),'%Y%m%d'));
-Person : => PL_DrgCrim2ndNewDate := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, DATETOSTRING(ONLY(DrgCrim1stNew, CriminalDate),'%Y%m%d'));
-Person : => PL_DrgCrim3rdNewDate := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, DATETOSTRING(ONLY(DrgCrim1stNew, CriminalDate),'%Y%m%d'));
-//97 - Offense Category
-Person : => PL_DrgCrim1stNewCrtOffLev := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, Get_category_from_bitmap(ONLY(DrgCrim1stNew, OffenseCategory)));  
-Person : => PL_DrgCrim2ndNewCrtOffLev := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, Get_category_from_bitmap(ONLY(DrgCrim1stNew, OffenseCategory))); 
-Person : => PL_DrgCrim3rdNewCrtOffLev := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, Get_category_from_bitmap(ONLY(DrgCrim1stNew, OffenseCategory))); 
-//criminal Type: Felony/Non-Felony
-Person : => PL_DrgCrim1stNewType := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, MAP(ONLY(DrgCrim1stNew, IsFelonyFCRA) => 'Felony', ONLY(DrgCrim1stNew, IsNonFelonyRecordsFCRA) => 'Dismeanor', 'Unkown'));
-Person : => PL_DrgCrim2ndNewType := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, MAP(ONLY(DrgCrim1stNew, IsFelonyFCRA) => 'Felony', ONLY(DrgCrim1stNew, IsNonFelonyRecordsFCRA) => 'Dismeanor', 'Unkown'));
-Person : => PL_DrgCrim3rdNewType := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, MAP(ONLY(DrgCrim1stNew, IsFelonyFCRA) => 'Felony', ONLY(DrgCrim1stNew, IsNonFelonyRecordsFCRA) => 'Dismeanor', 'Unkown'));
+// //87 Court Offense Level Mapped
+// Person : => PL_DrgCrim1stNewOffCat := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim1stNew, CourtOffenseLevelMapped));
+// Person : => PL_DrgCrim2ndNewOffCat := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim2ndNew, CourtOffenseLevelMapped));
+// Person : => PL_DrgCrim3rdNewOffCat := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim3rdNew, CourtOffenseLevelMapped));
+// //State
+// Person : => PL_DrgCrim1stNewState := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim1stNew, StateOfSource));
+// Person : => PL_DrgCrim2ndNewState := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim2ndNew, StateOfSource));
+// Person : => PL_DrgCrim3rdNewState := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, ONLY(DrgCrim3rdNew, StateOfSource));
+// //fcra_date(DriminalDate)
+// Person : => PL_DrgCrim1stNewDate := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, DATETOSTRING(ONLY(DrgCrim1stNew, CriminalDate),'%Y%m%d'));
+// Person : => PL_DrgCrim2ndNewDate := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, DATETOSTRING(ONLY(DrgCrim1stNew, CriminalDate),'%Y%m%d'));
+// Person : => PL_DrgCrim3rdNewDate := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, DATETOSTRING(ONLY(DrgCrim1stNew, CriminalDate),'%Y%m%d'));
+// //97 - Offense Category
+// Person : => PL_DrgCrim1stNewCrtOffLev := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, Get_category_from_bitmap(ONLY(DrgCrim1stNew, OffenseCategory)));  
+// Person : => PL_DrgCrim2ndNewCrtOffLev := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, Get_category_from_bitmap(ONLY(DrgCrim1stNew, OffenseCategory))); 
+// Person : => PL_DrgCrim3rdNewCrtOffLev := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, Get_category_from_bitmap(ONLY(DrgCrim1stNew, OffenseCategory))); 
+// //criminal Type: Felony/Non-Felony
+// Person : => PL_DrgCrim1stNewType := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, MAP(ONLY(DrgCrim1stNew, IsFelonyFCRA) => 'Felony', ONLY(DrgCrim1stNew, IsNonFelonyRecordsFCRA) => 'Dismeanor', 'Unkown'));
+// Person : => PL_DrgCrim2ndNewType := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, MAP(ONLY(DrgCrim1stNew, IsFelonyFCRA) => 'Felony', ONLY(DrgCrim1stNew, IsNonFelonyRecordsFCRA) => 'Dismeanor', 'Unkown'));
+// Person : => PL_DrgCrim3rdNewType := IF(P_LexIDSeenFlag = '0', CriminalOffense.MISSING_INPUT_DATA, MAP(ONLY(DrgCrim1stNew, IsFelonyFCRA) => 'Felony', ONLY(DrgCrim1stNew, IsNonFelonyRecordsFCRA) => 'Dismeanor', 'Unkown'));
+
+//------------------------------------------------------------------------------------------//
+//							     															//
+//           		                       Bankruptcy (Vinay)                               //
+//                               															//
+//------------------------------------------------------------------------------------------//
+//-------------------------------Bankruptcy Attributes- Vinay-------------------------------
+// Bankruptcy: ONE_YEAR_IN_DAYS := 365;
+// Bankruptcy: TWO_YEARS_IN_DAYS := 730;
+// Bankruptcy: THREE_YEARS_IN_DAYS := 1095;
+// Bankruptcy: FOUR_YEARS_IN_DAYS := 1461;
+// Bankruptcy: FIVE_YEARS_IN_DAYS := 1826;
+// Bankruptcy: SIX_YEARS_IN_DAYS := 2191;
+// Bankruptcy: SEVEN_YEARS_IN_DAYS := 2556;
+// Bankruptcy: EIGHT_YEARS_IN_DAYS := 2920;
+// Bankruptcy: NINE_YEARS_IN_DAYS := 3285;
+// Bankruptcy: => Banko1Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS;
+// Bankruptcy: => Banko2Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TWO_YEARS_IN_DAYS;
+// Bankruptcy: => Banko3Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.THREE_YEARS_IN_DAYS;
+// Bankruptcy: => Banko4Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.FOUR_YEARS_IN_DAYS;
+// Bankruptcy: => Banko5Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.FIVE_YEARS_IN_DAYS;
+// Bankruptcy: => Banko6Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SIX_YEARS_IN_DAYS;
+// Bankruptcy: => Banko8Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.EIGHT_YEARS_IN_DAYS;
+// Bankruptcy: => Banko9Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.NINE_YEARS_IN_DAYS;
+
+Person: => DrgBkCnt2Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko2Year)), 0, 99);
+Person: => DrgBkCnt3Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko3Year)), 0, 99);
+Person: => DrgBkCnt4Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko4Year)), 0, 99);
+Person: => DrgBkCnt5Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko5Year)), 0, 99);
+Person: => DrgBkCnt6Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko6Year)), 0, 99);
+Person: => DrgBkCnt8Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko8Year)), 0, 99);
+Person: => DrgBkCnt9Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko9Year)), 0, 99); 
+
+//----------------------------------Bankruptcy count attributes------------------------------
+Person: => PL_DrgBkCnt2Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, DrgBkCnt2Y);	
+Person: => PL_DrgBkCnt3Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, DrgBkCnt3Y);
+Person: => PL_DrgBkCnt4Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, DrgBkCnt4Y);
+Person: => PL_DrgBkCnt5Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, DrgBkCnt5Y);
+Person: => PL_DrgBkCnt6Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, DrgBkCnt6Y);
+Person: => PL_DrgBkCnt8Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, DrgBkCnt8Y);
+Person: => PL_DrgBkCnt9Y := IF(P_LexIDSeenFlag = '0', Bankruptcy.MISSING_INPUT_DATA_INT, DrgBkCnt9Y);
+
+// Bankruptcy dispositioned attributes
+
+Person: => PL_DrgBkDispCnt2Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt2Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko2Year AND IsDisposed)), 0, 99));
+
+Person: => PL_DrgBkDispCnt3Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt3Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko3Year AND IsDisposed)), 0, 99));
+      
+Person: => PL_DrgBkDispCnt4Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt4Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko4Year AND IsDisposed)), 0, 99));
+      
+Person: => PL_DrgBkDispCnt5Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt5Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko5Year AND IsDisposed)), 0, 99));
+      
+Person: => PL_DrgBkDispCnt6Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt6Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko6Year AND IsDisposed)), 0, 99));
+      
+Person: => PL_DrgBkDispCnt8Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt8Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko8Year AND IsDisposed)), 0, 99));
+     
+Person: => PL_DrgBkDispCnt9Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt9Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko9Year AND IsDisposed)), 0, 99));
+    
+
+//----------------------------------------Bankruptcy Dismissed attributes------------------------------------------      
+Person: => PL_DrgBkDsmsCnt2Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt2Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			(DrgBkCnt2Y > 0 AND PL_DrgBkDispCnt2Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko2Year AND ModifiedDisposition = 'DISMISSED')), 0, 99)); 
+      
+Person: => PL_DrgBkDsmsCnt3Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt3Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			(DrgBkCnt3Y > 0 AND PL_DrgBkDispCnt3Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko3Year AND ModifiedDisposition = 'DISMISSED')), 0, 99)); 
+      
+Person: => PL_DrgBkDsmsCnt4Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt4Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			(DrgBkCnt4Y > 0 AND PL_DrgBkDispCnt4Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko4Year AND ModifiedDisposition = 'DISMISSED')), 0, 99)); 
+     
+Person: => PL_DrgBkDsmsCnt5Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt5Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			(DrgBkCnt5Y > 0 AND PL_DrgBkDispCnt5Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko5Year AND ModifiedDisposition = 'DISMISSED')), 0, 99)); 
+      
+Person: => PL_DrgBkDsmsCnt6Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt6Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			(DrgBkCnt6Y > 0 AND PL_DrgBkDispCnt6Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko6Year AND ModifiedDisposition = 'DISMISSED')), 0, 99)); 
+
+Person: => PL_DrgBkDsmsCnt8Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt8Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT,
+			(DrgBkCnt8Y > 0 AND PL_DrgBkDispCnt8Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko8Year AND ModifiedDisposition = 'DISMISSED')), 0, 99)); 
+      
+Person: => PL_DrgBkDsmsCnt9Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA_INT,
+			(DrgBkCnt9Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY_INT, 
+			(DrgBkCnt9Y > 0 AND PL_DrgBkDispCnt9Y = 0) => Bankruptcy.NO_DATA_FOUND_97_INT,
+			BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko9Year AND ModifiedDisposition = 'DISMISSED')), 0, 99)); 
+
+//--------------------------------Bankruptcy Disposition list attributes---------------------------------------------
+// Bankruptcy: => Banko1Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.ONE_YEAR_IN_DAYS;
+// Bankruptcy: => Banko2Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.TWO_YEARS_IN_DAYS;
+// Bankruptcy: => Banko3Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.THREE_YEARS_IN_DAYS;
+// Bankruptcy: => Banko4Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.FOUR_YEARS_IN_DAYS;
+// Bankruptcy: => Banko5Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.FIVE_YEARS_IN_DAYS;
+// Bankruptcy: => Banko6Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.SIX_YEARS_IN_DAYS;
+// Bankruptcy: => Banko8Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.EIGHT_YEARS_IN_DAYS;
+// Bankruptcy: => Banko9Year := IsBankruptcy AND FilingAgeInDays <= Bankruptcy.NINE_YEARS_IN_DAYS;
+
+// Person: => DrgBkCnt2Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko2Year)), 0, 99);
+// Person: => DrgBkCnt3Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko3Year)), 0, 99);
+// Person: => DrgBkCnt4Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko4Year)), 0, 99);
+// Person: => DrgBkCnt5Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko5Year)), 0, 99);
+// Person: => DrgBkCnt6Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko6Year)), 0, 99);
+// Person: => DrgBkCnt8Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko8Year)), 0, 99);
+// Person: => DrgBkCnt9Y := BOUNDSFOLD(COUNT(PersonBankruptcy.Bankrupt(Banko9Year)), 0, 99);   
+
+
+//Person: => SortedBankruptcies1Y := TOPN(Bankruptcies(Banko1Year), 99, BankruptcyDate, LastStatusUpdate, DateFiled);
+Person: => SortedBankruptcies2Y := TOPN(Bankruptcies(Banko2Year), 99, BankruptcyDate, LastStatusUpdate, DateFiled);
+Person: => SortedBankruptcies3Y := TOPN(Bankruptcies(Banko3Year), 99, BankruptcyDate, LastStatusUpdate, DateFiled);
+Person: => SortedBankruptcies4Y := TOPN(Bankruptcies(Banko4Year), 99, BankruptcyDate, LastStatusUpdate, DateFiled);
+Person: => SortedBankruptcies5Y := TOPN(Bankruptcies(Banko5Year), 99, BankruptcyDate, LastStatusUpdate, DateFiled);
+Person: => SortedBankruptcies6Y := TOPN(Bankruptcies(Banko6Year), 99, BankruptcyDate, LastStatusUpdate, DateFiled);
+Person: => SortedBankruptcies8Y := TOPN(Bankruptcies(Banko8Year), 99, BankruptcyDate, LastStatusUpdate, DateFiled);
+Person: => SortedBankruptcies9Y := TOPN(Bankruptcies(Banko9Year), 99, BankruptcyDate, LastStatusUpdate, DateFiled);
+
+Person: => PL_DrgBkDispList2Y :=  MAP(
+   			   P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+   			   (DrgBkCnt2Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+   			   CONCAT(SortedBankruptcies2Y, DispositionTypeDescription, '|'));
+  
+Person: => PL_DrgBkDispList3Y :=  MAP(
+   			   P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+   			   (DrgBkCnt3Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+   			   CONCAT(SortedBankruptcies3Y, DispositionTypeDescription, '|'));
+           
+Person: => PL_DrgBkDispList4Y :=  MAP(
+   			   P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+   			   (DrgBkCnt4Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+   			   CONCAT(SortedBankruptcies4Y, DispositionTypeDescription, '|'));
+Person: => PL_DrgBkDispList5Y :=  MAP(
+   			   P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+   			   (DrgBkCnt5Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+   			   CONCAT(SortedBankruptcies5Y, DispositionTypeDescription, '|'));
+Person: => PL_DrgBkDispList6Y :=  MAP(
+   			   P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+   			   (DrgBkCnt6Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+   			   CONCAT(SortedBankruptcies6Y, DispositionTypeDescription, '|'));
+Person: => PL_DrgBkDispList8Y :=  MAP(
+   			   P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+   			   (DrgBkCnt8Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+   			   CONCAT(SortedBankruptcies8Y, DispositionTypeDescription, '|'));
+Person: => PL_DrgBkDispList9Y :=  MAP(
+   			   P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+   			   (DrgBkCnt9Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+   			   CONCAT(SortedBankruptcies9Y, DispositionTypeDescription, '|'));  
+           
+                     
+//--------------------------------------------Bankruptcy Disposition type attributes-------------------------------------
+Person: => MostRecentBankruptcy2Y := ONLY(TOPN(Bankruptcies(Banko2Year), 1, -BankruptcyDate, -LastStatusUpdate, -DateFiled));
+Person: => MostRecentBankruptcy3Y := ONLY(TOPN(Bankruptcies(Banko3Year), 1, -BankruptcyDate, -LastStatusUpdate, -DateFiled));
+Person: => MostRecentBankruptcy4Y := ONLY(TOPN(Bankruptcies(Banko4Year), 1, -BankruptcyDate, -LastStatusUpdate, -DateFiled));
+Person: => MostRecentBankruptcy5Y := ONLY(TOPN(Bankruptcies(Banko5Year), 1, -BankruptcyDate, -LastStatusUpdate, -DateFiled));
+Person: => MostRecentBankruptcy6Y := ONLY(TOPN(Bankruptcies(Banko6Year), 1, -BankruptcyDate, -LastStatusUpdate, -DateFiled));
+Person: => MostRecentBankruptcy8Y := ONLY(TOPN(Bankruptcies(Banko8Year), 1, -BankruptcyDate, -LastStatusUpdate, -DateFiled));
+Person: => MostRecentBankruptcy9Y := ONLY(TOPN(Bankruptcies(Banko9Year), 1, -BankruptcyDate, -LastStatusUpdate, -DateFiled));
+
+Person: => MostRecentDispo2Y := MostRecentBankruptcy2Y.ModifiedDispositionPerson;
+Person: => MostRecentDispo3Y := MostRecentBankruptcy3Y.ModifiedDispositionPerson;
+Person: => MostRecentDispo4Y := MostRecentBankruptcy4Y.ModifiedDispositionPerson;
+Person: => MostRecentDispo5Y := MostRecentBankruptcy5Y.ModifiedDispositionPerson;
+Person: => MostRecentDispo6Y := MostRecentBankruptcy6Y.ModifiedDispositionPerson;
+Person: => MostRecentDispo8Y := MostRecentBankruptcy8Y.ModifiedDispositionPerson;
+Person: => MostRecentDispo9Y := MostRecentBankruptcy9Y.ModifiedDispositionPerson;
+
+
+Person: => PL_DrgBkNewDispType2Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt2Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			MostRecentDispo2Y);
+      
+Person: => PL_DrgBkNewDispType3Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt3Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			MostRecentDispo3Y);      
+      
+Person: => PL_DrgBkNewDispType4Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt4Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			MostRecentDispo4Y);      
+      
+Person: => PL_DrgBkNewDispType5Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt5Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			MostRecentDispo5Y);      
+      
+Person: => PL_DrgBkNewDispType6Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt6Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			MostRecentDispo6Y);     
+      
+Person: => PL_DrgBkNewDispType8Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt8Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			MostRecentDispo8Y);     
+      
+Person: => PL_DrgBkNewDispType9Y := MAP(
+			P_LexIDSeenFlag = '0' => Bankruptcy.MISSING_INPUT_DATA,
+			(DrgBkCnt9Y = 0) => Bankruptcy.NO_DATA_FOUND_BANKRUPTCY,
+			MostRecentDispo9Y);      
+      
